@@ -27,10 +27,11 @@ registerSW({ immediate: true });
 void window.caches?.delete("photos").catch(() => {});
 
 // Connection back, app back in the foreground, and a slow poll: all just "check the server now".
-// Live updates arrive over SSE (engine.openEvents); this poll is only the safety net.
+// Live updates arrive over SSE (engine.openEvents). When a proxy or tunnel holds the stream back (no "ready" event: live stays
+// false), this poll is what keeps the profiles in sync, so it is short enough to feel immediate.
 window.addEventListener("online", () => void engine.retryNow());
 document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && void engine.retryNow());
-setInterval(() => document.visibilityState === "visible" && !engine.getState().live && void engine.refresh(), 30_000);
+setInterval(() => document.visibilityState === "visible" && !engine.getState().live && void engine.refresh(), 8_000);
 
 void engine.start();
 createRoot(document.getElementById("root")!).render(
