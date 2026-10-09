@@ -10,6 +10,7 @@ export interface Family {
   adil: APIRequestContext;
   lamiaa: APIRequestContext;
   products: Record<string, string>;
+  staff: APIRequestContext;
   staffLogin: string;
 }
 
@@ -32,17 +33,19 @@ export async function newFamily(playwright: { request: { newContext(o: object): 
   }
   const lamiaa = await playwright.request.newContext({ baseURL });
   expect((await lamiaa.post("/api/auth/login", { data: { familyCode: code, login: "lamiaa", secret: "573918" } })).status()).toBe(200);
+  const staff = await playwright.request.newContext({ baseURL });
+  expect((await staff.post("/api/auth/login", { data: { familyCode: code, login: staffLogin, secret: "573918" } })).status()).toBe(200);
   const cat = await (await adil.get("/api/catalog")).json();
   const products: Record<string, string> = {};
   for (const c of cat.categories) for (const p of c.products) products[p.name] = p.id;
-  return { code, adil, lamiaa, products, staffLogin };
+  return { code, adil, lamiaa, staff, products, staffLogin };
 }
 
-export async function uiLogin(page: Page, f: Family) {
+export async function uiLogin(page: Page, f: Family, login = f.staffLogin, secret = "573918") {
   await page.goto("/");
   await page.getByTestId("login-family").fill(f.code);
-  await page.getByTestId("login-id").fill(f.staffLogin);
-  await page.getByTestId("login-secret").fill("573918");
+  await page.getByTestId("login-id").fill(login);
+  await page.getByTestId("login-secret").fill(secret);
   await page.getByTestId("login-submit").click();
 }
 
@@ -58,3 +61,10 @@ export async function createList(f: Family): Promise<string> {
 }
 
 export const card = (page: Page, f: Family, name: string) => page.getByTestId(`card-${f.products[name]}`);
+
+/** Staff adds products through the API (what "Valider" does), returns the list view. */
+export async function staffAdds(f: Family, listId: string, names: string[]) {
+  const r = await f.staff.post(`/api/lists/${listId}/ops`, { data: { ops: names.map((n) => op.add(f.products[n]!)) } });
+  expect(r.status()).toBe(200);
+  return (await r.json()).list;
+}

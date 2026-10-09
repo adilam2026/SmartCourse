@@ -11,7 +11,7 @@ const db = createPool(config.DATABASE_URL);
 await migrate(db);
 if (config.INSTALL_TOKEN) await ensureInstallToken(db, config.INSTALL_TOKEN);
 
-const app = await buildApp({ db, store: createPhotoStore(config), webDir: existsSync(config.WEB_DIR) ? config.WEB_DIR : undefined });
+const app = await buildApp({ db, loginRateLimit: { max: config.LOGIN_RATE_MAX, timeWindow: "1 minute" }, store: createPhotoStore(config), webDir: existsSync(config.WEB_DIR) ? config.WEB_DIR : undefined });
 await app.listen({ port: config.PORT, host: "0.0.0.0" });
 
 for (const sig of ["SIGTERM", "SIGINT"] as const) {

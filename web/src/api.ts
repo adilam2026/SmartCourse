@@ -1,4 +1,4 @@
-import type { Catalog, ListView, Me, Op, OpResult } from "./types";
+import type { Catalog, ListView, Me, Op, OpResult, Product, Role } from "./types";
 
 /** The server could not be reached (offline, timeout, DNS…): nothing is known about what happened. */
 export class NetworkError extends Error {
@@ -62,7 +62,41 @@ export const api = {
   history: () => request<{ lists: HistoryEntry[] }>("GET", "/api/lists"),
   listById: (id: string) => request<{ list: ListView }>("GET", `/api/lists/${id}`),
   credits: () => request<{ credits: Credit[] }>("GET", "/api/credits"),
+  // administration
+  profiles: () => request<{ profiles: Profile[] }>("GET", "/api/profiles"),
+  createProfile: (b: { displayName: string; login: string; role: Role; secret?: string }) =>
+    request<{ profile: Profile; secret: string }>("POST", "/api/profiles", b),
+  updateProfile: (id: string, b: { displayName?: string; role?: Role; active?: boolean }) => request<{ profile: Profile }>("PATCH", `/api/profiles/${id}`, b),
+  resetSecret: (id: string) => request<{ secret: string }>("POST", `/api/profiles/${id}/reset-secret`, {}),
+  catalogAdmin: () => request<Catalog>("GET", "/api/catalog?includeInactive=1"),
+  patchProduct: (id: string, b: { name?: string; brand?: string | null; active?: boolean }) => request<{ product: Product }>("PATCH", `/api/products/${id}`, b),
+  searchExtended: (q: string) => request<{ results: ExtendedResult[] }>("GET", `/api/catalog/extended?q=${encodeURIComponent(q)}`),
+  addFromExtended: (extendedId: string) => request<{ product: Product }>("POST", "/api/products/from-extended", { extendedId }),
+  uploadPhoto: async (id: string, file: Blob) => {
+    const res = await fetch(`/api/products/${id}/photo`, { method: "POST", credentials: "same-origin", headers: { "content-type": file.type || "image/jpeg" }, body: file }).catch(() => {
+      throw new NetworkError();
+    });
+    if (!res.ok) throw new ApiError(res.status, "upload_failed", "Photo refusée");
+    return (await res.json()) as { product: Product };
+  },
 };
+
+export interface Profile {
+  id: string;
+  displayName: string;
+  login: string;
+  role: Role;
+  active: boolean;
+}
+
+export interface ExtendedResult {
+  id: string;
+  name: string;
+  brand: string | null;
+  category: string;
+  photoUrl: string | null;
+  alreadyAdded: boolean;
+}
 
 export interface HistoryEntry {
   id: string;

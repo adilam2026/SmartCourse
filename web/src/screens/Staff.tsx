@@ -21,18 +21,22 @@ export function NoList({ engine, s }: { engine: Engine; s: State }) {
   );
 }
 
-function TopBar({ engine, s, validate }: { engine: Engine; s: State; validate: boolean }) {
+export function TopBar({ engine, s, validate, onBack, title = "Liste de courses" }: { engine: Engine; s: State; validate: boolean; onBack?: () => void; title?: string }) {
   const [open, setOpen] = useState(false);
   const pending = Object.keys(s.toggles).length;
   const label = s.sending ? "Enregistrement…" : "Valider";
   const disabled = s.sending || pending === 0;
   return (
     <header className="topbar">
-      <button className="avatar" aria-label="Mon profil" data-testid="avatar" onClick={() => setOpen(true)}>
-        {s.me?.displayName.slice(0, 1).toUpperCase()}
-      </button>
+      {onBack ? (
+        <button className="avatar avatar--back" aria-label="Retour" data-testid="back" onClick={onBack}>←</button>
+      ) : (
+        <button className="avatar" aria-label="Mon profil" data-testid="avatar" onClick={() => setOpen(true)}>
+          {s.me?.displayName.slice(0, 1).toUpperCase()}
+        </button>
+      )}
       <div className="topbar__title">
-        <strong>Liste de courses</strong>
+        <strong>{title}</strong>
         <span className="muted" data-testid="sync-state">
           {s.sending ? "Envoi en cours…" : s.batches.length > 0 ? "En attente de synchronisation" : s.justSynced ? "✓ Enregistré" : pending > 0 ? `${pending} changement${pending > 1 ? "s" : ""} à valider` : ""}
         </span>
@@ -47,7 +51,7 @@ function TopBar({ engine, s, validate }: { engine: Engine; s: State; validate: b
   );
 }
 
-export function StaffScreen({ engine, s }: { engine: Engine; s: State }) {
+export function StaffScreen({ engine, s, onBack }: { engine: Engine; s: State; onBack?: () => void }) {
   const { catalog, list, toggles, batches } = s;
   const refs = useRef<Record<string, HTMLElement | null>>({});
 
@@ -64,7 +68,7 @@ export function StaffScreen({ engine, s }: { engine: Engine; s: State }) {
       .filter((c) => c.products.length > 0);
   }, [catalog, list]);
 
-  if (list === null) return <NoList engine={engine} s={s} />;
+  if (list === null) return onBack ? (onBack(), null) : <NoList engine={engine} s={s} />;
   if (!catalog || !list) {
     return (
       <main className="nolist">
@@ -93,7 +97,7 @@ export function StaffScreen({ engine, s }: { engine: Engine; s: State }) {
   return (
     <div className="staff">
       <div className="stickyhead">
-      <TopBar engine={engine} s={s} validate />
+      <TopBar engine={engine} s={s} validate onBack={onBack} title={onBack ? "Modifier la liste" : undefined} />
       <Banners engine={engine} s={s} />
       <nav className="chips" aria-label="Catégories">
         {sections.map((c) => (

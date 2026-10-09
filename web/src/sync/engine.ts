@@ -1,6 +1,6 @@
 import { api as realApi, ApiError, NetworkError } from "../api";
 import { AppDbClass, type AppDb, type OrphanRow } from "../db";
-import type { Batch, Catalog, ListView, Me, Toggles } from "../types";
+import type { Batch, Catalog, ListView, Me, Op, OpResult, Toggles } from "../types";
 import { buildOps, cancelQueuedAdd, interpretResults, isPurchased, normalizeToggles, projectedPresence, toggleProduct } from "./logic";
 
 export interface Notice {
@@ -102,7 +102,8 @@ export class Engine {
   async login(familyCode: string, login: string, secret: string): Promise<void> {
     this.set({ loggingIn: true, loginError: null });
     try {
-      const { me } = await this.api.login(familyCode, login, secret);
+      await this.api.login(familyCode, login, secret);
+      const { me } = await this.api.me(); // full profile (an administrator also gets the family code)
       await this.db.meta.put({ key: "lastLogin", value: { familyCode: familyCode.trim().toUpperCase(), login: login.trim().toLowerCase() } });
       this.set({ lastLogin: { familyCode: familyCode.trim().toUpperCase(), login: login.trim().toLowerCase() } });
       await this.enter(me);
@@ -331,6 +332,82 @@ export class Engine {
       this.syncedTimer = setTimeout(() => this.set({ justSynced: false }), 3_000);
     }
     if (refreshNeeded) await this.refresh();
+  }
+
+  // ---- direct actions (parents) ----------------------------------------------------------------
+  // Purchases and corrections are never queued: the other parents must be able to trust "bought" at once,
+  // so they need the server to answer. Without a connection they are refused, visibly.
+
+  private async direct(op: Op, okText?: (r: OpResult) => string | null): Promise<OpResult | null> {
+    const list = this.s.list;
+    if (!list || list.status !== "active") return null;
+    try {
+      const res = await this.api.postOps(list.id, [op]);
+      const r = res.results[0]!;
+      this.set({ conn: "online", list: res.list.id === list.id && res.list.status === "active" ? res.list : this.s.list });
+      this.set({ toggles: normalizeToggles(this.s.list, this.s.batches, this.s.toggles) });
+      await Promise.all([this.persistCache(), this.persistDraft()]);
+      if (r.status === "rejected") {
+        const msg: Record<string, string> = {
+          list_closed: "Cette liste vient d'être clôturée.",
+          item_removed: "Cet article vient d'être retiré de la liste.",
+          item_unknown: "Cet article n'est plus dans la liste.",
+          purchase_unknown: "Cet achat est introuvable.",
+        };
+        this.notice(msg[r.reason ?? ""] ?? "Action refusée.");
+        if (r.reason === "list_closed") void this.refresh();
+      } else if (okText) {
+        const t = okText(r);
+        if (t) this.notice(t);
+      }
+      return r;
+    } catch (e) {
+      if (e instanceof NetworkError) {
+        this.set({ conn: "offline" });
+        this.notice("Pas de connexion : cette action n'a pas été enregistrée. Réessayez quand le réseau est revenu.");
+        this.scheduleRetry();
+      } else if (e instanceof ApiError && e.status === 401) this.set({ phase: "loggedOut" });
+      else this.notice("Action refusée par le serveur.");
+      return null;
+    }
+  }
+
+  purchase(itemId: string) {
+    return this.direct({ opId: this.newId(), type: "purchase", itemId }, (r) =>
+      r.status === "already" ? `Déjà acheté${r.detail?.purchasedBy ? ` par ${r.detail.purchasedBy.displayName}` : ""}.` : null,
+    );
+  }
+
+  correct(purchaseId: string, reason: string) {
+    return this.direct({ opId: this.newId(), type: "correct", purchaseId, reason: reason.trim() || null }, (r) => (r.status === "already" ? "Cet achat était déjà corrigé." : null));
+  }
+
+  async createList(): Promise<void> {
+    try {
+      const { list } = await this.api.createList();
+      this.set({ list, conn: "online" });
+      await this.applyServerState(this.s.catalog ?? (await this.api.catalog()), list);
+    } catch (e) {
+      if (e instanceof NetworkError) this.set({ conn: "offline" }), this.notice("Pas de connexion : la liste n'a pas été créée.");
+      else if (e instanceof ApiError && e.status === 409) await this.refresh(); // someone just created it
+      else this.notice("Impossible de créer la liste.");
+    }
+  }
+
+  /** Returns what the server reports (remaining / purchased) or null if it did not happen. */
+  async closeList(): Promise<{ remaining: number; purchased: number } | null> {
+    const list = this.s.list;
+    if (!list || list.status !== "active") return null;
+    try {
+      const r = await this.api.closeList(list.id);
+      this.set({ conn: "online" });
+      await this.refresh();
+      return r;
+    } catch (e) {
+      if (e instanceof NetworkError) this.set({ conn: "offline" }), this.notice("Pas de connexion : la liste n'a pas été clôturée.");
+      else this.notice("Impossible de clôturer la liste.");
+      return null;
+    }
   }
 
   private scheduleRetry(): void {

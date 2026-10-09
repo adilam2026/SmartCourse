@@ -9,6 +9,8 @@ const schema = z.object({
   S3_ACCESS_KEY_ID: z.string().optional(),
   S3_SECRET_ACCESS_KEY: z.string().optional(),
   WEB_DIR: z.string().default("../web/dist"),
+  /** Per-IP cap on unauthenticated routes (login, setup) per minute. */
+  LOGIN_RATE_MAX: z.coerce.number().int().min(1).default(20),
   INSTALL_TOKEN: z.string().min(16).optional(),
   PORT: z.coerce.number().int().default(3000),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),

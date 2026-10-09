@@ -26,6 +26,7 @@ export default defineConfig({
       PHOTO_DIR: "/tmp/smartcourse-e2e-photos",
       WEB_DIR: "../web/dist",
       SCRYPT_N: "1024",
+      LOGIN_RATE_MAX: "5000",
     },
   },
 });
