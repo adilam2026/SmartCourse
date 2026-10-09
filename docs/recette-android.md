@@ -37,11 +37,11 @@ Préalable : application ouverte **en ligne** au moins 30 secondes (les images s
 2. `marie` (personnel) : choisissez « Pain » et « Lait », **Valider** → l'état est « validé, en attente de synchronisation » (pas de fausse confirmation).
 3. `lamiaa` (parent, sur un autre téléphone ou après changement de profil) : **Acheté** et **Corriger** sont **bloqués** hors connexion (règle convenue).
 4. `adil` : Ajouter/Modifier un article → **Enregistrer** → message « Pas de connexion… » ; la feuille reste ouverte avec **toutes** les données.
-5. Désactivez le mode avion. En quelques secondes : l'envoi part tout seul, `marie` voit « Enregistré sur le serveur », le second profil voit la liste mise à jour. `adil` peut maintenant **Enregistrer**.
+5. Désactivez le mode avion. En quelques secondes (jusqu'à ~10 s via le tunnel gratuit, qui retient le flux temps réel : l'application relit alors l'état toutes les 8 s) : l'envoi part tout seul, `marie` voit « Enregistré sur le serveur », le second profil voit la liste mise à jour. `adil` peut maintenant **Enregistrer**.
 
 ## 6. Fin de recette
 1. Désinstaller l'application d'essai : appui long sur l'icône → **Désinstaller** (ou Infos sur l'appli → Désinstaller).
 2. Sur l'ordinateur : `scripts/recette-locale.sh --stop` (efface la base d'essai).
 
 ## Ce qui est vérifié automatiquement (GitHub Actions « Vérification du tunnel HTTPS »)
-Sur un vrai tunnel HTTPS, depuis Chrome automatisé : page, manifeste « standalone », icônes 192/512 et « maskable », service worker, connexion avec cookie `Secure`, flux temps réel traversant le tunnel, envoi d'une photo d'environ 3 Mo, **verdict d'installabilité de Chrome**, ouverture hors connexion après un premier chargement.
+Sur un vrai tunnel HTTPS, depuis Chrome automatisé : page, manifeste « standalone », icônes 192/512 et « maskable », service worker, connexion avec cookie `Secure`, propagation d'une modification d'un profil à un autre sans rechargement (le flux temps réel SSE est retenu par le tunnel gratuit Cloudflare : bascule mesurée sur une relecture toutes les 8 s), envoi d'une photo d'environ 3 Mo, **verdict d'installabilité de Chrome**, ouverture hors connexion après un premier chargement.
