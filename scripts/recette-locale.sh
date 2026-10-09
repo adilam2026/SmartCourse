@@ -31,6 +31,14 @@ if [ "${NO_TUNNEL:-}" != "1" ]; then
   U=""
   for _ in $(seq 1 60); do U=$(docker logs "$TUN" 2>&1 | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | head -1 || true); [ -n "$U" ] && break; sleep 1; done
   [ -n "$U" ] || { echo "Tunnel introuvable : voir « docker logs $TUN »" >&2; exit 1; }
+  # L'adresse apparaît dans les journaux AVANT que son nom soit connu du DNS : on attend qu'elle réponde vraiment.
+  if command -v curl >/dev/null 2>&1; then
+    READY=0
+    for _ in $(seq 1 90); do curl -fsS --max-time 5 "$U/health" >/dev/null 2>&1 && { READY=1; break; }; sleep 2; done
+    [ "$READY" = 1 ] || { echo "Le tunnel $U ne répond pas encore (DNS) : réessayez dans une minute ou relancez le script." >&2; exit 1; }
+  else
+    echo "(curl absent : si l'adresse ne s'ouvre pas tout de suite, patientez une minute.)"
+  fi
   URL="$U   <- à ouvrir sur le téléphone"
 fi
 cat <<MSG

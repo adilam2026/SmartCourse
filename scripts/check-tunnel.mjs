@@ -11,6 +11,8 @@ const ko = (m) => { bad++; console.log(`ÉCHEC ${m}`); };
 const check = (c, m) => (c ? ok(m) : ko(m));
 
 const get = async (p, init) => fetch(BASE + p, init);
+// Le nom du tunnel peut mettre un moment à être connu du DNS : on attend qu'il réponde.
+for (let i = 0; i < 45; i++) { try { if ((await fetch(BASE + "/health")).ok) break; } catch {} await new Promise((r) => setTimeout(r, 2000)); }
 let r = await get("/health"); check(r.status === 200, `/health via HTTPS (${r.status})`);
 r = await get("/"); check(r.status === 200 && (await r.text()).includes('<div id="root">'), "page d'accueil de l'application");
 r = await get("/manifest.webmanifest"); const mf = await r.json();
@@ -72,6 +74,33 @@ r = await get("/api/me", { headers: { cookie } }); check(r.status === 200, "sess
   // Connexion par l'interface puis rechargement hors connexion
   await page.getByTestId("login-family").fill(FAMILY); await page.getByTestId("login-id").fill("marie"); await page.getByTestId("login-secret").fill("573918"); await page.getByTestId("login-submit").click();
   await page.getByTestId("catalog").waitFor({ timeout: 20_000 }); ok("connexion par l'interface via le tunnel (personnel)");
+  // Temps réel entre deux profils, À TRAVERS LE TUNNEL, sans rechargement : le personnel (page 1) voit l'article créé par l'administrateur
+  // (API), puis le parent (page 2, autre profil) voit ce que le personnel vient de valider.
+  {
+    await page.evaluate(() => { window.__sansRechargement = 1; });
+    let live = false; for (let i = 0; i < 30 && !live; i++) { live = await page.evaluate(() => (window).__engine?.getState().live === true); if (!live) await page.waitForTimeout(500); }
+    check(live, "l'application du personnel a un flux temps réel actif (live) via le tunnel");
+    const pb = await chromium.launch({ executablePath: process.env.CHROME ?? "/usr/bin/google-chrome", args: ["--no-sandbox"] });
+    const ppage = await (await pb.newContext({ viewport: { width: 412, height: 915 }, hasTouch: true, isMobile: true })).newPage();
+    await ppage.goto(BASE + "/"); await ppage.getByTestId("login-family").fill(FAMILY); await ppage.getByTestId("login-id").fill("lamiaa"); await ppage.getByTestId("login-secret").fill("573918"); await ppage.getByTestId("login-submit").click();
+    await ppage.getByTestId("to-buy").waitFor({ state: "attached", timeout: 20_000 }); ok("connexion du parent (second profil) via le tunnel");
+    await ppage.evaluate(() => { window.__sansRechargement = 1; });
+    const nom = `Essai direct ${Date.now() % 100000}`;
+    const t1 = Date.now();
+    const cr = await get("/api/products", { method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ name: nom, category: "pain" }) });
+    const pid = (await cr.json()).product.id;
+    const card = page.getByTestId(`card-${pid}`);
+    const seen = await card.waitFor({ state: "attached", timeout: 12_000 }).then(() => true).catch(() => false);
+    check(seen && (await page.evaluate(() => (window).__sansRechargement === 1)), `modification de l'administrateur visible chez le personnel sans rechargement (${seen ? Date.now() - t1 : ">12000"} ms)`);
+    if (seen) {
+      await card.scrollIntoViewIfNeeded(); await card.click(); const t2 = Date.now();
+      await page.getByTestId("validate").click();
+      const row = ppage.getByTestId(`row-${pid}`);
+      const seen2 = await row.waitFor({ state: "attached", timeout: 12_000 }).then(() => true).catch(() => false);
+      check(seen2 && (await ppage.evaluate(() => (window).__sansRechargement === 1)), `choix validé par le personnel visible chez le parent sans rechargement (${seen2 ? Date.now() - t2 : ">12000"} ms)`);
+    }
+    await pb.close();
+  }
   await page.waitForTimeout(3000);
   await ctx.setOffline(true); await page.reload();
   check(await page.getByTestId("catalog").waitFor({ timeout: 10_000 }).then(() => true).catch(() => false), "après coupure du réseau : l'application et le catalogue s'ouvrent encore");
