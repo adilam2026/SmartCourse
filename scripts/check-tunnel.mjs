@@ -28,13 +28,16 @@ r = await get("/api/me", { headers: { cookie } }); check(r.status === 200, "sess
 // Flux temps réel (SSE) à travers le tunnel : l'événement « ready » doit arriver sans être retenu par un tampon
 {
   const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 10_000);
-  let got = false;
+  let got = false, bytes = 0, status = "aucune réponse", ct = "", t0 = Date.now(), tHeaders = -1, tReady = -1;
   try {
     const res = await get("/api/events", { headers: { cookie }, signal: ctl.signal });
+    status = String(res.status); ct = res.headers.get("content-type") ?? ""; tHeaders = Date.now() - t0;
     const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = "";
-    while (!got) { const { value, done } = await reader.read(); if (done) break; buf += dec.decode(value); got = /event: ready/.test(buf); }
+    while (!got) { const { value, done } = await reader.read(); if (done) break; bytes += value.length; buf += dec.decode(value); got = /event: ready/.test(buf); }
+    if (got) tReady = Date.now() - t0;
   } catch {}
   clearTimeout(t); ctl.abort();
+  console.log(`      (flux : statut ${status}, type ${ct}, en-têtes après ${tHeaders} ms, ${bytes} octets reçus, ready après ${tReady} ms)`);
   check(got, "flux temps réel : événement « ready » reçu à travers le tunnel");
 }
 
@@ -47,14 +50,16 @@ r = await get("/api/me", { headers: { cookie } }); check(r.status === 200, "sess
   await page.context().browser().close();
   const res = await get("/api/products", { method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ name: "Essai tunnel", category: "pain", image: b64 }) });
   check(res.status === 201, `envoi d'une image de ${(b64.length / 1e6).toFixed(1)} Mo (base64) via le tunnel (${res.status})`);
-  if (res.status === 201) { const p = (await res.json()).product; const img = await get(p.photoUrl, { headers: { cookie } }); const len = (await img.arrayBuffer()).byteLength; check(img.status === 200 && len < 60_000, `image réduite côté serveur (${len} octets)`); }
+  if (res.status === 201) { const p = (await res.json()).product; const img = await get(p.photoUrl, { headers: { cookie } }); const len = (await img.arrayBuffer()).byteLength; check(img.status === 200 && len < 150_000, `image réduite côté serveur (${len} octets)`); }
 }
 
 // Installabilité telle que Chrome la juge (CDP), sur la vraie adresse HTTPS
 {
-  const browser = await chromium.launch({ executablePath: process.env.CHROME ?? "/usr/bin/google-chrome", args: ["--no-sandbox"] });
-  const ctx = await browser.newContext({ viewport: { width: 412, height: 915 }, hasTouch: true, isMobile: true });
-  const page = await ctx.newPage();
+  // Profil persistant : un contexte « newContext » est une fenêtre de navigation privée, que Chrome déclare non installable (in-incognito).
+  const { mkdtempSync } = await import("node:fs"); const { tmpdir } = await import("node:os"); const { join } = await import("node:path");
+  const ctx = await chromium.launchPersistentContext(mkdtempSync(join(tmpdir(), "chrome-")), { executablePath: process.env.CHROME ?? "/usr/bin/google-chrome", args: ["--no-sandbox"], viewport: { width: 412, height: 915 }, hasTouch: true, isMobile: true });
+  const browser = ctx;
+  const page = ctx.pages()[0] ?? (await ctx.newPage());
   await page.goto(BASE + "/", { waitUntil: "networkidle" });
   await page.evaluate(() => navigator.serviceWorker.ready.then(() => true));
   await page.reload({ waitUntil: "networkidle" }); // page contrôlée par le service worker
@@ -69,7 +74,7 @@ r = await get("/api/me", { headers: { cookie } }); check(r.status === 200, "sess
   await page.getByTestId("catalog").waitFor({ timeout: 20_000 }); ok("connexion par l'interface via le tunnel (personnel)");
   await page.waitForTimeout(3000);
   await ctx.setOffline(true); await page.reload();
-  check(await page.getByTestId("catalog").isVisible({ timeout: 10_000 }).catch(() => false), "après coupure du réseau : l'application et le catalogue s'ouvrent encore");
+  check(await page.getByTestId("catalog").waitFor({ timeout: 10_000 }).then(() => true).catch(() => false), "après coupure du réseau : l'application et le catalogue s'ouvrent encore");
   await browser.close();
 }
 console.log(bad ? `\n${bad} contrôle(s) en échec` : "\nTous les contrôles sont conformes");

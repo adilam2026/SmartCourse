@@ -184,6 +184,9 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       off();
     };
     req.raw.on("close", cleanup);
+    // Un commentaire de ~2 Ko force les intermédiaires (tunnels, proxys) à vider leur tampon : sans lui, ils peuvent
+    // retenir les premiers octets du flux et l'événement « ready » n'arrive pas. Ignoré par EventSource.
+    write(`: ${" ".repeat(2048)}\n\n`);
     write("retry: 3000\n\n");
     write(`event: ready\ndata: {}\n\n`);
   });
