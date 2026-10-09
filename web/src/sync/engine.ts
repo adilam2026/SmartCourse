@@ -67,6 +67,7 @@ export class Engine {
   private noticeSeq = 0;
   private retryTimer: ReturnType<typeof setTimeout> | undefined;
   private retryStep = 0;
+  private retryPending = false;
   private inFlightBatchId: string | undefined;
   private preloaded = new Set<string>();
   private syncedTimer: ReturnType<typeof setTimeout> | undefined;
@@ -189,6 +190,7 @@ export class Engine {
     }
     // Local drafts and the outbox stay on the device, keyed to this person, and are sent after the next login.
     clearTimeout(this.retryTimer);
+    this.retryPending = false;
     this.closeEvents();
     this.set({ phase: "loggedOut", me: null, catalog: null, list: undefined, toggles: {}, batches: [], draftListId: null, orphan: null, notices: [] });
   }
@@ -281,7 +283,27 @@ export class Engine {
   }
 
   // ---- server state --------------------------------------------------------------------------
-  async refresh(): Promise<void> {
+  /** One read at a time: triggers that arrive meanwhile (poll tick, SSE event, back to foreground) share one follow-up read. */
+  private refreshing: Promise<void> | null = null;
+  private refreshAgain = false;
+
+  refresh(): Promise<void> {
+    if (this.refreshing) {
+      this.refreshAgain = true;
+      return this.refreshing;
+    }
+    this.refreshing = (async () => {
+      do {
+        this.refreshAgain = false;
+        await this.refreshOnce();
+      } while (this.refreshAgain);
+    })().finally(() => {
+      this.refreshing = null;
+    });
+    return this.refreshing;
+  }
+
+  private async refreshOnce(): Promise<void> {
     if (!this.s.me) return;
     try {
       const [catalog, { list }] = await Promise.all([this.api.catalog(), this.api.activeList()]);
@@ -291,6 +313,22 @@ export class Engine {
       if (e instanceof NetworkError) this.set({ conn: "offline" });
       else if (e instanceof ApiError && e.status === 401) this.set({ phase: "loggedOut" });
     }
+  }
+
+  /**
+   * Safety-net poll for when no live stream is delivering (a proxy holds it back). It is a *frequency*, not a delivery
+   * guarantee: it does nothing while the app is in the background, while the stream is live, while a read is already
+   * running, and while offline (then only the existing back-off retry runs: 3 s, 8 s, 20 s, then every 45 s).
+   * Returns true when it started a read.
+   */
+  async pollTick(visible: boolean): Promise<boolean> {
+    if (!visible || this.s.phase !== "ready" || this.s.live || this.refreshing) return false;
+    if (this.s.conn === "offline") {
+      if (!this.retryPending) this.scheduleRetry();
+      return false;
+    }
+    await this.refresh();
+    return true;
   }
 
   private async applyServerState(catalog: Catalog, list: ListView | null): Promise<void> {
@@ -505,13 +543,15 @@ export class Engine {
   private scheduleRetry(): void {
     clearTimeout(this.retryTimer);
     const delay = RETRY_MS[Math.min(this.retryStep++, RETRY_MS.length - 1)]!;
-    this.retryTimer = setTimeout(() => void this.retryNow(), delay);
+    this.retryPending = true;
+    this.retryTimer = setTimeout(() => { this.retryPending = false; void this.retryNow(); }, delay);
   }
 
   /** Called by the browser hooks: connection back, app in the foreground, retry timer… */
   async retryNow(): Promise<void> {
     if (this.s.phase !== "ready") return;
     clearTimeout(this.retryTimer);
+    this.retryPending = false;
     this.openEvents();
     await this.refresh();
     if (this.s.conn === "online") await this.flush();

@@ -62,7 +62,22 @@ r = await get("/api/me", { headers: { cookie } }); check(r.status === 200, "sess
   const { mkdtempSync } = await import("node:fs"); const { tmpdir } = await import("node:os"); const { join } = await import("node:path");
   const ctx = await chromium.launchPersistentContext(mkdtempSync(join(tmpdir(), "chrome-")), { executablePath: process.env.CHROME ?? "/usr/bin/google-chrome", args: ["--no-sandbox"], viewport: { width: 412, height: 915 }, hasTouch: true, isMobile: true });
   const browser = ctx;
+  // Instrumentation (lecture seule) : événements SSE réellement reçus par l'application, et visibilité simulée (« hidden »).
+  await ctx.addInitScript(() => {
+    window.__sse = [];
+    const E = window.EventSource;
+    window.EventSource = function (url, o) { const es = new E(url, o); for (const t of ["ready", "list.updated", "list.created", "list.closed", "catalog.updated"]) es.addEventListener(t, () => window.__sse.push(t)); return es; };
+    window.EventSource.prototype = E.prototype;
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => window.__vis ?? "visible" });
+  });
   const page = ctx.pages()[0] ?? (await ctx.newPage());
+  // Lectures de la liste (relecture périodique ou événement) vues par le navigateur : début, fin, échec.
+  const reads = []; const open = new Map();
+  page.on("request", (r) => { if (r.url().includes("/api/lists/active")) open.set(r, Date.now()); });
+  const done = (r, failed) => { const t0 = open.get(r); if (t0 === undefined) return; open.delete(r); reads.push({ t0, t1: Date.now(), failed }); };
+  page.on("requestfinished", (r) => done(r, false)); page.on("requestfailed", (r) => done(r, true));
+  const since = (t) => reads.filter((x) => x.t0 >= t);
+  const maxOverlap = (list) => Math.max(0, ...list.map((a) => list.filter((b) => b.t0 < a.t1 && b.t1 > a.t0).length));
   await page.goto(BASE + "/", { waitUntil: "networkidle" });
   await page.evaluate(() => navigator.serviceWorker.ready.then(() => true));
   await page.reload({ waitUntil: "networkidle" }); // page contrôlée par le service worker
@@ -92,16 +107,35 @@ r = await get("/api/me", { headers: { cookie } }); check(r.status === 200, "sess
     const cr = await get("/api/products", { method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ name: nom, category: "pain" }) });
     const pid = (await cr.json()).product.id;
     const card = page.getByTestId(`card-${pid}`);
+    const mech = async () => { const ev = await page.evaluate(() => window.__sse); return ev.includes("catalog.updated") || ev.includes("list.updated") ? "mécanisme : SSE (événement reçu)" : "mécanisme : RELECTURE PÉRIODIQUE (aucun événement SSE reçu) — ne valide pas le SSE"; };
     const seen = await card.waitFor({ state: "attached", timeout: 30_000 }).then(() => true).catch(() => false);
-    check(seen && (await page.evaluate(() => (window).__sansRechargement === 1)), `modification de l'administrateur visible chez le personnel sans rechargement (${seen ? Date.now() - t1 : ">30000"} ms, ${live ? "flux SSE" : "relecture périodique"})`);
+    check(seen && (await page.evaluate(() => (window).__sansRechargement === 1)), `modification de l'administrateur visible chez le personnel sans rechargement (${seen ? Date.now() - t1 : ">30000"} ms, ${await mech()})`);
     if (seen) {
       await card.scrollIntoViewIfNeeded(); await card.click(); const t2 = Date.now();
       await page.getByTestId("validate").click();
       const row = ppage.getByTestId(`row-${pid}`);
       const seen2 = await row.waitFor({ state: "attached", timeout: 30_000 }).then(() => true).catch(() => false);
-      check(seen2 && (await ppage.evaluate(() => (window).__sansRechargement === 1)), `choix validé par le personnel visible chez le parent sans rechargement (${seen2 ? Date.now() - t2 : ">30000"} ms, ${live ? "flux SSE" : "relecture périodique"})`);
+      check(seen2 && (await ppage.evaluate(() => (window).__sansRechargement === 1)), `choix validé par le personnel visible chez le parent sans rechargement (${seen2 ? Date.now() - t2 : ">30000"} ms, ${await mech()})`);
     }
     await pb.close();
+  }
+  // Relecture périodique : jamais deux en même temps, arrêt en arrière-plan, espacement hors connexion
+  {
+    const all = reads.slice();
+    check(maxOverlap(all) <= 1, `relecture périodique : ${all.length} lectures de la liste depuis le début, au plus ${maxOverlap(all)} simultanée(s)`);
+    await page.evaluate(() => { window.__vis = "hidden"; });
+    const tBg = Date.now(); await page.waitForTimeout(20_000);
+    const bg = since(tBg).length;
+    check(bg === 0, `en arrière-plan (20 s, visibilité « hidden ») : ${bg} lecture(s) de la liste`);
+    await page.evaluate(() => { window.__vis = "visible"; });
+    await page.waitForTimeout(1500);
+    const tOff = Date.now(); await ctx.setOffline(true); await page.waitForTimeout(50_000);
+    const off = since(tOff);
+    check(off.length <= 4, `hors connexion (50 s) : ${off.length} tentative(s) de lecture (reprise espacée 3 s, 8 s, 20 s, 45 s ; une relecture toutes les 8 s en ferait 6)`);
+    await ctx.setOffline(false);
+    let back = false; for (let i = 0; i < 20 && !back; i++) { back = (await page.evaluate(() => window.__engine.getState().conn)) === "online"; if (!back) await page.waitForTimeout(500); }
+    check(back, "retour du réseau : l'application repasse en ligne d'elle-même (≤ 10 s)");
+    check(maxOverlap(reads) <= 1, `sur toute la durée : au plus ${maxOverlap(reads)} lecture(s) de la liste simultanée(s)`);
   }
   await page.waitForTimeout(3000);
   await ctx.setOffline(true); await page.reload();

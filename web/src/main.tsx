@@ -31,7 +31,7 @@ void window.caches?.delete("photos").catch(() => {});
 // false), this poll is what keeps the profiles in sync, so it is short enough to feel immediate.
 window.addEventListener("online", () => void engine.retryNow());
 document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && void engine.retryNow());
-setInterval(() => document.visibilityState === "visible" && !engine.getState().live && void engine.refresh(), 8_000);
+setInterval(() => void engine.pollTick(document.visibilityState === "visible"), 8_000);
 
 void engine.start();
 createRoot(document.getElementById("root")!).render(

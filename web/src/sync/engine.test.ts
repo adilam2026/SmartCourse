@@ -380,3 +380,68 @@ describe("temps réel (SSE)", () => {
     expect(e.getState().list?.items.map((i) => i.productId)).toEqual(["sucre"]);
   });
 });
+
+describe("relecture périodique (filet de sécurité quand le flux temps réel est retenu)", () => {
+  /** Serveur lent : chaque lecture de la liste attend qu'on la libère ; on compte les lectures simultanées. */
+  const slowServer = () => {
+    let inFlight = 0, maxInFlight = 0, total = 0;
+    const gates: (() => void)[] = [];
+    const orig = srv.api.activeList;
+    srv.api.activeList = async () => {
+      total++; inFlight++; maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise<void>((ok) => gates.push(ok));
+      inFlight--;
+      return orig();
+    };
+    return { stats: () => ({ maxInFlight, total, inFlight }), release: () => { while (gates.length) gates.shift()!(); } };
+  };
+
+  it("jamais deux relectures en même temps (serveur lent, déclencheurs en rafale)", async () => {
+    const e = await boot();
+    const s = slowServer();
+    const calls = [e.refresh(), e.refresh(), e.refresh()]; // tick périodique + événement + retour au premier plan
+    await wait(20);
+    expect(s.stats().maxInFlight).toBe(1);
+    s.release();
+    await wait(20);
+    s.release(); // la relecture « une dernière fois » demandée pendant la première
+    await Promise.all(calls);
+    expect(s.stats().maxInFlight).toBe(1);
+    expect(s.stats().total).toBeLessThanOrEqual(2); // une en cours + une seule de rattrapage, pas trois
+  });
+
+  it("politique : rien en arrière-plan, rien si le flux est actif, rien pendant une lecture, rien hors connexion (seule la reprise espacée tourne)", async () => {
+    const e = await boot();
+    let reads = 0;
+    const orig = srv.api.activeList; srv.api.activeList = async () => { reads++; return orig(); };
+    expect(await e.pollTick(false)).toBe(false); // application en arrière-plan
+    expect(reads).toBe(0);
+    expect(await e.pollTick(true)).toBe(true); // au premier plan, sans flux actif : une lecture
+    expect(reads).toBe(1);
+    const es = new FakeEventSource();
+    const live = new Engine({ db, api: srv.api, newId, eventSource: () => es });
+    await live.start(); es.emit("ready"); await wait(200);
+    const before = reads;
+    expect(await live.pollTick(true)).toBe(false); // flux actif : pas de relecture
+    expect(reads).toBe(before);
+    srv.down = true; // hors connexion
+    await e.refresh();
+    expect(e.getState().conn).toBe("offline");
+    const r = reads;
+    for (let i = 0; i < 5; i++) expect(await e.pollTick(true)).toBe(false); // 5 ticks hors connexion : aucune requête de plus
+    expect(reads).toBe(r);
+  });
+
+  it("hors connexion : la reprise suit le délai croissant (3 s, 8 s, 20 s, 45 s), pas toutes les 8 s ; retour du réseau = une lecture", async () => {
+    const e = await boot();
+    srv.down = true; await e.refresh();
+    await e.pollTick(true); // programme la reprise espacée une seule fois
+    const timers = (e as any).retryPending;
+    expect(timers).toBe(true);
+    await e.pollTick(true); await e.pollTick(true);
+    expect((e as any).retryStep).toBe(1); // un seul rendez-vous programmé malgré plusieurs ticks
+    srv.down = false;
+    await e.retryNow();
+    expect(e.getState().conn).toBe("online");
+  });
+});
