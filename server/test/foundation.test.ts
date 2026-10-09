@@ -10,7 +10,7 @@ afterAll(closeTestDb);
 
 describe("socle", () => {
   it("/health répond ok quand la base est joignable", async () => {
-    const app = buildApp({ db: await testDb() });
+    const app = await buildApp({ db: await testDb() });
     const res = await app.inject({ method: "GET", url: "/health" });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ status: "ok" });
