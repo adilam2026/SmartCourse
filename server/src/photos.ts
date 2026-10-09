@@ -92,13 +92,28 @@ export class S3PhotoStore implements PhotoStore {
   }
 }
 
-export function s3ClientFromConfig(config: Config): S3Client {
+export interface S3Parts {
+  endpoint?: string;
+  region?: string;
+  accessKeyId?: string;
+  secretAccessKey?: string;
+}
+
+export function s3ClientFromParts(p: S3Parts): S3Client {
   return new S3Client({
-    region: config.S3_REGION ?? "auto",
-    endpoint: config.S3_ENDPOINT,
+    region: p.region ?? "auto",
+    endpoint: p.endpoint,
     forcePathStyle: true,
-    credentials: { accessKeyId: config.S3_ACCESS_KEY_ID ?? "", secretAccessKey: config.S3_SECRET_ACCESS_KEY ?? "" },
+    credentials: { accessKeyId: p.accessKeyId ?? "", secretAccessKey: p.secretAccessKey ?? "" },
+    // Recent SDK versions add a CRC32 checksum to every request by default; several S3-compatible services (Backblaze B2,
+    // older Cloudflare R2, MinIO…) reject or mishandle it. Only send/validate checksums when an operation requires them.
+    requestChecksumCalculation: "WHEN_REQUIRED",
+    responseChecksumValidation: "WHEN_REQUIRED",
   });
+}
+
+export function s3ClientFromConfig(config: Config): S3Client {
+  return s3ClientFromParts({ endpoint: config.S3_ENDPOINT, region: config.S3_REGION, accessKeyId: config.S3_ACCESS_KEY_ID, secretAccessKey: config.S3_SECRET_ACCESS_KEY });
 }
 
 export function createPhotoStore(config: Config): PhotoStore {

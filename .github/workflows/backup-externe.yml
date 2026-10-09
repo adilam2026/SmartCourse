@@ -1,0 +1,81 @@
+name: Sauvegarde externe (base Supabase vers stockage indépendant, restauration vérifiée)
+# Sauvegarde quotidienne chiffrée de la base, restaurée dans UN AUTRE serveur PostgreSQL (conteneur jetable du coureur GitHub)
+# avant d'être déclarée valide, puis copie des photos ajoutées par la famille. Le résultat est écrit dans la table backup_runs de
+# la base : l'application l'affiche dans Réglages. Un échec fait échouer le job (GitHub envoie un e-mail).
+#
+# IMPORTANT : GitHub n'exécute le déclencheur « schedule » que pour le fichier présent sur la BRANCHE PAR DÉFAUT du dépôt.
+# Tant que ce fichier n'y est pas fusionné, seul le lancement manuel (workflow_dispatch) fonctionne.
+# Aucun secret n'est défini par ce dépôt : sans eux le job s'arrête avec un message clair, sans rien sauvegarder ni modifier.
+on:
+  schedule:
+    - cron: "23 2 * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: backup-externe
+  cancel-in-progress: false
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NODE_ENV: production
+      BACKUP_MODE: external
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}                       # pooler Supabase en MODE SESSION (port 5432)
+      DATABASE_SSL_CA: ${{ secrets.DATABASE_SSL_CA }}                 # certificat racine Supabase (texte PEM)
+      BACKUP_KEY: ${{ secrets.BACKUP_KEY }}                           # phrase de passe de chiffrement (≥ 16 caractères)
+      BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}               # stockage INDÉPENDANT (Cloudflare R2, Backblaze B2…)
+      BACKUP_S3_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+      BACKUP_S3_REGION: ${{ secrets.BACKUP_S3_REGION }}
+      BACKUP_S3_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+      BACKUP_S3_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+      S3_BUCKET: ${{ secrets.S3_BUCKET }}                             # stockage d'images (lecture), pour copier les photos de la famille
+      S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
+      S3_REGION: ${{ secrets.S3_REGION }}
+      S3_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
+      S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Secrets obligatoires
+        run: |
+          missing=""
+          for v in DATABASE_URL DATABASE_SSL_CA BACKUP_KEY BACKUP_S3_BUCKET BACKUP_S3_ENDPOINT BACKUP_S3_ACCESS_KEY_ID BACKUP_S3_SECRET_ACCESS_KEY; do
+            [ -n "${!v}" ] || missing="$missing $v"
+          done
+          if [ -n "$missing" ]; then echo "::error::Secrets manquants :$missing (Settings → Secrets and variables → Actions). Rien n'a été sauvegardé."; exit 1; fi
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Construction
+        run: cd server && npm ci && npm run build
+      - name: Version majeure du serveur PostgreSQL
+        id: pg
+        run: |
+          cd server
+          MAJOR=$(node -e 'import("./dist/db.js").then(async m=>{const {loadConfig}=await import("./dist/config.js");const db=m.createPoolFromConfig(loadConfig());const r=await db.query("SHOW server_version_num");console.log(Math.floor(Number(r.rows[0].server_version_num)/10000));await db.end()})')
+          echo "Serveur PostgreSQL $MAJOR"
+          echo "major=$MAJOR" >> "$GITHUB_OUTPUT"
+      - name: Client pg_dump de la même version (PGDG)
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+          sudo apt-get update -q
+          sudo apt-get install -y -q postgresql-client-${{ steps.pg.outputs.major }}
+          ls /usr/lib/postgresql/${{ steps.pg.outputs.major }}/bin/pg_dump
+      - name: Serveur de contrôle (même version, conteneur jetable)
+        run: |
+          . scripts/lib-docker.sh
+          IMG=$(docker_image postgres:${{ steps.pg.outputs.major }})
+          docker run -d --name scratch -p 5433:5432 -e POSTGRES_PASSWORD=scratch "$IMG"
+          for _ in $(seq 1 60); do docker exec scratch pg_isready -U postgres >/dev/null 2>&1 && break; sleep 1; done
+          docker exec scratch pg_isready -U postgres
+      - name: Sauvegarde, restauration de contrôle, rétention
+        run: cd server && node dist/backup-cli.js run
+        env:
+          VERIFY_DATABASE_URL: postgres://postgres:scratch@localhost:5433/postgres
+      - name: Photos de la famille
+        run: |
+          if [ -z "$S3_BUCKET" ]; then echo "::warning::S3_* absents : photos de la famille NON copiées (ce n'est pas une sauvegarde complète)."; exit 0; fi
+          cd server && node dist/backup-cli.js photos

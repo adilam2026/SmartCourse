@@ -23,7 +23,7 @@ export interface BackupStore {
 export class LocalBackupStore implements BackupStore {
   constructor(private dir: string) {}
   private file(key: string) {
-    if (!/^backups\/[\w.-]+$/.test(key)) throw new Error(`Invalid backup key: ${key}`);
+    if (!/^(backups|photos)\/[\w.-]+$/.test(key)) throw new Error(`Invalid backup key: ${key}`);
     return path.join(this.dir, key);
   }
   async put(key: string, data: Buffer) {
@@ -208,7 +208,10 @@ export interface Manifest {
 
 export interface BackupCtx {
   db: Db;
+  /** URL given to pg_dump (libpq): encrypted and verified when a CA is configured (see toolsDatabaseUrl). */
   databaseUrl: string;
+  /** Scratch server where a backup is restored to be checked. Default: the same server as `db` (in-app backups). */
+  verify?: { db: Db; url: string };
   store: BackupStore;
   passphrase: string;
   now?: () => Date;
@@ -297,11 +300,20 @@ export async function verifyBackup(ctx: BackupCtx, dumpKey: string): Promise<Ver
   const tools = await checkBackupTools(ctx.db);
   if (!tools.ok) return problems.push(tools.message), result();
 
+  // Where the restore happens: another server for external backups (then its major version must be the source's, or the
+  // check would not prove that THIS dump restores on THIS kind of server).
+  const vdb = ctx.verify?.db ?? ctx.db;
+  const vurl = ctx.verify?.url ?? ctx.databaseUrl;
+  if (ctx.verify) {
+    const m = Math.floor(Number((await vdb.query("SHOW server_version_num")).rows[0].server_version_num) / 10000);
+    if (m !== tools.serverMajor) return problems.push(`le serveur de contrôle est en PostgreSQL ${m}, la base sauvegardée en ${tools.serverMajor} : restauration de contrôle non significative`), result();
+  }
+
   const dbName = `sc_verify_${Date.now()}_${randomBytes(3).toString("hex")}`;
   const tmpFile = path.join(os.tmpdir(), `${dbName}.dump`);
-  const scratchUrl = new URL(ctx.databaseUrl);
+  const scratchUrl = new URL(vurl);
   scratchUrl.pathname = `/${dbName}`;
-  await ctx.db.query(`CREATE DATABASE "${dbName}"`);
+  await vdb.query(`CREATE DATABASE "${dbName}"`);
   let scratch: import("pg").Client | undefined;
   try {
     await writeFile(tmpFile, dump, { mode: 0o600 });
@@ -331,7 +343,7 @@ export async function verifyBackup(ctx: BackupCtx, dumpKey: string): Promise<Ver
   } finally {
     await scratch?.end().catch(() => {});
     await rm(tmpFile, { force: true });
-    await ctx.db.query(`DROP DATABASE IF EXISTS "${dbName}" WITH (FORCE)`).catch(() => {});
+    await vdb.query(`DROP DATABASE IF EXISTS "${dbName}" WITH (FORCE)`).catch(() => {});
   }
 }
 
@@ -379,16 +391,18 @@ export interface BackupStatus {
   lastVerifyFailedAt: string | null;
 }
 
-export async function backupStatus(db: Db, storage: "s3" | "local" | null): Promise<BackupStatus> {
+export const EXTERNAL_SCHEDULE_TEXT = "Sauvegarde chiffrée quotidienne faite hors de l'application (tâche planifiée GitHub Actions), restaurée dans un autre serveur PostgreSQL avant d'être déclarée valide ; copie des photos de la famille ajoutée.";
+
+export async function backupStatus(db: Db, storage: "s3" | "local" | null, mode: "internal" | "external" = "internal"): Promise<BackupStatus> {
   const configured = storage !== null;
-  const tools = configured ? await checkBackupTools(db) : null;
+  const tools = configured && mode === "internal" ? await checkBackupTools(db) : null;
   const r = await db.query(
     `SELECT (SELECT max(at) FROM backup_runs WHERE kind = 'backup' AND ok) AS b,
             (SELECT max(at) FROM backup_runs WHERE kind = 'verify' AND ok) AS v,
             (SELECT max(at) FROM backup_runs WHERE kind = 'verify' AND NOT ok) AS f`,
   );
   const row = r.rows[0];
-  return { configured, storage, schedule: SCHEDULE_TEXT, tools, lastBackupAt: row.b?.toISOString() ?? null, lastVerifiedOkAt: row.v?.toISOString() ?? null, lastVerifyFailedAt: row.f?.toISOString() ?? null };
+  return { configured, storage, schedule: mode === "external" ? EXTERNAL_SCHEDULE_TEXT : SCHEDULE_TEXT, tools, lastBackupAt: row.b?.toISOString() ?? null, lastVerifiedOkAt: row.v?.toISOString() ?? null, lastVerifyFailedAt: row.f?.toISOString() ?? null };
 }
 
 export const SCHEDULE_TEXT = "Une sauvegarde chiffrée par jour (dès que la dernière a plus de 24 h ; contrôle toutes les 10 min par l'application), suivie d'une restauration de vérification.";

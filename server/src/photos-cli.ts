@@ -5,7 +5,8 @@
  * Le manifeste est la source de vérité ; toutes les vérifications ont lieu avant la moindre écriture.
  */
 import { loadConfig } from "./config.js";
-import { createPool } from "./db.js";
+import { createPoolFromConfig } from "./db.js";
+import { hardenApiRoles } from "./harden.js";
 import { migrate } from "./migrate.js";
 import { createPhotoStore } from "./photos.js";
 import { purgeOrphanAssets, syncCatalogPhotos } from "./photos-import.js";
@@ -20,9 +21,10 @@ if (!(cmd === "import" && manifestPath) && cmd !== "purge") {
 }
 
 const config = loadConfig();
-const db = createPool(config.DATABASE_URL);
+const db = createPoolFromConfig(config);
 try {
   await migrate(db);
+  await hardenApiRoles(db);
   const store = createPhotoStore(config);
   if (cmd === "import") {
     const r = await syncCatalogPhotos(db, store, manifestPath!, { onlyMissing: flag("--only-missing") });

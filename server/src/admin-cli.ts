@@ -1,12 +1,14 @@
 import { loadConfig } from "./config.js";
-import { createPool } from "./db.js";
+import { createPoolFromConfig } from "./db.js";
+import { hardenApiRoles } from "./harden.js";
 import { migrate } from "./migrate.js";
 import { operatorResetSecret } from "./profiles.js";
 import { generateInstallToken } from "./auth.js";
 
 const [cmd, ...args] = process.argv.slice(2);
-const db = createPool(loadConfig().DATABASE_URL);
+const db = createPoolFromConfig(loadConfig());
 await migrate(db);
+await hardenApiRoles(db);
 try {
   if (cmd === "reset" && args.length === 2) {
     const code = await operatorResetSecret(db, args[0]!.toUpperCase(), args[1]!.toLowerCase());

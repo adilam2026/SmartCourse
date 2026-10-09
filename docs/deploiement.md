@@ -66,3 +66,8 @@ Si aucun administrateur ne peut se connecter : depuis un terminal ayant accès �
 ## Vérifier l'image Docker (sans déployer)
 
 `scripts/verify-docker.sh` (ou GitHub → Actions → « Vérification Docker », lancement manuel) construit l'image, la démarre sur un PostgreSQL jetable et contrôle : 80 WebP seulement, utilisateur `node`, clients `pg_dump` 16/17/18, import des 80 visuels au premier démarrage, **aucun changement** au redémarrage et à l'import manuel, purge sans effet, image personnalisée conservée. Aucun accès à Railway.
+
+
+## Variante retenue : Railway (serveur) + Supabase Free (base)
+
+Le plan, les portes à franchir, les coûts conditionnels, les limites du plan gratuit, les sauvegardes indépendantes et la liste de mise en service sont dans [`hebergement-supabase.md`](hebergement-supabase.md). Les sections 1 à 5 ci-dessus décrivent la variante « tout sur Railway » et ne s'appliquent pas à la variante Supabase pour la base et les sauvegardes.

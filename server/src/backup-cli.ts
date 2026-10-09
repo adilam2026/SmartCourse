@@ -1,7 +1,10 @@
 import { backupVerifyPrune, checkBackupTools, createBackup, listBackups, pruneBackups, verifyBackup } from "./backup.js";
 import { createBackupStorage } from "./backup-store.js";
 import { loadConfig } from "./config.js";
-import { createPool } from "./db.js";
+import { backupFamilyPhotos } from "./backup-photos.js";
+import { createPool, createPoolFromConfig, toolsDatabaseUrl } from "./db.js";
+import { hardenApiRoles } from "./harden.js";
+import { createPhotoStore } from "./photos.js";
 import { migrate } from "./migrate.js";
 
 const [cmd, arg] = process.argv.slice(2);
@@ -16,10 +19,18 @@ if (!storage) {
   process.exit(1);
 }
 console.log(`Stockage des sauvegardes : ${storage.kind === "s3" ? `bucket ${config.S3_BUCKET}` : `dossier local ${config.BACKUP_DIR}`}`);
-const db = createPool(config.DATABASE_URL);
-const ctx = { db, databaseUrl: config.DATABASE_URL, store: storage.store, passphrase: config.BACKUP_KEY };
+const db = createPoolFromConfig(config);
+// Restoration check on ANOTHER server when VERIFY_DATABASE_URL is given (required for a managed database, where a scratch database
+// cannot be created next to the production one).
+const verifyDb = config.VERIFY_DATABASE_URL ? createPool(config.VERIFY_DATABASE_URL) : null;
+const ctx = { db, databaseUrl: toolsDatabaseUrl(config), store: storage.store, passphrase: config.BACKUP_KEY, verify: verifyDb ? { db: verifyDb, url: config.VERIFY_DATABASE_URL! } : undefined };
 try {
-  await migrate(db);
+  // In external mode this command runs from the scheduled job, possibly with code newer than the deployed app: the app alone
+  // owns the schema, the job must never migrate (nor change grants on) the production database.
+  if (config.BACKUP_MODE !== "external") {
+    await migrate(db);
+    await hardenApiRoles(db);
+  }
   if (cmd === "check") {
     const t = await checkBackupTools(db);
     console.log(`${t.ok ? "OK" : "ÉCHEC"} : ${t.message}`);
@@ -41,12 +52,20 @@ try {
     if (!v.ok) process.exitCode = 2;
   } else if (cmd === "list") {
     for (const e of await listBackups(ctx.store)) console.log(`${e.at.toISOString()}  ${e.key}`);
+  } else if (cmd === "photos") {
+    const r = await backupFamilyPhotos(db, createPhotoStore(config), ctx.store);
+    console.log(`Photos de la famille : ${r.total} référencée(s), ${r.copied} copiée(s) (${r.bytes} octets), ${r.total - r.copied - r.missing.length} déjà présente(s).`);
+    if (r.missing.length) {
+      console.log(`ABSENTES du stockage d'images (référencées par la base) : ${r.missing.join(", ")}`);
+      process.exitCode = 2;
+    }
   } else if (cmd === "prune") {
     console.log(`Supprimées : ${(await pruneBackups(ctx.store)).join(", ") || "aucune"}`);
   } else {
-    console.log("Usage : backup-cli check | run | backup | verify [clé] | list | prune");
+    console.log("Usage : backup-cli check | run | backup | verify [clé] | photos | list | prune");
     process.exitCode = 1;
   }
 } finally {
+  await verifyDb?.end();
   await db.end();
 }
