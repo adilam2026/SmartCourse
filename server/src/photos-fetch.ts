@@ -8,7 +8,7 @@
  * Only files whose licence is on our allow-list (CC0, public domain, CC BY, CC BY-SA) are kept; the licence,
  * author and page URL are recorded for the credits screen. Nothing here writes to the database.
  */
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import sharp, { type OverlayOptions } from "sharp";
 
@@ -41,13 +41,25 @@ export function normalizeCommonsLicense(shortName: string | undefined): string |
   return null;
 }
 
+/**
+ * The API now hands out thumbnails on thumb.wikimedia.org; the same path is served by upload.wikimedia.org
+ * (which is the host we are allowed to reach). Tracking parameters are dropped.
+ */
+export function thumbOnUploadHost(url: string): string {
+  const u = new URL(url);
+  if (u.hostname === "thumb.wikimedia.org") u.hostname = "upload.wikimedia.org";
+  u.search = "";
+  return u.toString();
+}
+
 export function stripHtml(html: string | undefined): string | null {
   if (!html) return null;
   const t = html.replace(/<[^>]*>/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/\s+/g, " ").trim();
   return t || null;
 }
 
-const BAD_TITLE = /\b(logo|icon|diagram|map|drawing|illustration|sketch|painting|stamp|flag|coat of arms|seed ?ling|plant ?ation|market stall|menu|poster|screenshot)\b/i;
+// We want a clean picture of the product itself: no plants/flowers, fields, markets, dishes, people or drawings.
+const BAD_TITLE = /\b(logo|icon|diagram|map|drawing|illustration|sketch|painting|stamp|flag|coat of arms|seedling|plantation|market|stall|menu|poster|screenshot|flowers?|blossoms?|blooms?|plants?|trees?|fields?|gardens?|farms?|farmers?|harvest(ing)?|vendors?|shops?|supermarket|restaurant|cooking|cooked|recipe|dish|soup|salad|botanical|woman|women|man|men|girl|boy|child|children|people|person|hands?)\b/i;
 
 /** Pure: turns a Commons `query` response into usable candidates, best search rank first. */
 export function parseCommonsResponse(json: any, minSide = 600): Candidate[] {
@@ -59,7 +71,8 @@ export function parseCommonsResponse(json: any, minSide = 600): Candidate[] {
     if (!ii) continue;
     if (!/^image\/(jpeg|png|webp)$/.test(ii.mime ?? "")) continue;
     if (Math.min(ii.width ?? 0, ii.height ?? 0) < minSide) continue;
-    if (BAD_TITLE.test(p.title ?? "")) continue;
+    const meta0 = ii.extmetadata ?? {};
+    if (BAD_TITLE.test(`${p.title ?? ""} ${stripHtml(meta0.ImageDescription?.value) ?? ""} ${stripHtml(meta0.ObjectName?.value) ?? ""}`)) continue;
     const ratio = (ii.width ?? 1) / (ii.height ?? 1);
     if (ratio < 0.6 || ratio > 1.8) continue; // extreme panoramas / strips crop badly into a square tile
     const meta = ii.extmetadata ?? {};
@@ -70,7 +83,7 @@ export function parseCommonsResponse(json: any, minSide = 600): Candidate[] {
     out.push({
       title: p.title,
       pageUrl: ii.descriptionurl,
-      thumbUrl: ii.thumburl ?? ii.url,
+      thumbUrl: thumbOnUploadHost(ii.thumburl ?? ii.url),
       width: ii.width,
       height: ii.height,
       mime: ii.mime,
@@ -82,20 +95,48 @@ export function parseCommonsResponse(json: any, minSide = 600): Candidate[] {
   return out;
 }
 
-export type FetchFn = (url: string, init?: { headers?: Record<string, string> }) => Promise<{ ok: boolean; status: number; json(): Promise<any>; arrayBuffer(): Promise<ArrayBuffer> }>;
+export interface FetchResponse {
+  ok: boolean;
+  status: number;
+  headers?: { get(name: string): string | null };
+  json(): Promise<any>;
+  arrayBuffer(): Promise<ArrayBuffer>;
+}
+export type FetchFn = (url: string, init?: { headers?: Record<string, string> }) => Promise<FetchResponse>;
+
+/**
+ * GET with automatic retry on 429/5xx. Wikimedia throttles shared IP addresses and says how long to wait
+ * (Retry-After); we honour it (capped) with a growing minimum, and give up after `tries` attempts.
+ */
+export async function getWithRetry(
+  fetchFn: FetchFn, url: string, headers: Record<string, string>,
+  opts: { tries?: number; wait?: (ms: number) => Promise<void>; maxWaitMs?: number } = {},
+): Promise<FetchResponse> {
+  const tries = opts.tries ?? 8;
+  const wait = opts.wait ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  const cap = opts.maxWaitMs ?? 90_000;
+  let last: FetchResponse | undefined;
+  for (let attempt = 1; attempt <= tries; attempt++) {
+    last = await fetchFn(url, { headers });
+    if (last.ok || (last.status !== 429 && last.status < 500)) return last;
+    const asked = Number(last.headers?.get("retry-after") ?? 0);
+    await wait(Math.min(cap, Math.max(asked * 1000, 2000 * attempt)));
+  }
+  return last!;
+}
 
 export function commonsSearchUrl(query: string, limit = 12): string {
   const p = new URLSearchParams({
     action: "query", format: "json", 
     generator: "search", gsrsearch: `${query} filetype:bitmap`, gsrnamespace: "6", gsrlimit: String(limit),
-    prop: "imageinfo", iiprop: "url|size|mime|extmetadata", iiurlwidth: "800",
-    iiextmetadatafilter: "LicenseShortName|LicenseUrl|Artist|Credit|AttributionRequired",
+    prop: "imageinfo", iiprop: "url|size|mime|extmetadata", iiurlwidth: "960",
+    iiextmetadatafilter: "LicenseShortName|LicenseUrl|Artist|Credit|AttributionRequired|ImageDescription|ObjectName",
   });
   return `${API}?${p.toString()}`;
 }
 
 export async function searchCommons(query: string, fetchFn: FetchFn): Promise<Candidate[]> {
-  const res = await fetchFn(commonsSearchUrl(query), { headers: { "User-Agent": USER_AGENT, Accept: "application/json" } });
+  const res = await getWithRetry(fetchFn, commonsSearchUrl(query), { "User-Agent": USER_AGENT, Accept: "application/json" });
   if (!res.ok) throw new Error(`Commons API ${res.status} for "${query}"`);
   return parseCommonsResponse(await res.json());
 }
@@ -106,13 +147,20 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 async function cmdSearch(queriesPath: string, outDir: string, per: number) {
   const queries = JSON.parse(await readFile(queriesPath, "utf8")) as Record<string, string[] | string>;
   await mkdir(outDir, { recursive: true });
-  const all: Record<string, Candidate[]> = {};
+  // Resumable: candidates.json is rewritten after every product, and finished products are skipped on a re-run.
+  const file = path.join(outDir, "candidates.json");
+  let all: Record<string, Candidate[]> = {};
+  try {
+    all = JSON.parse(await readFile(file, "utf8"));
+  } catch {
+    /* first run */
+  }
   for (const [key, qs] of Object.entries(queries)) {
-    if (key.startsWith("_")) continue;
+    if (key.startsWith("_") || all[key]) continue;
     const seen = new Set<string>();
     const picked: Candidate[] = [];
     for (const q of qs as string[]) {
-      await sleep(400); // be polite to the API
+      await sleep(1200); // be polite to the API
       for (const c of await searchCommons(q, fetch as unknown as FetchFn)) {
         if (seen.has(c.pageUrl) || picked.length >= per) continue;
         seen.add(c.pageUrl);
@@ -123,15 +171,20 @@ async function cmdSearch(queriesPath: string, outDir: string, per: number) {
     const dir = path.join(outDir, key);
     await mkdir(dir, { recursive: true });
     for (const [i, c] of picked.entries()) {
-      await sleep(250);
-      const r = await (fetch as unknown as FetchFn)(c.thumbUrl, { headers: { "User-Agent": USER_AGENT } });
-      if (!r.ok) continue;
-      await writeFile(path.join(dir, `${i}.jpg`), await sharp(Buffer.from(await r.arrayBuffer())).rotate().resize(800, 800, { fit: "inside" }).jpeg({ quality: 85 }).toBuffer());
+      await sleep(1200);
+      try {
+        const r = await getWithRetry(fetch as unknown as FetchFn, c.thumbUrl, { "User-Agent": USER_AGENT });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        await writeFile(path.join(dir, `${i}.jpg`), await sharp(Buffer.from(await r.arrayBuffer())).rotate().resize(800, 800, { fit: "inside" }).jpeg({ quality: 85 }).toBuffer());
+      } catch (e) {
+        console.warn(`  téléchargement impossible (${(e as Error).message}) : ${c.title}`);
+        c.license = ""; // no local file for this candidate: keep it out of the selection
+      }
     }
-    all[key] = picked;
+    all[key] = picked; // indices stay aligned with files {0..n}.jpg
+    await writeFile(file, JSON.stringify(all, null, 2));
     console.log(`${key.padEnd(24)} ${picked.length} candidate(s)`);
   }
-  await writeFile(path.join(outDir, "candidates.json"), JSON.stringify(all, null, 2));
 }
 
 export async function makeSheet(outDir: string, keys: string[], file: string, cols = 4, tile = 220): Promise<void> {
@@ -156,12 +209,12 @@ export async function makeSheet(outDir: string, keys: string[], file: string, co
   await sharp({ create: { width: cols * tile, height: rows * (tile + labelH), channels: 3, background: "#ffffff" } }).composite(composites).png().toFile(file);
 }
 
-async function cmdSheet(outDir: string) {
+async function cmdSheet(outDir: string, from = 0) {
   const cands = JSON.parse(await readFile(path.join(outDir, "candidates.json"), "utf8")) as Record<string, Candidate[]>;
-  const keys = Object.keys(cands);
+  const keys = Object.keys(cands).slice(from);
   await mkdir(path.join(outDir, "sheets"), { recursive: true });
   for (let i = 0; i < keys.length; i += 5) {
-    const file = path.join(outDir, "sheets", `sheet-${String(i / 5 + 1).padStart(2, "0")}.png`);
+    const file = path.join(outDir, "sheets", `sheet-from${from}-${String(i / 5 + 1).padStart(2, "0")}.png`);
     await makeSheet(outDir, keys.slice(i, i + 5), file);
     console.log(file);
   }
@@ -170,22 +223,27 @@ async function cmdSheet(outDir: string) {
 async function cmdManifest(outDir: string, selectionPath: string, manifestPath: string) {
   const cands = JSON.parse(await readFile(path.join(outDir, "candidates.json"), "utf8")) as Record<string, Candidate[]>;
   const selection = JSON.parse(await readFile(selectionPath, "utf8")) as Record<string, number>;
-  const items = Object.entries(selection).map(([key, idx]) => {
+  const filesDir = path.join(path.dirname(manifestPath), "files");
+  await mkdir(filesDir, { recursive: true });
+  const items = [];
+  for (const [key, idx] of Object.entries(selection)) {
     const c = cands[key]?.[idx];
     if (!c) throw new Error(`Aucun candidat #${idx} pour ${key}`);
-    return {
-      target: "initial", key, file: path.relative(path.dirname(manifestPath), path.join(outDir, key, `${idx}.jpg`)),
+    // The chosen picture travels with the app (repository), so a deployment never depends on Wikimedia being reachable.
+    await copyFile(path.join(outDir, key, `${idx}.jpg`), path.join(filesDir, `${key}.jpg`));
+    items.push({
+      target: "initial", key, file: `files/${key}.jpg`,
       sourceName: "Wikimedia Commons", sourceUrl: c.pageUrl, license: c.license, licenseUrl: c.licenseUrl, author: c.author,
-    };
-  });
-  await writeFile(manifestPath, JSON.stringify({ items }, null, 2));
+    });
+  }
+  await writeFile(manifestPath, JSON.stringify({ items }, null, 2) + "\n");
   console.log(`${items.length} entrée(s) écrites dans ${manifestPath}`);
 }
 
 if (process.argv[1] && /photos-fetch\.(ts|js)$/.test(process.argv[1])) {
   const [cmd, a, b, c] = process.argv.slice(2);
   if (cmd === "search" && a && b) await cmdSearch(a, b, Number(c ?? 4));
-  else if (cmd === "sheet" && a) await cmdSheet(a);
+  else if (cmd === "sheet" && a) await cmdSheet(a, Number(b ?? 0));
   else if (cmd === "manifest" && a && b && c) await cmdManifest(a, b, c);
   else console.log("Usage : photos-fetch search <queries.json> <outdir> [n] | sheet <outdir> | manifest <outdir> <selection.json> <manifest.json>");
 }

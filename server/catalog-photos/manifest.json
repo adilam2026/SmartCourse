@@ -1,0 +1,264 @@
+{
+  "items": [
+    {
+      "target": "initial",
+      "key": "tomates",
+      "file": "files/tomates.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Tomato_je.jpg",
+      "license": "CC-BY-SA-3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+      "author": "Softeis"
+    },
+    {
+      "target": "initial",
+      "key": "pommes-de-terre",
+      "file": "files/pommes-de-terre.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Solanum_tuberosum_Red_Scarlett20170523_7825.jpg",
+      "license": "CC-BY-SA-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "author": "Bff"
+    },
+    {
+      "target": "initial",
+      "key": "oignons",
+      "file": "files/oignons.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Onion_on_White.JPG",
+      "license": "CC-BY-SA-3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+      "author": "Colin"
+    },
+    {
+      "target": "initial",
+      "key": "carottes",
+      "file": "files/carottes.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Carrots_from_Pakistan.jpg",
+      "license": "CC-BY-SA-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "author": "Challiyan"
+    },
+    {
+      "target": "initial",
+      "key": "poivrons-verts",
+      "file": "files/poivrons-verts.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Green_Bell_Pepper.jpg",
+      "license": "CC-BY-SA-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "author": "Gaurav Dhwaj Khadka"
+    },
+    {
+      "target": "initial",
+      "key": "poivrons-rouges",
+      "file": "files/poivrons-rouges.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Red_bell_pepper.jpg",
+      "license": "CC-BY-SA-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "author": "AntanO"
+    },
+    {
+      "target": "initial",
+      "key": "aubergines",
+      "file": "files/aubergines.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Round_eggplant_(1).jpg",
+      "license": "CC0-1.0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "author": "Fumikas Sagisavas"
+    },
+    {
+      "target": "initial",
+      "key": "haricots-verts",
+      "file": "files/haricots-verts.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Macro_of_Fresh_Green_Beans_Buncis.jpg",
+      "license": "CC-BY-SA-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "author": "Undeka 11"
+    },
+    {
+      "target": "initial",
+      "key": "laitue",
+      "file": "files/laitue.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Romaine_lettuce.jpg",
+      "license": "CC-BY-SA-3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+      "author": "Rainer Zenz"
+    },
+    {
+      "target": "initial",
+      "key": "ail",
+      "file": "files/ail.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Liat_Portal_for_Foodie_Disorder_-_Garlic_Bulbs_and_Cloves.jpg",
+      "license": "CC-BY-SA-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "author": "HaJunkiyada"
+    },
+    {
+      "target": "initial",
+      "key": "concombres",
+      "file": "files/concombres.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Greek_yoghurt_cucumbers_garlic.jpg",
+      "license": "CC-BY-SA-3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+      "author": "Nikodem Nijaki"
+    },
+    {
+      "target": "initial",
+      "key": "persil",
+      "file": "files/persil.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Liat_Portal_for_Foodie_Disorder_-_Parsley.jpg",
+      "license": "CC-BY-SA-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "author": "HaJunkiyada"
+    },
+    {
+      "target": "initial",
+      "key": "coriandre",
+      "file": "files/coriandre.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Coriander_Leaves.jpg",
+      "license": "CC-BY-SA-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "author": "Rupeshm364"
+    },
+    {
+      "target": "initial",
+      "key": "menthe",
+      "file": "files/menthe.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Mint_leaves_(Mentha_spicata).jpg",
+      "license": "CC-BY-SA-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "author": "Commonists"
+    },
+    {
+      "target": "initial",
+      "key": "bananes",
+      "file": "files/bananes.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Bananas_on_black_background_02.jpg",
+      "license": "CC-BY-SA-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "author": "Krzysztof Golik"
+    },
+    {
+      "target": "initial",
+      "key": "pommes",
+      "file": "files/pommes.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Red_Apple.jpg",
+      "license": "CC-BY-2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+      "author": "Abhijit Tembhekar from Mumbai, India"
+    },
+    {
+      "target": "initial",
+      "key": "oranges",
+      "file": "files/oranges.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Oranges_-_whole-halved-segment.jpg",
+      "license": "CC-BY-SA-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "author": "Ivar Leidus"
+    },
+    {
+      "target": "initial",
+      "key": "clementines",
+      "file": "files/clementines.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Clementines_whole,_peeled,_half_and_sectioned.jpg",
+      "license": "CC-BY-SA-3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+      "author": "carol"
+    },
+    {
+      "target": "initial",
+      "key": "citrons",
+      "file": "files/citrons.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Lemon.jpg",
+      "license": "CC-BY-SA-2.5",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.5",
+      "author": "André Karwath aka Aka"
+    },
+    {
+      "target": "initial",
+      "key": "fraises",
+      "file": "files/fraises.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Fragaria_vesca_fruit_-_Keila.jpg",
+      "license": "CC-BY-SA-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "author": "Ivar Leidus"
+    },
+    {
+      "target": "initial",
+      "key": "raisins",
+      "file": "files/raisins.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Green_Grape_3.jpg",
+      "license": "PD",
+      "licenseUrl": null,
+      "author": "Martin Kozák"
+    },
+    {
+      "target": "initial",
+      "key": "avocats",
+      "file": "files/avocats.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Avocado_Hass_-_single_and_halved.jpg",
+      "license": "CC-BY-SA-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "author": "Ivar Leidus"
+    },
+    {
+      "target": "initial",
+      "key": "poires",
+      "file": "files/poires.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:D%27anjou_pear.jpg",
+      "license": "CC-BY-SA-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "author": "Rhododendrites"
+    },
+    {
+      "target": "initial",
+      "key": "fruits-de-saison",
+      "file": "files/fruits-de-saison.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:A_basket_of_fruits.jpg",
+      "license": "CC-BY-SA-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "author": "Suyash Dwivedi"
+    },
+    {
+      "target": "initial",
+      "key": "oeufs",
+      "file": "files/oeufs.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:6-Pack-Chicken-Eggs.jpg",
+      "license": "PD",
+      "licenseUrl": null,
+      "author": "Evan-Amos"
+    },
+    {
+      "target": "initial",
+      "key": "fromage-rape",
+      "file": "files/fromage-rape.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Grated_cheese_Annie_Mole.jpg",
+      "license": "CC-BY-2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+      "author": "Annie Mole"
+    }
+  ]
+}

@@ -16,6 +16,7 @@ const schema = z.object({
   /** Set to "1" to accept a local directory for backups in production (only if it is a persistent volume). */
   BACKUP_ALLOW_LOCAL: z.string().optional(),
   BACKUP_DIR: z.string().default("./data/backups"),
+  PHOTO_MANIFEST: z.string().default("./catalog-photos/manifest.json"),
   INSTALL_TOKEN: z.string().min(16).optional(),
   PORT: z.coerce.number().int().default(3000),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),

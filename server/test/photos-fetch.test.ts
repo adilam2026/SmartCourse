@@ -4,7 +4,7 @@ import path from "node:path";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import { checkLicense } from "../src/photos.js";
-import { commonsSearchUrl, makeSheet, normalizeCommonsLicense, parseCommonsResponse, searchCommons, stripHtml, USER_AGENT, type FetchFn } from "../src/photos-fetch.js";
+import { commonsSearchUrl, getWithRetry, makeSheet, thumbOnUploadHost, normalizeCommonsLicense, parseCommonsResponse, searchCommons, stripHtml, USER_AGENT, type FetchFn } from "../src/photos-fetch.js";
 
 /*
  * No access to Wikimedia from the development environment yet: these tests use responses shaped like the
@@ -48,6 +48,13 @@ describe("licences Commons", () => {
   });
 });
 
+describe("miniatures", () => {
+  it("passe de thumb.wikimedia.org à upload.wikimedia.org et retire les paramètres de suivi", () => {
+    expect(thumbOnUploadHost("https://thumb.wikimedia.org/wikipedia/commons/thumb/8/89/Tomato_je.jpg/960px-Tomato_je.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo")).toBe("https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Tomato_je.jpg/960px-Tomato_je.jpg");
+    expect(thumbOnUploadHost("https://upload.wikimedia.org/wikipedia/commons/8/89/A.jpg?x=1")).toBe("https://upload.wikimedia.org/wikipedia/commons/8/89/A.jpg");
+  });
+});
+
 describe("réponse de l'API Commons", () => {
   it("garde les candidats utilisables, dans l'ordre de pertinence, avec auteur et licence", () => {
     const r = parseCommonsResponse(response(page(2, "File:Tomatoes b.jpg"), page(1, "File:Tomato a.jpg")));
@@ -64,6 +71,9 @@ describe("réponse de l'API Commons", () => {
       page(5, "File:Anim.gif", { mime: "image/gif" }),
       page(6, "File:Tomato diagram.jpg"),
       page(7, "File:Pano.jpg", { width: 4000, height: 800 }),
+      page(8, "File:Tomato plant.jpg"),
+      page(9, "File:Potato flowers 2016.jpg"),
+      page(10, "File:Tomatoes.jpg", {}, { ImageDescription: "Farmer selling tomatoes at the market" }),
     ));
     expect(r.map((c) => c.title)).toEqual(["File:Ok.jpg"]);
   });
@@ -97,8 +107,33 @@ describe("requête", () => {
     expect(USER_AGENT).not.toMatch(/@/);
   });
   it("erreur HTTP : échec explicite", async () => {
-    const f: FetchFn = async () => ({ ok: false, status: 429, json: async () => ({}), arrayBuffer: async () => new ArrayBuffer(0) });
-    await expect(searchCommons("x", f)).rejects.toThrow(/429/);
+    const f: FetchFn = async () => ({ ok: false, status: 404, json: async () => ({}), arrayBuffer: async () => new ArrayBuffer(0) });
+    await expect(searchCommons("x", f)).rejects.toThrow(/404/);
+  });
+});
+
+describe("reprise sur limitation (429)", () => {
+  const resp = (status: number, retryAfter?: string): any => ({ ok: status < 400, status, headers: { get: (n: string) => (n === "retry-after" ? retryAfter ?? null : null) }, json: async () => ({}), arrayBuffer: async () => new ArrayBuffer(0) });
+  it("attend le délai demandé puis réussit", async () => {
+    const waits: number[] = [];
+    const seq = [resp(429, "36"), resp(429, "1"), resp(200)];
+    const r = await getWithRetry(async () => seq.shift(), "u", {}, { wait: async (ms) => void waits.push(ms) });
+    expect(r.ok).toBe(true);
+    expect(waits).toEqual([36_000, 4_000]); // Retry-After respecté ; sinon délai minimal croissant
+  });
+  it("plafonne l'attente et abandonne après le nombre d'essais, en renvoyant le dernier échec", async () => {
+    const waits: number[] = [];
+    let calls = 0;
+    const r = await getWithRetry(async () => (calls++, resp(429, "600")), "u", {}, { tries: 3, wait: async (ms) => void waits.push(ms), maxWaitMs: 90_000 });
+    expect(r.status).toBe(429);
+    expect(calls).toBe(3);
+    expect(waits).toEqual([90_000, 90_000, 90_000]);
+  });
+  it("ne rejoue pas une erreur définitive (404)", async () => {
+    let calls = 0;
+    const r = await getWithRetry(async () => (calls++, resp(404)), "u", {}, { wait: async () => {} });
+    expect(r.status).toBe(404);
+    expect(calls).toBe(1);
   });
 });
 

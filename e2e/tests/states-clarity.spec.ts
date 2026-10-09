@@ -45,9 +45,10 @@ test("états distincts : enregistré sur le serveur / validé en attente / chois
 
   // 4. Retour du réseau : tout part, puis seulement alors « Enregistré sur le serveur »
   await ctx.setOffline(false);
-  await page.getByTestId("validate").click(); // envoie aussi Sucre
   await page.evaluate(() => (window as any).__engine.retryNow());
-  await expect(page.getByTestId("banner-pending")).toHaveCount(0);
+  await expect(page.getByTestId("banner-pending")).toHaveCount(0); // le choix validé hors connexion est parti et confirmé
+  await expect(page.getByTestId("validate")).toHaveText("Valider"); // plus d'envoi en cours : le bouton est de nouveau actif
+  await page.getByTestId("validate").click(); // envoie maintenant Sucre
   await expect(page.getByTestId("sync-state")).toContainText("✓ Enregistré sur le serveur");
   await expect(card(page, f, "Riz")).toHaveAttribute("data-state", "saved");
   await expect(page.getByTestId("count-saved")).toContainText("4 enregistrés sur le serveur");

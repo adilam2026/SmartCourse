@@ -281,6 +281,41 @@ class FakeEventSource implements EventSourceLike {
 }
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+describe("validation pendant un envoi en cours", () => {
+  it("un appui sur « Valider » pendant qu'un envoi est en vol n'est pas perdu : il part juste après", async () => {
+    const e = await boot();
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const real = srv.api.postOps;
+    let first = true;
+    srv.api.postOps = async (listId: string, ops: Op[]) => {
+      if (first) { first = false; await gate; } // le premier envoi reste « en vol »
+      return real(listId, ops);
+    };
+    await e.toggle("lait");
+    const p1 = e.validate();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(e.getState().sending).toBe(true);
+    await e.toggle("riz");
+    const p2 = e.validate(); // appui pendant l'envoi
+    expect(e.getState().toggles).toEqual({}); // pris en compte tout de suite (en file)
+    expect(e.getState().batches).toHaveLength(2);
+    release();
+    await Promise.all([p1, p2]);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(srv.items.map((i) => i.productId).sort()).toEqual(["lait", "riz"]);
+    expect(e.getState().batches).toEqual([]);
+    expect(srv.calls).toHaveLength(2);
+  });
+
+  it("double appui rapide : un seul envoi", async () => {
+    const e = await boot();
+    await e.toggle("lait");
+    await Promise.all([e.validate(), e.validate(), e.validate()]);
+    expect(srv.calls).toHaveLength(1);
+  });
+});
+
 describe("temps réel (SSE)", () => {
   it("un événement déclenche une relecture : les changements validés par d'autres apparaissent sans action", async () => {
     const es = new FakeEventSource();

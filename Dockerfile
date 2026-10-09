@@ -49,6 +49,7 @@ COPY server/package*.json ./
 RUN npm ci --omit=dev
 COPY --from=build /app/server/dist ./dist
 COPY server/migrations ./migrations
+COPY server/catalog-photos ./catalog-photos
 COPY --from=web /app/web/dist /app/web/dist
 # Run as the unprivileged "node" user; ./data is only used in development (production uses the bucket).
 RUN mkdir -p /app/server/data && chown -R node:node /app/server/data

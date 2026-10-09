@@ -4,4 +4,5 @@ dist
 e2e/test-results
 e2e/shots
 e2e/playwright-report
-server/data
+server/data/photos
+server/data/backups

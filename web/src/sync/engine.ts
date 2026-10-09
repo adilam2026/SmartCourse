@@ -364,7 +364,9 @@ export class Engine {
   /** "Valider": move the pending choices into the outbox (persisted first), then try to send. */
   async validate(): Promise<void> {
     const { list, toggles } = this.s;
-    if (!list || list.status !== "active" || this.s.sending) return;
+    // Not refused while a sync is in flight: the new batch is queued and the running loop sends it right after
+    // (a second tap is harmless: the first one already emptied the pending choices).
+    if (!list || list.status !== "active") return;
     const ops = buildOps(list, toggles, this.newId);
     if (ops.length === 0) {
       this.set({ toggles: {} });
