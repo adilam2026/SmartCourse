@@ -52,6 +52,8 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
 
 export const api = {
   login: (familyCode: string, login: string, secret: string) => request<{ me: Me }>("POST", "/api/auth/login", { familyCode, login, secret }),
+  setupFamily: (b: { installToken: string; familyName: string; admin: { displayName: string; login: string; secret: string } }) =>
+    request<{ familyCode: string; me: Me }>("POST", "/api/setup/family", b),
   logout: () => request<{ ok: true }>("POST", "/api/auth/logout"),
   me: () => request<{ me: Me }>("GET", "/api/me"),
   catalog: () => request<Catalog>("GET", "/api/catalog"),
@@ -68,6 +70,7 @@ export const api = {
     request<{ profile: Profile; secret: string }>("POST", "/api/profiles", b),
   updateProfile: (id: string, b: { displayName?: string; role?: Role; active?: boolean }) => request<{ profile: Profile }>("PATCH", `/api/profiles/${id}`, b),
   resetSecret: (id: string) => request<{ secret: string }>("POST", `/api/profiles/${id}/reset-secret`, {}),
+  backupStatus: () => request<BackupStatus>("GET", "/api/admin/backup-status"),
   catalogAdmin: () => request<Catalog>("GET", "/api/catalog?includeInactive=1"),
   patchProduct: (id: string, b: { name?: string; brand?: string | null; active?: boolean }) => request<{ product: Product }>("PATCH", `/api/products/${id}`, b),
   searchExtended: (q: string) => request<{ results: ExtendedResult[] }>("GET", `/api/catalog/extended?q=${encodeURIComponent(q)}`),
@@ -80,6 +83,13 @@ export const api = {
     return (await res.json()) as { product: Product };
   },
 };
+
+export interface BackupStatus {
+  configured: boolean;
+  lastBackupAt: string | null;
+  lastVerifiedOkAt: string | null;
+  lastVerifyFailedAt: string | null;
+}
 
 export interface Profile {
   id: string;

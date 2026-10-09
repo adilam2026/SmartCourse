@@ -11,6 +11,9 @@ const schema = z.object({
   WEB_DIR: z.string().default("../web/dist"),
   /** Per-IP cap on unauthenticated routes (login, setup) per minute. */
   LOGIN_RATE_MAX: z.coerce.number().int().min(1).default(20),
+  /** Passphrase that encrypts backups. Without it, scheduled backups are disabled. KEEP A COPY OUTSIDE RAILWAY: lost key = unreadable backups. */
+  BACKUP_KEY: z.string().min(16).optional(),
+  BACKUP_DIR: z.string().default("./data/backups"),
   INSTALL_TOKEN: z.string().min(16).optional(),
   PORT: z.coerce.number().int().default(3000),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),

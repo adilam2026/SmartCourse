@@ -143,3 +143,7 @@ h1, h2 { margin: 0; }
 .secret { font-size: 2.6rem; letter-spacing: 0.3em; text-align: center; font-weight: 800; margin: 4px 0; }
 .photo-btn { min-width: 44px; min-height: 44px; display: grid; place-items: center; font-size: 1.4rem; cursor: pointer; }
 .avatar--back { background: var(--surface); color: var(--ink); border: 2px solid var(--line); }
+
+.linkbtn { display: block; margin: 18px auto 0; background: none; border: 0; color: var(--green); font-weight: 700; text-decoration: underline; min-height: 44px; }
+
+.backupcard { margin: 6px 12px; }

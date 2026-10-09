@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { api, ApiError, NetworkError, type ExtendedResult, type Profile } from "../api";
+import { api, ApiError, NetworkError, type BackupStatus, type ExtendedResult, type Profile } from "../api";
+import { fmtDateTime } from "../format";
 import { CATEGORY_EMOJI } from "../categories";
 import { Dialog } from "../components/Dialog";
 import { Thumb } from "../components/Thumb";
@@ -22,8 +23,29 @@ export function Settings({ engine, s }: { engine: Engine; s: State }) {
         <button role="tab" aria-selected={section === "profiles"} className={section === "profiles" ? "on" : ""} data-testid="seg-profiles" onClick={() => setSection("profiles")}>Profils</button>
         <button role="tab" aria-selected={section === "catalog"} className={section === "catalog" ? "on" : ""} data-testid="seg-catalog" onClick={() => setSection("catalog")}>Catalogue</button>
       </div>
-      {section === "profiles" ? <Profiles me={s.me!.id} /> : <CatalogAdmin engine={engine} />}
+      {section === "profiles" ? <><BackupCard /><Profiles me={s.me!.id} /></> : <CatalogAdmin engine={engine} />}
     </>
+  );
+}
+
+function BackupCard() {
+  const [st, setSt] = useState<BackupStatus | null>(null);
+  useEffect(() => void api.backupStatus().then(setSt).catch(() => {}), []);
+  if (!st) return null;
+  const old = (iso: string | null, days: number) => !iso || Date.now() - new Date(iso).getTime() > days * 86_400_000;
+  const failedSince = st.lastVerifyFailedAt && (!st.lastVerifiedOkAt || st.lastVerifyFailedAt > st.lastVerifiedOkAt);
+  const bad = !st.configured || old(st.lastVerifiedOkAt, 3) || failedSince;
+  return (
+    <div className={`banner ${bad ? "banner--pending" : "banner--info"} backupcard`} data-testid="backup-card">
+      <span>
+        <strong>Sauvegarde {st.configured ? "automatique" : "NON configurée"}</strong>
+        <br />
+        Dernière sauvegarde : {st.lastBackupAt ? fmtDateTime(st.lastBackupAt) : "aucune"}
+        <br />
+        Dernière restauration vérifiée : {st.lastVerifiedOkAt ? fmtDateTime(st.lastVerifiedOkAt) : "jamais"}
+        {failedSince ? " — ÉCHEC de la dernière vérification" : ""}
+      </span>
+    </div>
   );
 }
 

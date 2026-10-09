@@ -5,6 +5,7 @@ import rateLimit from "@fastify/rate-limit";
 import Fastify, { type FastifyInstance, type FastifyReply } from "fastify";
 import { ZodError, z } from "zod";
 import { authenticate, login, revokeSession, setupFamily, type AuthContext, SESSION_DAYS } from "./auth.js";
+import { backupStatus } from "./backup.js";
 import { catalogRoutes } from "./catalog-routes.js";
 import { COOKIE, makeGuard } from "./guard.js";
 import { listRoutes } from "./list-routes.js";
@@ -21,6 +22,8 @@ export interface AppDeps {
   store: PhotoStore;
   /** Built PWA (web/dist). When set, the server also serves the app and falls back to index.html. */
   webDir?: string;
+  /** Whether scheduled, encrypted backups are set up (BACKUP_KEY present). */
+  backupConfigured?: boolean;
   /** Per-IP limits on the unauthenticated routes. */
   loginRateLimit?: { max: number; timeWindow: string };
   /** How often an open SSE stream re-checks its session (catches out-of-band revocation). */
@@ -138,6 +141,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     const body = z.object({ secret: secretField.optional() }).parse(req.body ?? {});
     return { secret: await resetSecret(db, hub, req.auth!, id, body.secret) };
   });
+
+  app.get("/api/admin/backup-status", { preHandler: guard("family.manage") }, async () => backupStatus(db, deps.backupConfigured ?? false));
 
   catalogRoutes(app, { db, store: deps.store, guard });
   listRoutes(app, { db, hub, guard });

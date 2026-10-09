@@ -30,6 +30,8 @@ export interface State {
   lastLogin: { familyCode: string; login: string } | null;
   /** True while the live (SSE) channel is connected. */
   live: boolean;
+  /** Family code to show once right after the first installation. */
+  welcomeCode: string | null;
 }
 
 /** The subset of EventSource the engine uses (so tests can fake it). */
@@ -55,7 +57,7 @@ const RETRY_MS = [3_000, 8_000, 20_000, 45_000];
 export class Engine {
   private s: State = {
     phase: "boot", me: null, conn: "online", catalog: null, list: undefined, toggles: {}, draftListId: null, batches: [],
-    sending: false, justSynced: false, notices: [], orphan: null, loginError: null, loggingIn: false, lastLogin: null, live: false,
+    sending: false, justSynced: false, notices: [], orphan: null, loginError: null, loggingIn: false, lastLogin: null, live: false, welcomeCode: null,
   };
   private listeners = new Set<() => void>();
   private api: typeof realApi;
@@ -116,6 +118,8 @@ export class Engine {
     }
   }
 
+  dismissWelcome = () => this.set({ welcomeCode: null });
+
   async login(familyCode: string, login: string, secret: string): Promise<void> {
     this.set({ loggingIn: true, loginError: null });
     try {
@@ -131,6 +135,36 @@ export class Engine {
         : e instanceof ApiError && e.status === 429 ? "Trop d'essais. Patientez un instant."
         : "Connexion impossible.";
       this.set({ loginError: msg });
+    } finally {
+      this.set({ loggingIn: false });
+    }
+  }
+
+  /** First installation: consumes the one-shot install token, creates the family and its first administrator. */
+  async setup(input: { installToken: string; familyName: string; displayName: string; login: string; secret: string }): Promise<string | null> {
+    this.set({ loggingIn: true, loginError: null });
+    try {
+      const r = await this.api.setupFamily({
+        installToken: input.installToken.trim(),
+        familyName: input.familyName,
+        admin: { displayName: input.displayName, login: input.login.trim().toLowerCase(), secret: input.secret },
+      });
+      const lastLogin = { familyCode: r.familyCode, login: input.login.trim().toLowerCase() };
+      await this.db.meta.put({ key: "lastLogin", value: lastLogin });
+      this.set({ lastLogin, welcomeCode: r.familyCode });
+      const { me } = await this.api.me();
+      await this.enter(me);
+      return r.familyCode;
+    } catch (e) {
+      this.set({
+        loginError:
+          e instanceof NetworkError ? "Pas de connexion. Réessayez."
+          : e instanceof ApiError && e.status === 403 ? "Jeton d'installation invalide ou déjà utilisé."
+          : e instanceof ApiError && e.code === "weak_secret" ? "Code trop simple (évitez 123456, 111111…)."
+          : e instanceof ApiError && e.status === 400 ? "Vérifiez les champs (identifiant : lettres minuscules, chiffres, . _ -)."
+          : "Installation impossible.",
+      });
+      return null;
     } finally {
       this.set({ loggingIn: false });
     }

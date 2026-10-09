@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { buildApp } from "../src/app.js";
@@ -41,5 +41,26 @@ describe("socle", () => {
     const n = await db.query("SELECT count(*)::int AS n FROM tmp_once");
     expect(n.rows[0].n).toBe(1);
     await db.query("DROP TABLE tmp_once; DELETE FROM schema_migrations WHERE name='901_once.sql'");
+  });
+
+  it("sert la PWA : index sans cache, bundles immuables, repli SPA, /api inconnu en JSON", async () => {
+    const web = await mkdtemp(path.join(os.tmpdir(), "web-"));
+    await mkdir(path.join(web, "assets"));
+    await writeFile(path.join(web, "index.html"), "<html>shell</html>");
+    await writeFile(path.join(web, "sw.js"), "// sw");
+    await writeFile(path.join(web, "assets", "app-abc123.js"), "console.log(1)");
+    const app = await buildApp({ db: await testDb(), store: testStore(), webDir: web });
+    const idx = await app.inject({ method: "GET", url: "/" });
+    expect(idx.body).toContain("shell");
+    expect(idx.headers["cache-control"]).toBe("no-cache");
+    expect((await app.inject({ method: "GET", url: "/sw.js" })).headers["cache-control"]).toBe("no-cache");
+    expect((await app.inject({ method: "GET", url: "/assets/app-abc123.js" })).headers["cache-control"]).toContain("immutable");
+    const spa = await app.inject({ method: "GET", url: "/une/page/inconnue" });
+    expect(spa.statusCode).toBe(200);
+    expect(spa.body).toContain("shell");
+    const api = await app.inject({ method: "GET", url: "/api/inconnu" });
+    expect(api.statusCode).toBe(404);
+    expect(api.json()).toEqual({ error: "not_found" });
+    await app.close();
   });
 });

@@ -60,16 +60,17 @@ export class S3PhotoStore implements PhotoStore {
   }
 }
 
+export function s3ClientFromConfig(config: Config): S3Client {
+  return new S3Client({
+    region: config.S3_REGION ?? "auto",
+    endpoint: config.S3_ENDPOINT,
+    forcePathStyle: true,
+    credentials: { accessKeyId: config.S3_ACCESS_KEY_ID ?? "", secretAccessKey: config.S3_SECRET_ACCESS_KEY ?? "" },
+  });
+}
+
 export function createPhotoStore(config: Config): PhotoStore {
-  if (config.S3_BUCKET) {
-    const client = new S3Client({
-      region: config.S3_REGION ?? "auto",
-      endpoint: config.S3_ENDPOINT,
-      forcePathStyle: true,
-      credentials: { accessKeyId: config.S3_ACCESS_KEY_ID ?? "", secretAccessKey: config.S3_SECRET_ACCESS_KEY ?? "" },
-    });
-    return new S3PhotoStore(client, config.S3_BUCKET);
-  }
+  if (config.S3_BUCKET) return new S3PhotoStore(s3ClientFromConfig(config), config.S3_BUCKET);
   return new LocalPhotoStore(config.PHOTO_DIR);
 }
 

@@ -107,7 +107,7 @@ PWA (React + Vite, IndexedDB). Sur iOS : pas de synchronisation en arrière-plan
 
 ## 8. Hébergement, coûts, sauvegardes
 
-Tarifs relevés (à confirmer sur la page tarifs avant engagement) : plan Hobby 5 $/mois incluant 5 $ de consommation ; RAM 10 $/Go/mois ; CPU 20 $/vCPU/mois ; volume 0,15 $/Go/mois ; bucket 0,015 $/Go/mois, sortie du bucket gratuite. Estimation : 6 à 8 $/mois, à remplacer par la mesure réelle (rapport de coût à l'étape 8).
+Tarifs relevés (à confirmer sur la page tarifs avant engagement) : plan Hobby 5 $/mois incluant 5 $ de consommation ; RAM 10 $/Go/mois ; CPU 20 $/vCPU/mois ; volume 0,15 $/Go/mois ; bucket 0,015 $/Go/mois, sortie du bucket gratuite. Mesures locales et prévision (environ 2,5 à 3,5 $/mois, à confirmer en réel) : voir `couts.md`.
 
 **Limite de dépense** : d'après les retours de la communauté Railway (documentation officielle non consultée), une limite stricte arrête les services du workspace lorsqu'elle est atteinte, et des anomalies de comptage ont été rapportées. Elle peut donc **interrompre l'application**. Elle ne sera pas activée sans votre accord ; on privilégie d'abord une alerte. Si vous l'activez, fixer une marge nettement supérieure à l'estimation.
 
@@ -116,7 +116,7 @@ Tarifs relevés (à confirmer sur la page tarifs avant engagement) : plan Hobby 
 - script de restauration `npm run backup:verify` : restaure la dernière sauvegarde dans une base temporaire et contrôle des comptages et des contraintes ;
 - une sauvegarde n'est comptée valide qu'après restauration vérifiée ; la date de la dernière vérification est affichée dans l'administration.
 
-## 9. Plan par étapes
+## 9. Plan par étapes (réalisé : voir README)
 
 1. Socle : projet, migrations, santé, déploiement Railway, tests.
 2. Authentification, profils, droits, jeton d'installation, révocation.

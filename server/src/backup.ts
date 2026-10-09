@@ -1,0 +1,359 @@
+import { spawn } from "node:child_process";
+import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from "node:crypto";
+import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, type S3Client } from "@aws-sdk/client-s3";
+import type { Db } from "./db.js";
+
+/*
+ * Backups = a consistent pg_dump, encrypted, plus a manifest of row counts taken in the SAME snapshot.
+ * A backup is only trusted once `verifyBackup` has restored it into a scratch database and the restored
+ * data matches the manifest: a file that was written but never restored proves nothing.
+ */
+
+export interface BackupStore {
+  put(key: string, data: Buffer): Promise<void>;
+  get(key: string): Promise<Buffer | null>;
+  list(prefix: string): Promise<{ key: string; at: Date }[]>;
+  delete(key: string): Promise<void>;
+}
+
+export class LocalBackupStore implements BackupStore {
+  constructor(private dir: string) {}
+  private file(key: string) {
+    if (!/^backups\/[\w.-]+$/.test(key)) throw new Error(`Invalid backup key: ${key}`);
+    return path.join(this.dir, key);
+  }
+  async put(key: string, data: Buffer) {
+    const f = this.file(key);
+    await mkdir(path.dirname(f), { recursive: true });
+    await writeFile(f, data);
+  }
+  async get(key: string) {
+    try {
+      return await readFile(this.file(key));
+    } catch (e: any) {
+      if (e.code === "ENOENT") return null;
+      throw e;
+    }
+  }
+  async list(prefix: string) {
+    const slash = prefix.lastIndexOf("/");
+    const folder = prefix.slice(0, slash); // "backups"
+    const namePrefix = prefix.slice(slash + 1);
+    const dir = path.join(this.dir, folder);
+    let names: string[];
+    try {
+      names = await readdir(dir);
+    } catch (e: any) {
+      if (e.code === "ENOENT") return [];
+      throw e;
+    }
+    const out = [];
+    for (const n of names) if (n.startsWith(namePrefix)) out.push({ key: `${folder}/${n}`, at: (await stat(path.join(dir, n))).mtime });
+    return out;
+  }
+  async delete(key: string) {
+    await rm(this.file(key), { force: true });
+  }
+}
+
+export class S3BackupStore implements BackupStore {
+  constructor(private c: S3Client, private bucket: string) {}
+  async put(key: string, data: Buffer) {
+    await this.c.send(new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: data }));
+  }
+  async get(key: string) {
+    try {
+      const r = await this.c.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
+      return Buffer.from(await r.Body!.transformToByteArray());
+    } catch (e: any) {
+      if (e.name === "NoSuchKey") return null;
+      throw e;
+    }
+  }
+  async list(prefix: string) {
+    const out: { key: string; at: Date }[] = [];
+    let token: string | undefined;
+    do {
+      const r = await this.c.send(new ListObjectsV2Command({ Bucket: this.bucket, Prefix: prefix, ContinuationToken: token }));
+      for (const o of r.Contents ?? []) if (o.Key) out.push({ key: o.Key, at: o.LastModified ?? new Date(0) });
+      token = r.NextContinuationToken;
+    } while (token);
+    return out;
+  }
+  async delete(key: string) {
+    await this.c.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
+  }
+}
+
+// ---- encryption (AES-256-GCM, key derived from the passphrase with scrypt) ---------------------
+const MAGIC = Buffer.from("SCB1");
+
+export function encrypt(plain: Buffer, passphrase: string): Buffer {
+  const salt = randomBytes(16);
+  const iv = randomBytes(12);
+  const key = scryptSync(passphrase, salt, 32);
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  const ct = Buffer.concat([cipher.update(plain), cipher.final()]);
+  return Buffer.concat([MAGIC, salt, iv, cipher.getAuthTag(), ct]);
+}
+
+/** Throws if the passphrase is wrong or a single byte was altered (GCM authentication). */
+export function decrypt(blob: Buffer, passphrase: string): Buffer {
+  if (blob.length < 48 || !blob.subarray(0, 4).equals(MAGIC)) throw new Error("Not a SmartCourse backup");
+  const salt = blob.subarray(4, 20);
+  const iv = blob.subarray(20, 32);
+  const tag = blob.subarray(32, 48);
+  const key = scryptSync(passphrase, salt, 32);
+  const d = createDecipheriv("aes-256-gcm", key, iv);
+  d.setAuthTag(tag);
+  return Buffer.concat([d.update(blob.subarray(48)), d.final()]);
+}
+
+// ---- retention -----------------------------------------------------------------------------------
+export interface Policy {
+  daily: number;
+  weekly: number;
+  monthly: number;
+}
+export const DEFAULT_POLICY: Policy = { daily: 7, weekly: 4, monthly: 3 };
+
+const dayKey = (d: Date) => d.toISOString().slice(0, 10);
+const monthKey = (d: Date) => d.toISOString().slice(0, 7);
+function weekKey(d: Date): string {
+  // ISO week: Thursday of the week decides the year.
+  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const day = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - day);
+  const yearStart = Date.UTC(t.getUTCFullYear(), 0, 1);
+  return `${t.getUTCFullYear()}-W${String(Math.ceil(((t.getTime() - yearStart) / 86_400_000 + 1) / 7)).padStart(2, "0")}`;
+}
+
+/** Keeps the newest backup of each of the last N days, N weeks and N months (those that have backups). */
+export function selectKeep<T extends { at: Date }>(entries: T[], policy: Policy = DEFAULT_POLICY): Set<T> {
+  const sorted = [...entries].sort((a, b) => b.at.getTime() - a.at.getTime());
+  const keep = new Set<T>();
+  const take = (keyFn: (d: Date) => string, n: number) => {
+    const seen = new Set<string>();
+    for (const e of sorted) {
+      const k = keyFn(e.at);
+      if (seen.has(k)) continue;
+      if (seen.size >= n) break;
+      seen.add(k);
+      keep.add(e);
+    }
+  };
+  take(dayKey, policy.daily);
+  take(weekKey, policy.weekly);
+  take(monthKey, policy.monthly);
+  return keep;
+}
+
+// ---- backup ----------------------------------------------------------------------------------------
+export interface Manifest {
+  createdAt: string;
+  pgDumpVersion?: string;
+  tables: Record<string, number>;
+  migrations: string[];
+}
+
+export interface BackupCtx {
+  db: Db;
+  databaseUrl: string;
+  store: BackupStore;
+  passphrase: string;
+  now?: () => Date;
+}
+
+function run(cmd: string, args: string[], opts: { input?: Buffer } = {}): Promise<{ stdout: Buffer; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    const p = spawn(cmd, args, { stdio: ["pipe", "pipe", "pipe"] });
+    const out: Buffer[] = [];
+    let err = "";
+    p.stdout.on("data", (d) => out.push(d));
+    p.stderr.on("data", (d) => (err += d));
+    p.on("error", reject);
+    p.on("close", (code) => (code === 0 ? resolve({ stdout: Buffer.concat(out), stderr: err }) : reject(new Error(`${cmd} exited ${code}: ${err.trim().slice(0, 500)}`))));
+    p.stdin.end(opts.input);
+  });
+}
+
+async function tableNames(q: { query: Db["query"] }): Promise<string[]> {
+  const r = await q.query("SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY 1");
+  return r.rows.map((x: { tablename: string }) => x.tablename);
+}
+
+const stamp = (d: Date) => d.toISOString().replace(/[:.]/g, "-");
+
+export async function createBackup(ctx: BackupCtx): Promise<{ key: string; manifest: Manifest; bytes: number }> {
+  const now = (ctx.now ?? (() => new Date()))();
+  const c = await ctx.db.connect();
+  try {
+    // One snapshot shared by the row counts and pg_dump: the manifest describes exactly what the dump holds.
+    await c.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
+    const snap = (await c.query("SELECT pg_export_snapshot() AS s")).rows[0].s as string;
+    const tables: Record<string, number> = {};
+    for (const t of await tableNames(c)) tables[t] = (await c.query(`SELECT count(*)::int AS n FROM "${t}"`)).rows[0].n;
+    const migrations = (await c.query("SELECT name FROM schema_migrations ORDER BY name")).rows.map((r) => r.name as string);
+    const dump = await run("pg_dump", ["--format=custom", `--snapshot=${snap}`, "--no-owner", "--no-privileges", `--dbname=${ctx.databaseUrl}`]);
+    await c.query("COMMIT");
+    const manifest: Manifest = { createdAt: now.toISOString(), tables, migrations };
+    const base = `backups/sc-${stamp(now)}`;
+    const blob = encrypt(dump.stdout, ctx.passphrase);
+    await ctx.store.put(`${base}.dump.enc`, blob);
+    await ctx.store.put(`${base}.manifest.json`, Buffer.from(JSON.stringify(manifest, null, 2)));
+    return { key: `${base}.dump.enc`, manifest, bytes: blob.length };
+  } catch (e) {
+    await c.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally {
+    c.release();
+  }
+}
+
+export interface VerifyResult {
+  ok: boolean;
+  key: string;
+  problems: string[];
+  restoredTables: number;
+}
+
+const INVARIANTS: { name: string; sql: string }[] = [
+  {
+    name: "article acheté sans achat ouvert (ou l'inverse)",
+    sql: `SELECT count(*)::int AS n FROM list_items i WHERE (i.status = 'purchased') <> EXISTS (SELECT 1 FROM purchases p WHERE p.list_item_id = i.id AND p.voided_at IS NULL)`,
+  },
+  { name: "plusieurs listes actives dans une famille", sql: `SELECT count(*)::int AS n FROM (SELECT family_id FROM lists WHERE status = 'active' GROUP BY 1 HAVING count(*) > 1) x` },
+  { name: "famille sans administrateur actif", sql: `SELECT count(*)::int AS n FROM families f WHERE NOT EXISTS (SELECT 1 FROM profiles p WHERE p.family_id = f.id AND p.role = 'admin' AND p.active)` },
+];
+
+/** Restores a backup into a scratch database and checks it against its manifest. Always cleans up. */
+export async function verifyBackup(ctx: BackupCtx, dumpKey: string): Promise<VerifyResult> {
+  const problems: string[] = [];
+  const result = (restoredTables = 0): VerifyResult => ({ ok: problems.length === 0, key: dumpKey, problems, restoredTables });
+  const manifestKey = dumpKey.replace(/\.dump\.enc$/, ".manifest.json");
+  const [blob, mf] = await Promise.all([ctx.store.get(dumpKey), ctx.store.get(manifestKey)]);
+  if (!blob) return problems.push("fichier de sauvegarde introuvable"), result();
+  if (!mf) return problems.push("manifeste introuvable"), result();
+  const manifest = JSON.parse(mf.toString()) as Manifest;
+  let dump: Buffer;
+  try {
+    dump = decrypt(blob, ctx.passphrase);
+  } catch {
+    return problems.push("déchiffrement impossible (mauvaise clé ou fichier altéré)"), result();
+  }
+
+  const dbName = `sc_verify_${Date.now()}_${randomBytes(3).toString("hex")}`;
+  const tmpFile = path.join(os.tmpdir(), `${dbName}.dump`);
+  const scratchUrl = new URL(ctx.databaseUrl);
+  scratchUrl.pathname = `/${dbName}`;
+  await ctx.db.query(`CREATE DATABASE "${dbName}"`);
+  let scratch: import("pg").Client | undefined;
+  try {
+    await writeFile(tmpFile, dump, { mode: 0o600 });
+    await run("pg_restore", ["--no-owner", "--no-privileges", "--exit-on-error", `--dbname=${scratchUrl.toString()}`, tmpFile]);
+    const pg = (await import("pg")).default;
+    scratch = new pg.Client({ connectionString: scratchUrl.toString() });
+    await scratch.connect();
+    const restored = await tableNames(scratch);
+    for (const [t, expected] of Object.entries(manifest.tables)) {
+      if (!restored.includes(t)) {
+        problems.push(`table ${t} absente après restauration`);
+        continue;
+      }
+      const n = (await scratch.query(`SELECT count(*)::int AS n FROM "${t}"`)).rows[0].n as number;
+      if (n !== expected) problems.push(`table ${t} : ${n} lignes restaurées, ${expected} attendues`);
+    }
+    const mig = (await scratch.query("SELECT name FROM schema_migrations ORDER BY name")).rows.map((r) => r.name as string);
+    if (JSON.stringify(mig) !== JSON.stringify(manifest.migrations)) problems.push("liste des migrations différente");
+    for (const inv of INVARIANTS) {
+      const n = (await scratch.query(inv.sql)).rows[0].n as number;
+      if (n > 0) problems.push(`invariant violé : ${inv.name} (${n})`);
+    }
+    return result(restored.length);
+  } catch (e) {
+    problems.push(`restauration échouée : ${(e as Error).message}`);
+    return result();
+  } finally {
+    await scratch?.end().catch(() => {});
+    await rm(tmpFile, { force: true });
+    await ctx.db.query(`DROP DATABASE IF EXISTS "${dbName}" WITH (FORCE)`).catch(() => {});
+  }
+}
+
+export async function listBackups(store: BackupStore): Promise<{ key: string; at: Date }[]> {
+  return (await store.list("backups/")).filter((e) => e.key.endsWith(".dump.enc")).sort((a, b) => b.at.getTime() - a.at.getTime());
+}
+
+/** Deletes backups outside the policy (both the dump and its manifest). Returns deleted dump keys. */
+export async function pruneBackups(store: BackupStore, policy: Policy = DEFAULT_POLICY): Promise<string[]> {
+  const all = await listBackups(store);
+  const keep = selectKeep(all, policy);
+  const deleted: string[] = [];
+  for (const e of all) {
+    if (keep.has(e)) continue;
+    await store.delete(e.key);
+    await store.delete(e.key.replace(/\.dump\.enc$/, ".manifest.json"));
+    deleted.push(e.key);
+  }
+  return deleted;
+}
+
+// ---- orchestration & recording --------------------------------------------------------------------------
+async function record(db: Db, kind: "backup" | "verify", ok: boolean, backupKey: string | null, detail: object) {
+  await db.query("INSERT INTO backup_runs (kind, ok, backup_key, detail) VALUES ($1,$2,$3,$4)", [kind, ok, backupKey, JSON.stringify(detail)]);
+}
+
+/** Backup → restore check → prune (only if the new backup restored correctly). */
+export async function backupVerifyPrune(ctx: BackupCtx, policy: Policy = DEFAULT_POLICY) {
+  const b = await createBackup(ctx);
+  await record(ctx.db, "backup", true, b.key, { bytes: b.bytes, tables: b.manifest.tables });
+  const v = await verifyBackup(ctx, b.key);
+  await record(ctx.db, "verify", v.ok, b.key, { problems: v.problems, restoredTables: v.restoredTables });
+  const pruned = v.ok ? await pruneBackups(ctx.store, policy) : []; // never delete older good backups on a bad one
+  return { backup: b, verify: v, pruned };
+}
+
+export interface BackupStatus {
+  configured: boolean;
+  lastBackupAt: string | null;
+  lastVerifiedOkAt: string | null;
+  lastVerifyFailedAt: string | null;
+}
+
+export async function backupStatus(db: Db, configured: boolean): Promise<BackupStatus> {
+  const r = await db.query(
+    `SELECT (SELECT max(at) FROM backup_runs WHERE kind = 'backup' AND ok) AS b,
+            (SELECT max(at) FROM backup_runs WHERE kind = 'verify' AND ok) AS v,
+            (SELECT max(at) FROM backup_runs WHERE kind = 'verify' AND NOT ok) AS f`,
+  );
+  const row = r.rows[0];
+  return { configured, lastBackupAt: row.b?.toISOString() ?? null, lastVerifiedOkAt: row.v?.toISOString() ?? null, lastVerifyFailedAt: row.f?.toISOString() ?? null };
+}
+
+const LOCK = 727_002;
+/** Daily backup + restore check, run by the app itself. One run at a time even if two instances overlap. */
+export function startBackupScheduler(ctx: BackupCtx, log: (m: string) => void, everyMs = 10 * 60_000): () => void {
+  const tick = async () => {
+    const c = await ctx.db.connect();
+    try {
+      if (!(await c.query("SELECT pg_try_advisory_lock($1) AS ok", [LOCK])).rows[0].ok) return;
+      const st = await backupStatus(ctx.db, true);
+      const due = !st.lastBackupAt || Date.now() - new Date(st.lastBackupAt).getTime() > 24 * 3_600_000;
+      if (!due) return;
+      const r = await backupVerifyPrune(ctx);
+      log(`backup ${r.backup.key} (${r.backup.bytes} o), restauration ${r.verify.ok ? "vérifiée" : "ÉCHEC: " + r.verify.problems.join("; ")}, ${r.pruned.length} ancien(s) supprimé(s)`);
+    } catch (e) {
+      log(`backup en échec : ${(e as Error).message}`);
+      await record(ctx.db, "backup", false, null, { error: (e as Error).message }).catch(() => {});
+    } finally {
+      await c.query("SELECT pg_advisory_unlock($1)", [LOCK]).catch(() => {});
+      c.release();
+    }
+  };
+  const t = setInterval(() => void tick(), everyMs);
+  setTimeout(() => void tick(), 30_000); // first check shortly after start
+  return () => clearInterval(t);
+}
