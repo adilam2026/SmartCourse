@@ -30,16 +30,16 @@ Trois niveaux de tests : serveur (vrai PostgreSQL, courses de concurrence), mote
 
 ## Ce qui n'est pas couvert
 
-- **Photos définitives** : non fournies (réseau bloqué, voir `photos-licences.md`). La recette de l'interface du personnel avec de vraies photos reste à faire.
+- **Photos** : 46 des 80 produits ont une photo ; manquent 4 produits sans marque et les 30 produits emballés (voir `photos-licences.md`). La recette de l'interface du personnel avec toutes les photos reste à faire.
 - **Marques** : en attente de votre choix (`marques-a-valider.md`).
 - **Déploiement Railway** : non exécuté ici (le build Docker, lui, a été exécuté, voir `deploiement.md`).
 - **iPhone / Safari réels** : testé uniquement sous Chromium mobile ; le comportement de stockage d'iOS (voir revue technique §7) est à vérifier sur un vrai appareil.
 
 ## Dernières exécutions (9 octobre 2026, après les corrections)
 
-- Serveur (PostgreSQL 16 réel + émulateur S3) : 102 tests, 2 exécutions consécutives identiques.
-- Moteur de synchronisation (IndexedDB simulée) : 32 tests.
-- Parcours navigateur (Chromium mobile, serveur et base réels) : 28 scénarios, dont « Valider » sur 4 tailles d'écran et les états enregistré / en attente / non envoyé.
+- Serveur (PostgreSQL 16 réel + émulateur S3) : 110 tests, 2 exécutions consécutives identiques.
+- Moteur de synchronisation (IndexedDB simulée) : 34 tests.
+- Parcours navigateur (Chromium mobile, serveur et base réels) : 29 scénarios, dont « Valider » sur 4 tailles d'écran et les états enregistré / en attente / non envoyé.
 - Compilation TypeScript stricte du serveur et de la PWA : sans erreur.
 - Image Docker complète construite et exécutée ; sauvegarde + restauration vérifiée contre PostgreSQL 16, 17 et 18 (voir `deploiement.md`).
 
@@ -48,4 +48,5 @@ Trois niveaux de tests : serveur (vrai PostgreSQL, courses de concurrence), mote
 - **Bouton « Valider »** : sur 320×568, 360×640, 390×844 et 412×915, avec tous les bandeaux (hors connexion, en attente, reprise, message), le bouton est entièrement dans l'écran avec marge, rien ne le recouvre (test de hit-test aux quatre coins et au centre), un vrai clic passe, et l'en-tête collant reste sous 50 % de la hauteur. Avant correction : jusqu'à 70 % de la hauteur sur 360×640 (catalogue presque inutilisable).
 - **Sauvegardes** : client `pg_dump` de même version majeure que le serveur, choisi automatiquement ; stockage refusé s'il n'est pas sûr en production ; état affiché dans Réglages.
 - **États distincts** : « ✓ Enregistré sur le serveur » n'apparaît qu'après confirmation du serveur et disparaît dès qu'il ne répond plus ; « ⏳ En attente de synchronisation » = validé mais non confirmé ; « N à valider » = choisi, pas encore envoyé ; compteurs séparés « enregistrés sur le serveur » / « pas encore enregistrés ». Captures du code testé dans `docs/captures/`.
-- **Outil de recherche de photos** (Wikimedia Commons) : 11 tests sur des réponses simulées ; **pas encore exécuté contre l'API réelle** (réseau fermé).
+- **Photos du catalogue** : 46 photos libres importées au démarrage (vérifié dans l'image Docker, utilisateur non privilégié), servies avec cache, crédits générés ; outil de recherche exécuté contre l'API réelle de Wikimedia Commons (15 tests + exécution réelle) ; import tout-ou-rien, sans écraser les photos de la famille (4 tests).
+- **Corrigé pendant ce travail** : un appui sur « Valider » pendant un envoi en cours pouvait être ignoré sans message (corrigé, testé) ; un import de photos pouvait être partiel si une clé était inconnue (corrigé, testé).

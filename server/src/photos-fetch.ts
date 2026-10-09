@@ -59,7 +59,7 @@ export function stripHtml(html: string | undefined): string | null {
 }
 
 // We want a clean picture of the product itself: no plants/flowers, fields, markets, dishes, people or drawings.
-const BAD_TITLE = /\b(logo|icon|diagram|map|drawing|illustration|sketch|painting|stamp|flag|coat of arms|seedling|plantation|market|stall|menu|poster|screenshot|flowers?|blossoms?|blooms?|plants?|trees?|fields?|gardens?|farms?|farmers?|harvest(ing)?|vendors?|shops?|supermarket|restaurant|cooking|cooked|recipe|dish|soup|salad|botanical|woman|women|man|men|girl|boy|child|children|people|person|hands?)\b/i;
+const BAD_TITLE = /\b(logo|icon|diagram|map|drawing|illustration|sketch|painting|stamp|flag|coat of arms|seedling|plantation|market|stall|menu|poster|screenshot|flowers?|blossoms?|blooms?|plants?|trees?|fields?|gardens?|farms?|farmers?|harvest(ing)?|vendors?|shops?|supermarket|restaurant|cooking|cooked|recipe|dish|soup|salad|botanical|woman|women|man|men|girl|boy|child|children|people|person|hands?|naked|nude|nudity|erotic|sexy|sexual|porn|lingerie|bikini|underwear|topless|butt|buttocks)\b/i;
 
 /** Pure: turns a Commons `query` response into usable candidates, best search rank first. */
 export function parseCommonsResponse(json: any, minSide = 600): Candidate[] {
@@ -78,7 +78,9 @@ export function parseCommonsResponse(json: any, minSide = 600): Candidate[] {
     const meta = ii.extmetadata ?? {};
     const license = normalizeCommonsLicense(meta.LicenseShortName?.value);
     if (!license) continue;
-    const author = stripHtml(meta.Artist?.value);
+    const rawAuthor = stripHtml(meta.Artist?.value);
+    // Commons sometimes fills the field with a disclaimer instead of a name: that is not an attribution.
+    const author = rawAuthor && !/no machine-readable author|unknown author|author unknown|^unknown\b|anonymous/i.test(rawAuthor) ? rawAuthor : null;
     if (/^CC-BY/.test(license) && !author) continue; // attribution is mandatory: no author, no use
     out.push({
       title: p.title,
@@ -125,7 +127,7 @@ export async function getWithRetry(
   return last!;
 }
 
-export function commonsSearchUrl(query: string, limit = 12): string {
+export function commonsSearchUrl(query: string, limit = 25): string {
   const p = new URLSearchParams({
     action: "query", format: "json", 
     generator: "search", gsrsearch: `${query} filetype:bitmap`, gsrnamespace: "6", gsrlimit: String(limit),
@@ -142,6 +144,8 @@ export async function searchCommons(query: string, fetchFn: FetchFn): Promise<Ca
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** Pause between requests; raise it (PHOTO_PACE_MS) when Wikimedia throttles a shared IP address. */
+const PACE = Number(process.env.PHOTO_PACE_MS ?? 1200);
 
 // ---- CLI ---------------------------------------------------------------------------------------------
 async function cmdSearch(queriesPath: string, outDir: string, per: number) {
@@ -157,10 +161,30 @@ async function cmdSearch(queriesPath: string, outDir: string, per: number) {
   }
   for (const [key, qs] of Object.entries(queries)) {
     if (key.startsWith("_") || all[key]) continue;
+    // The API throttles shared IPs hard: a product that still fails after the built-in retries is retried later
+    // in this run, then skipped (a re-run picks it up, since only finished products are recorded).
+    let lastError: unknown;
+    let done = false;
+    for (let attempt = 1; attempt <= 3 && !done; attempt++) {
+      try {
+        await searchOne(key, qs as string[], per, outDir, all, file);
+        done = true;
+      } catch (e) {
+        lastError = e;
+        console.warn(`  ${key}: tentative ${attempt} échouée (${(e as Error).message}); pause 60 s`);
+        await sleep(60_000);
+      }
+    }
+    if (!done) console.warn(`  ${key}: abandonné pour cette passe (${(lastError as Error).message})`);
+  }
+}
+
+async function searchOne(key: string, qs: string[], per: number, outDir: string, all: Record<string, Candidate[]>, file: string) {
+  {
     const seen = new Set<string>();
     const picked: Candidate[] = [];
     for (const q of qs as string[]) {
-      await sleep(1200); // be polite to the API
+      await sleep(PACE); // be polite to the API
       for (const c of await searchCommons(q, fetch as unknown as FetchFn)) {
         if (seen.has(c.pageUrl) || picked.length >= per) continue;
         seen.add(c.pageUrl);
@@ -171,7 +195,7 @@ async function cmdSearch(queriesPath: string, outDir: string, per: number) {
     const dir = path.join(outDir, key);
     await mkdir(dir, { recursive: true });
     for (const [i, c] of picked.entries()) {
-      await sleep(1200);
+      await sleep(PACE);
       try {
         const r = await getWithRetry(fetch as unknown as FetchFn, c.thumbUrl, { "User-Agent": USER_AGENT });
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -240,10 +264,21 @@ async function cmdManifest(outDir: string, selectionPath: string, manifestPath: 
   console.log(`${items.length} entrée(s) écrites dans ${manifestPath}`);
 }
 
+async function cmdCredits(manifestPath: string, outPath: string) {
+  const m = JSON.parse(await readFile(manifestPath, "utf8")) as { items: { key: string; sourceUrl: string; license: string; licenseUrl: string | null; author: string | null }[] };
+  const names = new Map<string, string>(); // catalogue key → display name, read from the generated migration
+  for (const mm of (await readFile(path.join(path.dirname(new URL(import.meta.url).pathname), "../migrations/003_catalog.sql"), "utf8")).matchAll(/\('([a-z0-9-]+)','[a-z]+','((?:[^']|'')+)',\d+\)/g)) names.set(mm[1]!, mm[2]!.replace(/''/g, "'"));
+  const rows = m.items.map((i) => `| ${names.get(i.key) ?? i.key} | ${i.author ?? "—"} | ${i.license} | [page d'origine](${i.sourceUrl}) |`);
+  const out = ["# Crédits des photos du catalogue", "", "Généré depuis `server/catalog-photos/manifest.json` (provenance lue dans les métadonnées de chaque fichier Wikimedia Commons). Les photos prises par la famille ne figurent pas ici.", "", "| Produit | Auteur | Licence | Source |", "|---|---|---|---|", ...rows, ""].join("\n");
+  await writeFile(outPath, out);
+  console.log(`${rows.length} crédit(s) écrits dans ${outPath}`);
+}
+
 if (process.argv[1] && /photos-fetch\.(ts|js)$/.test(process.argv[1])) {
   const [cmd, a, b, c] = process.argv.slice(2);
   if (cmd === "search" && a && b) await cmdSearch(a, b, Number(c ?? 4));
   else if (cmd === "sheet" && a) await cmdSheet(a, Number(b ?? 0));
   else if (cmd === "manifest" && a && b && c) await cmdManifest(a, b, c);
-  else console.log("Usage : photos-fetch search <queries.json> <outdir> [n] | sheet <outdir> | manifest <outdir> <selection.json> <manifest.json>");
+  else if (cmd === "credits" && a && b) await cmdCredits(a, b);
+  else console.log("Usage : photos-fetch credits <manifest.json> <out.md> | search <queries.json> <outdir> [n] | sheet <outdir> | manifest <outdir> <selection.json> <manifest.json>");
 }

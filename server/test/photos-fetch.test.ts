@@ -74,8 +74,13 @@ describe("réponse de l'API Commons", () => {
       page(8, "File:Tomato plant.jpg"),
       page(9, "File:Potato flowers 2016.jpg"),
       page(10, "File:Tomatoes.jpg", {}, { ImageDescription: "Farmer selling tomatoes at the market" }),
+      page(11, "File:Naked-Male-Nude-Skin-Strawberries-Fruit-Butt-Erotic.jpg"),
+      page(12, "File:Strawberries.jpg", {}, { ImageDescription: "Sexy model with strawberries" }),
     ));
     expect(r.map((c) => c.title)).toEqual(["File:Ok.jpg"]);
+    // a placeholder instead of a real author name does not count as attribution (CC BY / CC BY-SA)
+    const vague = parseCommonsResponse(response(page(1, "File:Vague.jpg", {}, { Artist: "No machine-readable author provided. Someone assumed (based on copyright claims)." }), page(2, "File:Good.jpg")));
+    expect(vague.map((c) => c.title)).toEqual(["File:Good.jpg"]);
   });
   it("CC0 et domaine public sont acceptés sans auteur", () => {
     const r = parseCommonsResponse(response(page(1, "File:A.jpg", {}, { LicenseShortName: "CC0", Artist: "" }), page(2, "File:B.jpg", {}, { LicenseShortName: "Public domain", Artist: "" })));

@@ -1,0 +1,58 @@
+{
+  "_note": "Deuxième passe pour les produits dont le premier lot n'avait pas de bon candidat.",
+  "courgettes": [
+    "green zucchini",
+    "zucchini courgette vegetable white",
+    "courgettes green"
+  ],
+  "concombres": [
+    "cucumber whole green",
+    "cucumbers white background",
+    "fresh cucumbers"
+  ],
+  "fraises": [
+    "strawberries fruit",
+    "strawberries punnet",
+    "garden strawberry Fragaria ananassa fruit"
+  ],
+  "poivre": [
+    "ground black pepper",
+    "black peppercorns",
+    "pepper mill peppercorns"
+  ],
+  "poulet": [
+    "raw chicken whole",
+    "chicken carcass raw",
+    "chicken meat raw white"
+  ],
+  "viande-hachee": [
+    "minced meat raw",
+    "ground beef raw pile",
+    "raw minced beef"
+  ],
+  "poisson": [
+    "sardines fresh fish",
+    "fresh fish whole",
+    "fish on ice"
+  ],
+  "miel": [
+    "honey jar glass",
+    "honey in jar plain",
+    "honey jar close up"
+  ],
+  "sacs-poubelle": [
+    "garbage bags box",
+    "trash bags roll plastic",
+    "bin liners"
+  ],
+  "eponges": [
+    "kitchen sponge scourer",
+    "dish sponge yellow",
+    "cleaning sponge green scouring pad"
+  ],
+  "lingettes": [
+    "wet wipes pack",
+    "baby wipes",
+    "cleaning wipes tub"
+  ]
+}

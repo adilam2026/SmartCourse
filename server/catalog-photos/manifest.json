@@ -105,10 +105,10 @@
       "key": "concombres",
       "file": "files/concombres.jpg",
       "sourceName": "Wikimedia Commons",
-      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Greek_yoghurt_cucumbers_garlic.jpg",
-      "license": "CC-BY-SA-3.0",
-      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
-      "author": "Nikodem Nijaki"
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Cucumber_from_Denmark.jpg",
+      "license": "CC0-1.0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "author": "WiseMan42"
     },
     {
       "target": "initial",
@@ -259,6 +259,206 @@
       "license": "CC-BY-2.0",
       "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
       "author": "Annie Mole"
+    },
+    {
+      "target": "initial",
+      "key": "creme-fraiche",
+      "file": "files/creme-fraiche.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Cr%C3%A8me_d%27Isigny_3_adjusted.png",
+      "license": "CC-BY-SA-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "author": "Patafisik"
+    },
+    {
+      "target": "initial",
+      "key": "lentilles",
+      "file": "files/lentilles.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:3_types_of_lentil.jpg",
+      "license": "CC-BY-SA-2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+      "author": "User:Justinc"
+    },
+    {
+      "target": "initial",
+      "key": "pois-chiches",
+      "file": "files/pois-chiches.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Ordinary_chickpeas_in_a_ceramic_bowl.jpg",
+      "license": "CC-BY-SA-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "author": "AlixSaz"
+    },
+    {
+      "target": "initial",
+      "key": "sel",
+      "file": "files/sel.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Salt_shaker_on_white_background.jpg",
+      "license": "CC-BY-2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+      "author": "Dubravko Sorić SoraZG on Flickr"
+    },
+    {
+      "target": "initial",
+      "key": "cumin",
+      "file": "files/cumin.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Seeds_of_Cumin.jpg",
+      "license": "CC-BY-SA-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "author": "Sanjay Acharya"
+    },
+    {
+      "target": "initial",
+      "key": "levure-chimique",
+      "file": "files/levure-chimique.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Backpulver_RZ.jpg",
+      "license": "CC-BY-SA-3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+      "author": "Rainer Z ..."
+    },
+    {
+      "target": "initial",
+      "key": "viande-de-boeuf",
+      "file": "files/viande-de-boeuf.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Raw_beef_steak,_2011.jpg",
+      "license": "CC-BY-2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+      "author": "Jellaluna"
+    },
+    {
+      "target": "initial",
+      "key": "thon-en-conserve",
+      "file": "files/thon-en-conserve.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Lata_de_at%C3%BAn-Albo.jpg",
+      "license": "CC-BY-3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/3.0",
+      "author": "Tamorlan"
+    },
+    {
+      "target": "initial",
+      "key": "petits-pois-surgeles",
+      "file": "files/petits-pois-surgeles.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Frozen_peas.JPG",
+      "license": "CC-BY-SA-3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+      "author": "Photo by and (c) 2007 Jina Lee"
+    },
+    {
+      "target": "initial",
+      "key": "frites-surgelees",
+      "file": "files/frites-surgelees.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Frozen_French_Fries_1.jpg",
+      "license": "CC-BY-SA-3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+      "author": "LimoWreck"
+    },
+    {
+      "target": "initial",
+      "key": "pain-de-mie",
+      "file": "files/pain-de-mie.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Sliced_sandwich_breads_2021-8-28.jpg",
+      "license": "CC-BY-SA-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "author": "Baoothersks"
+    },
+    {
+      "target": "initial",
+      "key": "pain",
+      "file": "files/pain.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Matlou3.jpg",
+      "license": "CC-BY-SA-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "author": "Heeculemdd"
+    },
+    {
+      "target": "initial",
+      "key": "confiture",
+      "file": "files/confiture.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Jam_jar,_Kazakhstan.jpg",
+      "license": "CC-BY-SA-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "author": "Nurken"
+    },
+    {
+      "target": "initial",
+      "key": "essuie-tout",
+      "file": "files/essuie-tout.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Roll_of_Paper_Towels.jpg",
+      "license": "CC-BY-SA-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "author": "MrBeastRapper"
+    },
+    {
+      "target": "initial",
+      "key": "mouchoirs-en-papier",
+      "file": "files/mouchoirs-en-papier.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:A_tissue_box.jpg",
+      "license": "CC-BY-SA-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "author": "Captain MarcusL"
+    },
+    {
+      "target": "initial",
+      "key": "courgettes",
+      "file": "files/courgettes.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Cucurbita_pepo_Zucchini_Green_Squash,_9-2014,_by_Mike_Mozart_of_TheToyChannel_and_JeepersMedia_on_YouTube_-Green_-Squash.jpg",
+      "license": "CC-BY-2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+      "author": "Mike Mozart from Funny YouTube, USA"
+    },
+    {
+      "target": "initial",
+      "key": "poivre",
+      "file": "files/poivre.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Ground_black_pepper.jpg",
+      "license": "CC-BY-SA-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "author": "Eliška Jindříšková"
+    },
+    {
+      "target": "initial",
+      "key": "poulet",
+      "file": "files/poulet.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Whole_raw_chicken_-_Japan_Dec_22_2019.jpeg",
+      "license": "CC-BY-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
+      "author": "Nesnad"
+    },
+    {
+      "target": "initial",
+      "key": "poisson",
+      "file": "files/poisson.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Beach-sea-animal-food-seafood-fresh-1084632-pxhere.jpg",
+      "license": "CC0-1.0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "author": "PxHere"
+    },
+    {
+      "target": "initial",
+      "key": "miel",
+      "file": "files/miel.jpg",
+      "sourceName": "Wikimedia Commons",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Honey_miele.jpg",
+      "license": "CC-BY-SA-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "author": "Marcobeltrametti"
     }
   ]
 }

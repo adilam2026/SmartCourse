@@ -1,7 +1,19 @@
 # Photos du catalogue — sources, licences, procédure
 
-État au 9 octobre 2026 : **aucune photo définitive n'est importée. Les photos restent indispensables à la V1 et ce point est toujours bloquant.**
-Nouveau contrôle le 9 octobre 2026 : `commons.wikimedia.org`, `upload.wikimedia.org`, `world.openfoodfacts.org` et `images.openfoodfacts.org` sont **toujours refusés** (403 de la politique d'accès sortant), comme le dépôt Debian et celui de PostgreSQL. L'environnement de développement bloque l'accès réseau aux sources d'images (Wikimedia Commons, Open Food Facts : refus 403 de la politique d'accès sortant). Rien n'a donc été téléchargé ni vérifié en ligne. Tout ce qui suit sur les licences vient de ma connaissance générale et **doit être relu sur les pages officielles au moment de l'import**.
+## État au 9 octobre 2026 (après ouverture des domaines)
+
+Accès réseau ouvert et vérifié (`commons.wikimedia.org`, `upload.wikimedia.org`, `world.openfoodfacts.org`, `images.openfoodfacts.org`). **46 des 50 produits sans marque ont maintenant une photo libre de droits**, avec auteur, licence et page d'origine ([liste complète des crédits](photos-credits.md)) : 25 CC BY-SA 4.0, 8 autres CC BY-SA, 7 CC BY, 3 CC0, 2 domaine public. Les photos sont dans le dépôt (`server/catalog-photos/`) et importées automatiquement au démarrage de l'application, sans écraser une photo prise par la famille ; aucun déploiement ne dépend de Wikimedia.
+
+| | Produits |
+|---|---|
+| **Sans photo** (aucun bon candidat libre après 3 recherches) | viande hachée, sacs-poubelle, éponges, lingettes |
+| **Photo provisoire** (acceptable, à améliorer) | fraises (fraise des bois), levure chimique (poudre sur une cuillère : ressemble à du sucre ou de la farine), frites surgelées (texte d'emballage visible), poulet (étiquette japonaise visible), concombres → remplacé par une meilleure photo ; carottes (carottes rosées de basket) |
+| **En attente des marques** (30 produits) | produits emballés : voir `marques-a-valider.md` |
+
+Limites constatées :
+- **Photos reconnaissables, pas identiques à ce que vous achetez** : ce sont des photos de produits génériques prises dans le monde entier (pommes de terre rouges, carottes roses…). Pour un produit précis, la photo de votre paquet (bouton 📷 de Réglages) est plus fidèle.
+- **Persil et coriandre se ressemblent sur photo** : le nom sous l'image reste nécessaire pour les distinguer.
+- Wikimedia limite fortement les requêtes depuis cette adresse partagée (réponses 429) : la recherche a pris plusieurs heures. L'outil reprend où il s'est arrêté et ralentit tout seul.
 
 ## Ce qui est déjà en place (testé)
 
@@ -49,11 +61,12 @@ Je ne peux pas modifier ces réglages : ils sont dans l'environnement qui héber
 
 Ne choisissez pas un niveau d'accès plus large que nécessaire (« accès complet à Internet ») : ces cinq domaines suffisent.
 
-## Procédure d'import, une fois le réseau ouvert (outil prêt et testé sur des réponses simulées)
+## Procédure d'import (outil exécuté pour de vrai)
 
-1. `npm run photos:fetch -- search data/photo-queries.json staging 4` : pour chaque produit sans marque (50 produits dans `server/data/photo-queries.json`), jusqu'à 4 candidats de Wikimedia Commons ; seuls les fichiers dont **la licence est acceptée** (CC0, domaine public, CC BY, CC BY-SA), avec **auteur** pour CC BY / CC BY-SA, et d'au moins 600 px sont gardés. Licence, auteur et page d'origine viennent des métadonnées de chaque fichier.
+0. Variables : `NODE_USE_ENV_PROXY=1` (Node 22 doit utiliser le proxy de l'environnement) et, si besoin, `PHOTO_PACE_MS=3000` pour espacer les requêtes.
+1. `npm run photos:fetch -- search data/photo-queries.json staging 3` : pour chaque produit sans marque (50 produits dans `server/data/photo-queries.json`), jusqu'à 4 candidats de Wikimedia Commons ; seuls les fichiers dont **la licence est acceptée** (CC0, domaine public, CC BY, CC BY-SA), avec **auteur** pour CC BY / CC BY-SA, et d'au moins 600 px sont gardés. Licence, auteur et page d'origine viennent des métadonnées de chaque fichier.
 2. `npm run photos:fetch -- sheet staging` : planches (5 produits × 4 candidats) que je regarde une par une pour choisir : le produit doit être **reconnaissable à l'écran d'un téléphone**, au premier plan, sans marque ni texte visible, sans personne.
-3. `npm run photos:fetch -- manifest staging selection.json manifest.json`, puis `npm run photos -- import manifest.json` : normalisation (carré 480 px, WebP), contrôle de licence, copie dans notre stockage, enregistrement de la provenance. L'écran « Crédits photos » liste automatiquement les auteurs.
+3. `npm run photos:fetch -- manifest staging selection.json catalog-photos/manifest.json` (copie les photos choisies dans `server/catalog-photos/files/`) ; l'application les importe au démarrage (ou `npm run photos -- import catalog-photos/manifest.json --only-missing`) : normalisation (carré 480 px, WebP), contrôle de licence, copie dans notre stockage, enregistrement de la provenance. L'écran « Crédits photos » liste automatiquement les auteurs.
 4. Je vous montre le résultat sur les captures de l'application avant de passer aux produits emballés.
 
 Limite à connaître : le premier lot (produits frais et sans marque) dépend de la qualité des photos disponibles sur Commons. Pour quelques produits (levure chimique, lingettes, sacs-poubelle…), il peut n'y avoir aucune photo libre de bonne qualité ; je vous les listerai plutôt que d'en importer une médiocre.

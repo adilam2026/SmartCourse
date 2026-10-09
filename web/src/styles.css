@@ -91,7 +91,7 @@ h1, h2 { margin: 0; }
 .card__name small { font-weight: 500; color: var(--muted); font-size: 0.78rem; }
 
 .badge { position: absolute; top: 8px; right: 8px; min-width: 44px; height: 44px; border-radius: 22px; display: grid; place-items: center; font-weight: 900; font-size: 1.5rem; color: #fff; box-shadow: 0 2px 6px rgb(0 0 0 / 0.3); }
-.badge--off { background: rgb(255 255 255 / 0.65); border: 3px solid var(--line); box-shadow: none; }
+.badge--off { background: rgb(255 255 255 / 0.95); border: 3px solid #7d8883; box-shadow: 0 1px 5px rgb(0 0 0 / 0.4); }
 .badge--saved { background: var(--green); }
 .badge--unsaved { background: var(--amber); }
 .badge--removing { background: var(--red); }
