@@ -1,0 +1,25 @@
+name: Vérification du tunnel HTTPS de recette (manuelle, sans déploiement)
+# Lance scripts/recette-locale.sh AVEC son tunnel Cloudflare gratuit sur un serveur GitHub (base jetable, quelques minutes),
+# puis contrôle l'adresse publique comme le ferait Chrome sur Android. Aucun secret, aucun accès à Railway.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  tunnel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Démarrage de l'application et du tunnel
+        run: scripts/recette-locale.sh | tee /tmp/recette.out
+      - name: Contrôles de bout en bout via l'adresse HTTPS publique
+        run: |
+          URL=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' /tmp/recette.out | head -1)
+          CODE=$(grep -oE 'Code famille : [A-Z0-9]+' /tmp/recette.out | awk '{print $4}')
+          echo "Tunnel : $URL"
+          mkdir -p /tmp/pw && cd /tmp/pw && npm init -y >/dev/null && npm i playwright-core@1.64.0 >/dev/null
+          cp "$GITHUB_WORKSPACE/scripts/check-tunnel.mjs" /tmp/pw/check.mjs
+          BASE="$URL" FAMILY="$CODE" node /tmp/pw/check.mjs
+      - run: scripts/recette-locale.sh --stop
+        if: always()
