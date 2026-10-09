@@ -1,47 +1,81 @@
 # Recette de l'application installée sur Android
 
-Pour tester l'**application installée** (icône, plein écran, fermeture/réouverture, mode avion), pas seulement une page dans le navigateur.
+But : tester l'**application installée** (icône, plein écran, fermeture/réouverture, mode avion), pas une simple page dans le navigateur. Aucun déploiement Railway, aucune base Supabase : tout tourne sur **votre ordinateur**, temporairement, avec des données jetables.
 
-**Limite** : ces étapes sont vérifiées par un navigateur Chrome automatisé (installabilité, service worker, connexion HTTPS, flux temps réel, hors connexion : voir « Ce qui est vérifié automatiquement »). Elles n'ont **pas** été jouées sur un vrai téléphone Android : l'appareil photo réel, l'invite « Installer » et l'icône sur votre écran d'accueil sont à constater par vous.
+## 0. État de la vérification (à lire d'abord)
 
-## 0. Préparer l'accès (ordinateur avec Docker)
-1. `scripts/recette-locale.sh` (voir `recette-telephone.md`). Il affiche une adresse `https://….trycloudflare.com`, le code famille et les identifiants d'essai.
-2. **Ne l'arrêtez pas et ne mettez pas l'ordinateur en veille pendant toute la recette.** L'adresse change à chaque lancement : l'application installée reste liée à *cette* adresse.
-3. Envoyez l'adresse à votre téléphone (message à vous-même, e-mail).
+**Vérifié automatiquement** (GitHub Actions, Chrome de bureau, vrai tunnel HTTPS Cloudflare, runs « Vérification du tunnel » n° 5 et 6) :
+page et manifeste « standalone », icônes 192/512/« maskable », service worker, connexion avec cookie `Secure`, jugement d'installabilité de Chrome sans erreur, envoi d'une photo de 2,6 Mo, connexion de deux profils (personnel et parent), propagation d'une modification d'un profil à l'autre sans rechargement, relecture périodique, ouverture hors connexion.
 
-## 1. Ouvrir sur Android
-1. Ouvrez l'adresse **dans Chrome** (appuyez sur le lien puis « Ouvrir avec Chrome » si une autre application s'ouvre).
-2. L'écran de connexion de SmartCourse apparaît. Ne vous connectez pas encore.
+**Pas de validation de bout en bout du tunnel avec la version actuelle du code.** Le dernier run du tunnel date d'avant : l'optimisation de la relecture (révision du catalogue, migration 008), le retrait de la directive `syntax` du Dockerfile et le repli de téléchargement des scripts. Seule la variante **sans tunnel** du script a tourné ensuite (run Docker n° 8 : construction, démarrage, 80 images, trois profils connectés).
 
-## 2. Installer avec son icône
-1. Menu **⋮** (en haut à droite de Chrome) → **Installer l'application** (parfois « Ajouter à l'écran d'accueil » → choisir **Installer**, et non « Créer un raccourci »).
-2. Confirmez **Installer**. Quelques secondes plus tard, l'icône verte avec un panier coché, nom **Courses**, apparaît sur l'écran d'accueil (ou dans la liste des applications : la glisser sur l'écran d'accueil).
-3. Fermez Chrome. **Ouvrez l'application par son icône** : elle s'ouvre en plein écran, **sans barre d'adresse**. C'est l'application installée ; toute la suite se fait ici.
-   - Si l'option « Installer » est absente : rechargez la page, attendez 10 secondes, ouvrez le menu ⋮ de nouveau.
+**Non vérifié du tout** :
+- tout ce qui se passe sur un vrai téléphone Android : l'invite « Installer », l'icône sur votre écran d'accueil, l'appareil photo réel, la galerie, le vrai clavier, le vrai mode avion, la fermeture depuis les applications récentes ;
+- le flux temps réel (SSE) à travers le tunnel : il ne passe pas par le tunnel gratuit Cloudflare dans nos essais (0 octet reçu) ; la cause exacte n'est pas isolée ; la synchronisation repose alors sur une **relecture périodique de 8 s, sans garantie de délai** ;
+- la migration 008 lue directement dans une exécution Docker : le contrôle explicite est écrit dans le script mais n'a pas encore tourné ;
+- le téléchargement de l'image `cloudflare/cloudflared` sur votre machine, et son tunnel avec le code actuel.
 
-## 3. Se connecter et utiliser galerie / appareil photo
-1. Connexion : code famille affiché par le script, identifiant `adil`, code `482913`.
-2. Réglages → Catalogue → **+ Ajouter un article**.
-3. **📷 Prendre une photo** : l'appareil photo d'Android s'ouvre (aucune autorisation spéciale n'est normalement demandée ; sinon, acceptez). Photographiez un pain, validez la photo : l'**aperçu** apparaît, image entière sur fond blanc.
-4. **🖼️ Galerie** : le sélecteur de photos s'ouvre ; choisissez une image : l'aperçu se remplace.
-5. Nom « Khobz », catégorie « Pain et petit-déjeuner », **Enregistrer** : la feuille se ferme, l'article apparaît.
+## 1. Ce qu'il vous faut
 
-## 4. Fermer puis rouvrir
-1. Touche « Applications récentes » → faites glisser **Courses** hors de l'écran (fermeture complète).
-2. Rouvrez par l'icône : vous êtes **toujours connecté** (session de 90 jours), la liste et le catalogue sont là, sans écran de chargement long.
-3. Avec le profil `marie` (personnel) : choisissez deux articles **sans valider**, fermez l'application, rouvrez : les choix non validés sont **conservés** (brouillon local).
+Un **ordinateur avec Docker, qui reste allumé et connecté à Internet pendant toute la recette** :
+- Docker Desktop (Windows ou Mac) ou Docker Engine (Linux), **démarré** ;
+- un terminal « bash » : Linux/Mac natif ; sous Windows, **WSL2** ou **Git Bash** ;
+- `git`, `curl` et `openssl` (présents par défaut sur Mac/Linux et dans Git Bash) ;
+- ne pas laisser l'ordinateur se mettre en veille (réglages d'alimentation) : **veille ou arrêt = tunnel coupé = application inaccessible**.
 
-## 5. Mode avion et synchronisation
-Préalable : application ouverte **en ligne** au moins 30 secondes (les images se mettent en mémoire).
-1. Activez le **mode avion**. Ouvrez l'application : un bandeau « hors connexion » apparaît ; le catalogue **et ses images** s'affichent.
-2. `marie` (personnel) : choisissez « Pain » et « Lait », **Valider** → l'état est « validé, en attente de synchronisation » (pas de fausse confirmation).
-3. `lamiaa` (parent, sur un autre téléphone ou après changement de profil) : **Acheté** et **Corriger** sont **bloqués** hors connexion (règle convenue).
-4. `adil` : Ajouter/Modifier un article → **Enregistrer** → message « Pas de connexion… » ; la feuille reste ouverte avec **toutes** les données.
-5. Désactivez le mode avion. En quelques secondes (jusqu'à ~10 s via le tunnel gratuit, qui retient le flux temps réel : l'application relit alors l'état toutes les 8 s) : l'envoi part tout seul, `marie` voit « Enregistré sur le serveur », le second profil voit la liste mise à jour. `adil` peut maintenant **Enregistrer**.
+Le téléphone n'a **pas** besoin d'être sur le même Wi-Fi : il passe par Internet, via l'adresse HTTPS du tunnel.
 
-## 6. Fin de recette
-1. Désinstaller l'application d'essai : appui long sur l'icône → **Désinstaller** (ou Infos sur l'appli → Désinstaller).
-2. Sur l'ordinateur : `scripts/recette-locale.sh --stop` (efface la base d'essai).
+## 2. Obtenir l'adresse HTTPS
 
-## Ce qui est vérifié automatiquement (GitHub Actions « Vérification du tunnel HTTPS »)
-Sur un vrai tunnel HTTPS, depuis Chrome automatisé : page, manifeste « standalone », icônes 192/512 et « maskable », service worker, connexion avec cookie `Secure`, propagation d'une modification d'un profil à un autre sans rechargement (le flux temps réel SSE est retenu par le tunnel gratuit Cloudflare : bascule mesurée sur une relecture toutes les 8 s), envoi d'une photo d'environ 3 Mo, **verdict d'installabilité de Chrome**, ouverture hors connexion après un premier chargement.
+1. Sur l'ordinateur : `git clone https://github.com/adilam2026/SmartCourse.git`, puis `cd SmartCourse` et `git checkout claude/family-shopping-list-specs-eqevg8`.
+2. Lancer : `scripts/recette-locale.sh`. La première fois : **plusieurs minutes** (construction de l'image, téléchargement des images PostgreSQL et Node).
+3. À la fin, le script affiche : une adresse `https://….trycloudflare.com`, le **code famille** et les identifiants d'essai :
+   - `adil` / `482913` : administrateur (peut aussi faire tout ce que fait un parent) ;
+   - `lamiaa` / `573918` : parent ;
+   - `marie` / `573918` : personnel.
+   Une liste de courses est déjà en cours.
+4. Envoyez l'adresse à votre téléphone (message à vous-même, e-mail).
+5. **Ne fermez pas le terminal.** Pour tout arrêter et effacer : `scripts/recette-locale.sh --stop`.
+
+Durée de validité : **tant que le script tourne et que l'ordinateur est allumé**. Cloudflare ne donne aucune durée garantie pour ce tunnel gratuit. **L'adresse change à chaque lancement.**
+
+## 3. Installer l'application avec son icône (Android, Chrome)
+1. Ouvrez l'adresse **dans Chrome**.
+2. Attendez 10 à 20 secondes (premier chargement), puis menu **⋮** → **Installer l'application** (ou « Ajouter à l'écran d'accueil » → choisir **Installer**, et **non** « Créer un raccourci », qui n'installe rien).
+3. Confirmez **Installer**. L'icône verte « Courses » (panier coché) apparaît sur l'écran d'accueil, ou dans la liste des applications (la faire glisser sur l'écran d'accueil).
+4. Fermez Chrome, ouvrez l'application **par son icône** : plein écran, sans barre d'adresse. Toute la suite se fait ici.
+5. Si « Installer » n'apparaît pas : rechargez la page, attendez 10 s, rouvrez le menu ⋮.
+
+## 4. Tester les deux profils
+
+**Un téléphone n'ouvre qu'un profil à la fois dans l'application installée** (une seule session par appareil). Pour voir deux profils en même temps, utilisez **un deuxième appareil** : le plus simple est le **navigateur de l'ordinateur**, qui ouvre la même adresse HTTPS.
+
+- **Téléphone, application installée : `adil`** (administrateur) → ajoute des articles, achète, modifie le catalogue.
+- **Ordinateur, navigateur : `marie`** (personnel) → sélectionne et valide des articles.
+- Option : `lamiaa` (parent) sur l'ordinateur dans une fenêtre de navigation privée, en plus.
+
+Parcours :
+1. Téléphone : connexion `adil` (code famille affiché par le script).
+2. Téléphone : Réglages → Catalogue → **+ Ajouter un article** → **📷 Prendre une photo** (l'appareil photo d'Android s'ouvre ; aucune autorisation spéciale n'est normalement demandée) ou **🖼️ Galerie** ; l'aperçu montre l'image entière sur fond blanc ; nom « Khobz », catégorie « Pain et petit-déjeuner » ; **Enregistrer**.
+3. Ordinateur : connexion `marie` → « Khobz » doit apparaître **sans rechargement**, en quelques secondes (jusqu'à une dizaine, sans garantie : relecture périodique via le tunnel).
+4. Ordinateur : toucher « Khobz », puis **Valider**.
+5. Téléphone : l'article apparaît dans « À acheter » **sans rechargement** ; toucher **Acheté**.
+6. Téléphone : modifier « Khobz » (nom, photo), puis le **désactiver** : l'ordinateur voit le changement ; l'article déjà dans la liste reste visible, marqué « désactivé ».
+
+## 5. Fermer puis rouvrir
+Applications récentes → faire glisser **Courses** hors de l'écran → rouvrir par l'icône : toujours connecté (session de 90 jours), liste et catalogue présents. Avec `marie` : choisir deux articles **sans valider**, fermer, rouvrir : les choix sont conservés.
+
+## 6. Mode avion et synchronisation
+Application ouverte **en ligne au moins 30 s** (mise en mémoire des images).
+1. Mode avion → ouvrir l'application : bandeau hors connexion, catalogue **et images** affichés.
+2. `marie` (sur le téléphone après changement de profil, ou sur l'ordinateur coupé du réseau) : choisir des articles → **Valider** → « en attente de synchronisation » (pas de fausse confirmation).
+3. Parent/administrateur hors connexion : **Acheté** et **Corriger** sont bloqués (règle convenue).
+4. Administrateur hors connexion : Enregistrer un article → message « Pas de connexion… », la feuille reste ouverte avec toutes les données.
+5. Désactiver le mode avion : l'envoi reprend tout seul ; la propagation vers l'autre profil arrive à la relecture suivante (plusieurs secondes, **sans garantie**).
+
+## 7. Fin
+1. Désinstaller : appui long sur l'icône → **Désinstaller** (indispensable : l'application installée pointe vers l'ancienne adresse).
+2. Ordinateur : `scripts/recette-locale.sh --stop` (efface la base d'essai).
+
+## 8. Sans ordinateur allumé : option non réalisée
+Un workflow GitHub pourrait garder le tunnel ouvert pendant une durée fixée (au plus quelques heures, limite des tâches GitHub) et afficher l'adresse dans ses journaux. Il n'existe pas ; il exposerait publiquement l'application d'essai (adresse aléatoire, données jetables) et **ne remplace pas un hébergement durable**. À décider par vous.
