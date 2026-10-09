@@ -92,7 +92,7 @@ function Current({ engine, s, onEdit }: { engine: Engine; s: State; onEdit(): vo
           {toBuy.map((i) => (
             <li key={i.id} className="row" data-testid={`row-${i.productId}`}>
               <Thumb photoUrl={i.photoUrl} category={i.category} />
-              <span className="row__name">{i.name}{i.brand && <small>{i.brand}</small>}{!i.productActive && <small>plus proposé</small>}</span>
+              <span className="row__name">{i.name}{i.brand && <small>{i.brand}</small>}{!i.productActive && <small>désactivé</small>}</span>
               <button className="btn btn--primary" data-testid={`buy-${i.productId}`} disabled={busy === i.id} onClick={() => void buy(i.id)}>Acheté</button>
             </li>
           ))}

@@ -61,3 +61,8 @@ Si aucun administrateur ne peut se connecter : depuis un terminal ayant accès �
 **Limite** : les sauvegardes couvrent la base (profils, listes, achats, catalogue, références des photos). Les fichiers photo restent dans le bucket mais ne sont pas copiés dans les sauvegardes. Les photos du catalogue initial se réimportent ; une photo prise par la famille perdue serait à reprendre.
 
 **Restauration réelle (sinistre)** : créer une base vide du **même numéro de version majeure**, déchiffrer le fichier (fonction `decrypt` de `server/src/backup.ts`), `pg_restore --no-owner --dbname=<url> fichier.dump`, puis pointer `DATABASE_URL` dessus.
+
+
+## Vérifier l'image Docker (sans déployer)
+
+`scripts/verify-docker.sh` (ou GitHub → Actions → « Vérification Docker », lancement manuel) construit l'image, la démarre sur un PostgreSQL jetable et contrôle : 80 WebP seulement, utilisateur `node`, clients `pg_dump` 16/17/18, import des 80 visuels au premier démarrage, **aucun changement** au redémarrage et à l'import manuel, purge sans effet, image personnalisée conservée. Aucun accès à Railway.

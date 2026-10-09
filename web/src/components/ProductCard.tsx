@@ -56,7 +56,7 @@ export const ProductCard = memo(function ProductCard({ productId, name, brand, p
       <span className="card__name">
         {name}
         {brand ? <small>{brand}</small> : null}
-        {inactive ? <small>plus proposé</small> : null}
+        {inactive ? <small>désactivé</small> : null}
       </span>
     </button>
   );

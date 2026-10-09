@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, ApiError, NetworkError } from "../api";
 import { CATEGORY_EMOJI } from "../categories";
 import { prepareImage } from "../image";
@@ -27,6 +27,8 @@ export function ProductForm({ product, categories, onClose, onSaved }: Props) {
   const [reset, setReset] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false); // un deuxième appui avant le rendu suivant ne doit pas envoyer deux fois
+  const dirty = !!image || reset || name !== (product?.name ?? "") || category !== (product?.category ?? categories[0]?.key ?? "") || active !== (product?.active ?? true);
   useEffect(() => () => { if (image) URL.revokeObjectURL(image.previewUrl); }, [image]);
 
   const pick = async (f: File | undefined) => {
@@ -44,9 +46,12 @@ export function ProductForm({ product, categories, onClose, onSaved }: Props) {
   const title = product ? "Modifier un article" : "Ajouter un article";
 
   return (
-    <Dialog title={title} onClose={onClose}>
+    <Dialog title={title} onClose={onClose} dismissable={!busy && !dirty}>
+      <button type="button" className="sheet__close" aria-label="Fermer" data-testid="pf-close" onClick={onClose}>✕</button>
       <form className="form" data-testid="product-form" onSubmit={async (e) => {
         e.preventDefault();
+        if (inFlight.current) return;
+        inFlight.current = true;
         setBusy(true);
         setError(null);
         try {
@@ -56,6 +61,7 @@ export function ProductForm({ product, categories, onClose, onSaved }: Props) {
         } catch (err) {
           setError(errText(err));
         } finally {
+          inFlight.current = false;
           setBusy(false);
         }
       }}>
@@ -77,11 +83,14 @@ export function ProductForm({ product, categories, onClose, onSaved }: Props) {
             {categories.map((c) => <option key={c.key} value={c.key}>{CATEGORY_EMOJI[c.key]} {c.label}</option>)}
           </select>
         </label>
-        <label className="check"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} data-testid="pf-active" /> Actif (désactivé : n'apparaît plus pour le personnel)</label>
-        <p className="muted">L'image est réduite automatiquement (512 px, fond blanc, sans rognage). Les listes déjà clôturées ne changent pas.</p>
+        <label className="check"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} data-testid="pf-active" /> Article actif</label>
+        <p className="muted" data-testid="pf-rule">Désactivé : l'article ne peut plus être ajouté à une liste. S'il est déjà dans la liste en cours, il y reste, marqué « désactivé » : il peut encore être acheté ou retiré. Les listes clôturées ne changent jamais.</p>
+        <p className="muted">L'image est réduite automatiquement (512 px, fond blanc, sans rognage).</p>
         {error && <p className="error" role="alert" data-testid="pf-error">{error}</p>}
-        <button className="btn btn--primary btn--big" disabled={busy || !name.trim()} data-testid="pf-save">{busy ? "Enregistrement…" : "Enregistrer"}</button>
-        <button type="button" className="btn btn--ghost" onClick={onClose}>Annuler</button>
+        <div className="form__actions">
+          <button className="btn btn--primary btn--big" disabled={busy || !name.trim()} aria-busy={busy} data-testid="pf-save">{busy ? "Enregistrement…" : "Enregistrer"}</button>
+          <button type="button" className="btn btn--ghost" disabled={busy} data-testid="pf-cancel" onClick={onClose}>Annuler</button>
+        </div>
       </form>
     </Dialog>
   );

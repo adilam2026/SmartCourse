@@ -1,0 +1,13 @@
+name: Vérification Docker (manuelle, sans déploiement)
+# Ne se lance que sur demande (onglet Actions → Run workflow). Aucun secret, aucun accès à Railway.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - run: scripts/verify-docker.sh

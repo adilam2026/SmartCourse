@@ -81,7 +81,7 @@ export interface Interpreted {
 const REASON_TEXT: Record<string, string> = {
   stale: "a changé entre-temps : vérifiez avant de le retirer",
   locked_purchased: "est déjà acheté : il ne peut plus être retiré",
-  product_inactive: "n'est plus proposé dans le catalogue",
+  product_inactive: "est désactivé : il ne peut plus être ajouté",
   product_unknown: "est introuvable",
   item_unknown: "n'est plus dans la liste",
   item_removed: "a été retiré de la liste",
