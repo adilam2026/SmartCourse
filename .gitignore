@@ -6,3 +6,4 @@ e2e/shots
 e2e/playwright-report
 server/data/photos
 server/data/backups
+exports
