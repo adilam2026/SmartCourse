@@ -83,6 +83,15 @@ Opérations par article, identifiées par `op_id`, rattachées à une liste. Cha
 - États affichés : brouillon · enregistrement… · en attente de synchronisation · enregistré.
 - Flux SSE : un événement par changement validé ; au retour de connexion le client recharge l'état courant (SSE peut perdre des événements). Les connexions d'un profil désactivé sont fermées immédiatement.
 
+### Compléments d'implémentation (étape 4)
+
+- Un article retiré n'est pas supprimé : il passe à l'état `removed` (même ligne, `rev` incrémenté). Un nouvel ajout le remet à `to_buy`. L'unicité `(list_id, product_id)` reste donc vraie.
+- `rev` s'incrémente à chaque changement d'état d'un article. Un retrait porte la `rev` vue par le client (`baseRev`) : si l'article a changé depuis (acheté puis corrigé, retiré puis rajouté), le retrait est refusé « périmé » et le client doit relire l'état.
+- Protocole de verrous : mutation = liste `FOR SHARE` puis article `FOR UPDATE` ; clôture = liste `FOR UPDATE`. Ordre constant liste → article → achat.
+- Index uniques partiels : une liste active par famille ; un seul achat non corrigé par article.
+- Défense en profondeur : des déclencheurs SQL interdisent toute écriture sur une liste archivée (y compris par SQL direct).
+- Idempotence : table `op_log` (profil, `op_id`) ; rejouer une opération renvoie le résultat d'origine, y compris pour un refus.
+
 ## 6. Catalogue et photos
 
 - 80 références génériques chargées par migration.

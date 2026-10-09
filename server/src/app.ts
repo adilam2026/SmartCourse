@@ -5,6 +5,7 @@ import { ZodError, z } from "zod";
 import { authenticate, login, revokeSession, setupFamily, type AuthContext, SESSION_DAYS } from "./auth.js";
 import { catalogRoutes } from "./catalog-routes.js";
 import { COOKIE, makeGuard } from "./guard.js";
+import { listRoutes } from "./list-routes.js";
 import type { PhotoStore } from "./photos.js";
 import type { Db } from "./db.js";
 import { HttpError } from "./errors.js";
@@ -135,6 +136,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   });
 
   catalogRoutes(app, { db, store: deps.store, guard });
+  listRoutes(app, { db, hub, guard });
 
   // --- flux SSE ---
   app.get("/api/events", { preHandler: guard() }, async (req, reply) => {
