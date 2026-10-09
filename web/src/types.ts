@@ -19,6 +19,8 @@ export interface Product {
 }
 
 export interface Catalog {
+  /** Revision of the family catalogue (absent on an older server: then it is always downloaded). */
+  rev?: number;
   categories: { key: string; label: string; products: Product[] }[];
 }
 

@@ -306,7 +306,11 @@ export class Engine {
   private async refreshOnce(): Promise<void> {
     if (!this.s.me) return;
     try {
-      const [catalog, { list }] = await Promise.all([this.api.catalog(), this.api.activeList()]);
+      // The list is small (a few hundred bytes to a few KB) and comes with the catalogue revision: the catalogue (≈ 15 KB)
+      // is downloaded only when it is unknown or its revision changed (article added, edited, deactivated, new picture).
+      const { list, catalogRev } = await this.api.activeList();
+      const known = this.s.catalog;
+      const catalog = known && catalogRev !== undefined && known.rev === catalogRev ? known : await this.api.catalog();
       this.set({ conn: "online" });
       await this.applyServerState(catalog, list);
     } catch (e) {

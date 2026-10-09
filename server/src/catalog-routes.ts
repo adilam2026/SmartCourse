@@ -46,6 +46,9 @@ export function catalogRoutes(app: FastifyInstance, { db, store, guard, hub }: D
     const a = req.auth!;
     const { includeInactive } = z.object({ includeInactive: z.enum(["0", "1"]).optional() }).parse(req.query);
     const withInactive = includeInactive === "1" && can(a.role, "family.manage");
+    // Revision read FIRST: if the catalogue changes while it is being read, the client holds a revision older than its data
+    // and simply downloads once more; it can never keep stale data under a fresh revision.
+    const rev = Number((await db.query("SELECT catalog_rev FROM families WHERE id = $1", [a.familyId])).rows[0]?.catalog_rev ?? 0);
     const [cats, prods] = await Promise.all([
       db.query("SELECT key, label FROM categories ORDER BY position"),
       db.query(
@@ -54,6 +57,7 @@ export function catalogRoutes(app: FastifyInstance, { db, store, guard, hub }: D
       ),
     ]);
     return {
+      rev,
       categories: cats.rows.map((c) => ({
         key: c.key,
         label: c.label,

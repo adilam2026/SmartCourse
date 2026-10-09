@@ -20,6 +20,9 @@ class FakeServer {
   down = false;
   calls: { listId: string; ops: Op[] }[] = [];
   meOk = true;
+  cat: Catalog = catalog;
+  catalogRev: number | undefined; // undefined = ancien serveur, sans révision
+  catalogCalls = 0;
 
   view(): ListView | null {
     return this.listId ? { id: this.listId, status: "active", createdAt: "", closedAt: null, items: this.items.map((i) => ({ ...i })) } : null;
@@ -28,8 +31,8 @@ class FakeServer {
     me: async () => { this.check(); if (!this.meOk) throw new ApiError(401, "unauthenticated", "x"); return { me: me() }; },
     login: async () => { this.check(); return { me: me() }; },
     logout: async () => ({ ok: true as const }),
-    catalog: async () => { this.check(); return catalog; },
-    activeList: async () => { this.check(); return { list: this.view() }; },
+    catalog: async () => { this.check(); this.catalogCalls++; return this.catalogRev === undefined ? this.cat : { ...this.cat, rev: this.catalogRev }; },
+    activeList: async () => { this.check(); return { list: this.view(), catalogRev: this.catalogRev }; },
     postOps: async (listId: string, ops: Op[]) => {
       this.check();
       this.calls.push({ listId, ops });
@@ -443,5 +446,61 @@ describe("relecture périodique (filet de sécurité quand le flux temps réel e
     srv.down = false;
     await e.retryNow();
     expect(e.getState().conn).toBe("online");
+  });
+
+  describe("révision du catalogue : on ne retélécharge le catalogue que s'il a changé", () => {
+    const withCat = (mut: (c: Catalog) => Catalog) => { srv.cat = mut(srv.cat); srv.catalogRev = (srv.catalogRev ?? 0) + 1; };
+
+    it("10 relectures sans changement : le catalogue n'est téléchargé qu'une fois, la liste à chaque fois", async () => {
+      srv.catalogRev = 1;
+      const e = await boot();
+      let lists = 0; const orig = srv.api.activeList; srv.api.activeList = async () => { lists++; return orig(); };
+      expect(srv.catalogCalls).toBe(1);
+      for (let i = 0; i < 10; i++) await e.pollTick(true);
+      expect(srv.catalogCalls).toBe(1);
+      expect(lists).toBe(10);
+    });
+
+    it("ajout, modification et désactivation d'un article : repris à la relecture suivante, une seule fois chacun", async () => {
+      srv.catalogRev = 1;
+      const e = await boot();
+      const names = () => e.getState().catalog!.categories.flatMap((c) => c.products.map((p) => p.name)).sort();
+      expect(names()).toEqual(["LAIT", "RIZ", "SUCRE"]);
+      withCat((c) => ({ categories: c.categories.map((k) => ({ ...k, products: [...k.products, product("khobz")] })) })); // ajout
+      await e.pollTick(true);
+      expect(names()).toEqual(["KHOBZ", "LAIT", "RIZ", "SUCRE"]);
+      expect(srv.catalogCalls).toBe(2);
+      withCat((c) => ({ categories: c.categories.map((k) => ({ ...k, products: k.products.map((p) => (p.id === "riz" ? { ...p, name: "Riz basmati" } : p)) })) })); // modification
+      await e.pollTick(true);
+      expect(names()).toContain("Riz basmati");
+      expect(srv.catalogCalls).toBe(3);
+      withCat((c) => ({ categories: c.categories.map((k) => ({ ...k, products: k.products.filter((p) => p.id !== "sucre") })) })); // désactivation (disparaît du catalogue du personnel)
+      await e.pollTick(true);
+      expect(names()).not.toContain("SUCRE");
+      expect(srv.catalogCalls).toBe(4);
+      for (let i = 0; i < 5; i++) await e.pollTick(true); // plus rien ne change
+      expect(srv.catalogCalls).toBe(4);
+    });
+
+    it("un événement catalog.updated du flux temps réel passe par le même contrôle de révision", async () => {
+      srv.catalogRev = 1;
+      const es = new FakeEventSource();
+      const e = new Engine({ db, api: srv.api, newId, eventSource: () => es });
+      await e.start(); es.emit("ready"); await wait(200);
+      const before = srv.catalogCalls;
+      es.emit("list.updated"); await wait(300); // pas de changement de catalogue : pas de téléchargement
+      expect(srv.catalogCalls).toBe(before);
+      withCat((c) => ({ categories: c.categories.map((k) => ({ ...k, products: [...k.products, product("miel")] })) }));
+      es.emit("catalog.updated"); await wait(300);
+      expect(srv.catalogCalls).toBe(before + 1);
+      expect(e.getState().catalog!.categories[0]!.products.map((p) => p.id)).toContain("miel");
+    });
+
+    it("ancien serveur sans révision : comportement d'avant (le catalogue est relu à chaque fois)", async () => {
+      srv.catalogRev = undefined;
+      const e = await boot();
+      for (let i = 0; i < 3; i++) await e.pollTick(true);
+      expect(srv.catalogCalls).toBe(4);
+    });
   });
 });

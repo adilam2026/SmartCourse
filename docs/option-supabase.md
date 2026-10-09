@@ -29,30 +29,36 @@ Objectif donné : rester dans les 5 $/mois déjà payés à Railway, toutes appl
 
 **Gain attendu de B : environ 1 à 2 $ par mois**, soit un tiers à la moitié du coût de l'application. C'est une estimation, pas une mesure.
 
-## 2. Coût de l'application ≠ consommation de votre workspace
+## 2. Coût de l'application ≠ consommation de votre workspace (scénarios estimatifs, pas des limites)
 
-Votre abonnement Hobby est de 5 $ qui **incluent** 5 $ de consommation : vous payez le plus grand des deux (5 $ ou votre consommation). Donc :
+Principe (tarifs Railway relevés dans des sources secondaires concordantes, **à reconfirmer sur votre page Usage**) : l'abonnement Hobby de 5 $ **inclut** 5 $ de consommation ; on paie le plus grand des deux. Le coût supplémentaire dû à cette application serait donc max(0 ; consommation totale du workspace − 5 $).
 
-> coût supplémentaire dû à cette application = max(0 ; consommation de tous vos projets − 5 $)
+Les valeurs ci-dessous sont **des scénarios fondés sur mes estimations de coût de l'application (§1)**, qui sont elles-mêmes des extrapolations de mesures locales. **Ce ne sont ni des seuils garantis ni des limites de Railway.** La facturation réelle dépend de la mémoire réellement mesurée par Railway, du temps d'activité, des volumes, de la sortie réseau et de vos autres services, que je ne vois pas.
 
-- Si vos autres projets consomment **U** $/mois, l'option A reste dans les 5 $ tant que **U + (2,5 à 3,5) ≤ 5**, soit **U ≤ 1,5 à 2,5 $**.
-- L'option B reste dans les 5 $ tant que **U + (1,2 à 1,6) ≤ 5**, soit **U ≤ 3,4 à 3,8 $**.
-- **Je ne connais pas U.** C'est le chiffre qui décide. À relever sur la page Usage de Railway (consommation du mois en cours, par projet) avant de choisir.
+| Scénario : consommation mensuelle de vos **autres** projets (U) | A. Railway seul (application ≈ 2,5 à 3,5 $, jusqu'à ≈ 6 $) | B. Railway + Supabase Free (application ≈ 1,2 à 1,6 $, jusqu'à ≈ 2,5 $) |
+|---|---|---|
+| U ≈ 1 $ | total ≈ 3,5 à 4,5 $ : **sous les 5 $ dans l'estimation centrale** ; au-dessus si l'estimation haute se vérifie (≈ 7 $) | total ≈ 2,2 à 2,6 $ (≈ 3,5 $ en haut de fourchette) : sous les 5 $ |
+| U ≈ 2 $ | total ≈ 4,5 à 5,5 $ : **limite**, dépassement possible | total ≈ 3,2 à 3,6 $ (≈ 4,5 $) : sous les 5 $ |
+| U ≈ 3 $ | total ≈ 5,5 à 6,5 $ : dépassement probable | total ≈ 4,2 à 4,6 $ (≈ 5,5 $) : sous les 5 $ en estimation centrale, **dépassement possible** en haut de fourchette |
+| U ≈ 4 $ ou plus | dépassement | total ≈ 5,2 à 5,6 $ ou plus : dépassement probable |
 
-Rappel de vos limites (inchangées) : alerte 5 $ (prévient seulement), plafond COMPUTE 10 $ (arrête **tous** les services du workspace), AGENT 0 $. Une consommation de 5 à 10 $ coûte donc de l'argent en plus des 5 $ payés ; 10 $ arrête tout, application familiale comprise.
+À lire comme un ordre de grandeur : **je ne connais pas U**, et la fourchette haute de l'application peut faire basculer un scénario. **Aucune de ces lignes n'est une promesse de rester dans les 5 $.** Le seul moyen de le savoir est la mesure : consommation réelle d'une semaine de l'application, ajoutée à U relevé sur votre page Usage (§11).
+
+Rappel de vos limites (inchangées) : alerte 5 $ (prévient seulement), plafond COMPUTE 10 $ (arrête **tous** les services du workspace), AGENT 0 $. Un dépassement des 5 $ coûte de l'argent en plus ; 10 $ arrête tout, application familiale comprise.
 
 ## 3. Pourquoi je ne garantis pas le budget
-1. U est inconnu.
+1. U est inconnu (et les scénarios du §2 ne sont pas des seuils).
 2. Mes mesures sont locales : la mémoire facturée par Railway est celle du conteneur (souvent supérieure).
 3. La sortie vers Supabase compte comme sortie Railway et comme sortie Supabase (§6) : faible, mais à mesurer.
-4. Les 5 Go de sortie Supabase peuvent être dépassés dans un cas précis (relecture périodique, §6).
+4. Le quota de sortie Supabase n'est plus menacé par la relecture périodique depuis son optimisation (§6) ; il reste partagé avec vos autres projets de l'organisation.
 
 ## 4. Vérifier vos quotas Supabase sans rien perturber (lecture seule, par vous)
 Je n'ai aucun accès à votre compte Supabase et je n'en demande pas. Pour vérifier vous-même, sans modifier quoi que ce soit :
 1. Tableau de bord Supabase → votre organisation → **Usage** : base de données (Mo), stockage (Go), sortie (Go) pour le mois en cours, **par projet**.
-2. Organisation → **Billing** : plan (Free/Pro) et nombre de projets. Free : **2 projets actifs maximum**, les projets en pause ne comptent pas.
-3. Vous remarquerez si un projet existant est proche de 500 Mo ou de 5 Go : le quota de **sortie est par organisation**, partagé avec vos autres applications.
-4. **Recommandation de prudence : créer un projet Supabase dédié, dans une organisation séparée si possible**, pour que cette application ne consomme pas la sortie de vos autres projets et inversement.
+2. Organisation → **Billing** : plan (Free/Pro).
+3. **La limite de 2 projets Free s'applique à l'ensemble des organisations où vous êtes propriétaire (Owner) ou administratrice (Administrator)**, et non par organisation (documentation officielle : « The project limit applies across all organizations where you are an Owner or Administrator »). Les projets **en pause ne comptent pas**. Il faut donc compter vos projets Free **actifs dans toutes vos organisations** : si vous en avez déjà 2, un projet dédié à cette application est **impossible en Free** (créer une organisation séparée n'y change rien).
+4. Le quota de sortie (§6) est, lui, **par organisation** : un projet dans une organisation à part n'utilise pas la sortie de vos autres organisations, mais il compte quand même dans la limite des 2 projets.
+5. Notez si un projet existant est proche de 500 Mo.
 
 ## 5. Compatibilité de l'application avec Supabase (lecture du code)
 
@@ -78,7 +84,7 @@ Je n'ai aucun accès à votre compte Supabase et je n'en demande pas. Pour véri
 | Limite (Free) | Conséquence si atteinte |
 |---|---|
 | **Base : 500 Mo** par projet (la nôtre : 8,8 Mo avec les 80 produits ; croissance lente) | **Lecture seule** : les écritures échouent (« cannot execute INSERT in a read-only transaction ») ; la famille ne peut plus rien acheter ni cocher. Libérable en supprimant des données puis `vacuum`, sinon passage en Pro (25 $) |
-| **Sortie : 5 Go/mois** (par organisation) | Comportement exact **non confirmé sur la page lue** ; Supabase applique des **restrictions** aux organisations Free qui dépassent. Prévoir une interruption possible |
+| **Sortie non mise en cache : 5 Go/mois** et **sortie mise en cache : 5 Go/mois**, deux quotas **indépendants**, par organisation et partagés entre tous les services (base, stockage, authentification…) | La « sortie mise en cache » est celle servie par le CDN (essentiellement le stockage de fichiers via Smart CDN) : **elle ne concerne pas nos requêtes SQL**. Notre trafic base → serveur est de la sortie **non mise en cache**, comptée comme « sortie du pooler partagé » (la documentation précise qu'elle n'est pas comptée en plus comme sortie de base) : **je suppose qu'elle consomme les 5 Go non cachés, à vérifier dans votre page Usage**. Au dépassement, l'organisation est **restreinte jusqu'au début du cycle suivant** (ou passage en Pro) ; il n'y a pas de tarif de dépassement en Free. Les restrictions exactes ne sont pas détaillées dans la page lue : **prévoir une interruption possible** |
 | **Stockage : 1 Go** | Ajout d'images impossible au-delà ; non concerné si on garde le bucket Railway |
 | **Pause après 7 jours sans activité suffisante** | Application **hors service** jusqu'à reprise manuelle (« Resume project ») ; avertissement par e-mail ~1 semaine avant ; **restauration possible pendant 1 an** (la doc elle-même est incohérente : titre « 90 jours », texte « 1 an » : à ne pas parier dessus) |
 | **Pas de sauvegarde automatique** (Free) | **Aucune copie** si vous n'en faites pas : d'où §7 |
@@ -86,17 +92,19 @@ Je n'ai aucun accès à votre compte Supabase et je n'en demande pas. Pour véri
 | **Disponibilité** | Pas d'engagement de service sur Free |
 
 ### Trafic : ce que j'ai mesuré et ce que j'estime
-Mesuré en local : catalogue **14,7 Ko** par lecture, liste en cours **0,2 Ko** (vide) à quelques Ko (remplie), base **8,8 Mo**. Estimation de ce qui sort de la base vers le serveur par rafraîchissement : **≈ 20 à 30 Ko**.
+**Relecture périodique optimisée (faite, testée)** : la relecture ne télécharge plus le catalogue : elle lit la liste en cours, qui porte une **révision du catalogue** ; le catalogue (14,7 Ko) n'est retéléchargé que si cette révision a changé (article ajouté, modifié, désactivé, nouvelle image). Mesuré en navigateur, flux temps réel bloqué : **25 s sans changement = 3 lectures de la liste, 0 du catalogue, 462 octets au total** (avant : 3 × ≈ 15 Ko ≈ 44 Ko). Un ajout, un renommage et une désactivation sont repris chacun avec **un seul** téléchargement du catalogue.
 
-| Scénario | Calcul | Sortie Supabase / mois |
+Taille mesurée d'une liste en cours : 0,2 Ko (vide) à **7,9 Ko pour 30 articles**. Une relecture coûte donc **≈ 8 Ko au plus** (liste de 30 articles) au lieu de ≈ 23 Ko : **gain ≈ ×3 avec une liste pleine, bien plus avec une liste vide** (la liste reste relue en entier ; l'alléger davantage demanderait une révision de liste, non faite).
+
+| Scénario (estimatif ; ordre de grandeur du trafic base → serveur, assimilé à la taille des réponses HTTP) | Calcul | Sortie non cachée Supabase / mois |
 |---|---|---|
-| Usage normal avec flux temps réel (3 profils × ≈ 40 rafraîchissements/jour) | 120/jour × 30 Ko | **≈ 0,1 Go** |
-| Flux temps réel retenu par un proxy → relecture toutes les 8 s, 1 h/jour au premier plan par profil | 3 × 450 × 30 Ko × 30 jours | **≈ 1,2 Go** |
-| Même cas, 3 h/jour par profil (téléphone resté ouvert au magasin) | idem × 3 | **≈ 3,6 Go** (proche des 5 Go, partagés avec vos autres projets) |
+| Usage normal avec flux temps réel (3 profils × ≈ 40 rafraîchissements/jour) | 120/jour × ≈ 8 Ko | **≈ 0,03 Go** |
+| Flux temps réel retenu → relecture toutes les 8 s, 1 h/jour au premier plan par profil, liste de 30 articles | 3 × 450 × 8 Ko × 30 j | **≈ 0,3 Go** (avant optimisation : ≈ 0,9 Go) |
+| Même cas, 3 h/jour par profil | idem × 3 | **≈ 1 Go** (avant optimisation : ≈ 2,7 Go) |
 
-**Risque réel** : si le flux temps réel ne fonctionne pas sur Railway (non vérifié, §3 de `proposition-railway.md`), la relecture toutes les 8 s lit **le catalogue entier à chaque fois** alors qu'il change rarement. **Amélioration à envisager (non faite)** : relire seulement la liste en cours (quelques centaines d'octets) et le catalogue sur événement ou toutes les quelques minutes ; cela divise le trafic par ~50.
+Ces chiffres ne comptent pas les requêtes de session (quelques centaines d'octets par requête) ni les en-têtes du protocole : l'ordre de grandeur est ≈ ±50 %. Ils restent des estimations à confirmer sur votre page Usage Supabase après un essai.
 
-La pause est peu probable pendant l'usage familial (activité quotidienne) mais **possible pendant des vacances** : la sauvegarde quotidienne décrite en §7 fait aussi office d'activité régulière.
+**Pause** : l'usage familial quotidien produit de l'activité, mais la pause reste **possible** (vacances, application peu utilisée). La documentation dit que le projet est jugé inactif s'il ne reçoit pas « sufficient user database activity » sur 7 jours, et qu'« a few daily requests » suffit généralement. **Je ne peux pas garantir qu'une sauvegarde quotidienne (ou une requête automatique) compte comme activité suffisante** : ce n'est pas écrit dans la documentation lue et je ne l'ai pas testé. Ne comptez donc pas sur elle pour empêcher la pause ; surveillez l'e-mail d'avertissement envoyé environ une semaine avant, et sachez que la reprise est manuelle.
 
 ## 7. Sauvegardes indépendantes avec restauration vérifiée (conception, non réalisée)
 
@@ -120,17 +128,36 @@ Limites : les tâches planifiées GitHub peuvent être retardées ou désactivé
 - Supabase Storage (1 Go gratuits) est possible : son interface S3 prend en charge `PutObject`, `GetObject`, `HeadObject`, `DeleteObject`, ce que notre code utilise ; **pas de versions** (suppression définitive). Endpoint et région à lire dans vos paramètres Supabase (non confirmés). Gain : < 0,01 $ : **sans intérêt**.
 - Cloudflare R2 (10 Go gratuits) : pertinent surtout pour les **sauvegardes**.
 
-## 9. Recommandation
+## 9. Recommandation (provisoire)
 
-1. **Ne pas migrer tout de suite.** Relevez d'abord **U**, la consommation mensuelle de votre workspace Railway hors cette application (page Usage). Si **U ≤ 1,5 $**, l'option A (Railway seul, ≈ 2,5–3,5 $) tient dans vos 5 $ et reste la plus simple (une seule plateforme, sauvegardes déjà prêtes).
-2. Si **1,5 $ < U ≤ 3,4 $**, l'option B (Supabase Free) devient la seule qui reste probablement dans les 5 $ : **gain ≈ 1 à 2 $/mois**, au prix de : pause possible, lecture seule à 500 Mo, quota de sortie partagé, un **projet dédié** à créer, un durcissement de sécurité obligatoire (§5) et de **nouvelles sauvegardes indépendantes** (§7, ≈ 1 jour de travail).
-3. Si **U > 3,4 $**, aucune des deux options ne garantit les 5 $ ; il faudra réduire d'autres services ou accepter un coût au-delà de 5 $.
-4. Dans tous les cas : un **test à blanc** (projet Supabase jetable, jeu de données d'essai, `scripts/check-tunnel.mjs`, migrations, sauvegarde et restauration) avant toute donnée réelle, puis **une semaine de mesure** des coûts réels.
+1. **Ne pas migrer maintenant.** Avant de choisir A ou B, il faut **mesurer** : U (consommation mensuelle de vos autres projets), le plan et la consommation prévue (captures du §11), et l'état de vos projets Supabase.
+2. **Lecture des scénarios du §2** : plus U est faible, moins le choix compte ; plus U approche 2 à 3 $, plus B devient la seule option susceptible de rester dans les 5 $ ; au-delà, aucune option ne tient dans les 5 $ sans réduire d'autres services. Ce sont des ordres de grandeur, pas des seuils.
+3. **B n'a de sens que si** : vous avez de la place dans la limite de 2 projets Free (toutes organisations), le gain de 1 à 2 $ par mois compte pour vous, et vous acceptez : pause possible, lecture seule à 500 Mo, quota de sortie, un durcissement de sécurité obligatoire (§5) et des sauvegardes indépendantes à construire (§7, ≈ 1 jour de travail).
+4. **Dans tous les cas** : test à blanc (projet jetable, jeu d'essai, `scripts/check-tunnel.mjs`, migrations, sauvegarde et restauration) avant toute donnée réelle, puis **une semaine de mesure** des coûts réels.
 
 ## 10. Ce que j'ai besoin de vous pour continuer
-- la valeur de **U** (ou les captures de la page Usage de Railway) ;
-- votre choix A / B ;
-- pour B : accord pour un **projet Supabase dédié** (vous le créez, ou vous me guidez ; je ne demande aucun identifiant ici), accord pour un compte R2 ou B2 pour les sauvegardes ;
-- votre décision sur l'amélioration « relire seulement la liste en cours » (réduit le trafic, petit changement).
+- les **captures du §11** (lecture seule) ;
+- votre choix A / B, **après** lecture des captures et de ce document ;
+- pour B uniquement : accord pour un **projet Supabase dédié** (qui doit rentrer dans la limite des 2 projets Free de toutes vos organisations ; vous le créez, ou vous me guidez ; aucun identifiant n'est demandé) et pour un compte R2 ou B2 pour les sauvegardes.
 
-**Rien de tout cela n'est fait.** Aucune souscription, aucune migration, aucun déploiement, aucune modification de vos limites.
+**Rien de tout cela n'est fait.** Aucune souscription, aucune migration, aucun service ajouté, aucun déploiement, aucune modification de vos limites.
+
+## 11. Captures à fournir pour décider (lecture seule)
+
+**Règles** : ne cliquez sur aucun bouton « Upgrade », « Resume », « Pause », « Delete » ni sur aucun réglage. Ne montrez **aucune** variable d'environnement, clé d'API, jeton, mot de passe ni chaîne de connexion (masquez-les). Les libellés exacts peuvent différer de ceux ci-dessous : prenez l'écran équivalent.
+
+**Railway** (espace de travail concerné par les 5 $ payés)
+1. **Plan et facturation** : le plan (nom, prix mensuel, crédit d'usage inclus, date de renouvellement) et les **dernières factures** (pour voir si un mois a déjà dépassé les 5 $).
+2. **Usage du workspace, mois en cours** : la consommation à ce jour, la **consommation estimée / projetée** du mois si elle est affichée, et la ventilation **par projet** puis **par ressource** (CPU, mémoire, réseau, volumes, buckets). Si possible aussi le **mois précédent**.
+3. **Limites de dépense** : l'alerte, le plafond et la ligne AGENT telles qu'elles sont réglées (affichage seul).
+4. **Liste de tous les projets et services** du workspace (nom, type, état en ligne/arrêté), avec pour les **trois services qui consomment le plus** l'onglet **Metrics sur 7 jours** (mémoire, CPU, réseau).
+5. Si vous avez des **volumes** ou des **buckets** : leur taille.
+
+**Supabase** (toutes les organisations dont vous êtes propriétaire ou administratrice)
+1. **Liste de vos organisations** (sélecteur en haut) avec, pour chacune, son **plan** (Free/Pro) et votre rôle.
+2. Pour **chaque organisation** : la **liste des projets** avec leur **statut (actif / en pause)** et leur région. Cela permet de compter les projets Free **actifs** (limite : 2 au total, toutes organisations confondues).
+3. Pour **chaque organisation** : **Usage** du cycle en cours (dates de début et de fin du cycle) avec **Egress (non mise en cache)**, **Cached Egress** si affiché, **Database size par projet** et **Storage size**.
+4. Pour chaque organisation : **Billing** (plan, plafond de dépense s'il existe).
+5. Pour un projet existant concerné (ou celui qui serait utilisé) : la **taille de calcul** et la **version de PostgreSQL**, sans aucune clé ni chaîne de connexion.
+
+Avec ces captures je pourrai : recalculer U et les scénarios du §2 avec vos vrais chiffres, dire si un projet Supabase dédié est possible, et préciser le gain réel. **Ce sera encore une estimation** : seule une semaine de mesure après un essai donnera la consommation réelle.

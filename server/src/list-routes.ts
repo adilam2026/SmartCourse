@@ -23,7 +23,12 @@ const REQUIRED: Record<OpIn["type"], Action> = {
 };
 
 export function listRoutes(app: FastifyInstance, { db, hub, guard }: { db: Db; hub: SseHub; guard: Guard }): void {
-  app.get("/api/lists/active", { preHandler: guard() }, async (req) => ({ list: await getActiveListView(db, req.auth!) }));
+  // `catalogRev` lets a client that polls decide whether it must download the catalogue again (see migration 008).
+  app.get("/api/lists/active", { preHandler: guard() }, async (req) => {
+    const list = await getActiveListView(db, req.auth!);
+    const catalogRev = Number((await db.query("SELECT catalog_rev FROM families WHERE id = $1", [req.auth!.familyId])).rows[0]?.catalog_rev ?? 0);
+    return { list, catalogRev };
+  });
 
   app.post("/api/lists", { preHandler: guard("list.create") }, async (req, reply) => {
     const { id } = await createList(db, hub, req.auth!);

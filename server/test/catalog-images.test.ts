@@ -454,3 +454,56 @@ describe("traitement de l'image et provenance", () => {
     expect(JSON.stringify(res)).not.toMatch(/Wikimedia|CC BY|CC0/); // cette famille n'a aucune archive avec une ancienne image
   });
 });
+
+describe("révision du catalogue (relecture légère)", () => {
+  const revOf = async (c: Cookies) => (await app.inject({ method: "GET", url: "/api/catalog", cookies: c })).json().rev as number;
+  const listRev = async (c: Cookies) => (await app.inject({ method: "GET", url: "/api/lists/active", cookies: c })).json() as { list: unknown; catalogRev: number };
+
+  it("change à chaque ajout, renommage, changement de catégorie, désactivation, image ; seule la famille concernée est touchée", async () => {
+    const F = await newFamily();
+    const G = await newFamily();
+    await newList(F.parent);
+    const r0 = await revOf(F.admin);
+    const g0 = await revOf(G.admin);
+    expect(typeof r0).toBe("number");
+    expect((await listRev(F.staff)).catalogRev).toBe(r0); // la liste en cours rapporte la même révision (même valeur pour tous les rôles)
+    let last = r0;
+    const changed = async (what: string) => {
+      const r = await revOf(F.admin);
+      expect(r, what).toBeGreaterThan(last);
+      expect((await listRev(F.staff)).catalogRev, what).toBe(r);
+      last = r;
+    };
+    const created = await app.inject({ method: "POST", url: "/api/products", cookies: F.admin, payload: { name: "Khobz rev", category: "pain" } });
+    expect(created.statusCode).toBe(201);
+    await changed("ajout");
+    const id = created.json().product.id as string;
+    await app.inject({ method: "PATCH", url: `/api/products/${id}`, cookies: F.admin, payload: { name: "Khobz rev 2" } });
+    await changed("renommage");
+    await app.inject({ method: "PATCH", url: `/api/products/${id}`, cookies: F.admin, payload: { category: "epicerie" } });
+    await changed("catégorie");
+    await app.inject({ method: "PATCH", url: `/api/products/${id}`, cookies: F.admin, payload: { image: b64(await png(300, 200, "#336699")) } });
+    await changed("image");
+    await app.inject({ method: "PATCH", url: `/api/products/${id}`, cookies: F.admin, payload: { active: false } });
+    await changed("désactivation");
+    // une lecture n'incrémente rien
+    expect(await revOf(F.admin)).toBe(last);
+    expect(await revOf(F.parent)).toBe(last);
+    // l'autre famille n'a pas bougé
+    expect(await revOf(G.admin)).toBe(g0);
+  });
+
+  it("sans liste en cours, la révision est quand même fournie", async () => {
+    const F = await newFamily();
+    const r = await listRev(F.staff);
+    expect(r.list).toBeNull();
+    expect(r.catalogRev).toBe(await revOf(F.admin));
+  });
+
+  it("le remplacement des images du catalogue (import) change la révision des familles", async () => {
+    const F = await newFamily();
+    const before = await revOf(F.admin);
+    await db.query("UPDATE products SET photo_asset_id = NULL WHERE family_id = $1 AND catalog_key = 'poires'", [F.familyId]);
+    expect(await revOf(F.admin)).toBeGreaterThan(before);
+  });
+});

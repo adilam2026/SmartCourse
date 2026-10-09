@@ -85,7 +85,7 @@ describe("listes : base", () => {
 
   it("sans liste active : le personnel reçoit « null » (écran « Aucune liste en cours ») et ne peut pas créer", async () => {
     const f = await newFamily();
-    expect((await app.inject({ method: "GET", url: "/api/lists/active", cookies: f.marie })).json()).toEqual({ list: null });
+    expect((await app.inject({ method: "GET", url: "/api/lists/active", cookies: f.marie })).json()).toMatchObject({ list: null });
     expect((await app.inject({ method: "POST", url: "/api/lists", cookies: f.marie })).statusCode).toBe(403);
   });
 
