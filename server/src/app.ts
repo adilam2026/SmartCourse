@@ -1,8 +1,11 @@
 import cookie from "@fastify/cookie";
 import rateLimit from "@fastify/rate-limit";
-import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
+import Fastify, { type FastifyInstance, type FastifyReply } from "fastify";
 import { ZodError, z } from "zod";
 import { authenticate, login, revokeSession, setupFamily, type AuthContext, SESSION_DAYS } from "./auth.js";
+import { catalogRoutes } from "./catalog-routes.js";
+import { COOKIE, makeGuard } from "./guard.js";
+import type { PhotoStore } from "./photos.js";
 import type { Db } from "./db.js";
 import { HttpError } from "./errors.js";
 import { SseHub } from "./hub.js";
@@ -12,19 +15,13 @@ import { createProfile, listProfiles, resetSecret, updateProfile } from "./profi
 export interface AppDeps {
   db: Db;
   hub?: SseHub;
+  store: PhotoStore;
   /** Per-IP limits on the unauthenticated routes. */
   loginRateLimit?: { max: number; timeWindow: string };
   /** How often an open SSE stream re-checks its session (catches out-of-band revocation). */
   sseRevalidateMs?: number;
 }
 
-declare module "fastify" {
-  interface FastifyRequest {
-    auth?: AuthContext;
-  }
-}
-
-const COOKIE = "sc_session";
 
 const loginSchema = z.object({
   familyCode: z.string().trim().toUpperCase().min(1).max(20),
@@ -69,13 +66,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       maxAge: SESSION_DAYS * 24 * 3600,
     });
 
-  /** Rejects with 401 if no valid session, 403 if the role lacks `action`. Identity always comes from the session. */
-  const guard = (action?: Action) => async (req: FastifyRequest) => {
-    const auth = await authenticate(db, req.cookies[COOKIE]);
-    if (!auth) throw new HttpError(401, "unauthenticated", "Connexion requise");
-    if (action && !can(auth.role, action)) throw new HttpError(403, "forbidden", "Action non autorisée");
-    req.auth = auth;
-  };
+  const guard = makeGuard(db);
 
   const limit = deps.loginRateLimit ?? { max: 20, timeWindow: "1 minute" };
 
@@ -142,6 +133,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     const body = z.object({ secret: secretField.optional() }).parse(req.body ?? {});
     return { secret: await resetSecret(db, hub, req.auth!, id, body.secret) };
   });
+
+  catalogRoutes(app, { db, store: deps.store, guard });
 
   // --- flux SSE ---
   app.get("/api/events", { preHandler: guard() }, async (req, reply) => {

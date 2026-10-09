@@ -4,13 +4,13 @@ import os from "node:os";
 import path from "node:path";
 import { buildApp } from "../src/app.js";
 import { migrate } from "../src/migrate.js";
-import { closeTestDb, testDb } from "./helpers.js";
+import { closeTestDb, testDb, testStore } from "./helpers.js";
 
 afterAll(closeTestDb);
 
 describe("socle", () => {
   it("/health répond ok quand la base est joignable", async () => {
-    const app = await buildApp({ db: await testDb() });
+    const app = await buildApp({ db: await testDb(), store: testStore() });
     const res = await app.inject({ method: "GET", url: "/health" });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ status: "ok" });

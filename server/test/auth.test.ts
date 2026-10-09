@@ -5,7 +5,7 @@ import { generateInstallToken } from "../src/auth.js";
 import type { Db } from "../src/db.js";
 import { SseHub } from "../src/hub.js";
 import { operatorResetSecret } from "../src/profiles.js";
-import { closeTestDb, resetData, testDb } from "./helpers.js";
+import { closeTestDb, resetData, testDb, testStore } from "./helpers.js";
 
 let db: Db;
 let app: FastifyInstance;
@@ -23,7 +23,7 @@ afterAll(async () => {
 beforeEach(async () => {
   await app?.close();
   hub = new SseHub();
-  app = await buildApp({ db, hub, loginRateLimit: { max: 1000, timeWindow: "1 minute" }, sseRevalidateMs: 100 });
+  app = await buildApp({ db, store: testStore(), hub, loginRateLimit: { max: 1000, timeWindow: "1 minute" }, sseRevalidateMs: 100 });
   await app.ready();
 });
 
@@ -136,7 +136,7 @@ describe("connexion", () => {
 
   it("limite les requêtes par IP sur la route de connexion", async () => {
     await app.close();
-    app = await buildApp({ db, loginRateLimit: { max: 3, timeWindow: "1 minute" } });
+    app = await buildApp({ db, store: testStore(), loginRateLimit: { max: 3, timeWindow: "1 minute" } });
     const codes: number[] = [];
     for (let i = 0; i < 5; i++) codes.push((await doLogin("AAAAAAAA", "x1", "482913")).statusCode);
     expect(codes.slice(3)).toEqual([429, 429]);
