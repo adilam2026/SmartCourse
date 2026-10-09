@@ -17,6 +17,8 @@ cleanup() { [ "$KEEP" = 1 ] && { echo "Conteneurs conservés : $APP, $PGC (rése
 trap cleanup EXIT
 
 sql() { docker exec "$PGC" psql -U smart -d smartcourse -tA -c "$1"; }
+# Dernière ligne d'import du journal (celle du démarrage le plus récent), pas la fin du journal.
+last_import() { docker logs "$APP" 2>&1 | grep "Images du catalogue" | tail -1; }
 wait_health() { for _ in $(seq 1 60); do docker exec "$APP" node -e 'fetch("http://127.0.0.1:3000/health").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))' && return 0; sleep 1; done; return 1; }
 start_app() {
   docker run -d --name "$APP" --network "$NET" -v "$VOL:/app/server/data" \
@@ -42,7 +44,7 @@ start_app
 wait_health || fail "l'application ne répond pas sur /health"
 ok "/health répond"
 sleep 3
-docker logs "$APP" 2>&1 | grep -q "Images du catalogue : 80 remplacée(s) ou ajoutée(s), 0 déjà à jour." || fail "import initial attendu : 80 remplacées/ajoutées"
+last_import | grep -q "Images du catalogue : 80 remplacée(s) ou ajoutée(s), 0 déjà à jour." || fail "import initial attendu : 80 remplacées/ajoutées"
 [ "$(sql "SELECT count(*) FROM initial_catalog WHERE photo_asset_id IS NOT NULL")" = 80 ] || fail "80 références du catalogue devraient avoir une image"
 [ "$(sql "SELECT count(*) FROM photo_assets WHERE generated AND license = 'GENERATED' AND source_name LIKE 'Image générée%' AND author IS NULL AND source_url IS NULL")" = 80 ] || fail "provenance « Image générée avec ChatGPT » attendue sur 80 images"
 [ "$(docker exec "$APP" sh -c 'ls /app/server/data/photos/photos/*.webp | wc -l')" = 80 ] || fail "80 fichiers attendus dans le stockage"
@@ -53,7 +55,7 @@ echo "== 4. Idempotence : redémarrage"
 docker restart "$APP" >/dev/null
 wait_health || fail "l'application ne redémarre pas"
 sleep 3
-docker logs "$APP" 2>&1 | grep -q "Images du catalogue : 0 remplacée(s) ou ajoutée(s), 80 déjà à jour." || fail "après redémarrage : 0 remplacée / 80 déjà à jour attendu"
+last_import | grep -q "Images du catalogue : 0 remplacée(s) ou ajoutée(s), 80 déjà à jour." || fail "après redémarrage : 0 remplacée / 80 déjà à jour attendu"
 [ "$(sql "SELECT count(*) FROM photo_assets")" = 80 ] || fail "le redémarrage ne doit pas créer d'image"
 [ "$(sql "SELECT md5(string_agg(photo_asset_id::text, ',' ORDER BY key)) FROM initial_catalog")" = "$IDS_BEFORE" ] || fail "les références d'image ont changé au redémarrage"
 ok "redémarrage : rien n'a changé"
@@ -88,7 +90,7 @@ const sharp=require("sharp");
 })().catch(e=>{console.error(e.message);process.exit(1)})' > "/tmp/$RUN.custom" || fail "création de la famille / image personnalisée"
 CUSTOM=$(cat "/tmp/$RUN.custom"); rm -f "/tmp/$RUN.custom"
 docker restart "$APP" >/dev/null; wait_health || fail "redémarrage"; sleep 3
-docker logs "$APP" 2>&1 | tail -3 | grep -q "Images du catalogue : 0 remplacée(s)" || fail "redémarrage : l'import ne devrait rien changer"
+last_import | grep -q "Images du catalogue : 0 remplacée(s)" || fail "redémarrage : l'import ne devrait rien changer"
 [ "$(sql "SELECT count(*) FROM products WHERE photo_asset_id = '${CUSTOM##*/}'")" = 1 ] || fail "l'image personnalisée a été remplacée"
 ok "image personnalisée conservée après redémarrage"
 
