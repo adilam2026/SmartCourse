@@ -51,6 +51,11 @@ last_import | grep -q "Images du catalogue : 80 remplacée(s) ou ajoutée(s), 0 
 [ "$(sql "SELECT count(*) FROM photo_assets WHERE generated AND license = 'GENERATED' AND source_name LIKE 'Image générée%' AND author IS NULL AND source_url IS NULL")" = 80 ] || fail "provenance « Image générée avec ChatGPT » attendue sur 80 images"
 [ "$(docker exec "$APP" sh -c 'ls /app/server/data/photos/photos/*.webp | wc -l')" = 80 ] || fail "80 fichiers attendus dans le stockage"
 ok "80 images importées, provenance générée, 80 fichiers stockés"
+# Migration 008 (révision du catalogue) : enregistrée, colonne et déclencheur présents, révision incrémentée par la création des produits
+[ "$(sql "SELECT count(*) FROM schema_migrations WHERE name LIKE '008%'")" = 1 ] || fail "migration 008 non enregistrée"
+[ "$(sql "SELECT count(*) FROM information_schema.columns WHERE table_name = 'families' AND column_name = 'catalog_rev'")" = 1 ] || fail "colonne families.catalog_rev absente"
+[ "$(sql "SELECT count(*) FROM pg_trigger WHERE tgname = 'products_bump_catalog_rev' AND NOT tgisinternal")" = 1 ] || fail "déclencheur products_bump_catalog_rev absent"
+ok "migration 008 appliquée (colonne et déclencheur présents)"
 IDS_BEFORE=$(sql "SELECT md5(string_agg(photo_asset_id::text, ',' ORDER BY key)) FROM initial_catalog")
 
 echo "== 4. Idempotence : redémarrage"
@@ -95,6 +100,8 @@ docker restart "$APP" >/dev/null; wait_health || fail "redémarrage"; sleep 3
 last_import | grep -q "Images du catalogue : 0 remplacée(s)" || fail "redémarrage : l'import ne devrait rien changer"
 [ "$(sql "SELECT count(*) FROM products WHERE photo_asset_id = '${CUSTOM##*/}'")" = 1 ] || fail "l'image personnalisée a été remplacée"
 ok "image personnalisée conservée après redémarrage"
+[ "$(sql "SELECT (catalog_rev > 0)::int FROM families LIMIT 1")" = 1 ] || fail "la révision du catalogue n'a pas été incrémentée par la création des produits / le changement d'image"
+ok "révision du catalogue incrémentée (création de la famille, changement d'image)"
 
 echo
 echo "Vérification Docker terminée : tout est conforme. Rien n'a été déployé."
