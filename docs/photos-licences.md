@@ -7,7 +7,7 @@ Accès réseau ouvert et vérifié (`commons.wikimedia.org`, `upload.wikimedia.o
 | | Produits |
 |---|---|
 | **Sans photo** (aucun bon candidat libre après 3 recherches) | viande hachée, sacs-poubelle, éponges, lingettes |
-| **Photo provisoire** (acceptable, à améliorer) | fraises (fraise des bois), levure chimique (poudre sur une cuillère : ressemble à du sucre ou de la farine), frites surgelées (texte d'emballage visible), poulet (étiquette japonaise visible), concombres → remplacé par une meilleure photo ; carottes (carottes rosées de basket) |
+| **Photo provisoire** (acceptable, à améliorer) | fraises (fraise des bois), levure chimique (poudre sur une cuillère : ressemble à du sucre ou de la farine), frites surgelées (texte d'emballage visible), poulet (étiquette japonaise visible), carottes (carottes rosées dans un panier) |
 | **En attente des marques** (30 produits) | produits emballés : voir `marques-a-valider.md` |
 
 Limites constatées :
