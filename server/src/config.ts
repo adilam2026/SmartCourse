@@ -8,6 +8,7 @@ const schema = z.object({
   S3_REGION: z.string().optional(),
   S3_ACCESS_KEY_ID: z.string().optional(),
   S3_SECRET_ACCESS_KEY: z.string().optional(),
+  WEB_DIR: z.string().default("../web/dist"),
   INSTALL_TOKEN: z.string().min(16).optional(),
   PORT: z.coerce.number().int().default(3000),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),

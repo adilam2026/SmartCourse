@@ -1,4 +1,6 @@
 import cookie from "@fastify/cookie";
+import fastifyStatic from "@fastify/static";
+import path from "node:path";
 import rateLimit from "@fastify/rate-limit";
 import Fastify, { type FastifyInstance, type FastifyReply } from "fastify";
 import { ZodError, z } from "zod";
@@ -17,6 +19,8 @@ export interface AppDeps {
   db: Db;
   hub?: SseHub;
   store: PhotoStore;
+  /** Built PWA (web/dist). When set, the server also serves the app and falls back to index.html. */
+  webDir?: string;
   /** Per-IP limits on the unauthenticated routes. */
   loginRateLimit?: { max: number; timeWindow: string };
   /** How often an open SSE stream re-checks its session (catches out-of-band revocation). */
@@ -179,7 +183,24 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     write(`event: ready\ndata: {}\n\n`);
   });
 
+  if (deps.webDir) {
+    const root = path.resolve(deps.webDir);
+    await app.register(fastifyStatic, {
+      root,
+      wildcard: false,
+      setHeaders: (res, file) => {
+        // Hashed bundles never change; the shell, service worker and manifest must always be revalidated.
+        const immutable = /[\\/]assets[\\/]/.test(file) || /[\\/]icons[\\/]/.test(file);
+        res.header("Cache-Control", immutable ? "public, max-age=31536000, immutable" : "no-cache");
+      },
+    });
+    app.setNotFoundHandler((req, reply) => {
+      if (req.method === "GET" && !req.url.startsWith("/api/") && !req.url.startsWith("/health")) return reply.header("Cache-Control", "no-cache").sendFile("index.html");
+      return reply.code(404).send({ error: "not_found" });
+    });
+  }
+
   return app;
 }
 
-const publicMe = (a: AuthContext) => ({ id: a.profileId, displayName: a.displayName, login: a.login, role: a.role });
+const publicMe = (a: AuthContext) => ({ id: a.profileId, familyId: a.familyId, displayName: a.displayName, login: a.login, role: a.role });
