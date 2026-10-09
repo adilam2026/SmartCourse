@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { ApiError, NetworkError } from "../api";
 import { AppDbClass } from "../db";
 import type { Catalog, ListItem, ListView, Me, Op, OpResult } from "../types";
-import { Engine } from "./engine";
+import { Engine, type EventSourceLike } from "./engine";
 
 const me = (id = "p1", familyId = "f1"): Me => ({ id, familyId, displayName: "Marie", login: "marie", role: "staff" });
 const product = (id: string, category = "c") => ({ id, category, name: id.toUpperCase(), brand: null, active: true, photoUrl: null });
@@ -267,5 +267,81 @@ describe("moteur de synchronisation", () => {
     const e2 = await boot();
     expect(e2.getState().list).toBeNull();
     expect(Object.keys(e2.getState().toggles)).toEqual(["lait"]);
+  });
+});
+
+class FakeEventSource implements EventSourceLike {
+  readyState = 1;
+  onerror: ((e: unknown) => void) | null = null;
+  handlers = new Map<string, ((e: unknown) => void)[]>();
+  closed = false;
+  addEventListener(type: string, fn: (e: unknown) => void) { this.handlers.set(type, [...(this.handlers.get(type) ?? []), fn]); }
+  close() { this.closed = true; this.readyState = 2; }
+  emit(type: string) { for (const h of this.handlers.get(type) ?? []) h({}); }
+}
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+describe("temps réel (SSE)", () => {
+  it("un événement déclenche une relecture : les changements validés par d'autres apparaissent sans action", async () => {
+    const es = new FakeEventSource();
+    const e = new Engine({ db, api: srv.api, newId, eventSource: () => es });
+    await e.start();
+    es.emit("ready");
+    expect(e.getState().live).toBe(true);
+    srv.items = [item("lait")]; // un parent a modifié la liste
+    es.emit("list.updated");
+    es.emit("list.updated"); // rafale : une seule relecture
+    await wait(300);
+    expect(e.getState().list?.items.map((i) => i.productId)).toEqual(["lait"]);
+  });
+
+  it("critère 9 / 10 : l'événement ne remplace pas les choix non validés, il les complète", async () => {
+    const es = new FakeEventSource();
+    const e = new Engine({ db, api: srv.api, newId, eventSource: () => es });
+    await e.start();
+    await e.toggle("riz"); // brouillon local
+    srv.items = [item("lait")]; // ajout indépendant d'un autre membre
+    es.emit("list.updated");
+    await wait(300);
+    expect(e.getState().list?.items.map((i) => i.productId)).toEqual(["lait"]);
+    expect(Object.keys(e.getState().toggles)).toEqual(["riz"]);
+    await e.validate();
+    expect(srv.items.map((i) => i.productId).sort()).toEqual(["lait", "riz"]); // les deux sont conservés
+  });
+
+  it("flux fermé par le serveur (session révoquée) : retour à la connexion", async () => {
+    const es = new FakeEventSource();
+    const e = new Engine({ db, api: srv.api, newId, eventSource: () => es });
+    await e.start();
+    srv.meOk = false;
+    srv.api.catalog = async () => { throw new ApiError(401, "unauthenticated", "x"); };
+    es.readyState = 2;
+    es.onerror?.({});
+    await wait(100);
+    expect(e.getState().phase).toBe("loggedOut");
+    expect(e.getState().live).toBe(false);
+  });
+
+  it("la déconnexion ferme le flux", async () => {
+    const es = new FakeEventSource();
+    const e = new Engine({ db, api: srv.api, newId, eventSource: () => es });
+    await e.start();
+    await e.logout();
+    expect(es.closed).toBe(true);
+  });
+
+  it("coupure du flux : « live » retombe, la reprise relit l'état", async () => {
+    const es = new FakeEventSource();
+    const e = new Engine({ db, api: srv.api, newId, eventSource: () => es });
+    await e.start();
+    es.emit("ready");
+    es.readyState = 0; // le navigateur retente
+    es.onerror?.({});
+    expect(e.getState().live).toBe(false);
+    srv.items = [item("sucre")];
+    es.emit("ready"); // reconnecté : le serveur envoie « ready »
+    await wait(300);
+    expect(e.getState().live).toBe(true);
+    expect(e.getState().list?.items.map((i) => i.productId)).toEqual(["sucre"]);
   });
 });

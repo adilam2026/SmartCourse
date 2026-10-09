@@ -28,9 +28,22 @@ export interface State {
   loginError: string | null;
   loggingIn: boolean;
   lastLogin: { familyCode: string; login: string } | null;
+  /** True while the live (SSE) channel is connected. */
+  live: boolean;
+}
+
+/** The subset of EventSource the engine uses (so tests can fake it). */
+export interface EventSourceLike {
+  readyState: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onerror: ((e: any) => void) | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  addEventListener(type: string, fn: (e: any) => void): void;
+  close(): void;
 }
 
 export interface EngineDeps {
+  eventSource?: (url: string) => EventSourceLike;
   api?: typeof realApi;
   db: AppDb;
   newId?: () => string;
@@ -42,7 +55,7 @@ const RETRY_MS = [3_000, 8_000, 20_000, 45_000];
 export class Engine {
   private s: State = {
     phase: "boot", me: null, conn: "online", catalog: null, list: undefined, toggles: {}, draftListId: null, batches: [],
-    sending: false, justSynced: false, notices: [], orphan: null, loginError: null, loggingIn: false, lastLogin: null,
+    sending: false, justSynced: false, notices: [], orphan: null, loginError: null, loggingIn: false, lastLogin: null, live: false,
   };
   private listeners = new Set<() => void>();
   private api: typeof realApi;
@@ -55,12 +68,16 @@ export class Engine {
   private inFlightBatchId: string | undefined;
   private preloaded = new Set<string>();
   private syncedTimer: ReturnType<typeof setTimeout> | undefined;
+  private makeEventSource?: (url: string) => EventSourceLike;
+  private es: EventSourceLike | null = null;
+  private refreshTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(deps: EngineDeps) {
     this.api = deps.api ?? realApi;
     this.db = deps.db;
     this.newId = deps.newId ?? (() => crypto.randomUUID());
     this.preloadFn = deps.preload ?? (() => {});
+    this.makeEventSource = deps.eventSource;
   }
 
   // ---- store plumbing ------------------------------------------------------------------------
@@ -123,6 +140,7 @@ export class Engine {
     await this.db.meta.put({ key: "lastMe", value: me });
     this.set({ me, phase: "ready" });
     await this.loadLocal(me);
+    this.openEvents();
     if (online) await this.refresh();
     await this.flush(); // the screen is already up (phase "ready"); this only drains the outbox
   }
@@ -135,7 +153,43 @@ export class Engine {
     }
     // Local drafts and the outbox stay on the device, keyed to this person, and are sent after the next login.
     clearTimeout(this.retryTimer);
+    this.closeEvents();
     this.set({ phase: "loggedOut", me: null, catalog: null, list: undefined, toggles: {}, batches: [], draftListId: null, orphan: null, notices: [] });
+  }
+
+  // ---- live updates (SSE) ----------------------------------------------------------------------
+  // Events only say "something changed": the client refetches the state, so a missed event can never
+  // leave it wrong (the server also sends "ready" on every (re)connection, which triggers a refetch).
+
+  private openEvents(): void {
+    if (this.es || !this.makeEventSource || this.s.phase !== "ready") return;
+    const es = this.makeEventSource("/api/events");
+    this.es = es;
+    es.addEventListener("ready", () => {
+      this.set({ live: true });
+      this.scheduleRefresh();
+    });
+    for (const t of ["list.updated", "list.created", "list.closed"]) es.addEventListener(t, () => this.scheduleRefresh());
+    es.onerror = () => {
+      this.set({ live: false });
+      if (es.readyState === 2 && this.es === es) {
+        // Closed for good (e.g. the server refused: session revoked). Find out why via a normal request.
+        this.es = null;
+        void this.refresh();
+      }
+    };
+  }
+
+  private closeEvents(): void {
+    clearTimeout(this.refreshTimer);
+    this.es?.close();
+    this.es = null;
+    this.set({ live: false });
+  }
+
+  private scheduleRefresh(): void {
+    clearTimeout(this.refreshTimer); // a burst of events costs one refetch
+    this.refreshTimer = setTimeout(() => void this.refresh(), 120);
   }
 
   // ---- local persistence ---------------------------------------------------------------------
@@ -420,6 +474,7 @@ export class Engine {
   async retryNow(): Promise<void> {
     if (this.s.phase !== "ready") return;
     clearTimeout(this.retryTimer);
+    this.openEvents();
     await this.refresh();
     if (this.s.conn === "online") await this.flush();
     else this.scheduleRetry();
