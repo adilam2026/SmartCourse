@@ -25,13 +25,38 @@ Nouveau contrôle le 9 octobre 2026 : `commons.wikimedia.org`, `upload.wikimedia
 | Photos de la famille | tout produit introuvable ou mal illustré | aucune question de licence ; fonction déjà disponible pour l'administrateur (`POST /api/products/:id/photo`) |
 | Images d'un site marchand | — | **non retenues par défaut** : droits d'auteur, conditions d'utilisation interdisant souvent la copie ; à ne faire que si le marchand fournit explicitement une licence ou une API autorisant la réutilisation |
 
-## Procédure quand le réseau est ouvert
+## Ouvrir l'accès réseau (à faire par vous, une seule fois)
 
-1. L'utilisateur autorise les hôtes : `commons.wikimedia.org`, `upload.wikimedia.org`, `world.openfoodfacts.org`, `images.openfoodfacts.org` (et, au besoin, la banque d'images choisie).
-2. Pour chacune des 80 références, je cherche 2–3 candidates, je lis licence et auteur dans les métadonnées de la source, je télécharge, puis je produis un manifeste.
-3. Revue visuelle (lisibilité sur mobile, produit correspondant vraiment au nom, pas de marque par erreur sur un produit générique).
-4. Import par le CLI ; les crédits apparaissent dans l'application.
-5. Les produits emballés avec marque ne sont figés qu'**après validation des marques** (voir `marques-a-valider.md`).
+Je ne peux pas modifier ces réglages : ils sont dans l'environnement qui héberge cette session. Les libellés exacts peuvent légèrement différer de ce qui suit, car je ne vois pas votre écran ; le principe est celui de la documentation ([Network access](https://code.claude.com/docs/en/cloud-environments#network-access)).
+
+1. Dans l'application Claude, ouvrez cette session. Dans **la barre de titre de la session**, cliquez sur **le nom de l'environnement cloud** (le menu de l'environnement).
+2. Cliquez sur **Edit** (Modifier).
+3. Cherchez le réglage **Network access** (Accès réseau).
+   - Si le niveau est **Limited** (Limité) : une zone **Allowed domains** (Domaines autorisés) apparaît.
+   - Si l'écran affiche **Custom** (Personnalisé) : la même zone existe, avec une case pour inclure la liste par défaut des gestionnaires de paquets.
+4. Dans **Allowed domains**, saisissez ces cinq domaines, **un par ligne** (ou séparés comme le champ l'indique), sans `https://` :
+
+   ```
+   commons.wikimedia.org
+   upload.wikimedia.org
+   world.openfoodfacts.org
+   images.openfoodfacts.org
+   static.openfoodfacts.org
+   ```
+5. **Laissez cochée** la case **Allow package managers** (ou « inclure la liste par défaut des gestionnaires de paquets ») : sans elle, l'installation des dépendances du projet serait bloquée.
+6. Enregistrez (**Save**).
+7. Écrivez-moi « domaines ouverts ». Je teste l'accès. Si les domaines sont encore refusés, le changement ne s'applique peut-être qu'aux **nouvelles sessions** : ouvrez une nouvelle session sur la **même branche** `claude/family-shopping-list-specs-eqevg8` (tout est déjà poussé) et écrivez-y « reprends les photos ».
+
+Ne choisissez pas un niveau d'accès plus large que nécessaire (« accès complet à Internet ») : ces cinq domaines suffisent.
+
+## Procédure d'import, une fois le réseau ouvert (outil prêt et testé sur des réponses simulées)
+
+1. `npm run photos:fetch -- search data/photo-queries.json staging 4` : pour chaque produit sans marque (50 produits dans `server/data/photo-queries.json`), jusqu'à 4 candidats de Wikimedia Commons ; seuls les fichiers dont **la licence est acceptée** (CC0, domaine public, CC BY, CC BY-SA), avec **auteur** pour CC BY / CC BY-SA, et d'au moins 600 px sont gardés. Licence, auteur et page d'origine viennent des métadonnées de chaque fichier.
+2. `npm run photos:fetch -- sheet staging` : planches (5 produits × 4 candidats) que je regarde une par une pour choisir : le produit doit être **reconnaissable à l'écran d'un téléphone**, au premier plan, sans marque ni texte visible, sans personne.
+3. `npm run photos:fetch -- manifest staging selection.json manifest.json`, puis `npm run photos -- import manifest.json` : normalisation (carré 480 px, WebP), contrôle de licence, copie dans notre stockage, enregistrement de la provenance. L'écran « Crédits photos » liste automatiquement les auteurs.
+4. Je vous montre le résultat sur les captures de l'application avant de passer aux produits emballés.
+
+Limite à connaître : le premier lot (produits frais et sans marque) dépend de la qualité des photos disponibles sur Commons. Pour quelques produits (levure chimique, lingettes, sacs-poubelle…), il peut n'y avoir aucune photo libre de bonne qualité ; je vous les listerai plutôt que d'en importer une médiocre.
 
 ## Foyer au Maroc : produits emballés
 

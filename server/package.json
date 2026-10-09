@@ -15,7 +15,8 @@
     "migrate": "tsx src/migrate-cli.ts",
     "admin": "tsx src/admin-cli.ts",
     "photos": "tsx src/photos-cli.ts",
-    "backup": "tsx src/backup-cli.ts"
+    "backup": "tsx src/backup-cli.ts",
+    "photos:fetch": "tsx src/photos-fetch.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1148.0",
