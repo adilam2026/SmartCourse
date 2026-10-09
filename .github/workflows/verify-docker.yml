@@ -11,3 +11,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: scripts/verify-docker.sh
+  recette-locale:
+    # Vérifie que le script de recette fonctionne (sans tunnel) : démarrage, famille d'essai, connexion des 3 profils.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - run: NO_TUNNEL=1 scripts/recette-locale.sh
+      - name: Connexion des trois profils d'essai
+        run: |
+          CODE=$(docker exec sc-recette-pg psql -U smart -d smartcourse -tA -c "select code from families limit 1")
+          for p in "adil 482913" "lamiaa 573918" "marie 573918"; do
+            set -- $p
+            s=$(curl -s -o /dev/null -w '%{http_code}' -H 'content-type: application/json' -d "{\"familyCode\":\"$CODE\",\"login\":\"$1\",\"secret\":\"$2\"}" http://localhost:3000/api/auth/login)
+            echo "$1 -> $s"; [ "$s" = 200 ] || exit 1
+          done
+      - run: scripts/recette-locale.sh --stop
+        if: always()

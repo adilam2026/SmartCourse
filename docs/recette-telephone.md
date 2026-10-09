@@ -1,5 +1,8 @@
 # Recette sur téléphone : gérer le catalogue (≈ 10 minutes)
 
+## Accès sans Railway (temporaire, gratuit)
+Sur un ordinateur avec Docker : `scripts/recette-locale.sh`. Il construit l'application, démarre une base **jetable**, crée la famille d'essai (administrateur adil / 482913, parent lamiaa / 573918, personnel marie / 573918, une liste en cours) et affiche une adresse `https://….trycloudflare.com` à ouvrir sur le téléphone (tunnel Cloudflare gratuit, sans compte, valable tant que le script tourne). Le code famille est affiché. `scripts/recette-locale.sh --stop` efface tout. L'ordinateur doit rester allumé pendant la recette. Aucun service payant, rien sur Railway.
+
 Matériel : **deux téléphones** (ou un téléphone et un ordinateur), l'application ouverte sur les deux.
 - Téléphone A : profil **administrateur** (Adil).
 - Téléphone B : second profil, d'abord **personnel**, puis **parent**.
