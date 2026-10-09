@@ -15,7 +15,7 @@ jobs:
         run: scripts/recette-locale.sh | tee /tmp/recette.out
       - name: Contrôles de bout en bout via l'adresse HTTPS publique
         run: |
-          URL=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' /tmp/recette.out | head -1)
+          URL=$(grep -oE 'Application prête : https://[a-z0-9-]+\.trycloudflare\.com' /tmp/recette.out | awk '{print $4}')
           CODE=$(grep -oE 'Code famille : [A-Z0-9]+' /tmp/recette.out | awk '{print $4}')
           echo "Tunnel : $URL"
           mkdir -p /tmp/pw && cd /tmp/pw && npm init -y >/dev/null && npm i playwright-core@1.64.0 >/dev/null
