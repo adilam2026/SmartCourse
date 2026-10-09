@@ -8,6 +8,7 @@
 # Usage : scripts/verify-docker.sh [--keep]     (--keep laisse les conteneurs pour inspection)
 set -euo pipefail
 cd "$(dirname "$0")/.."
+. scripts/lib-docker.sh
 
 TAG="smartcourse:verify"; RUN="sc-verify-$$"; NET="$RUN-net"; PGC="$RUN-pg"; APP="$RUN-app"; VOL="$RUN-photos"
 KEEP=0; [ "${1:-}" = "--keep" ] && KEEP=1
@@ -26,7 +27,7 @@ start_app() {
 }
 
 echo "== 1. Construction de l'image"
-docker build -t "$TAG" .
+docker_build "$TAG"
 ok "image construite"
 
 echo "== 2. Contenu de l'image"
@@ -38,7 +39,8 @@ ok "80 WebP, aucun autre fichier, utilisateur node, clients pg_dump 16, 17, 18 p
 
 echo "== 3. Premier démarrage (base vide)"
 docker network create "$NET" >/dev/null
-docker run -d --name "$PGC" --network "$NET" -e POSTGRES_USER=smart -e POSTGRES_PASSWORD=smart -e POSTGRES_DB=smartcourse postgres:16 >/dev/null
+PGIMG=$(docker_image postgres:16) || fail "image postgres:16 introuvable (registre)"
+docker run -d --name "$PGC" --network "$NET" -e POSTGRES_USER=smart -e POSTGRES_PASSWORD=smart -e POSTGRES_DB=smartcourse "$PGIMG" >/dev/null
 for _ in $(seq 1 60); do docker exec "$PGC" pg_isready -U smart -d smartcourse >/dev/null 2>&1 && break; sleep 1; done
 start_app
 wait_health || fail "l'application ne répond pas sur /health"

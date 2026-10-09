@@ -1,4 +1,6 @@
-# syntax=docker/dockerfile:1
+# No "# syntax=docker/dockerfile:1" line on purpose: it makes every build download the Dockerfile frontend from Docker Hub
+# (one more request that can fail with 429/504). Nothing below needs it: only multi-stage builds, ARG before FROM and
+# plain COPY --from, all handled by the builder's built-in frontend.
 # pg_dump/pg_restore must have EXACTLY the major version of the database server (a newer client writes
 # dumps that an older server cannot restore). The image therefore carries the clients for PostgreSQL
 # 16, 17 and 18 and the app picks the one matching the server at backup time (see server/src/backup.ts).

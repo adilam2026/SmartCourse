@@ -9,13 +9,15 @@
 # Aucun service payant, aucun déploiement. Les données d'essai disparaissent avec --stop.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+. scripts/lib-docker.sh
 NET=sc-recette-net; PGC=sc-recette-pg; APP=sc-recette-app; VOL=sc-recette-data; TUN=sc-recette-tunnel; TAG=smartcourse:recette
 stop() { docker rm -f "$APP" "$PGC" "$TUN" >/dev/null 2>&1 || true; docker volume rm "$VOL" >/dev/null 2>&1 || true; docker network rm "$NET" >/dev/null 2>&1 || true; }
 if [ "${1:-}" = "--stop" ]; then stop; echo "Recette arrêtée, données d'essai effacées."; exit 0; fi
 stop
-docker build -t "$TAG" .
+docker_build "$TAG"
 docker network create "$NET" >/dev/null
-docker run -d --name "$PGC" --network "$NET" -e POSTGRES_USER=smart -e POSTGRES_PASSWORD=smart -e POSTGRES_DB=smartcourse postgres:16 >/dev/null
+PGIMG=$(docker_image postgres:16)
+docker run -d --name "$PGC" --network "$NET" -e POSTGRES_USER=smart -e POSTGRES_PASSWORD=smart -e POSTGRES_DB=smartcourse "$PGIMG" >/dev/null
 for _ in $(seq 1 60); do docker exec "$PGC" pg_isready -U smart -d smartcourse >/dev/null 2>&1 && break; sleep 1; done
 TOKEN=$(openssl rand -hex 16)
 # Port publié sur localhost seulement : le téléphone passe par le tunnel HTTPS.
