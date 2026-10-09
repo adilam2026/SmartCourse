@@ -3,7 +3,7 @@
 # pause, puis on télécharge LES MÊMES images (mêmes noms et mêmes étiquettes que le Dockerfile) par le miroir public
 # mirror.gcr.io. Les erreurs sans rapport avec le registre (compilation, tests…) ne déclenchent aucun repli.
 
-REGISTRY_ERR='429|Too Many Requests|504|Gateway Time-?out|failed to authorize|failed to fetch oauth token|toomanyrequests|TLS handshake timeout|unexpected EOF|connection reset'
+REGISTRY_ERR='429|Too Many Requests|504|Gateway Time-?out|failed to authorize|failed to fetch oauth token|toomanyrequests|TLS handshake timeout|unexpected EOF|connection reset|Client\.Timeout|context deadline exceeded|request canceled|i/o timeout|dial tcp|no such host|temporary failure in name resolution'
 MIRROR="${DOCKER_MIRROR:-mirror.gcr.io/library}"
 
 # Image par défaut d'une ARG du Dockerfile (source unique des versions).
