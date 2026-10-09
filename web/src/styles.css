@@ -50,14 +50,14 @@ h1, h2 { margin: 0; }
 .topbar { display: flex; align-items: center; gap: 12px; padding: calc(8px + var(--safe-top)) max(14px, env(safe-area-inset-right)) 8px max(14px, env(safe-area-inset-left)); background: var(--bg); }
 .avatar { width: 44px; height: 44px; flex: none; border-radius: 50%; border: 0; background: var(--green); color: #fff; font-weight: 800; font-size: 1.1rem; }
 .topbar__title { flex: 1; min-width: 0; display: grid; line-height: 1.15; }
-.topbar__title .muted { min-height: 1.1em; }
+.topbar__title .muted { min-height: 1.1em; font-size: 0.8rem; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .validate { min-width: 120px; min-height: 48px; font-size: 1.05rem; flex: none; }
 .topbar__title strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Short phones: while banners are showing, the category chips scroll away to leave room for the products. */
 @media (max-height: 760px) { .stickyhead.has-banners .chips { display: none; } }
 
 /* ---- banners ---- */
-.banners { display: grid; gap: 4px; padding: 0 12px 6px; max-height: 34dvh; overflow-y: auto; }
+.banners { display: grid; gap: 4px; padding: 0 12px 6px; max-height: 30dvh; overflow-y: auto; }
 .banner { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 5px 10px; border-radius: 10px; font-size: 0.82rem; line-height: 1.2; flex-wrap: wrap; }
 .banner > span { display: inline; }
 .banner em { color: var(--muted); font-style: normal; }
@@ -75,7 +75,9 @@ h1, h2 { margin: 0; }
 
 /* ---- catalogue ---- */
 .catalog { padding: 0 12px calc(40px + var(--safe-bottom)); }
-.count { margin: 6px 4px 0; }
+.count { margin: 6px 4px 0; display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 0.9rem; font-weight: 700; }
+.count__ok { color: var(--green); }
+.count__todo { color: var(--amber); }
 .category { scroll-margin-top: 190px; }
 .category h2 { font-size: 1.35rem; margin: 20px 4px 10px; }
 .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }

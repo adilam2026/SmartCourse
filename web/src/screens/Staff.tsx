@@ -21,6 +21,23 @@ export function NoList({ engine, s }: { engine: Engine; s: State }) {
   );
 }
 
+/**
+ * One line, three distinct situations, never mixed up:
+ *   - chosen but not sent yet  → "N à valider" (the counter below says "pas encore enregistrés")
+ *   - validated, server has not confirmed → "⏳ En attente de synchronisation"
+ *   - confirmed by the server → "✓ Enregistré sur le serveur" (only right after a confirmation, never while offline)
+ */
+export function syncLine(s: State, unsent: number): string {
+  const queued = s.batches.reduce((n, b) => n + b.ops.length, 0);
+  if (s.sending) return "Envoi en cours…";
+  const parts: string[] = [];
+  if (unsent > 0) parts.push(`${unsent} à valider`);
+  if (queued > 0) parts.push("⏳ En attente"); // full wording in the banner right below
+  if (parts.length > 0) return parts.join(" · ");
+  if (s.conn === "offline") return "Dernière liste connue";
+  return s.justSynced ? "✓ Enregistré sur le serveur" : "";
+}
+
 export function TopBar({ engine, s, validate, onBack, title = "Courses" }: { engine: Engine; s: State; validate: boolean; onBack?: () => void; title?: string }) {
   const [open, setOpen] = useState(false);
   const pending = Object.keys(s.toggles).length;
@@ -38,7 +55,7 @@ export function TopBar({ engine, s, validate, onBack, title = "Courses" }: { eng
       <div className="topbar__title">
         <strong>{title}</strong>
         <span className="muted" data-testid="sync-state">
-          {s.sending ? "Envoi en cours…" : s.batches.length > 0 ? "En attente de synchronisation" : s.justSynced ? "✓ Enregistré" : pending > 0 ? `${pending} changement${pending > 1 ? "s" : ""} à valider` : ""}
+          {syncLine(s, pending)}
         </span>
       </div>
       {validate && (
@@ -91,7 +108,9 @@ export function StaffScreen({ engine, s, onBack }: { engine: Engine; s: State; o
     return item ? "saved" : "unsaved";
   };
 
-  const count = sections.reduce((n, c) => n + c.products.filter((p) => ["saved", "unsaved", "bought"].includes(stateOf(p.id))).length, 0);
+  const all = sections.flatMap((c) => c.products.map((p) => stateOf(p.id)));
+  const confirmed = all.filter((x) => x === "saved" || x === "bought").length; // known to the server
+  const notYet = all.filter((x) => x === "unsaved" || x === "removing").length; // chosen here, not confirmed
   const tap = (id: string) => void engine.toggle(id);
 
   return (
@@ -108,7 +127,10 @@ export function StaffScreen({ engine, s, onBack }: { engine: Engine; s: State; o
       </nav>
       </div>
       <main className="catalog" data-testid="catalog">
-        <p className="muted count" data-testid="count">{count} produit{count > 1 ? "s" : ""} dans la liste</p>
+        <p className="count" data-testid="count">
+          <span className="count__ok" data-testid="count-saved">✓ {confirmed} enregistré{confirmed > 1 ? "s" : ""} sur le serveur</span>
+          {notYet > 0 && <span className="count__todo" data-testid="count-unsaved">● {notYet} pas encore enregistré{notYet > 1 ? "s" : ""}</span>}
+        </p>
         {sections.map((c) => (
           <section key={c.key} ref={(el) => void (refs.current[c.key] = el)} className="category" aria-labelledby={`cat-${c.key}`}>
             <h2 id={`cat-${c.key}`}><span aria-hidden="true">{CATEGORY_EMOJI[c.key]} </span>{c.label}</h2>

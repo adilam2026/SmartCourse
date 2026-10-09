@@ -21,12 +21,12 @@ export function Banners({ engine, s }: { engine: Engine; s: State }) {
         <div className={`banner ${queued > 0 ? "banner--pending" : "banner--offline"}`} data-testid="banner-status">
           {offline && (
             <span data-testid="banner-offline">
-              <strong>Hors connexion.</strong> {queued === 0 && "Vos choix sont gardés sur ce téléphone."}
+              <strong>Hors connexion.</strong> {queued === 0 && "Vous voyez la dernière liste connue ; vos choix sont gardés sur ce téléphone."}
             </span>
           )}
           {queued > 0 && (
             <span data-testid="banner-pending">
-              <strong>⏳ En attente de synchronisation</strong> ({queued}) : pas encore enregistré sur le serveur.
+              <strong>⏳ En attente de synchronisation :</strong> {queued} choix validé{queued > 1 ? "s" : ""} mais pas encore enregistré{queued > 1 ? "s" : ""} sur le serveur.
             </span>
           )}
         </div>
