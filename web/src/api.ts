@@ -63,7 +63,7 @@ export const api = {
   closeList: (listId: string) => request<{ status: string; remaining: number; purchased: number }>("POST", `/api/lists/${listId}/close`),
   history: () => request<{ lists: HistoryEntry[] }>("GET", "/api/lists"),
   listById: (id: string) => request<{ list: ListView }>("GET", `/api/lists/${id}`),
-  credits: () => request<{ credits: Credit[] }>("GET", "/api/credits"),
+  credits: () => request<{ generated: { count: number; source: string } | null; credits: Credit[] }>("GET", "/api/credits"),
   // administration
   profiles: () => request<{ profiles: Profile[] }>("GET", "/api/profiles"),
   createProfile: (b: { displayName: string; login: string; role: Role; secret?: string }) =>
@@ -72,7 +72,8 @@ export const api = {
   resetSecret: (id: string) => request<{ secret: string }>("POST", `/api/profiles/${id}/reset-secret`, {}),
   backupStatus: () => request<BackupStatus>("GET", "/api/admin/backup-status"),
   catalogAdmin: () => request<Catalog>("GET", "/api/catalog?includeInactive=1"),
-  patchProduct: (id: string, b: { name?: string; brand?: string | null; active?: boolean }) => request<{ product: Product }>("PATCH", `/api/products/${id}`, b),
+  patchProduct: (id: string, b: ProductPatch) => request<{ product: Product }>("PATCH", `/api/products/${id}`, b),
+  createProduct: (b: { name: string; category: string; image?: string; active?: boolean }) => request<{ product: Product }>("POST", "/api/products", b),
   searchExtended: (q: string) => request<{ results: ExtendedResult[] }>("GET", `/api/catalog/extended?q=${encodeURIComponent(q)}`),
   addFromExtended: (extendedId: string) => request<{ product: Product }>("POST", "/api/products/from-extended", { extendedId }),
   uploadPhoto: async (id: string, file: Blob) => {
@@ -83,6 +84,16 @@ export const api = {
     return (await res.json()) as { product: Product };
   },
 };
+
+/** `image` is a base64 picture (already shrunk by the phone); `resetImage` goes back to the catalogue picture. */
+export interface ProductPatch {
+  name?: string;
+  category?: string;
+  brand?: string | null;
+  active?: boolean;
+  image?: string;
+  resetImage?: boolean;
+}
 
 export interface BackupStatus {
   configured: boolean;

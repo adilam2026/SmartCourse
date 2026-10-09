@@ -6,10 +6,11 @@ const ROLE: Record<string, string> = { admin: "Administrateur", parent: "Parent"
 
 export function UserSheet({ engine, s, onClose }: { engine: Engine; s: State; onClose(): void }) {
   const [credits, setCredits] = useState<Credit[] | null>(null);
+  const [generated, setGenerated] = useState<{ count: number; source: string } | null>(null);
   const [showCredits, setShowCredits] = useState(false);
   const pending = Object.keys(s.toggles).length + s.batches.length;
   useEffect(() => {
-    if (showCredits && !credits) api.credits().then((r) => setCredits(r.credits)).catch(() => setCredits([]));
+    if (showCredits && !credits) api.credits().then((r) => { setGenerated(r.generated); setCredits(r.credits); }).catch(() => setCredits([]));
   }, [showCredits, credits]);
   return (
     <div className="sheet-backdrop" onClick={onClose}>
@@ -20,7 +21,11 @@ export function UserSheet({ engine, s, onClose }: { engine: Engine; s: State; on
         <button className="btn btn--ghost" onClick={() => setShowCredits((v) => !v)}>Crédits photos</button>
         {showCredits && (
           <ul className="credits">
-            {credits === null ? <li>Chargement…</li> : credits.length === 0 ? <li>Aucune photo sous licence à créditer.</li> : credits.map((c, i) => (
+            {credits === null ? <li>Chargement…</li> : <>
+              {generated && <li data-testid="credits-generated">{generated.count} visuels du catalogue : {generated.source}.</li>}
+              {credits.length === 0 && !generated && <li>Aucune photo sous licence à créditer.</li>}
+            </>}
+            {credits?.map((c, i) => (
               <li key={i}>{c.text ?? `${c.author ?? c.sourceName} — ${c.license}`}</li>
             ))}
           </ul>

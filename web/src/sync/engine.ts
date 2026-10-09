@@ -205,7 +205,7 @@ export class Engine {
       this.set({ live: true });
       this.scheduleRefresh();
     });
-    for (const t of ["list.updated", "list.created", "list.closed"]) es.addEventListener(t, () => this.scheduleRefresh());
+    for (const t of ["list.updated", "list.created", "list.closed", "catalog.updated"]) es.addEventListener(t, () => this.scheduleRefresh());
     es.onerror = () => {
       this.set({ live: false });
       if (es.readyState === 2 && this.es === es) {

@@ -144,7 +144,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
   app.get("/api/admin/backup-status", { preHandler: guard("family.manage") }, async () => backupStatus(db, deps.backupStorage ?? null));
 
-  catalogRoutes(app, { db, store: deps.store, guard });
+  catalogRoutes(app, { db, store: deps.store, guard, hub });
   listRoutes(app, { db, hub, guard });
 
   // --- flux SSE ---

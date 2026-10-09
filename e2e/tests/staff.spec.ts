@@ -172,8 +172,13 @@ test.describe("parcours du personnel", () => {
     const img2 = card(page, f, "Tomates").locator("img");
     await expect(img2).toBeVisible();
     await expect.poll(() => img2.evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
-    // un produit sans photo : tuile neutre avec le nom, pas de fausse image
-    await expect(card(page, f, "Riz").locator("img")).toHaveCount(0);
-    await expect(card(page, f, "Riz")).toContainText("Riz"); // le nom reste sous la tuile
+    // un article ajouté sans image : tuile neutre avec le nom, pas de fausse image
+    const added = await f.adil.post("/api/products", { data: { name: "Article sans image", category: "epicerie" } });
+    expect(added.status()).toBe(201);
+    await context.setOffline(false);
+    await page.evaluate(() => (window as any).__engine.refresh());
+    const bare = page.getByTestId(`card-${(await added.json()).product.id}`);
+    await expect(bare).toContainText("Article sans image");
+    await expect(bare.locator("img")).toHaveCount(0);
   });
 });

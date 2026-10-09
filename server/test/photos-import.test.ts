@@ -48,7 +48,7 @@ describe("import des photos du catalogue", () => {
     const after = await newFamily(); // famille créée après l'import : copie la photo du catalogue initial
     expect(await photoOf(after, "tomates")).toBe(await photoOf(before, "tomates"));
     const a = (await db.query("SELECT * FROM photo_assets WHERE id = $1", [await photoOf(before, "tomates")])).rows[0];
-    expect(a).toMatchObject({ license: "CC-BY-SA-4.0", author: "Jean Dupont", source_name: "Wikimedia Commons", attribution_required: true, width: 480, height: 480 });
+    expect(a).toMatchObject({ license: "CC-BY-SA-4.0", author: "Jean Dupont", source_name: "Wikimedia Commons", attribution_required: true, width: 512, height: 512 });
     expect(a.attribution_text).toContain("Jean Dupont");
   });
 

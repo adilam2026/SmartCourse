@@ -1,3 +1,14 @@
+# Images du catalogue : provenance et règles
+
+> **État actuel (à jour).** Les 80 références du catalogue utilisent les **80 visuels génériques fournis** (`server/catalog-photos/`, WebP 512 × 512, une image par produit, aucune variante de marque). Leur provenance est « **Image générée avec ChatGPT** » : aucune licence ni aucun auteur externe n'est revendiqué, et il ne faut pas en inventer (voir `server/catalog-photos/PROVENANCE.md`). Le manifeste est la source de vérité ; il est vérifié en entier (nom exact, empreinte SHA-256, image lisible, provenance) avant la moindre écriture, puis appliqué en une seule transaction.
+>
+> - **Images de la famille** (prises ou choisies par l'administrateur dans Réglages → Catalogue → Ajouter / Modifier un article) : jamais remplacées par l'import, un redémarrage ou une mise à jour.
+> - **Anciennes images** (photos Wikimedia Commons de l'étape précédente) : remplacées, puis supprimées du stockage et de la base par la purge (`npm run photos -- purge`, aussi lancée automatiquement après l'import puis toutes les 6 h) **sauf** si une archive, un autre produit ou le catalogue étendu les référence encore. Une image de moins de 10 minutes n'est jamais supprimée.
+> - **Les archives ne changent pas** : nom, marque, image et catégorie sont figés à la clôture d'une liste.
+> - Le reste de ce document est l'**historique** de l'étape précédente (recherche de photos libres sur Wikimedia Commons, 46 photos) ; la liste d'auteurs correspondante est dans `photos-credits.md` (historique, ces images ne sont plus utilisées).
+
+---
+
 # Photos du catalogue — sources, licences, procédure
 
 ## État au 9 octobre 2026 (après ouverture des domaines)
@@ -17,7 +28,7 @@ Limites constatées :
 
 ## Ce qui est déjà en place (testé)
 
-- Stockage : chaque photo est normalisée (carré 480 × 480, WebP, environ 30 Ko), nommée par son empreinte SHA-256, **immuable** (la base interdit `UPDATE`/`DELETE` sur `photo_assets`). Changer une photo = en créer une nouvelle ; les archives gardent l'ancienne.
+- Stockage : chaque photo est normalisée (carré 512 × 512 sur fond blanc, sans rognage, WebP, quelques dizaines de Ko), nommée par son empreinte SHA-256, **immuable** (la base interdit `UPDATE`/`DELETE` sur `photo_assets`). Changer une photo = en créer une nouvelle ; les archives gardent l'ancienne.
 - Provenance : chaque photo enregistre source, URL d'origine, licence, URL de licence, auteur, texte d'attribution.
 - Contrôle automatique à l'import (`npm run photos -- import manifeste.json`) :
   - acceptées : domaine public, CC0, CC BY 1.0–4.0, CC BY-SA 1.0–4.0, Pexels / Pixabay / Unsplash, photo familiale ;
@@ -66,7 +77,7 @@ Ne choisissez pas un niveau d'accès plus large que nécessaire (« accès compl
 0. Variables : `NODE_USE_ENV_PROXY=1` (Node 22 doit utiliser le proxy de l'environnement) et, si besoin, `PHOTO_PACE_MS=3000` pour espacer les requêtes.
 1. `npm run photos:fetch -- search data/photo-queries.json staging 3` : pour chaque produit sans marque (50 produits dans `server/data/photo-queries.json`), jusqu'à 4 candidats de Wikimedia Commons ; seuls les fichiers dont **la licence est acceptée** (CC0, domaine public, CC BY, CC BY-SA), avec **auteur** pour CC BY / CC BY-SA, et d'au moins 600 px sont gardés. Licence, auteur et page d'origine viennent des métadonnées de chaque fichier.
 2. `npm run photos:fetch -- sheet staging` : planches (5 produits × 4 candidats) que je regarde une par une pour choisir : le produit doit être **reconnaissable à l'écran d'un téléphone**, au premier plan, sans marque ni texte visible, sans personne.
-3. `npm run photos:fetch -- manifest staging selection.json catalog-photos/manifest.json` (copie les photos choisies dans `server/catalog-photos/files/`) ; l'application les importe au démarrage (ou `npm run photos -- import catalog-photos/manifest.json --only-missing`) : normalisation (carré 480 px, WebP), contrôle de licence, copie dans notre stockage, enregistrement de la provenance. L'écran « Crédits photos » liste automatiquement les auteurs.
+3. `npm run photos:fetch -- manifest staging selection.json catalog-photos/manifest.json` (copie les photos choisies dans `server/catalog-photos/files/`) ; l'application les importe au démarrage (ou `npm run photos -- import catalog-photos/manifest.json --only-missing`) : normalisation (carré 512 px, fond blanc, WebP), contrôle de licence, copie dans notre stockage, enregistrement de la provenance. L'écran « Crédits photos » liste automatiquement les auteurs.
 4. Je vous montre le résultat sur les captures de l'application avant de passer aux produits emballés.
 
 Limite à connaître : le premier lot (produits frais et sans marque) dépend de la qualité des photos disponibles sur Commons. Pour quelques produits (levure chimique, lingettes, sacs-poubelle…), il peut n'y avoir aucune photo libre de bonne qualité ; je vous les listerai plutôt que d'en importer une médiocre.

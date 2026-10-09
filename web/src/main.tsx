@@ -23,6 +23,8 @@ async function preloadPhotos(urls: string[]): Promise<void> {
 const engine = createEngine({ preload: (urls) => void preloadPhotos(urls), eventSource: (url) => new EventSource(url) });
 (window as unknown as { __engine: typeof engine }).__engine = engine;
 registerSW({ immediate: true });
+// The catalogue pictures were replaced: drop the previous picture cache so phones do not keep the old images.
+void window.caches?.delete("photos").catch(() => {});
 
 // Connection back, app back in the foreground, and a slow poll: all just "check the server now".
 // Live updates arrive over SSE (engine.openEvents); this poll is only the safety net.

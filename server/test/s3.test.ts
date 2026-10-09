@@ -59,7 +59,7 @@ describe("stockage S3 (bucket)", () => {
     expect(up.statusCode).toBe(200);
     const img = await app.inject({ method: "GET", url: up.json().product.photoUrl, cookies });
     expect(img.statusCode).toBe(200);
-    expect((await sharp(img.rawPayload).metadata()).width).toBe(480);
+    expect((await sharp(img.rawPayload).metadata()).width).toBe(512);
     await app.close();
   });
 

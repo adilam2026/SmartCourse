@@ -8,24 +8,38 @@ import { migrate } from "./migrate.js";
 import { createBackupStorage } from "./backup-store.js";
 import { startBackupScheduler } from "./backup.js";
 import { createPhotoStore } from "./photos.js";
-import { importManifest } from "./photos-import.js";
+import { purgeOrphanAssets, syncCatalogPhotos } from "./photos-import.js";
 
 const config = loadConfig();
 const db = createPool(config.DATABASE_URL);
 await migrate(db);
 if (config.INSTALL_TOKEN) await ensureInstallToken(db, config.INSTALL_TOKEN);
 
-// Catalogue photos shipped with the app (server/data/photos): imported once, only where a reference has none yet.
+// Catalogue pictures shipped with the app (server/catalog-photos): the manifest is the source of truth. Verified, switched
+// in one transaction, read back; then pictures nothing refers to any more are removed from the database AND the storage.
+// Pictures the family chose itself are never touched, and none that an archive still shows is ever deleted.
 const photoStore = createPhotoStore(config);
 const photoManifest = path.resolve(config.PHOTO_MANIFEST);
+let readBackOk = true;
 if (existsSync(photoManifest)) {
   try {
-    const r = await importManifest(db, photoStore, photoManifest, { onlyMissing: true });
-    if (r.imported.length) console.log(`Photos du catalogue importées : ${r.imported.length}`);
+    const r = await syncCatalogPhotos(db, photoStore, photoManifest);
+    console.log(`Images du catalogue : ${r.imported.length} remplacée(s) ou ajoutée(s), ${r.skipped.length} déjà à jour.`);
   } catch (e) {
-    console.error(`Import des photos du catalogue impossible : ${(e as Error).message}`); // never prevents the app from starting
+    readBackOk = false;
+    console.error(`Synchronisation des images du catalogue impossible : ${(e as Error).message}`); // never prevents the app from starting
   }
 }
+const purgeOnce = async () => {
+  try {
+    const p = await purgeOrphanAssets(db, photoStore);
+    if (p.assets) console.log(`Images inutilisées supprimées : ${p.assets} enregistrement(s), ${p.files} fichier(s), ${p.bytesFreed} octets libérés.`);
+  } catch (e) {
+    console.error(`Purge des images inutilisées impossible : ${(e as Error).message}`);
+  }
+};
+if (readBackOk) await purgeOnce(); // after a failed switch nothing is purged
+setInterval(() => void purgeOnce(), 6 * 3_600_000).unref();
 
 const backup = config.BACKUP_KEY ? createBackupStorage(config) : null;
 const app = await buildApp({ db, loginRateLimit: { max: config.LOGIN_RATE_MAX, timeWindow: "1 minute" }, store: photoStore, webDir: existsSync(config.WEB_DIR) ? config.WEB_DIR : undefined, backupStorage: backup?.kind ?? null });

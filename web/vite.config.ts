@@ -29,7 +29,7 @@ export default defineConfig({
           {
             urlPattern: ({ url }) => url.pathname.startsWith("/api/photos/"),
             handler: "CacheFirst",
-            options: { cacheName: "photos", expiration: { maxEntries: 500 }, cacheableResponse: { statuses: [200] } },
+            options: { cacheName: "photos-v2", expiration: { maxEntries: 500 }, cacheableResponse: { statuses: [200] } },
           },
         ],
       },

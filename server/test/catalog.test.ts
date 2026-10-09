@@ -166,7 +166,7 @@ describe("photos", () => {
     expect(img.headers["content-type"]).toBe("image/webp");
     expect(img.headers["cache-control"]).toContain("immutable");
     const meta = await sharp(img.rawPayload).metadata();
-    expect([meta.format, meta.width, meta.height]).toEqual(["webp", 480, 480]);
+    expect([meta.format, meta.width, meta.height]).toEqual(["webp", 512, 512]);
     expect(img.rawPayload.length).toBeLessThan(40_000);
 
     const cached = await app.inject({ method: "GET", url, cookies: a.staff, headers: { "if-none-match": img.headers.etag as string } });

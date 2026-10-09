@@ -188,9 +188,10 @@ export async function closeList(db: Db, hub: SseHub, a: AuthContext, listId: str
     if (!list) throw new HttpError(404, "not_found", "Liste introuvable");
     let status: CloseResult["status"] = "already";
     if (list.status === "active") {
-      // Freeze what the archive shows (name, brand, photo version) before the list becomes read-only.
+      // Freeze what the archive shows (name, brand, category, photo version) before the list becomes read-only.
       await c.query(
-        `UPDATE list_items i SET snapshot_name = p.name, snapshot_brand = p.brand, snapshot_photo_asset_id = p.photo_asset_id
+        `UPDATE list_items i SET snapshot_name = p.name, snapshot_brand = p.brand, snapshot_photo_asset_id = p.photo_asset_id,
+                snapshot_category = p.category
            FROM products p WHERE p.id = i.product_id AND i.list_id = $1`,
         [listId],
       );
@@ -219,18 +220,18 @@ export async function getListView(db: Db, a: AuthContext, listId: string) {
   if (!l) throw new HttpError(404, "not_found", "Liste introuvable");
   const archived = l.status === "archived";
   const items = await db.query(
-    `SELECT i.id, i.product_id, i.status, i.rev, p.category, p.active AS product_active, p.position,
+    `SELECT i.id, i.product_id, i.status, i.rev, cat.key AS category, p.active AS product_active, p.position,
             ${archived ? "coalesce(i.snapshot_name, p.name)" : "p.name"} AS name,
             ${archived ? "i.snapshot_brand" : "p.brand"} AS brand,
             ${archived ? "i.snapshot_photo_asset_id" : "p.photo_asset_id"} AS photo_asset_id,
             pu.id AS purchase_id, pu.purchased_at, pb.id AS buyer_id, pb.display_name AS buyer_name
        FROM list_items i
        JOIN products p ON p.id = i.product_id
-       JOIN categories cat ON cat.key = p.category
+       JOIN categories cat ON cat.key = ${archived ? "coalesce(i.snapshot_category, p.category)" : "p.category"}
        LEFT JOIN purchases pu ON pu.list_item_id = i.id AND pu.voided_at IS NULL
        LEFT JOIN profiles pb ON pb.id = pu.purchased_by
       WHERE i.list_id = $1 AND i.status <> 'removed'
-      ORDER BY cat.position, p.position, lower(p.name)`,
+      ORDER BY cat.position, ${archived ? "lower(coalesce(i.snapshot_name, p.name))" : "p.position, lower(p.name)"}`,
     [listId],
   );
   const parentView = a.role !== "staff";

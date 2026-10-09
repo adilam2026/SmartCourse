@@ -1,4 +1,6 @@
-# Crédits des photos du catalogue
+# Crédits des photos du catalogue (historique)
+
+> **Historique.** Ces 46 photos Wikimedia Commons ont été remplacées par les 80 visuels « Image générée avec ChatGPT » (aucun crédit externe). Cette liste n'est conservée que pour mémoire.
 
 Généré depuis `server/catalog-photos/manifest.json` (provenance lue dans les métadonnées de chaque fichier Wikimedia Commons). Les photos prises par la famille ne figurent pas ici.
 

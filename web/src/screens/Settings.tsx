@@ -3,9 +3,10 @@ import { api, ApiError, NetworkError, type BackupStatus, type ExtendedResult, ty
 import { fmtDateTime } from "../format";
 import { CATEGORY_EMOJI } from "../categories";
 import { Dialog } from "../components/Dialog";
+import { ProductForm } from "../components/ProductForm";
 import { Thumb } from "../components/Thumb";
 import type { Engine, State } from "../sync/engine";
-import type { Catalog, Role } from "../types";
+import type { Catalog, Product, Role } from "../types";
 
 const ROLE_LABEL: Record<Role, string> = { admin: "Administrateur", parent: "Parent", staff: "Personnel" };
 
@@ -137,6 +138,7 @@ function CatalogAdmin({ engine }: { engine: Engine }) {
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [results, setResults] = useState<ExtendedResult[] | null>(null);
+  const [form, setForm] = useState<{ product?: Product } | null>(null);
   const load = () => api.catalogAdmin().then(setCat).catch((e) => setError(errText(e)));
   useEffect(() => void load(), []);
   useEffect(() => {
@@ -159,6 +161,15 @@ function CatalogAdmin({ engine }: { engine: Engine }) {
   return (
     <>
       {error && <p className="error" role="alert">{error}</p>}
+      <button className="btn btn--primary btn--big addbtn" data-testid="add-article" onClick={() => setForm({})}>+ Ajouter un article</button>
+      {form && cat && (
+        <ProductForm
+          product={form.product}
+          categories={cat.categories.map((c) => ({ key: c.key, label: c.label }))}
+          onClose={() => setForm(null)}
+          onSaved={() => { setForm(null); void act(async () => {}); }}
+        />
+      )}
       <label className="field search">Chercher un produit à ajouter
         <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ex. pêches, couscous…" data-testid="ext-search" />
       </label>
@@ -179,13 +190,13 @@ function CatalogAdmin({ engine }: { engine: Engine }) {
           <h2 className="sect">{CATEGORY_EMOJI[c.key]} {c.label}</h2>
           <ul className="rows">
             {c.products.map((p) => (
-              <li key={p.id} className={`row ${p.active ? "" : "row--off"}`} data-testid={`prod-${p.name}`}>
+              <li key={p.id} className={`row row--cat ${p.active ? "" : "row--off"}`} data-testid={`prod-${p.name}`}>
                 <Thumb photoUrl={p.photoUrl} category={c.key} />
                 <span className="row__name">{p.name}{p.brand && <small>{p.brand}</small>}{!p.active && <small>désactivé</small>}</span>
-                <label className="photo-btn" aria-label={`Photo de ${p.name}`}>📷
-                  <input type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void act(() => api.uploadPhoto(p.id, f)); e.target.value = ""; }} />
-                </label>
-                <button className="btn btn--small btn--ghost" data-testid={`active-${p.name}`} onClick={() => void act(() => api.patchProduct(p.id, { active: !p.active }))}>{p.active ? "Désactiver" : "Réactiver"}</button>
+                <span className="rowbtns">
+                  <button className="btn btn--small" data-testid={`edit-${p.name}`} aria-label={`Modifier ${p.name}`} onClick={() => setForm({ product: p })}>Modifier</button>
+                  <button className="btn btn--small btn--ghost" data-testid={`active-${p.name}`} onClick={() => void act(() => api.patchProduct(p.id, { active: !p.active }))}>{p.active ? "Désactiver" : "Réactiver"}</button>
+                </span>
               </li>
             ))}
           </ul>

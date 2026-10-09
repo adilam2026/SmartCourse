@@ -1,21 +1,21 @@
 /**
- * Import de photos depuis un manifeste JSON (chemins relatifs au manifeste) :
- *   { "items": [ { "target": "initial", "key": "tomates", "file": "files/tomates.jpg",
- *                  "sourceName": "Wikimedia Commons", "sourceUrl": "...", "license": "CC-BY-SA-4.0",
- *                  "licenseUrl": "...", "author": "..." } ] }
- * Rien n'est importé si une seule entrée est refusée (licence, provenance). Option --only-missing : ignore les
- * références qui ont déjà une photo (c'est ce que fait le démarrage du serveur).
+ * Outils d'exploitation des images du catalogue :
+ *   photos-cli import <manifeste.json> [--only-missing]   synchronise les images du catalogue avec le manifeste
+ *   photos-cli purge [--dry-run] [--min-age-minutes N]    supprime les images que plus rien ne référence (base + stockage)
+ * Le manifeste est la source de vérité ; toutes les vérifications ont lieu avant la moindre écriture.
  */
 import { loadConfig } from "./config.js";
 import { createPool } from "./db.js";
 import { migrate } from "./migrate.js";
 import { createPhotoStore } from "./photos.js";
-import { importManifest } from "./photos-import.js";
+import { purgeOrphanAssets, syncCatalogPhotos } from "./photos-import.js";
 
 const args = process.argv.slice(2);
 const [cmd, manifestPath] = args;
-if (cmd !== "import" || !manifestPath) {
-  console.log("Usage : photos-cli import <manifeste.json> [--only-missing]");
+const flag = (n: string) => args.includes(n);
+const numArg = (n: string) => (args.includes(n) ? Number(args[args.indexOf(n) + 1]) : undefined);
+if (!(cmd === "import" && manifestPath) && cmd !== "purge") {
+  console.log("Usage : photos-cli import <manifeste.json> [--only-missing] | purge [--dry-run] [--min-age-minutes N]");
   process.exit(1);
 }
 
@@ -23,9 +23,16 @@ const config = loadConfig();
 const db = createPool(config.DATABASE_URL);
 try {
   await migrate(db);
-  const r = await importManifest(db, createPhotoStore(config), manifestPath, { onlyMissing: args.includes("--only-missing") });
-  for (const k of r.imported) console.log(`OK    ${k}`);
-  for (const k of r.skipped) console.log(`déjà  ${k}`);
+  const store = createPhotoStore(config);
+  if (cmd === "import") {
+    const r = await syncCatalogPhotos(db, store, manifestPath!, { onlyMissing: flag("--only-missing") });
+    for (const k of r.imported) console.log(`OK    ${k}`);
+    console.log(`${r.imported.length} remplacée(s) ou ajoutée(s), ${r.skipped.length} déjà à jour.`);
+  } else {
+    const p = await purgeOrphanAssets(db, store, { dryRun: flag("--dry-run"), minAgeMinutes: numArg("--min-age-minutes") });
+    if (flag("--dry-run")) console.log(`Simulation, rien n'est supprimé : ${p.assets} enregistrement(s) d'image et ${p.keys.length} fichier(s) seraient supprimés.`);
+    else console.log(`Supprimé : ${p.assets} enregistrement(s) d'image, ${p.files} fichier(s), ${p.bytesFreed} octets libérés.`);
+  }
 } finally {
   await db.end();
 }

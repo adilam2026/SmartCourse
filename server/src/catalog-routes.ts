@@ -4,12 +4,14 @@ import { withTx, type Db } from "./db.js";
 import { HttpError } from "./errors.js";
 import type { Guard } from "./guard.js";
 import { can } from "./permissions.js";
-import { savePhotoAsset, type PhotoStore } from "./photos.js";
+import type { SseHub } from "./hub.js";
+import { insertPhotoAsset, MAX_INPUT_BYTES, preparePhoto, type PhotoStore, type PreparedPhoto } from "./photos.js";
 
 interface Deps {
   db: Db;
   store: PhotoStore;
   guard: Guard;
+  hub: SseHub;
 }
 
 /** Lowercase, accents and ligatures flattened: what extended_catalog.search_text holds. */
@@ -34,7 +36,7 @@ const productView = (r: any) => ({
   photoUrl: photoUrl(r.photo_asset_id),
 });
 
-export function catalogRoutes(app: FastifyInstance, { db, store, guard }: Deps): void {
+export function catalogRoutes(app: FastifyInstance, { db, store, guard, hub }: Deps): void {
   app.addContentTypeParser(["image/jpeg", "image/png", "image/webp"], { parseAs: "buffer", bodyLimit: 9 * 1024 * 1024 }, (_req, body, done) =>
     done(null, body),
   );
@@ -60,30 +62,91 @@ export function catalogRoutes(app: FastifyInstance, { db, store, guard }: Deps):
     };
   });
 
-  app.patch("/api/products/:id", { preHandler: guard("family.manage") }, async (req) => {
+  // ---- Ajouter / modifier un article (administrateur). Pas réservé aux 80 articles de départ.
+  // L'image arrive en base64 (déjà réduite par le téléphone, puis normalisée ici : 512 px, WebP, fond blanc, sans rognage).
+  const imageField = z.string().min(20).max(12_000_000);
+  const categoryField = z.string().min(1).max(40);
+  const decodeImage = (b64: string): Buffer => {
+    const buf = Buffer.from(b64.replace(/^data:[^,]*,/, ""), "base64");
+    if (buf.length === 0) throw new HttpError(400, "invalid_image", "Fichier image illisible");
+    if (buf.length > MAX_INPUT_BYTES) throw new HttpError(413, "image_too_large", "Image trop volumineuse (8 Mo max)");
+    return buf;
+  };
+
+  interface SaveInput {
+    id?: string;
+    name?: string;
+    category?: string;
+    brand?: string | null;
+    active?: boolean;
+    image?: Buffer;
+    resetImage?: boolean;
+  }
+
+  async function saveProduct(auth: { familyId: string; profileId: string }, input: SaveInput) {
+    // The picture is processed and written first (no database involved); the product row and its link to the new
+    // picture are then written together, so a failure can never leave a product pointing at nothing.
+    const prepared: PreparedPhoto | undefined = input.image ? await preparePhoto(store, input.image, { sourceName: "Photo familiale", license: "OWN" }) : undefined;
+    try {
+      return await withTx(db, async (c) => {
+        if (input.category !== undefined) {
+          const ok = await c.query("SELECT 1 FROM categories WHERE key = $1", [input.category]);
+          if (!ok.rows[0]) throw new HttpError(400, "invalid_category", "Catégorie inconnue");
+        }
+        const photoId = prepared ? await insertPhotoAsset(c, prepared, { ownerFamilyId: auth.familyId, importedBy: auth.profileId }) : undefined;
+        if (!input.id) {
+          const category = input.category!;
+          const pos = (await c.query("SELECT coalesce(max(position), -1) + 1 AS p FROM products WHERE family_id = $1 AND category = $2", [auth.familyId, category])).rows[0].p;
+          const r = await c.query(
+            `INSERT INTO products (family_id, category, name, brand, active, photo_asset_id, position) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+            [auth.familyId, category, input.name, input.brand ?? null, input.active ?? true, photoId ?? null, pos],
+          );
+          return r.rows[0];
+        }
+        // Same id before and after: renaming, moving or deactivating never detaches history (archives keep their own snapshot).
+        const cur = (await c.query("SELECT p.*, i.photo_asset_id AS catalog_photo FROM products p LEFT JOIN initial_catalog i ON i.key = p.catalog_key WHERE p.id = $1 AND p.family_id = $2 FOR UPDATE OF p", [input.id, auth.familyId])).rows[0];
+        if (!cur) throw new HttpError(404, "not_found", "Produit introuvable");
+        const category = input.category ?? cur.category;
+        const position = category !== cur.category ? (await c.query("SELECT coalesce(max(position), -1) + 1 AS p FROM products WHERE family_id = $1 AND category = $2", [auth.familyId, category])).rows[0].p : cur.position;
+        let photo = cur.photo_asset_id as string | null;
+        if (photoId) photo = photoId;
+        else if (input.resetImage) photo = cur.catalog_photo ?? null; // back to the catalogue picture (or none for an added article)
+        const r = await c.query(
+          `UPDATE products SET name = $3, category = $4, position = $5, brand = $6, active = $7, photo_asset_id = $8 WHERE id = $1 AND family_id = $2 RETURNING *`,
+          [input.id, auth.familyId, input.name ?? cur.name, category, position, input.brand !== undefined ? input.brand : cur.brand, input.active ?? cur.active, photo],
+        );
+        return r.rows[0];
+      });
+    } catch (e: any) {
+      if (e.code === "23505") throw new HttpError(409, "product_exists", "Un article de ce nom existe déjà dans le catalogue");
+      throw e;
+    }
+  }
+
+  app.post("/api/products", { preHandler: guard("family.manage"), bodyLimit: 14 * 1024 * 1024 }, async (req, reply) => {
+    const body = z
+      .object({ name: z.string().trim().min(1).max(60), category: categoryField, image: imageField.optional(), active: z.boolean().optional() })
+      .parse(req.body);
+    const product = await saveProduct(req.auth!, { name: body.name, category: body.category, active: body.active, image: body.image ? decodeImage(body.image) : undefined });
+    hub.broadcast(req.auth!.familyId, "catalog.updated", { productId: product.id });
+    return reply.code(201).send({ product: productView(product) });
+  });
+
+  app.patch("/api/products/:id", { preHandler: guard("family.manage"), bodyLimit: 14 * 1024 * 1024 }, async (req) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
     const body = z
       .object({
         name: z.string().trim().min(1).max(60).optional(),
+        category: categoryField.optional(),
         brand: z.string().trim().min(1).max(40).nullable().optional(),
         active: z.boolean().optional(),
+        image: imageField.optional(),
+        resetImage: z.boolean().optional(),
       })
       .parse(req.body);
-    try {
-      // Same id before and after: renaming or deactivating never detaches history.
-      const r = await db.query(
-        `UPDATE products SET name = COALESCE($3, name),
-                brand = CASE WHEN $4::boolean THEN $5 ELSE brand END,
-                active = COALESCE($6, active)
-          WHERE id = $1 AND family_id = $2 RETURNING *`,
-        [id, req.auth!.familyId, body.name ?? null, body.brand !== undefined, body.brand ?? null, body.active ?? null],
-      );
-      if (!r.rows[0]) throw new HttpError(404, "not_found", "Produit introuvable");
-      return { product: productView(r.rows[0]) };
-    } catch (e: any) {
-      if (e.code === "23505") throw new HttpError(409, "product_exists", "Ce produit existe déjà dans le catalogue familial");
-      throw e;
-    }
+    const product = await saveProduct(req.auth!, { id, ...body, image: body.image ? decodeImage(body.image) : undefined });
+    hub.broadcast(req.auth!.familyId, "catalog.updated", { productId: product.id });
+    return { product: productView(product) };
   });
 
   // Catalogue étendu : recherche seulement, jamais listé en entier, jamais exposé au personnel.
@@ -131,16 +194,13 @@ export function catalogRoutes(app: FastifyInstance, { db, store, guard }: Deps):
     return reply.code(201).send({ product: productView(product) });
   });
 
-  // Photo prise par la famille : nouvelle ressource immuable, l'ancienne reste référencée par l'historique.
+  // Photo envoyée telle quelle (JPEG/PNG/WebP) : nouvelle ressource immuable ; l'ancienne reste référencée par les archives.
   app.post("/api/products/:id/photo", { preHandler: guard("family.manage"), bodyLimit: 9 * 1024 * 1024 }, async (req) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
     if (!Buffer.isBuffer(req.body)) throw new HttpError(415, "unsupported_media_type", "Envoyer une image JPEG, PNG ou WebP");
-    const familyId = req.auth!.familyId;
-    const owned = await db.query("SELECT 1 FROM products WHERE id = $1 AND family_id = $2", [id, familyId]);
-    if (!owned.rows[0]) throw new HttpError(404, "not_found", "Produit introuvable");
-    const assetId = await savePhotoAsset(db, store, req.body, { sourceName: "Photo familiale", license: "OWN" }, { ownerFamilyId: familyId, importedBy: req.auth!.profileId });
-    const r = await db.query("UPDATE products SET photo_asset_id = $3 WHERE id = $1 AND family_id = $2 RETURNING *", [id, familyId, assetId]);
-    return { product: productView(r.rows[0]) };
+    const product = await saveProduct(req.auth!, { id, image: req.body });
+    hub.broadcast(req.auth!.familyId, "catalog.updated", { productId: product.id });
+    return { product: productView(product) };
   });
 
   // Les photos sont immuables : cache d'un an, validé par l'empreinte du contenu.
@@ -160,25 +220,32 @@ export function catalogRoutes(app: FastifyInstance, { db, store, guard }: Deps):
     return reply.type(file.mime).send(file.data);
   });
 
-  // Crédits : provenance et attribution de chaque photo utilisée par la famille.
+  // Crédits : provenance et attribution des images affichées à la famille (catalogue ET archives, qui gardent leur image d'origine).
   app.get("/api/credits", { preHandler: guard() }, async (req) => {
     const r = await db.query(
-      `SELECT DISTINCT a.id, a.source_name, a.source_url, a.license, a.license_url, a.author, a.attribution_required, a.attribution_text
-         FROM products p JOIN photo_assets a ON a.id = p.photo_asset_id
-        WHERE p.family_id = $1 AND a.license <> 'OWN'
+      `SELECT DISTINCT a.id, a.source_name, a.source_url, a.license, a.license_url, a.author, a.attribution_required, a.attribution_text, a.generated
+         FROM photo_assets a
+        WHERE a.license <> 'OWN'
+          AND (EXISTS (SELECT 1 FROM products p WHERE p.photo_asset_id = a.id AND p.family_id = $1)
+            OR EXISTS (SELECT 1 FROM list_items li WHERE li.snapshot_photo_asset_id = a.id AND li.family_id = $1))
         ORDER BY a.source_name, a.author NULLS LAST`,
       [req.auth!.familyId],
     );
+    const generated = r.rows.filter((a) => a.generated);
     return {
-      credits: r.rows.map((a) => ({
-        sourceName: a.source_name,
-        sourceUrl: a.source_url,
-        license: a.license,
-        licenseUrl: a.license_url,
-        author: a.author,
-        attributionRequired: a.attribution_required,
-        text: a.attribution_text,
-      })),
+      // Images we generated: one line, no licence invented.
+      generated: generated.length ? { count: generated.length, source: generated[0].source_name as string } : null,
+      credits: r.rows
+        .filter((a) => !a.generated)
+        .map((a) => ({
+          sourceName: a.source_name,
+          sourceUrl: a.source_url,
+          license: a.license,
+          licenseUrl: a.license_url,
+          author: a.author,
+          attributionRequired: a.attribution_required,
+          text: a.attribution_text,
+        })),
     };
   });
 }

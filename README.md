@@ -26,4 +26,4 @@ cd web    && npm test      # moteur de synchronisation
 cd e2e    && npm install && npm test   # navigateur réel ; nécessite server et web construits (npm run build)
 ```
 
-Outils d'exploitation (dans `server/`) : `npm run admin -- reset|token`, `npm run backup -- run|verify|list|prune`, `npm run photos -- import manifeste.json`.
+Outils d'exploitation (dans `server/`) : `npm run admin -- reset|token`, `npm run backup -- run|verify|list|prune`, `npm run photos -- import manifeste.json`, `npm run photos -- purge [--dry-run]` (supprime les images que plus rien ne référence).
