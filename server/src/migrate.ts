@@ -1,7 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { Db } from "./db.js";
+import { ensureSchema, type Db } from "./db.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const MIGRATIONS_DIR = path.resolve(here, "../migrations");
@@ -11,6 +11,7 @@ const LOCK_KEY = 727_001;
 
 /** Applies pending *.sql files in name order, each in its own transaction. Returns applied names. */
 export async function migrate(db: Db, dir = MIGRATIONS_DIR): Promise<string[]> {
+  await ensureSchema(db); // own schema on a shared database; nothing for "public"
   const client = await db.connect();
   const applied: string[] = [];
   try {

@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import sharp from "sharp";
 import type { BackupStore } from "./backup.js";
 import type { Db } from "./db.js";
 import type { PhotoStore } from "./photos.js";
@@ -25,4 +27,44 @@ export async function backupFamilyPhotos(db: Db, photos: PhotoStore, target: Bac
     bytes += f.data.length;
   }
   return { total: keys.length, copied, missing, bytes };
+}
+
+/**
+ * Copying files is not a backup until they are proven restorable. Run on the RESTORED database: every picture a family added
+ * (as the restored data lists them) must exist in the backup storage, be byte-for-byte the content the database recorded
+ * (SHA-256 and size) and decode as an image. Returns the problems found (empty = complete).
+ */
+export async function verifyPhotoBackup(
+  restored: { query: Db["query"] },
+  target: BackupStore,
+): Promise<{ problems: string[]; checked: number; bytes: number }> {
+  const rows = (await restored.query("SELECT storage_key, content_hash, bytes FROM photo_assets WHERE owner_family_id IS NOT NULL ORDER BY storage_key")).rows as { storage_key: string; content_hash: string; bytes: number }[];
+  const problems: string[] = [];
+  let checked = 0;
+  let total = 0;
+  for (const r of rows) {
+    const data = await target.get(r.storage_key);
+    if (!data) {
+      problems.push(`${r.storage_key} : absente de la sauvegarde`);
+      continue;
+    }
+    if (createHash("sha256").update(data).digest("hex") !== r.content_hash) {
+      problems.push(`${r.storage_key} : contenu différent de celui enregistré (empreinte SHA-256)`);
+      continue;
+    }
+    if (data.length !== Number(r.bytes)) {
+      problems.push(`${r.storage_key} : taille ${data.length} au lieu de ${r.bytes}`);
+      continue;
+    }
+    try {
+      const m = await sharp(data).metadata();
+      if (!m.width || !m.height) throw new Error("dimensions");
+    } catch {
+      problems.push(`${r.storage_key} : image illisible`);
+      continue;
+    }
+    checked++;
+    total += data.length;
+  }
+  return { problems, checked, bytes: total };
 }

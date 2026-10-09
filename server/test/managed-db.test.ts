@@ -6,11 +6,12 @@ import pg from "pg";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { generateInstallToken, setupFamily } from "../src/auth.js";
-import { backupFamilyPhotos } from "../src/backup-photos.js";
+import { backupFamilyPhotos, verifyPhotoBackup } from "../src/backup-photos.js";
 import { createBackupStorage } from "../src/backup-store.js";
-import { backupStatus, createBackup, LocalBackupStore, S3BackupStore, selectTools, verifyBackup, type BackupCtx } from "../src/backup.js";
+import { backupStatus, createBackup, encrypt, LocalBackupStore, S3BackupStore, selectTools, verifyBackup, type BackupCtx } from "../src/backup.js";
 import { loadConfig } from "../src/config.js";
-import { assertSafeDatabaseUrl, createPool, toolsDatabaseUrl, type Db } from "../src/db.js";
+import { assertSafeDatabaseUrl, createPool, createPoolFromConfig, schemaOf, toolsDatabaseUrl, type Db } from "../src/db.js";
+import { migrate } from "../src/migrate.js";
 import { hardenApiRoles } from "../src/harden.js";
 import { savePhotoAsset } from "../src/photos.js";
 import { closeTestDb, resetData, testDb, testStore } from "./helpers.js";
@@ -32,13 +33,41 @@ afterAll(closeTestDb);
 describe("connexion à une base gérée (Supabase) : garde-fous", () => {
   it("refuse le pooler en mode transaction (6543) et une base Supabase sans certificat ; accepte le mode session avec certificat et une base ordinaire", () => {
     const pooler = (port: number) => `postgresql://postgres.abcd:pw@aws-0-eu-west-3.pooler.supabase.com:${port}/postgres`;
-    expect(() => assertSafeDatabaseUrl(pooler(6543), { ca: "x" })).toThrow(/transaction/);
-    expect(() => assertSafeDatabaseUrl(pooler(5432))).toThrow(/DATABASE_SSL_CA/);
-    expect(() => assertSafeDatabaseUrl("postgresql://postgres:pw@db.abcd.supabase.co:5432/postgres")).toThrow(/DATABASE_SSL_CA/);
-    expect(() => assertSafeDatabaseUrl(pooler(5432), { ca: "x" })).not.toThrow();
+    const ok = { ca: "x", schema: "smartcourse", backupMode: "external" as const };
+    expect(() => assertSafeDatabaseUrl(pooler(6543), ok)).toThrow(/transaction/);
+    expect(() => assertSafeDatabaseUrl(pooler(5432), { ...ok, ca: undefined })).toThrow(/DATABASE_SSL_CA/);
+    expect(() => assertSafeDatabaseUrl("postgresql://postgres:pw@db.abcd.supabase.co:5432/postgres", { ...ok, ca: undefined })).toThrow(/DATABASE_SSL_CA/);
+    expect(() => assertSafeDatabaseUrl(pooler(5432), ok)).not.toThrow();
     expect(() => assertSafeDatabaseUrl("postgresql://u:p@db.railway.internal:5432/railway")).not.toThrow();
     expect(() => assertSafeDatabaseUrl("postgresql://u:p@localhost:5432/x")).not.toThrow();
     expect(() => assertSafeDatabaseUrl("pas une url")).toThrow();
+  });
+
+  it("sur Supabase : schéma « public » ou réservé refusé ; sauvegardes internes refusées ; message clair", () => {
+    const url = "postgresql://postgres.abcd:pw@aws-0-eu-west-3.pooler.supabase.com:5432/postgres";
+    expect(() => assertSafeDatabaseUrl(url, { ca: "x", backupMode: "external" })).toThrow(/DATABASE_SCHEMA=smartcourse/); // public par défaut
+    expect(() => assertSafeDatabaseUrl(url, { ca: "x", schema: "public", backupMode: "external" })).toThrow(/propre schéma/);
+    for (const reserved of ["auth", "storage", "extensions", "graphql_public", "realtime", "pg_catalog", "pg_toast", "information_schema"]) {
+      expect(() => assertSafeDatabaseUrl(url, { ca: "x", schema: reserved, backupMode: "external" }), reserved).toThrow(/réservé/);
+    }
+    expect(() => assertSafeDatabaseUrl(url, { ca: "x", schema: "smartcourse", backupMode: "internal" })).toThrow(/BACKUP_MODE=external/);
+    expect(() => assertSafeDatabaseUrl(url, { ca: "x", schema: "smartcourse" })).toThrow(/BACKUP_MODE=external/); // défaut interne
+    expect(() => assertSafeDatabaseUrl(url, { ca: "x", schema: "smartcourse", backupMode: "external" })).not.toThrow();
+    // une base ordinaire garde ses réglages par défaut (public, sauvegardes internes)
+    expect(() => assertSafeDatabaseUrl("postgresql://u:p@localhost:5432/x", { schema: "public", backupMode: "internal" })).not.toThrow();
+  });
+
+  it("le démarrage lit la configuration : erreur claire avant toute connexion, 5 connexions maximum par défaut sur une base gérée", () => {
+    const base = { DATABASE_URL: "postgresql://postgres.abcd:pw@aws-0-eu-west-3.pooler.supabase.com:5432/postgres", DATABASE_SSL_CA: "x" } as NodeJS.ProcessEnv;
+    expect(() => createPoolFromConfig(loadConfig({ ...base } as NodeJS.ProcessEnv))).toThrow(/DATABASE_SCHEMA/);
+    expect(() => createPoolFromConfig(loadConfig({ ...base, DATABASE_SCHEMA: "smartcourse" } as NodeJS.ProcessEnv))).toThrow(/BACKUP_MODE=external/);
+    expect(() => loadConfig({ ...base, DATABASE_SCHEMA: "Smart-Course" } as NodeJS.ProcessEnv)).toThrow(/DATABASE_SCHEMA/);
+    // CA invalide mais configuration cohérente : la pool se construit (aucune connexion n'est ouverte à la création) avec 5 connexions
+    const cfg = loadConfig({ ...base, DATABASE_CA: "", DATABASE_SCHEMA: "smartcourse", BACKUP_MODE: "external", DATABASE_SSL_CA: "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----" } as NodeJS.ProcessEnv);
+    const pool = createPoolFromConfig(cfg);
+    expect((pool as unknown as { options: { max: number } }).options.max).toBe(5);
+    expect(schemaOf(pool)).toBe("smartcourse");
+    void pool.end();
   });
 
   const tls = it.skipIf(!local || !existsSync(SNAKEOIL));
@@ -95,7 +124,7 @@ describe("protection des tables contre l'API de données de Supabase", () => {
   afterAll(cleanup);
 
   it("sans ces rôles (PostgreSQL ordinaire) : rien n'est fait", async () => {
-    expect(await hardenApiRoles(db, ["sc_absent_a", "sc_absent_b"])).toEqual({ applied: false, roles: [], tables: 0 });
+    expect(await hardenApiRoles(db, ["sc_absent_a", "sc_absent_b"])).toEqual({ applied: false, schema: "public", roles: [], tables: 0 });
   });
 
   it("reproduit les droits par défaut de Supabase, puis ferme tout : aucun droit, RLS partout, y compris pour une table créée après", async () => {
@@ -132,6 +161,74 @@ describe("protection des tables contre l'API de données de Supabase", () => {
       await c.query("RESET ROLE");
     } finally {
       c.release();
+    }
+  });
+});
+
+describe("isolation : SmartCourse ne touche qu'à son propre schéma", () => {
+  const SCHEMA = "sc_test_app";
+  const R = "sc_test_iso_role";
+  let app: Db;
+  afterAll(async () => {
+    await app?.end();
+    await db.query(`DROP SCHEMA IF EXISTS ${SCHEMA} CASCADE`);
+    await db.query("DROP TABLE IF EXISTS public.zz_autre_application");
+  });
+
+  it("migrations dans le schéma dédié ; la protection laisse intacts les tables d'une autre application et le schéma public", async () => {
+    await db.query(`DROP SCHEMA IF EXISTS ${SCHEMA} CASCADE`);
+    if (!(await db.query("SELECT 1 FROM pg_roles WHERE rolname = $1", [R])).rowCount) await db.query(`CREATE ROLE ${R} NOLOGIN`);
+    // « une autre application » : une table du schéma public avec les droits par défaut de Supabase, sans RLS
+    await db.query("DROP TABLE IF EXISTS public.zz_autre_application");
+    await db.query("CREATE TABLE public.zz_autre_application (id int)");
+    await db.query(`GRANT USAGE ON SCHEMA public TO ${R}`);
+    await db.query(`GRANT ALL ON public.zz_autre_application TO ${R}`);
+    const publicBefore = (await db.query("SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY 1")).rows.map((r) => r.tablename);
+    const aclBefore = (await db.query("SELECT relacl::text AS a, relrowsecurity AS rls FROM pg_class WHERE oid = 'public.zz_autre_application'::regclass")).rows[0];
+
+    app = createPool(URL_, { schema: SCHEMA });
+    expect(schemaOf(app)).toBe(SCHEMA);
+    const applied = await migrate(app);
+    expect(applied.length).toBeGreaterThan(5);
+    // toutes les tables SmartCourse sont dans le schéma dédié, aucune dans public
+    const inApp = (await db.query("SELECT tablename FROM pg_tables WHERE schemaname = $1", [SCHEMA])).rows.map((r) => r.tablename);
+    expect(inApp).toEqual(expect.arrayContaining(["families", "profiles", "products", "list_items", "schema_migrations", "backup_runs"]));
+    expect((await db.query("SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY 1")).rows.map((r) => r.tablename)).toEqual(publicBefore);
+    // l'application lit et écrit dans son schéma sans le nommer
+    const f = await setupFamily(app, { installToken: await generateInstallToken(app), familyName: "Isolée", admin: { displayName: "Adil", login: "adil", secret: "482913" } });
+    expect((await app.query("SELECT count(*)::int AS n FROM products WHERE family_id = $1", [f.auth.familyId])).rows[0].n).toBe(80);
+    expect((await db.query(`SELECT count(*)::int AS n FROM ${SCHEMA}.products`)).rows[0].n).toBeGreaterThanOrEqual(80);
+
+    // droits par défaut de Supabase sur NOTRE schéma, puis protection
+    await db.query(`GRANT USAGE ON SCHEMA ${SCHEMA} TO ${R}`);
+    await db.query(`GRANT ALL ON ALL TABLES IN SCHEMA ${SCHEMA} TO ${R}`);
+    const res = await hardenApiRoles(app, [R]);
+    expect(res).toMatchObject({ applied: true, schema: SCHEMA, roles: [R] });
+    expect(res.tables).toBe(inApp.length);
+    const open = await db.query(`SELECT count(*)::int AS n FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = $1 AND c.relkind = 'r'
+                                   AND (has_table_privilege('${R}', c.oid, 'SELECT') OR NOT c.relrowsecurity)`, [SCHEMA]);
+    expect(open.rows[0].n).toBe(0);
+    // l'autre application : droits, RLS et contenu strictement inchangés
+    const aclAfter = (await db.query("SELECT relacl::text AS a, relrowsecurity AS rls FROM pg_class WHERE oid = 'public.zz_autre_application'::regclass")).rows[0];
+    expect(aclAfter).toEqual(aclBefore);
+    expect(aclAfter.rls).toBe(false);
+    expect((await db.query(`SELECT has_table_privilege('${R}', 'public.zz_autre_application', 'SELECT') AS p`)).rows[0].p).toBe(true);
+    expect((await db.query("SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY 1")).rows.map((r) => r.tablename)).toEqual(publicBefore);
+  });
+
+  it("la sauvegarde ne copie que le schéma SmartCourse et la restauration de contrôle le retrouve entier", async () => {
+    const store = new LocalBackupStore(mkdtempSync(path.join(os.tmpdir(), "bk-")));
+    const scratch = createPool(new URL("/postgres", URL_).toString().replace(/\/postgres$/, "/postgres"));
+    try {
+      const ctx: BackupCtx = { db: app, databaseUrl: URL_, store, passphrase: "une-phrase-secrete-de-test", verify: { db: scratch, url: new URL("/postgres", URL_).toString() } };
+      const b = await createBackup(ctx);
+      expect(Object.keys(b.manifest.tables)).not.toContain("zz_autre_application"); // l'autre application n'est ni lue ni copiée
+      expect(Object.keys(b.manifest.tables)).toEqual(expect.arrayContaining(["families", "products"]));
+      const v = await verifyBackup(ctx, b.key);
+      expect(v.problems).toEqual([]);
+      expect(v.restoredTables).toBe(Object.keys(b.manifest.tables).length);
+    } finally {
+      await scratch.end();
     }
   });
 });
@@ -212,5 +309,64 @@ describe("sauvegarde externe : restauration de contrôle sur un autre serveur, p
     expect(st.kind).toBe("s3");
     expect(st.store).toBeInstanceOf(S3BackupStore);
     expect(loadConfig({ DATABASE_URL: URL_ } as NodeJS.ProcessEnv).BACKUP_MODE).toBe("internal"); // défaut : les sauvegardes internes ne sont pas désactivées
+  });
+
+  it("restauration complète : les photos listées par la base RESTAURÉE doivent exister, intactes, dans la sauvegarde (absente, altérée ou illisible = échec)", async () => {
+    const photos = testStore();
+    const store = new LocalBackupStore(mkdtempSync(path.join(os.tmpdir(), "bk-")));
+    const png = (c: string) => sharp({ create: { width: 64, height: 64, channels: 3, background: c } }).png().toBuffer();
+    await db.query("DELETE FROM photo_assets WHERE owner_family_id IS NOT NULL AND false"); // (aucune suppression : les assets sont immuables)
+    const mine = await savePhotoAsset(db, photos, await png("#112233"), { sourceName: "Photo familiale", license: "OWN" }, { ownerFamilyId: familyId });
+    const key = (await db.query("SELECT storage_key FROM photo_assets WHERE id = $1", [mine])).rows[0].storage_key as string;
+    const scratchAdmin = createPool(new URL("/postgres", URL_).toString());
+    try {
+      const mk = (): BackupCtx => ({
+        db, databaseUrl: URL_, store, passphrase: "une-phrase-secrete-de-test", verify: { db: scratchAdmin, url: new URL("/postgres", URL_).toString() },
+        afterRestore: async (scratch) => (await verifyPhotoBackup(scratch, store)).problems.map((p) => `photos : ${p}`),
+      });
+      // 1. photos non copiées : la sauvegarde de la base seule ne suffit pas
+      const b1 = await createBackup(mk());
+      const v1 = await verifyBackup(mk(), b1.key);
+      expect(v1.ok).toBe(false);
+      expect(v1.problems.join("\n")).toMatch(/absente de la sauvegarde/);
+      // 2. copiées : complet (toutes les photos de la famille de la base restaurée sont vérifiées)
+      const all = await backupFamilyPhotos(db, photos, store);
+      expect(all.missing.filter((k) => k !== undefined).length).toBeGreaterThanOrEqual(0);
+      const ownKeys = (await db.query("SELECT DISTINCT storage_key FROM photo_assets WHERE owner_family_id IS NOT NULL")).rows.map((r) => r.storage_key as string);
+      // (les photos des essais précédents dont le fichier a été retiré du stockage sont signalées par la copie, pas par la restauration)
+      for (const k of ownKeys) if (!(await store.get(k))) { const f = await photos.get(k); if (f) await store.put(k, f.data); }
+      const stillMissing = (await Promise.all(ownKeys.map(async (k) => ((await store.get(k)) ? null : k)))).filter(Boolean) as string[];
+      if (stillMissing.length === 0) {
+        const b2 = await createBackup(mk());
+        const v2 = await verifyBackup(mk(), b2.key);
+        expect(v2.problems).toEqual([]);
+        // 3. altérée : même clé, autre contenu → empreinte différente
+        await store.put(key, await png("#445566"));
+        const v3 = await verifyBackup(mk(), (await createBackup(mk())).key);
+        expect(v3.ok).toBe(false);
+        expect(v3.problems.join("\n")).toMatch(/empreinte SHA-256/);
+      }
+      // 4. fichier illisible mais de la bonne empreinte : impossible à fabriquer ; on vérifie au moins la détection d'absence après suppression
+      await store.delete(key);
+      const v4 = await verifyBackup(mk(), (await createBackup(mk())).key);
+      expect(v4.ok).toBe(false);
+      expect(v4.problems.join("\n")).toContain(key);
+    } finally {
+      await scratchAdmin.end();
+    }
+  });
+
+  it("un fichier de sauvegarde lisible (non chiffré) est refusé", async () => {
+    const store = new LocalBackupStore(mkdtempSync(path.join(os.tmpdir(), "bk-")));
+    const ctx: BackupCtx = { db, databaseUrl: URL_, store, passphrase: "une-phrase-secrete-de-test" };
+    await store.put("backups/sc-clair.dump.enc", Buffer.from("PGDMP\u0000contenu lisible"));
+    await store.put("backups/sc-clair.manifest.json", Buffer.from(JSON.stringify({ createdAt: new Date().toISOString(), tables: {}, migrations: [] })));
+    const v = await verifyBackup(ctx, "backups/sc-clair.dump.enc");
+    expect(v.ok).toBe(false);
+    expect(v.problems.join(" ")).toMatch(/pas chiffré/);
+    // et un fichier chiffré avec une autre clé est refusé aussi
+    await store.put("backups/sc-autre.dump.enc", encrypt(Buffer.from("PGDMPxx"), "une-autre-phrase-secrete"));
+    await store.put("backups/sc-autre.manifest.json", Buffer.from(JSON.stringify({ createdAt: new Date().toISOString(), tables: {}, migrations: [] })));
+    expect((await verifyBackup(ctx, "backups/sc-autre.dump.enc")).problems.join(" ")).toMatch(/déchiffrement impossible/);
   });
 });

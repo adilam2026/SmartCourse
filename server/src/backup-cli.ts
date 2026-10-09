@@ -1,7 +1,7 @@
-import { backupVerifyPrune, checkBackupTools, createBackup, listBackups, pruneBackups, verifyBackup } from "./backup.js";
+import { type BackupCtx, backupVerifyPrune, checkBackupTools, createBackup, listBackups, pruneBackups, verifyBackup } from "./backup.js";
 import { createBackupStorage } from "./backup-store.js";
 import { loadConfig } from "./config.js";
-import { backupFamilyPhotos } from "./backup-photos.js";
+import { backupFamilyPhotos, verifyPhotoBackup } from "./backup-photos.js";
 import { createPool, createPoolFromConfig, toolsDatabaseUrl } from "./db.js";
 import { hardenApiRoles } from "./harden.js";
 import { createPhotoStore } from "./photos.js";
@@ -18,12 +18,29 @@ if (!storage) {
   console.error("Aucun stockage sûr : en production, configurez le bucket (S3_*), ou BACKUP_ALLOW_LOCAL=1 avec un volume persistant.");
   process.exit(1);
 }
-console.log(`Stockage des sauvegardes : ${storage.kind === "s3" ? `bucket ${config.S3_BUCKET}` : `dossier local ${config.BACKUP_DIR}`}`);
+// Never print bucket names or hosts: the scheduled job runs in a PUBLIC repository, whose logs are public.
+console.log(`Stockage des sauvegardes : ${storage.kind === "s3" ? "stockage S3 (indépendant si BACKUP_S3_* est défini)" : "dossier local"}`);
 const db = createPoolFromConfig(config);
 // Restoration check on ANOTHER server when VERIFY_DATABASE_URL is given (required for a managed database, where a scratch database
 // cannot be created next to the production one).
 const verifyDb = config.VERIFY_DATABASE_URL ? createPool(config.VERIFY_DATABASE_URL) : null;
-const ctx = { db, databaseUrl: toolsDatabaseUrl(config), store: storage.store, passphrase: config.BACKUP_KEY, verify: verifyDb ? { db: verifyDb, url: config.VERIFY_DATABASE_URL! } : undefined };
+const external = config.BACKUP_MODE === "external";
+let photoCheck: { checked: number; bytes: number } | null = null;
+const ctx: BackupCtx = {
+  db,
+  databaseUrl: toolsDatabaseUrl(config),
+  store: storage.store,
+  passphrase: config.BACKUP_KEY,
+  verify: verifyDb ? { db: verifyDb, url: config.VERIFY_DATABASE_URL! } : undefined,
+  // External backups are only declared valid when the restored database AND the pictures it lists are proven complete.
+  afterRestore: external
+    ? async (scratch) => {
+        const r = await verifyPhotoBackup(scratch, storage.store);
+        photoCheck = { checked: r.checked, bytes: r.bytes };
+        return r.problems.map((p) => `photos : ${p}`);
+      }
+    : undefined,
+};
 try {
   // In external mode this command runs from the scheduled job, possibly with code newer than the deployed app: the app alone
   // owns the schema, the job must never migrate (nor change grants on) the production database.
@@ -36,9 +53,15 @@ try {
     console.log(`${t.ok ? "OK" : "ÉCHEC"} : ${t.message}`);
     if (!t.ok) process.exitCode = 2;
   } else if (cmd === "run") {
+    if (external && (config.S3_BUCKET || config.NODE_ENV !== "production")) {
+      // Pictures first, so that the restoration check below can prove they are all there.
+      const c = await backupFamilyPhotos(db, createPhotoStore(config), ctx.store);
+      console.log(`Photos de la famille : ${c.total} référencée(s), ${c.copied} copiée(s), ${c.missing.length} absente(s) du stockage d'images.`);
+    }
     const r = await backupVerifyPrune(ctx);
     console.log(`Sauvegarde : ${r.backup.key} (${r.backup.bytes} octets)`);
-    console.log(r.verify.ok ? `Restauration vérifiée (${r.verify.restoredTables} tables conformes au manifeste).` : `RESTAURATION EN ÉCHEC :\n- ${r.verify.problems.join("\n- ")}`);
+    console.log(r.verify.ok ? `Restauration vérifiée (${r.verify.restoredTables} tables conformes au manifeste, fichier chiffré, déchiffré avec la clé).` : `RESTAURATION EN ÉCHEC :\n- ${r.verify.problems.join("\n- ")}`);
+    if (r.verify.ok && photoCheck) console.log(`Photos vérifiées après restauration : ${(photoCheck as { checked: number }).checked} (empreinte SHA-256, taille, décodage).`);
     if (r.pruned.length) console.log(`Supprimées (hors rétention) : ${r.pruned.join(", ")}`);
     if (!r.verify.ok) process.exitCode = 2;
   } else if (cmd === "backup") {

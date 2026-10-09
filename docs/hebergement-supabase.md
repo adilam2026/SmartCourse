@@ -1,115 +1,135 @@
 # Hébergement choisi : Railway (serveur) + Supabase Free (base PostgreSQL)
 
-**Statut : adaptations du code faites et testées localement ; rien n'est créé, rien n'est déployé, aucun abonnement, aucune limite Railway modifiée.** Le choix d'architecture est confirmé ; il n'autorise pas encore la création de services ni le déploiement.
+**Statut : adaptations du code faites et testées EN LOCAL ; rien n'est créé, rien n'est déployé, aucun abonnement, aucune limite Railway modifiée.** Les essais locaux ne valident ni Supabase, ni le bucket Railway, ni le stockage de sauvegarde : voir §8 pour ce qui reste à valider sur les vrais services.
 
 ## 1. Portes à franchir avant toute création de service
 
 | # | Condition | État |
 |---|---|---|
-| G1 | **Un projet Supabase Free est disponible** (moins de 2 projets Free actifs, toutes organisations dont vous êtes propriétaire ou administratrice confondues) | **Non vérifiable par moi** (aucun accès à votre compte). À vérifier par vous : liste de vos organisations et projets, statut de chacun |
-| G2 | **Consommation de votre workspace Railway** (U) | **Non fournie** : le coût total ci-dessous reste conditionnel |
-| G3 | **Stockage de sauvegarde indépendant choisi et ouvert** (Cloudflare R2 ou Backblaze B2) | À décider et à ouvrir par vous (compte à créer) |
-| G4 | **Un run manuel du job de sauvegarde externe réussi** (§5), avant de passer l'application en mode `BACKUP_MODE=external` | Non réalisé : le job n'a jamais tourné (aucun secret, aucune base Supabase) |
-| G5 | Votre accord écrit sur la mise en service | En attente |
+| G1 | **Un projet Supabase Free est disponible** (moins de 2 projets Free actifs, toutes organisations dont vous êtes propriétaire ou administratrice confondues) | **Non vérifiable par moi** (aucun accès à votre compte) : captures attendues |
+| G2 | **Consommation de votre workspace Railway** (U) | Captures attendues : le coût total reste conditionnel |
+| G3 | **Stockage de sauvegarde indépendant** : Backblaze B2 recommandé (§7), compte à créer **après votre accord** | Non créé |
+| G4 | **Validation sur les vrais services** (§8) : un lancement manuel du job de sauvegarde externe réussi, avec restauration complète vérifiée | **Non réalisée** : aucun service réel n'existe encore |
+| G5 | Variable de dépôt `BACKUP_EXTERNE_ACTIVE=true` créée **après** G4 (sinon la planification reste inactive) | À faire après G4 |
+| G6 | Votre accord écrit sur la mise en service | En attente |
 
 ## 2. Où seront les données
 
 | Donnée | Emplacement | Pourquoi |
 |---|---|---|
-| Base PostgreSQL (profils, listes, achats, catalogue, références d'images) | **Supabase Free** (région proche de Railway : Europe) | Évite un service PostgreSQL payant sur Railway |
-| Serveur (API + application installable) | **Railway**, 1 service | Domaine HTTPS stable fourni par Railway |
-| Images (80 visuels du catalogue + images ajoutées par la famille) | **Bucket Railway** (S3) : variables `S3_*` | Moins de 0,05 Go (< 0,01 $ par mois d'après les tarifs relevés) ; Supabase Storage n'apporterait aucun gain |
-| **Sauvegardes de la base** (chiffrées AES-256-GCM, clé `BACKUP_KEY`) | **Stockage S3 indépendant** : Cloudflare R2 ou Backblaze B2 (10 Go gratuits chacun) | Une panne ou une suppression chez Supabase **ou** Railway n'emporte pas les sauvegardes |
-| **Copie des photos de la famille** | Même stockage indépendant, sous `photos/` | Les sauvegardes de la base ne contiennent que les références |
-| Clé `BACKUP_KEY` | **Hors Railway et hors GitHub** (gestionnaire de mots de passe) *et* en secret GitHub pour le job | Sans elle, les sauvegardes sont illisibles |
+| Base PostgreSQL | **Supabase Free**, projet en Europe, **schéma `smartcourse` (jamais `public`)** | Pas de service PostgreSQL payant ; isolation des autres applications |
+| Serveur (API + application installable) | **Railway**, 1 service, domaine HTTPS stable fourni par Railway | |
+| Images (80 visuels + images ajoutées par la famille) | **Bucket Railway** (`S3_*`) | < 0,05 Go, < 0,01 $ par mois d'après les tarifs relevés |
+| Sauvegardes de la base (chiffrées AES-256-GCM) et copie des photos de la famille | **Backblaze B2** (recommandé, §7) : un bucket privé, une clé d'accès limitée à ce bucket | Indépendant de Railway et de Supabase |
+| `BACKUP_KEY` | Votre gestionnaire de mots de passe **et** secret GitHub du job. **Pas** dans Railway : le serveur n'en a pas besoin en mode externe | Sans elle, les sauvegardes sont illisibles |
 
 ## 3. Coût total estimé (conditionnel à U)
 
-Estimations d'après des mesures locales ; les tarifs Railway viennent de sources secondaires concordantes, **à reconfirmer sur votre page Usage**. Ce ne sont pas des seuils garantis.
+Estimations d'après des mesures locales ; tarifs Railway issus de sources secondaires concordantes, **à reconfirmer sur votre page Usage**. Ce ne sont pas des seuils garantis.
 
 | Poste (par mois) | Estimation |
 |---|---|
 | Service Railway (≈ 0,11 Go de mémoire, CPU quasi nul) | ≈ 1,2 à 1,6 $ (jusqu'à ≈ 2,5 $ en fourchette prudente) |
 | Bucket Railway (images) | < 0,01 $ |
-| Supabase Free (base) | 0 $ |
-| Stockage de sauvegardes (R2 ou B2, dans les 10 Go gratuits) | 0 $ |
-| Tâche planifiée GitHub Actions (≈ 5 min par jour) | 0 $ attendu (minutes incluses ; **à confirmer** pour votre type de dépôt) |
+| Supabase Free | 0 $ |
+| Backblaze B2 (< 10 Go gratuits ; nos sauvegardes pèseront quelques dizaines de Mo) | 0 $ |
+| **GitHub Actions** | **0 $ : votre dépôt est PUBLIC** (vérifié par l'API GitHub) ; selon la documentation GitHub, les exécuteurs standard sont gratuits pour les dépôts publics. Pour mémoire : un dépôt privé disposerait de 2 000 minutes par mois avec GitHub Free (3 000 avec Pro ou Team), largement suffisant pour ≈ 5 min par jour |
 | **Application** | **≈ 1,2 à 1,7 $ (prudent : jusqu'à ≈ 2,6 $)** |
-| **Total Railway = U + application** | voir ci-dessous |
 
-Votre abonnement Hobby de 5 $ inclut 5 $ de consommation : vous ne payez de plus que le dépassement. **Je ne connais pas U** (consommation mensuelle de vos autres applications), donc je ne peux pas dire si le total reste sous 5 $ :
+Total Railway = U + application, et vous ne payez que le dépassement des 5 $ inclus. **Je ne connais pas U.** Scénarios (estimatifs, pas des limites) :
 
-| Si U vaut… | Total estimé (application seule 1,2–1,7 $) | Total « prudent » (jusqu'à 2,6 $) |
+| Si U vaut… | Total estimé | Total « prudent » |
 |---|---|---|
 | 1 $ | ≈ 2,2 à 2,7 $ | ≈ 3,6 $ |
 | 2 $ | ≈ 3,2 à 3,7 $ | ≈ 4,6 $ |
-| 3 $ | ≈ 4,2 à 4,7 $ | ≈ 5,6 $ : **dépassement possible** |
+| 3 $ | ≈ 4,2 à 4,7 $ | ≈ 5,6 $ : dépassement possible |
 | 4 $ ou plus | ≈ 5,2 $ ou plus | dépassement probable |
 
-**Scénarios estimatifs, pas des limites Railway.** Aucun ne garantit le zéro dépassement : seule une semaine de mesure après mise en service le dira. Vos limites (alerte 5 $, plafond 10 $, AGENT 0 $) ne sont pas modifiées.
+Aucun ne garantit le zéro dépassement : seule une semaine de mesure après mise en service le dira. Vos limites (alerte 5 $, plafond 10 $, AGENT 0 $) ne sont pas modifiées.
 
 ## 4. Limites et risques du plan gratuit Supabase
 
 | Limite / risque | Conséquence |
 |---|---|
-| **Base : 500 Mo** (la nôtre : < 10 Mo au départ) | Au-delà : **lecture seule**, la famille ne peut plus rien écrire |
-| **Pause après 7 jours de faible activité** | Application hors service jusqu'à reprise manuelle (« Resume project ») ; avertissement par e-mail environ 1 semaine avant ; restauration possible 1 an selon le texte de la documentation (sa page est incohérente). **Aucune garantie** qu'une sauvegarde quotidienne compte comme activité suffisante |
-| **Sortie : 5 Go non cachée, 5 Go cachée par mois**, par organisation, partagés par tous vos projets | Notre trafic base → serveur est de la sortie non cachée. Estimé ≈ 0,03 Go/mois en usage normal, ≈ 0,3 à 1 Go si le temps réel est retenu et que les téléphones restent ouverts des heures (à vérifier). Au dépassement : restrictions de l'organisation jusqu'au cycle suivant |
-| **Pas de sauvegarde automatique** (Free) | Remplacée par notre job (§5) ; sans lui, aucune copie |
-| **Connexion** : la connexion directe est IPv6 seulement ; le pooler en mode transaction (6543) casse les verrous de session | On utilise le **pooler en mode session (port 5432)** ; le code refuse le port 6543 |
-| **Limite de connexions du plan** | Non confirmée (page non lue) ; notre pool est de 10 connexions maximum |
-| **Disponibilité** | Pas d'engagement de service en Free |
-| **API de données de Supabase** | Elle expose le schéma `public` aux rôles `anon`/`authenticated` : **protégée par notre code** (§6) ; il reste prudent de ne jamais utiliser ni publier les clés `anon`/`service_role` |
-| Dépendance au certificat | Sans `DATABASE_SSL_CA`, le serveur **refuse de démarrer** sur une base Supabase |
+| **Base : 500 Mo** (la nôtre : < 10 Mo au départ) | Au-delà : **lecture seule** |
+| **Pause après 7 jours de faible activité** | Application hors service jusqu'à reprise manuelle ; e-mail d'avertissement environ 1 semaine avant ; restauration possible 1 an selon le texte de la documentation (sa page est incohérente). **Aucune garantie** qu'une sauvegarde quotidienne compte comme activité suffisante |
+| **Sortie : 5 Go non cachée + 5 Go cachée par mois**, par organisation | Notre trafic base → serveur est de la sortie non cachée, estimé ≈ 0,03 Go/mois en usage normal, ≈ 0,3 à 1 Go dans le pire cas de relecture périodique. Au dépassement : restrictions de l'organisation jusqu'au cycle suivant |
+| **Connexions (calcul « Nano », plan gratuit)** | D'après le tableau de la documentation officielle : **60 connexions directes, 200 clients du pooler**. Le serveur ouvre **5 connexions au plus** par défaut sur une base gérée, le job de sauvegarde 2 : très en dessous. **Non confirmé** : la taille du pool côté serveur du pooler en mode session sur le plan gratuit (un client en mode session occupe une connexion du serveur jusqu'à sa déconnexion), à lire dans vos paramètres de base de données |
+| **Pas de sauvegarde automatique** (Free) | Remplacée par notre job (§5) |
+| **Pas d'engagement de disponibilité** | |
+| **API de données de Supabase** | Elle expose le schéma `public` ; SmartCourse n'y est jamais (schéma dédié), et est en plus verrouillée (§6). Ne jamais utiliser ni publier les clés `anon` / `service_role` |
 
-## 5. Sauvegardes indépendantes avec restauration vérifiée
+## 5. Sauvegardes indépendantes, restauration complète vérifiée
 
-Fichier : `.github/workflows/backup-externe.yml`. Chaque jour (et à la demande) :
-1. lit la version majeure de PostgreSQL de Supabase ;
-2. installe le client `pg_dump` de **la même version** ;
-3. démarre un **PostgreSQL jetable de la même version** (conteneur du coureur GitHub) ;
-4. fait la sauvegarde cohérente (instantané unique, manifeste des comptages), la **chiffre**, la dépose dans le stockage indépendant ;
-5. la **restaure dans le serveur jetable** et la compare au manifeste (comptage de chaque table, migrations, invariants métier) ; **la sauvegarde n'est déclarée valide qu'après cette restauration** ;
-6. n'applique la rétention (7 quotidiennes, 4 hebdomadaires, 3 mensuelles) qu'après une restauration réussie ;
-7. copie les photos de la famille ;
-8. écrit le résultat dans la table `backup_runs` de la base : **Réglages → Profils** affiche la dernière sauvegarde et la dernière restauration vérifiée ; l'application consigne une erreur si aucune restauration vérifiée n'a eu lieu depuis 36 h, et l'écran passe en orange après 3 jours.
+Fichier : `.github/workflows/backup-externe.yml`. À chaque exécution :
+1. lit la version majeure de PostgreSQL de Supabase et installe le client `pg_dump` de la même version ;
+2. démarre un **PostgreSQL jetable de la même version** (conteneur du coureur GitHub), jamais la base de production ;
+3. **copie d'abord les photos de la famille** dans le stockage indépendant ;
+4. sauvegarde le **seul schéma SmartCourse** (instantané unique, manifeste des comptages), **chiffre** (le fichier stocké doit être chiffré, sinon échec) et dépose le fichier ;
+5. **restaure** la sauvegarde dans le serveur jetable, déchiffrée avec la clé, et la compare au manifeste : comptage de chaque table, migrations, invariants métier ;
+6. **vérifie les photos sur la base restaurée** : chaque photo de famille qu'elle liste doit exister dans la sauvegarde, avec la **même empreinte SHA-256 et la même taille** que celles enregistrées, et s'ouvrir comme une image ; **copier ne suffit pas** : une photo absente, altérée ou illisible rend la sauvegarde invalide ;
+7. n'applique la rétention (7 quotidiennes, 4 hebdomadaires, 3 mensuelles) qu'après une vérification complète réussie ;
+8. écrit le résultat dans `backup_runs` : **Réglages → Profils** affiche la dernière restauration vérifiée ; l'application consigne une erreur si aucune n'a eu lieu depuis 36 h, et l'écran passe en orange après 3 jours.
 
-Ce job **ne migre jamais** et ne modifie jamais les droits de la base de production.
+Ce job **ne migre jamais** la base de production et n'y change aucun droit.
 
-**Secrets GitHub à créer par vous** (Settings → Secrets and variables → Actions) : `DATABASE_URL` (pooler **session**, port 5432), `DATABASE_SSL_CA` (certificat racine en texte), `BACKUP_KEY`, `BACKUP_S3_BUCKET`, `BACKUP_S3_ENDPOINT`, `BACKUP_S3_REGION`, `BACKUP_S3_ACCESS_KEY_ID`, `BACKUP_S3_SECRET_ACCESS_KEY` ; pour copier les photos : `S3_BUCKET`, `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` (accès au bucket d'images). Sans les 7 premiers, le job s'arrête avec un message clair, sans rien faire.
+**Secrets GitHub** (Settings → Secrets and variables → Actions → Secrets) : `DATABASE_URL` (pooler **session**, port 5432), `DATABASE_SSL_CA`, `BACKUP_KEY`, `BACKUP_S3_BUCKET`, `BACKUP_S3_ENDPOINT`, `BACKUP_S3_REGION`, `BACKUP_S3_ACCESS_KEY_ID`, `BACKUP_S3_SECRET_ACCESS_KEY`, et pour les photos `S3_BUCKET`, `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` (accès au bucket d'images Railway). **Variable** : `BACKUP_EXTERNE_ACTIVE=true`, à créer seulement après la validation (§8).
 
-**Contraintes à connaître**
-- GitHub n'exécute le déclencheur planifié que pour un fichier présent sur la **branche par défaut** : tant que cette branche n'est pas fusionnée, seul le lancement manuel marche.
-- Les secrets de connexion à la base sont stockés dans GitHub.
-- Un échec du job envoie un e-mail GitHub ; il n'y a pas d'autre alerte tant qu'aucune n'est ajoutée.
+**Dépôt public** : les journaux sont publics. Le job n'imprime ni adresse de base, ni noms de bucket, ni clé, ni contenu ; GitHub masque les secrets. Les secrets ne sont pas transmis aux exécutions déclenchées depuis un fork.
 
-**Ne pas désactiver les sauvegardes sans remplacement opérationnel** : le mode par défaut reste `BACKUP_MODE=internal` (sauvegardes de l'application, inchangées). Le passage à `external` n'est à faire qu'**après le premier run manuel réussi** (porte G4). Important : sur Supabase, le mode `internal` ne peut pas vérifier ses restaurations (il crée une base jetable sur le même serveur) : il ne faut donc **pas** mettre l'application en production sur Supabase en mode `internal`.
+**Sauvegardes internes de l'application** : conservées (mode par défaut `internal`) pour une base ordinaire, mais **impossibles sur Supabase** : le serveur refuse de démarrer (§6). Rien n'est désactivé sans remplacement : le remplacement est ce job.
 
-**Restauration en cas de sinistre** (à répéter une fois par mois pour la tester) : télécharger la dernière sauvegarde `.dump.enc` du stockage indépendant ; la déchiffrer avec `BACKUP_KEY` (fonction `decrypt` de `server/src/backup.ts`) ; `pg_restore --no-owner --dbname=<nouvelle base de la même version>` ; recopier `photos/` vers le bucket d'images ; pointer `DATABASE_URL` sur la nouvelle base.
+**Restauration en cas de sinistre** (à répéter une fois par mois) : télécharger la dernière sauvegarde `.dump.enc` ; la déchiffrer avec `BACKUP_KEY` (fonction `decrypt` de `server/src/backup.ts`) ; `pg_restore --no-owner --dbname=<nouvelle base de la même version>` ; recopier `photos/` vers le bucket d'images ; pointer `DATABASE_URL` et `DATABASE_SCHEMA` sur la nouvelle base.
 
-## 6. Ce que j'ai adapté dans le code (tout est testé localement)
+## 6. Adaptations du code (testées en local : 149 tests serveur)
 
-| Adaptation | Fichiers | Vérification |
+| Exigence | Réalisation | Test |
 |---|---|---|
-| **Connexion sécurisée** : `DATABASE_SSL_CA` (texte PEM ou fichier) → connexion chiffrée **et** certificat vérifié ; refus du pooler en mode transaction (6543) ; refus d'une base Supabase sans certificat ; URL fournie aux outils libpq en `verify-full` | `db.ts`, `config.ts` | Tests avec un **vrai TLS** (serveur local) : accepté avec le bon certificat, refusé sans lui ou avec un autre ; `pg_dump` accepté/refusé de même |
-| **Protection des tables** : si les rôles `anon`/`authenticated` existent, sécurité par ligne (RLS) activée partout, tous les droits retirés (tables, séquences, fonctions, schéma), droits par défaut retirés, contrôle final qui **fait échouer le démarrage** si une table reste exposée ; rien n'est fait sur un PostgreSQL ordinaire | `harden.ts`, `index.ts`, outils en ligne de commande | Test qui reproduit les droits par défaut de Supabase, vérifie fermeture, idempotence, table créée après, et que le serveur (propriétaire) continue à tout lire |
-| **Migrations** : verrou de session conservé (mode session) | `migrate.ts` (inchangé) | Garde-fou du port 6543 |
-| **Sauvegarde externe** : serveur de contrôle distinct (`VERIFY_DATABASE_URL`, même version majeure exigée), stockage dédié (`BACKUP_S3_*`), copie des photos, mode `external`, état affiché, aucune migration par le job | `backup.ts`, `backup-cli.ts`, `backup-store.ts`, `backup-photos.ts`, `app.ts`, `index.ts`, workflow | Tests (restauration vers une autre base, mauvais accès refusé, photos copiées une fois, absentes signalées, état) ; parcours complet `run` + `photos` en local avec la même commande que le workflow |
-| Client S3 : somme de contrôle seulement quand elle est exigée | `photos.ts` | Tests S3 existants (143 tests serveur) |
+| **La protection ne concerne que SmartCourse** | SmartCourse vit dans son **propre schéma** (`DATABASE_SCHEMA=smartcourse`) : migrations, tables, sauvegarde (`--schema`) et verrouillage n'agissent **que** sur ce schéma. Les rôles `anon`/`authenticated` y perdent tous les droits et la sécurité par ligne y est activée ; le schéma `public`, les tables d'autres applications et tous les schémas gérés par Supabase ne sont ni lus, ni modifiés, ni sauvegardés. Les noms de schéma réservés (`auth`, `storage`, `extensions`, `graphql_public`, `realtime`, `pg_*`…) sont refusés | Test : une table d'« une autre application » dans `public`, avec droits ouverts et sans RLS, reste **strictement identique** (droits, RLS, liste des tables) ; nos tables sont toutes dans le schéma dédié et verrouillées ; la sauvegarde ne contient pas l'autre table ; la restauration de contrôle retrouve le schéma entier |
+| **Erreur claire si la configuration est incorrecte (Supabase)** | Le démarrage s'arrête **avant toute connexion** si : le mode de sauvegarde n'est pas `external` (message : sauvegardes internes incompatibles) ; le schéma est `public` ou réservé ; le certificat `DATABASE_SSL_CA` manque ; le port est 6543 (pooler en mode transaction) | Tests sur chacun des messages |
+| **Connexion sécurisée** | Chiffrée **et** vérifiée avec le certificat racine ; `pg_dump` en `verify-full` | Vrai TLS local : accepté / refusé sans certificat / refusé avec un autre |
+| **Sauvegarde externe** | Serveur de contrôle distinct de même version majeure, stockage dédié, chiffrement contrôlé, photos copiées puis vérifiées après restauration | Tests : restauration vers une autre base, mauvais accès refusé, photo absente / altérée détectée, fichier non chiffré refusé, mauvaise clé refusée |
+| Connexions | 5 au plus par défaut sur une base gérée (`DATABASE_POOL_MAX`) | Test |
 
-## 7. Ce qui n'est PAS vérifié
-- tout ce qui touche un **vrai projet Supabase** : connexion par le pooler en mode session, certificat racine (nom d'hôte du pooler), droits du rôle `postgres` pour activer la RLS et modifier les droits par défaut, version de PostgreSQL, limite de connexions ;
-- le **workflow de sauvegarde** : jamais exécuté (étapes PGDG, conteneur jetable, secrets) ;
-- la compatibilité du stockage **R2 ou B2** avec notre client (précautions prises, non testées) ;
-- l'accès externe au **bucket Railway** (pour la copie des photos) ;
-- l'interface **Réglages** en mode externe sur un vrai téléphone.
+## 7. Stockage de sauvegarde : une seule recommandation, **Backblaze B2, sans carte bancaire**
 
-## 8. Mise en service : liste d'étapes (rien n'est exécuté)
-1. **Vous** : relever U (usage Railway), vérifier vos projets Supabase (G1), choisir R2 ou B2 (G3).
-2. **Vous** : créer le projet Supabase (région Europe, mot de passe fort) ; en relever : l'URL du **pooler en mode session**, le certificat racine ; vous ne me donnez aucun mot de passe.
-3. **Vous** : créer le stockage de sauvegarde et son accès ; créer les secrets GitHub ; choisir et conserver `BACKUP_KEY`.
-4. Lancer **à la main** le workflow `backup-externe` ; constater : sauvegarde déposée, restauration vérifiée (G4). Sans cela, ne pas continuer.
-5. Création du service Railway + bucket (après votre accord écrit) avec : `DATABASE_URL`, `DATABASE_SSL_CA`, `S3_*`, `BACKUP_KEY`, `BACKUP_MODE=external`, `INSTALL_TOKEN`.
+| | Backblaze B2 (recommandé) | Cloudflare R2 (non retenu) |
+|---|---|---|
+| Gratuit | 10 Go de stockage ; sortie gratuite jusqu'à 3 × le stockage moyen (page tarifaire Backblaze) | 10 Go-mois, 1 M d'opérations A, 10 M d'opérations B par mois, sortie gratuite (documentation Cloudflare) |
+| Compte sans carte | **Oui** d'après le blog officiel de Backblaze (« you don't need to give us a credit card to create an account ») | Une source tierce affirme qu'une carte est exigée pour activer R2 ; non confirmé par Cloudflare |
+| **Risque de facturation** | **Nul tant que vous n'ajoutez aucune carte** : il est impossible de vous facturer | **Réel** si une carte est enregistrée : dépassement facturé automatiquement (opérations A à 4,50 $ par million, selon Cloudflare), même si nos volumes sont très loin du gratuit |
+| API S3 | Oui | Oui |
+
+**Conditions et incertitudes** : nous sauvegardons ≈ 1 fois par jour (quelques centaines de Ko, 14 fichiers conservés) : < 0,1 Go et quelques centaines d'opérations par jour. Je n'ai pas pu confirmer qu'un compte B2 **sans carte** a accès à l'API S3 et aux clés d'application, ni la règle exacte des appels d'API gratuits (la page officielle et des sources plus anciennes divergent). **Si, à l'inscription, Backblaze exige une carte : ne la donnez pas, arrêtez-vous et dites-le-moi** (alternative à discuter alors).
+
+**À l'ouverture du compte (après votre accord)** : bucket **privé**, région Europe si proposée, une **clé d'application limitée à ce bucket** (lecture, écriture, liste, suppression), jamais la clé principale ; aucun réglage de facturation à activer.
+
+## 8. Ce qui est validé, et ce qui ne l'est pas
+
+**Validé en local seulement** (PostgreSQL 16 de développement, stockage de fichiers local) : le code, les garde-fous, l'isolation de schéma, la protection, le chiffrement, la restauration vers une autre base, la vérification des photos, les messages d'erreur.
+
+**NON validé sur les vrais services** (rien n'existe encore) — à faire avant la mise en production, dans l'ordre :
+1. **Supabase** : connexion par le pooler en mode session avec le vrai certificat racine (nom d'hôte du pooler) ; création du schéma `smartcourse` et exécution des migrations par le rôle `postgres` ; protection des tables (droits de `postgres` pour la RLS et les droits par défaut) ; version de PostgreSQL ; lecture de la taille du pool du pooler.
+2. **Bucket Railway** : écriture, lecture, suppression d'images ; lecture **depuis GitHub** (accès externe) pour copier les photos.
+3. **Backblaze B2** : compatibilité de notre client S3 (envoi, liste, lecture, suppression), clé limitée au bucket.
+4. **Job de sauvegarde** : un lancement **manuel** (Actions → « Sauvegarde externe » → Run workflow) qui doit afficher : *photos copiées*, *restauration vérifiée (n tables, fichier chiffré, déchiffré avec la clé)*, *photos vérifiées après restauration*. Puis, **de vos propres yeux** : le fichier présent dans B2 et illisible en clair, l'état dans Réglages. Seulement après : créer `BACKUP_EXTERNE_ACTIVE=true`.
+5. **Test de sinistre une fois** : restaurer cette sauvegarde dans une base d'essai et ouvrir l'application dessus.
+
+## 9. Branche par défaut et planification
+
+Constat (API GitHub) : **la branche par défaut de votre dépôt est déjà `claude/family-shopping-list-specs-eqevg8`**, qui est aussi la seule branche ; il n'y a ni `main` ni demande de fusion. GitHub n'exécute le déclencheur planifié que pour le fichier de la branche par défaut : **la planification est donc déjà possible sans fusion**. Pour éviter des échecs chaque nuit avant que tout soit prêt, la planification est **désactivée par défaut** (variable `BACKUP_EXTERNE_ACTIVE`, §5).
+
+Points à connaître :
+- **Un dépôt public désactive les workflows planifiés après 60 jours sans activité** (documentation GitHub) : une mise en veille longue du dépôt arrêterait les sauvegardes sans bruit. Garde-fous : l'écran Réglages passe en orange après 3 jours sans restauration vérifiée, le serveur consigne une erreur après 36 h ; à surveiller, ou rendre le dépôt privé (alors 2 000 minutes gratuites par mois, ce qui suffit, et pas de désactivation à 60 jours).
+- Tout commit sur la branche par défaut change le code exécuté par le job planifié. Recommandé (facultatif, à votre décision) : **renommer la branche par défaut en `main`** (Settings → Branches → icône de crayon) et ne déployer que depuis elle ; GitHub redirige les anciens liens. Je ne le fais pas sans votre accord.
+- Le dépôt est **public** : il contient vos documents de budget et de limites Railway (sans secret). À vous de décider si vous le voulez public.
+
+## 10. Mise en service : liste d'étapes (rien n'est exécuté)
+1. **Vous** : captures Railway et Supabase (G1, G2) ; accord sur Backblaze B2 (G3).
+2. **Vous** : créer le projet Supabase (Europe, mot de passe fort) ; relever l'URL du **pooler en mode session**, le certificat racine ; ne m'envoyez aucun mot de passe.
+3. **Vous** : créer le compte B2 **sans carte**, le bucket privé et la clé limitée ; créer les secrets GitHub.
+4. Valider sur les vrais services (§8, points 1 à 5), puis créer `BACKUP_EXTERNE_ACTIVE=true`.
+5. Après votre accord écrit : service Railway + bucket, avec `DATABASE_URL`, `DATABASE_SSL_CA`, `DATABASE_SCHEMA=smartcourse`, `BACKUP_MODE=external`, `S3_*`, `INSTALL_TOKEN`.
 6. Premier démarrage : journaux « Tables protégées contre l'API de données », « Images du catalogue : 80 », `/health` ; puis `scripts/check-tunnel.mjs` sur l'adresse Railway.
-7. Première installation, suppression de `INSTALL_TOKEN`, création des profils, **recette sur le vrai Android** avec l'adresse stable.
-8. **Une semaine de mesure** : usage Railway, sortie et taille de base Supabase, résultat quotidien des sauvegardes ; mise à jour de `couts.md`.
+7. Première installation, suppression de `INSTALL_TOKEN`, profils, **recette sur le vrai Android** avec l'adresse stable.
+8. **Une semaine de mesure** (usage Railway, sortie et taille Supabase, sauvegardes quotidiennes), puis mise à jour de `couts.md`.

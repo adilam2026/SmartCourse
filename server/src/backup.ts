@@ -5,7 +5,8 @@ import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises"
 import os from "node:os";
 import path from "node:path";
 import { DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, type S3Client } from "@aws-sdk/client-s3";
-import type { Db } from "./db.js";
+import type pg from "pg";
+import { schemaOf, type Db } from "./db.js";
 
 /*
  * Backups = a consistent pg_dump, encrypted, plus a manifest of row counts taken in the SAME snapshot.
@@ -212,6 +213,8 @@ export interface BackupCtx {
   databaseUrl: string;
   /** Scratch server where a backup is restored to be checked. Default: the same server as `db` (in-app backups). */
   verify?: { db: Db; url: string };
+  /** Extra checks run on the RESTORED database (e.g. every picture it references exists, intact, in the backup storage). Returns problems. */
+  afterRestore?: (scratch: pg.Client) => Promise<string[]>;
   store: BackupStore;
   passphrase: string;
   now?: () => Date;
@@ -230,8 +233,8 @@ function run(cmd: string, args: string[], opts: { input?: Buffer } = {}): Promis
   });
 }
 
-async function tableNames(q: { query: Db["query"] }): Promise<string[]> {
-  const r = await q.query("SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY 1");
+async function tableNames(q: { query: Db["query"] }, schema = "public"): Promise<string[]> {
+  const r = await q.query("SELECT tablename FROM pg_tables WHERE schemaname = $1 ORDER BY 1", [schema]);
   return r.rows.map((x: { tablename: string }) => x.tablename);
 }
 
@@ -247,9 +250,11 @@ export async function createBackup(ctx: BackupCtx): Promise<{ key: string; manif
     await c.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
     const snap = (await c.query("SELECT pg_export_snapshot() AS s")).rows[0].s as string;
     const tables: Record<string, number> = {};
-    for (const t of await tableNames(c)) tables[t] = (await c.query(`SELECT count(*)::int AS n FROM "${t}"`)).rows[0].n;
+    for (const t of await tableNames(c, schemaOf(ctx.db))) tables[t] = (await c.query(`SELECT count(*)::int AS n FROM "${t}"`)).rows[0].n;
     const migrations = (await c.query("SELECT name FROM schema_migrations ORDER BY name")).rows.map((r) => r.name as string);
-    const dump = await run(tools.pgDump!, ["--format=custom", `--snapshot=${snap}`, "--no-owner", "--no-privileges", `--dbname=${ctx.databaseUrl}`]);
+    // Only SmartCourse's own schema is dumped when it has one (other applications' data is never copied into our backups).
+    const only = schemaOf(ctx.db) === "public" ? [] : [`--schema=${schemaOf(ctx.db)}`];
+    const dump = await run(tools.pgDump!, ["--format=custom", `--snapshot=${snap}`, "--no-owner", "--no-privileges", ...only, `--dbname=${ctx.databaseUrl}`]);
     await c.query("COMMIT");
     const manifest: Manifest = { createdAt: now.toISOString(), tables, migrations };
     const base = `backups/sc-${stamp(now)}`;
@@ -290,6 +295,8 @@ export async function verifyBackup(ctx: BackupCtx, dumpKey: string): Promise<Ver
   if (!blob) return problems.push("fichier de sauvegarde introuvable"), result();
   if (!mf) return problems.push("manifeste introuvable"), result();
   const manifest = JSON.parse(mf.toString()) as Manifest;
+  // The stored file must be encrypted: a readable dump (or anything not produced by `encrypt`) is a failure, not a success.
+  if (!blob.subarray(0, MAGIC.length).equals(MAGIC) || blob.includes(Buffer.from("PGDMP"))) return problems.push("le fichier stocké n'est pas chiffré"), result();
   let dump: Buffer;
   try {
     dump = decrypt(blob, ctx.passphrase);
@@ -321,7 +328,9 @@ export async function verifyBackup(ctx: BackupCtx, dumpKey: string): Promise<Ver
     const pg = (await import("pg")).default;
     scratch = new pg.Client({ connectionString: scratchUrl.toString() });
     await scratch.connect();
-    const restored = await tableNames(scratch);
+    const schema = schemaOf(ctx.db);
+    if (schema !== "public") await scratch.query(`SET search_path TO "${schema.replace(/"/g, '""')}"`);
+    const restored = await tableNames(scratch, schema);
     for (const [t, expected] of Object.entries(manifest.tables)) {
       if (!restored.includes(t)) {
         problems.push(`table ${t} absente après restauration`);
@@ -336,6 +345,7 @@ export async function verifyBackup(ctx: BackupCtx, dumpKey: string): Promise<Ver
       const n = (await scratch.query(inv.sql)).rows[0].n as number;
       if (n > 0) problems.push(`invariant violé : ${inv.name} (${n})`);
     }
+    if (ctx.afterRestore) problems.push(...(await ctx.afterRestore(scratch)));
     return result(restored.length);
   } catch (e) {
     problems.push(`restauration échouée : ${(e as Error).message}`);

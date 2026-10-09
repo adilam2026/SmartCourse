@@ -1,11 +1,15 @@
 name: Sauvegarde externe (base Supabase vers stockage indépendant, restauration vérifiée)
 # Sauvegarde quotidienne chiffrée de la base, restaurée dans UN AUTRE serveur PostgreSQL (conteneur jetable du coureur GitHub)
-# avant d'être déclarée valide, puis copie des photos ajoutées par la famille. Le résultat est écrit dans la table backup_runs de
+# avant d'être déclarée valide. Les photos ajoutées par la famille sont copiées AVANT, puis vérifiées APRÈS la restauration
+# (présentes, empreinte SHA-256 et taille conformes à la base restaurée, image lisible) : un échec = sauvegarde non valide. Le résultat est écrit dans la table backup_runs de
 # la base : l'application l'affiche dans Réglages. Un échec fait échouer le job (GitHub envoie un e-mail).
 #
-# IMPORTANT : GitHub n'exécute le déclencheur « schedule » que pour le fichier présent sur la BRANCHE PAR DÉFAUT du dépôt.
-# Tant que ce fichier n'y est pas fusionné, seul le lancement manuel (workflow_dispatch) fonctionne.
-# Aucun secret n'est défini par ce dépôt : sans eux le job s'arrête avec un message clair, sans rien sauvegarder ni modifier.
+# GitHub n'exécute le déclencheur « schedule » que pour le fichier présent sur la BRANCHE PAR DÉFAUT du dépôt (c'est déjà le
+# cas ici). Pour ne pas échouer chaque nuit AVANT que tout soit prêt, la planification ne s'exécute que si la variable de dépôt
+# BACKUP_EXTERNE_ACTIVE vaut « true » (Settings → Secrets and variables → Actions → Variables) ; à créer APRÈS un premier
+# lancement manuel réussi. Le lancement manuel fonctionne toujours et s'arrête avec un message clair si un secret manque.
+# Le dépôt est PUBLIC : les journaux sont publics. Ce job n'imprime ni adresse de base, ni clé, ni contenu ; GitHub masque les
+# secrets dans les journaux.
 on:
   schedule:
     - cron: "23 2 * * *"
@@ -17,11 +21,14 @@ concurrency:
   cancel-in-progress: false
 jobs:
   backup:
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.BACKUP_EXTERNE_ACTIVE == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
       NODE_ENV: production
       BACKUP_MODE: external
+      DATABASE_SCHEMA: smartcourse                                     # le schéma de SmartCourse (jamais « public »)
+      DATABASE_POOL_MAX: "2"
       DATABASE_URL: ${{ secrets.DATABASE_URL }}                       # pooler Supabase en MODE SESSION (port 5432)
       DATABASE_SSL_CA: ${{ secrets.DATABASE_SSL_CA }}                 # certificat racine Supabase (texte PEM)
       BACKUP_KEY: ${{ secrets.BACKUP_KEY }}                           # phrase de passe de chiffrement (≥ 16 caractères)
@@ -71,11 +78,13 @@ jobs:
           docker run -d --name scratch -p 5433:5432 -e POSTGRES_PASSWORD=scratch "$IMG"
           for _ in $(seq 1 60); do docker exec scratch pg_isready -U postgres >/dev/null 2>&1 && break; sleep 1; done
           docker exec scratch pg_isready -U postgres
-      - name: Sauvegarde, restauration de contrôle, rétention
-        run: cd server && node dist/backup-cli.js run
+      - name: Sauvegarde, restauration de contrôle, photos, rétention
+        shell: bash
+        run: |
+          cd server
+          {
+            echo "## Sauvegarde externe"
+            node dist/backup-cli.js run
+          } 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
         env:
           VERIFY_DATABASE_URL: postgres://postgres:scratch@localhost:5433/postgres
-      - name: Photos de la famille
-        run: |
-          if [ -z "$S3_BUCKET" ]; then echo "::warning::S3_* absents : photos de la famille NON copiées (ce n'est pas une sauvegarde complète)."; exit 0; fi
-          cd server && node dist/backup-cli.js photos

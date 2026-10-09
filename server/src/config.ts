@@ -15,6 +15,17 @@ const schema = z.object({
    */
   DATABASE_SSL_CA: z.string().optional(),
   /**
+   * PostgreSQL schema that holds ALL SmartCourse tables. "public" (default) for a dedicated database (Railway, development). On a
+   * shared managed database (Supabase) it must be a schema of its own, e.g. "smartcourse": other applications and the schemas managed
+   * by the platform are then never read, changed nor protected by this server.
+   */
+  DATABASE_SCHEMA: z
+    .string()
+    .regex(/^[a-z_][a-z0-9_]{0,40}$/, "DATABASE_SCHEMA : minuscules, chiffres et _ seulement")
+    .default("public"),
+  /** Maximum connections of the pool (default 10; 5 on a managed database whose plan limits connections). */
+  DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(20).optional(),
+  /**
    * "internal" (default): the app makes, restores-to-check and prunes its own backups on the same PostgreSQL server.
    * "external": backups are made by the scheduled job in .github/workflows/backup-externe.yml, restored into ANOTHER
    * server and recorded in this database; the app only displays their state. Switch ONLY after one external run succeeded.
