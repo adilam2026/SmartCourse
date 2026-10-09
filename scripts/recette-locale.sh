@@ -29,7 +29,8 @@ URL="http://localhost:3000 (cet ordinateur seulement ; pas de tunnel)"
 if [ "${NO_TUNNEL:-}" != "1" ]; then
   docker run -d --name "$TUN" --network "$NET" cloudflare/cloudflared:latest tunnel --no-autoupdate --url http://"$APP":3000 >/dev/null
   U=""
-  for _ in $(seq 1 60); do U=$(docker logs "$TUN" 2>&1 | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | grep -v '^https://api\.' | head -1 || true) # api.trycloudflare.com est cité dans les journaux : ce n'est pas le tunnel; [ -n "$U" ] && break; sleep 1; done
+  # api.trycloudflare.com est cité dans les journaux de cloudflared : ce n'est pas le tunnel, on l'écarte.
+  for _ in $(seq 1 60); do U=$(docker logs "$TUN" 2>&1 | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | grep -v '^https://api\.' | head -1 || true); [ -n "$U" ] && break; sleep 1; done
   [ -n "$U" ] || { echo "Tunnel introuvable : voir « docker logs $TUN »" >&2; exit 1; }
   # L'adresse apparaît dans les journaux AVANT que son nom soit connu du DNS : on attend qu'elle réponde vraiment.
   if command -v curl >/dev/null 2>&1; then
