@@ -86,6 +86,9 @@ export const api = {
 
 export interface BackupStatus {
   configured: boolean;
+  storage: "s3" | "local" | null;
+  schedule: string;
+  tools: { ok: boolean; message: string; serverMajor: number | null; available: number[] } | null;
   lastBackupAt: string | null;
   lastVerifiedOkAt: string | null;
   lastVerifyFailedAt: string | null;

@@ -22,8 +22,8 @@ export interface AppDeps {
   store: PhotoStore;
   /** Built PWA (web/dist). When set, the server also serves the app and falls back to index.html. */
   webDir?: string;
-  /** Whether scheduled, encrypted backups are set up (BACKUP_KEY present). */
-  backupConfigured?: boolean;
+  /** Where scheduled backups go (null = not set up). */
+  backupStorage?: "s3" | "local" | null;
   /** Per-IP limits on the unauthenticated routes. */
   loginRateLimit?: { max: number; timeWindow: string };
   /** How often an open SSE stream re-checks its session (catches out-of-band revocation). */
@@ -142,7 +142,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     return { secret: await resetSecret(db, hub, req.auth!, id, body.secret) };
   });
 
-  app.get("/api/admin/backup-status", { preHandler: guard("family.manage") }, async () => backupStatus(db, deps.backupConfigured ?? false));
+  app.get("/api/admin/backup-status", { preHandler: guard("family.manage") }, async () => backupStatus(db, deps.backupStorage ?? null));
 
   catalogRoutes(app, { db, store: deps.store, guard });
   listRoutes(app, { db, hub, guard });

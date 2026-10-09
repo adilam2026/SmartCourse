@@ -34,16 +34,19 @@ function BackupCard() {
   if (!st) return null;
   const old = (iso: string | null, days: number) => !iso || Date.now() - new Date(iso).getTime() > days * 86_400_000;
   const failedSince = st.lastVerifyFailedAt && (!st.lastVerifiedOkAt || st.lastVerifyFailedAt > st.lastVerifiedOkAt);
-  const bad = !st.configured || old(st.lastVerifiedOkAt, 3) || failedSince;
+  const toolsBad = st.tools && !st.tools.ok;
+  const bad = !st.configured || old(st.lastVerifiedOkAt, 3) || !!failedSince || !!toolsBad;
   return (
     <div className={`banner ${bad ? "banner--pending" : "banner--info"} backupcard`} data-testid="backup-card">
       <span>
-        <strong>Sauvegarde {st.configured ? "automatique" : "NON configurée"}</strong>
+        <strong>Sauvegarde {st.configured ? "automatique" : "NON configurée (aucun bucket sûr ou clé absente)"}</strong>
+        {st.configured && <><br />Stockage : {st.storage === "s3" ? "bucket (chiffré)" : "dossier local"} · {st.schedule}</>}
         <br />
         Dernière sauvegarde : {st.lastBackupAt ? fmtDateTime(st.lastBackupAt) : "aucune"}
         <br />
         Dernière restauration vérifiée : {st.lastVerifiedOkAt ? fmtDateTime(st.lastVerifiedOkAt) : "jamais"}
         {failedSince ? " — ÉCHEC de la dernière vérification" : ""}
+        {toolsBad && <><br /><strong>Outils : </strong>{st.tools!.message}</>}
       </span>
     </div>
   );

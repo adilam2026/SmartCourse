@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { Banners } from "../components/Banners";
+import { Banners, bannerCount } from "../components/Banners";
 import { ProductCard, type CardState } from "../components/ProductCard";
 import { UserSheet } from "../components/UserSheet";
 import { CATEGORY_EMOJI } from "../categories";
@@ -21,7 +21,7 @@ export function NoList({ engine, s }: { engine: Engine; s: State }) {
   );
 }
 
-export function TopBar({ engine, s, validate, onBack, title = "Liste de courses" }: { engine: Engine; s: State; validate: boolean; onBack?: () => void; title?: string }) {
+export function TopBar({ engine, s, validate, onBack, title = "Courses" }: { engine: Engine; s: State; validate: boolean; onBack?: () => void; title?: string }) {
   const [open, setOpen] = useState(false);
   const pending = Object.keys(s.toggles).length;
   const label = s.sending ? "Enregistrement…" : "Valider";
@@ -96,7 +96,7 @@ export function StaffScreen({ engine, s, onBack }: { engine: Engine; s: State; o
 
   return (
     <div className="staff">
-      <div className="stickyhead">
+      <div className={`stickyhead ${bannerCount(s) > 0 ? "has-banners" : ""}`}>
       <TopBar engine={engine} s={s} validate onBack={onBack} title={onBack ? "Modifier la liste" : undefined} />
       <Banners engine={engine} s={s} />
       <nav className="chips" aria-label="Catégories">

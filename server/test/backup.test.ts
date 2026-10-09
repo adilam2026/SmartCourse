@@ -1,8 +1,8 @@
-import { mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { backupStatus, backupVerifyPrune, createBackup, decrypt, encrypt, listBackups, LocalBackupStore, selectKeep, verifyBackup, type BackupCtx } from "../src/backup.js";
+import { backupStatus, backupVerifyPrune, checkBackupTools, selectTools, createBackup, decrypt, encrypt, listBackups, LocalBackupStore, selectKeep, verifyBackup, type BackupCtx } from "../src/backup.js";
 import { generateInstallToken, setupFamily } from "../src/auth.js";
 import type { Db } from "../src/db.js";
 import { closeTestDb, resetData, testDb } from "./helpers.js";
@@ -30,6 +30,43 @@ describe("chiffrement", () => {
     tampered[tampered.length - 1]! ^= 1;
     expect(() => decrypt(tampered, PASS)).toThrow();
     expect(() => decrypt(Buffer.from("n'importe quoi"), PASS)).toThrow(/backup/);
+  });
+});
+
+describe("compatibilité des outils", () => {
+  const fakeRoot = (...majors: number[]) => {
+    const root = mkdtempSync(path.join(os.tmpdir(), "pgroot-"));
+    for (const m of majors) {
+      mkdirSync(path.join(root, String(m), "bin"), { recursive: true });
+      for (const b of ["pg_dump", "pg_restore"]) writeFileSync(path.join(root, String(m), "bin", b), "");
+    }
+    return root;
+  };
+  it("choisit le client de la même version majeure que le serveur", () => {
+    const root = fakeRoot(16, 17, 18);
+    for (const v of [16, 17, 18]) {
+      const t = selectTools(v, root);
+      expect(t.ok).toBe(true);
+      expect(t.pgDump).toBe(path.join(root, String(v), "bin", "pg_dump"));
+      expect(t.pgRestore).toBe(path.join(root, String(v), "bin", "pg_restore"));
+    }
+  });
+  it("refuse sans client de la bonne version, en listant ce qui existe (ni plus ancien, ni plus récent)", () => {
+    const root = fakeRoot(16, 18);
+    const t = selectTools(17, root);
+    expect(t.ok).toBe(false);
+    expect(t.available).toEqual([16, 18]);
+    expect(t.message).toContain("17");
+    expect(t.message).toContain("16, 18");
+    expect(selectTools(19, fakeRoot(16, 17, 18)).ok).toBe(false);
+    expect(selectTools(null, root).ok).toBe(false);
+    expect(selectTools(16, fakeRoot()).available).toEqual([]);
+  });
+  it("sur cette machine (serveur 16) : le client 16 est trouvé", async () => {
+    const t = await checkBackupTools(db);
+    expect(t.message).not.toContain("aucun client");
+    expect(t.ok).toBe(true);
+    expect(t.serverMajor).toBe(16);
   });
 });
 
@@ -128,7 +165,7 @@ describe("sauvegarde et restauration vérifiée", () => {
   it("sauvegarde + vérification + rétention enregistrées ; l'état est exposé", async () => {
     const r = await backupVerifyPrune({ ...ctx, now: () => new Date(Date.now() + 5000) });
     expect(r.verify.ok).toBe(true);
-    const st = await backupStatus(db, true);
+    const st = await backupStatus(db, "local");
     expect(st.configured).toBe(true);
     expect(st.lastBackupAt).toBeTruthy();
     expect(st.lastVerifiedOkAt).toBeTruthy();

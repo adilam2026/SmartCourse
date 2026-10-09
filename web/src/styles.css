@@ -47,15 +47,20 @@ h1, h2 { margin: 0; }
 
 /* ---- top bar ---- */
 .stickyhead { position: sticky; top: 0; z-index: 20; background: var(--bg); border-bottom: 1px solid var(--line); }
-.topbar { display: flex; align-items: center; gap: 12px; padding: calc(10px + var(--safe-top)) 14px 10px; background: var(--bg); }
+.topbar { display: flex; align-items: center; gap: 12px; padding: calc(8px + var(--safe-top)) max(14px, env(safe-area-inset-right)) 8px max(14px, env(safe-area-inset-left)); background: var(--bg); }
 .avatar { width: 44px; height: 44px; flex: none; border-radius: 50%; border: 0; background: var(--green); color: #fff; font-weight: 800; font-size: 1.1rem; }
 .topbar__title { flex: 1; min-width: 0; display: grid; line-height: 1.15; }
 .topbar__title .muted { min-height: 1.1em; }
-.validate { min-width: 150px; min-height: 52px; font-size: 1.1rem; }
+.validate { min-width: 120px; min-height: 48px; font-size: 1.05rem; flex: none; }
+.topbar__title strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Short phones: while banners are showing, the category chips scroll away to leave room for the products. */
+@media (max-height: 760px) { .stickyhead.has-banners .chips { display: none; } }
 
 /* ---- banners ---- */
-.banners { display: grid; gap: 6px; padding: 0 12px; }
-.banner { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 12px; border-radius: 12px; font-size: 0.88rem; line-height: 1.25; }
+.banners { display: grid; gap: 4px; padding: 0 12px 6px; max-height: 34dvh; overflow-y: auto; }
+.banner { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 5px 10px; border-radius: 10px; font-size: 0.82rem; line-height: 1.2; flex-wrap: wrap; }
+.banner > span { display: inline; }
+.banner em { color: var(--muted); font-style: normal; }
 .banner--offline { background: var(--slate-soft); color: var(--ink); border: 2px solid var(--slate); }
 .banner--pending { background: var(--amber-soft); border: 2px solid var(--amber); }
 .banner--info { background: var(--green-soft); border: 2px solid var(--green); flex-wrap: wrap; }

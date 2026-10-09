@@ -32,12 +32,18 @@ Trois niveaux de tests : serveur (vrai PostgreSQL, courses de concurrence), mote
 
 - **Photos définitives** : non fournies (réseau bloqué, voir `photos-licences.md`). La recette de l'interface du personnel avec de vraies photos reste à faire.
 - **Marques** : en attente de votre choix (`marques-a-valider.md`).
-- **Déploiement Railway et build Docker** : non exécutés ici.
+- **Déploiement Railway** : non exécuté ici (le build Docker, lui, a été exécuté, voir `deploiement.md`).
 - **iPhone / Safari réels** : testé uniquement sous Chromium mobile ; le comportement de stockage d'iOS (voir revue technique §7) est à vérifier sur un vrai appareil.
 
-## Dernières exécutions (9 octobre 2026)
+## Dernières exécutions (9 octobre 2026, après les corrections)
 
-- Serveur (PostgreSQL 16 réel) : 81 tests, 2 exécutions consécutives identiques.
+- Serveur (PostgreSQL 16 réel + émulateur S3) : 91 tests, 2 exécutions consécutives identiques.
 - Moteur de synchronisation (IndexedDB simulée) : 32 tests.
-- Parcours navigateur (Chromium mobile, serveur et base réels) : 22 scénarios.
+- Parcours navigateur (Chromium mobile, serveur et base réels) : 26 scénarios, dont « Valider » sur 4 tailles d'écran.
 - Compilation TypeScript stricte du serveur et de la PWA : sans erreur.
+- Image Docker complète construite et exécutée ; sauvegarde + restauration vérifiée contre PostgreSQL 16, 17 et 18 (voir `deploiement.md`).
+
+## Ajouts de cette série de corrections
+
+- **Bouton « Valider »** : sur 320×568, 360×640, 390×844 et 412×915, avec tous les bandeaux (hors connexion, en attente, reprise, message), le bouton est entièrement dans l'écran avec marge, rien ne le recouvre (test de hit-test aux quatre coins et au centre), un vrai clic passe, et l'en-tête collant reste sous 50 % de la hauteur. Avant correction : jusqu'à 70 % de la hauteur sur 360×640 (catalogue presque inutilisable).
+- **Sauvegardes** : client `pg_dump` de même version majeure que le serveur, choisi automatiquement ; stockage refusé s'il n'est pas sûr en production ; état affiché dans Réglages.

@@ -13,6 +13,8 @@ const schema = z.object({
   LOGIN_RATE_MAX: z.coerce.number().int().min(1).default(20),
   /** Passphrase that encrypts backups. Without it, scheduled backups are disabled. KEEP A COPY OUTSIDE RAILWAY: lost key = unreadable backups. */
   BACKUP_KEY: z.string().min(16).optional(),
+  /** Set to "1" to accept a local directory for backups in production (only if it is a persistent volume). */
+  BACKUP_ALLOW_LOCAL: z.string().optional(),
   BACKUP_DIR: z.string().default("./data/backups"),
   INSTALL_TOKEN: z.string().min(16).optional(),
   PORT: z.coerce.number().int().default(3000),

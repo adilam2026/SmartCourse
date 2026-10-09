@@ -1,7 +1,7 @@
 # Photos du catalogue — sources, licences, procédure
 
-État au démarrage de l'étape 3 : **aucune photo définitive n'est encore importée.**
-L'environnement de développement bloque l'accès réseau aux sources d'images (Wikimedia Commons, Open Food Facts : refus 403 de la politique d'accès sortant). Rien n'a donc été téléchargé ni vérifié en ligne. Tout ce qui suit sur les licences vient de ma connaissance générale et **doit être relu sur les pages officielles au moment de l'import**.
+État au 9 octobre 2026 : **aucune photo définitive n'est importée. Les photos restent indispensables à la V1 et ce point est toujours bloquant.**
+Nouveau contrôle le 9 octobre 2026 : `commons.wikimedia.org`, `upload.wikimedia.org`, `world.openfoodfacts.org` et `images.openfoodfacts.org` sont **toujours refusés** (403 de la politique d'accès sortant), comme le dépôt Debian et celui de PostgreSQL. L'environnement de développement bloque l'accès réseau aux sources d'images (Wikimedia Commons, Open Food Facts : refus 403 de la politique d'accès sortant). Rien n'a donc été téléchargé ni vérifié en ligne. Tout ce qui suit sur les licences vient de ma connaissance générale et **doit être relu sur les pages officielles au moment de l'import**.
 
 ## Ce qui est déjà en place (testé)
 
@@ -33,6 +33,12 @@ L'environnement de développement bloque l'accès réseau aux sources d'images (
 4. Import par le CLI ; les crédits apparaissent dans l'application.
 5. Les produits emballés avec marque ne sont figés qu'**après validation des marques** (voir `marques-a-valider.md`).
 
+## Foyer au Maroc : produits emballés
+
+Pour les produits de marque marocaine, je ne compte pas sur Wikimedia Commons (peu d'emballages) ni sur une couverture suffisante d'Open Food Facts (non vérifiée). **La voie la plus sûre : vos propres photos** de vos paquets habituels, avec le bouton 📷 de Réglages → Catalogue. Voir `marques-a-valider.md`.
+
 ## Interface sans photo
+
+Aujourd'hui, un produit sans photo affiche un emoji de sa **catégorie** : tous les produits d'une même catégorie ont donc le même emoji. **Cela ne permet pas au personnel de distinguer les produits sans lire**, et je ne le considère pas comme acceptable pour la recette : c'est un état provisoire, pas une solution. Je n'ai pas inventé d'emojis par produit : plusieurs produits n'en ont pas de fidèle (courgettes, persil/coriandre/menthe, semoule/farine…), et un emoji faux est pire qu'aucun.
 
 Tant qu'un produit n'a pas de photo, l'interface affichera une tuile neutre avec le nom du produit en grand (pas de fausse photo). La recette de l'interface personnel nécessite toutes les photos.

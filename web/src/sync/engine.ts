@@ -89,6 +89,8 @@ export class Engine {
     return () => this.listeners.delete(fn);
   };
   private set(patch: Partial<State>) {
+    // Never keep saying "saved" once the server stopped answering.
+    if (patch.conn === "offline") patch = { ...patch, justSynced: false };
     this.s = { ...this.s, ...patch };
     for (const l of this.listeners) l();
   }

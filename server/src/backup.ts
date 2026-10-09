@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from "node:crypto";
+import { existsSync, readdirSync } from "node:fs";
 import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -151,6 +152,52 @@ export function selectKeep<T extends { at: Date }>(entries: T[], policy: Policy 
   return keep;
 }
 
+// ---- tool compatibility ----------------------------------------------------------------------------
+// The client major version must EQUAL the server's: an older client refuses to dump, a newer one writes
+// dumps that an older server cannot restore (e.g. `SET transaction_timeout`, unknown before PostgreSQL 17).
+// So the image carries several clients under /usr/lib/postgresql/<major>/bin and the right one is chosen
+// from the server's version each time.
+export interface ToolCheck {
+  ok: boolean;
+  serverMajor: number | null;
+  available: number[];
+  pgDump: string | null;
+  pgRestore: string | null;
+  message: string;
+}
+
+export const PG_ROOT = process.env.PG_BIN_ROOT ?? "/usr/lib/postgresql";
+
+export function availableMajors(root = PG_ROOT): number[] {
+  try {
+    return readdirSync(root)
+      .filter((d) => /^\d+$/.test(d) && existsSync(path.join(root, d, "bin", "pg_dump")) && existsSync(path.join(root, d, "bin", "pg_restore")))
+      .map(Number)
+      .sort((a, b) => a - b);
+  } catch {
+    return [];
+  }
+}
+
+/** Pure: which client binaries to use for a given server major (null paths when none matches). */
+export function selectTools(serverMajor: number | null, root = PG_ROOT): ToolCheck {
+  const available = availableMajors(root);
+  if (serverMajor === null) return { ok: false, serverMajor, available, pgDump: null, pgRestore: null, message: "version du serveur PostgreSQL illisible" };
+  if (!available.includes(serverMajor)) {
+    return {
+      ok: false, serverMajor, available, pgDump: null, pgRestore: null,
+      message: `aucun client pg_dump ${serverMajor} dans l'image (disponibles : ${available.join(", ") || "aucun"}) : ajouter cette version au Dockerfile et reconstruire`,
+    };
+  }
+  const bin = path.join(root, String(serverMajor), "bin");
+  return { ok: true, serverMajor, available, pgDump: path.join(bin, "pg_dump"), pgRestore: path.join(bin, "pg_restore"), message: `client pg_dump ${serverMajor} = serveur PostgreSQL ${serverMajor}` };
+}
+
+export async function checkBackupTools(db: Db, root = PG_ROOT): Promise<ToolCheck> {
+  const num = Number((await db.query("SHOW server_version_num")).rows[0].server_version_num);
+  return selectTools(Number.isFinite(num) ? Math.floor(num / 10000) : null, root);
+}
+
 // ---- backup ----------------------------------------------------------------------------------------
 export interface Manifest {
   createdAt: string;
@@ -188,6 +235,8 @@ async function tableNames(q: { query: Db["query"] }): Promise<string[]> {
 const stamp = (d: Date) => d.toISOString().replace(/[:.]/g, "-");
 
 export async function createBackup(ctx: BackupCtx): Promise<{ key: string; manifest: Manifest; bytes: number }> {
+  const tools = await checkBackupTools(ctx.db);
+  if (!tools.ok) throw new Error(tools.message); // fail before touching anything, with an actionable message
   const now = (ctx.now ?? (() => new Date()))();
   const c = await ctx.db.connect();
   try {
@@ -197,7 +246,7 @@ export async function createBackup(ctx: BackupCtx): Promise<{ key: string; manif
     const tables: Record<string, number> = {};
     for (const t of await tableNames(c)) tables[t] = (await c.query(`SELECT count(*)::int AS n FROM "${t}"`)).rows[0].n;
     const migrations = (await c.query("SELECT name FROM schema_migrations ORDER BY name")).rows.map((r) => r.name as string);
-    const dump = await run("pg_dump", ["--format=custom", `--snapshot=${snap}`, "--no-owner", "--no-privileges", `--dbname=${ctx.databaseUrl}`]);
+    const dump = await run(tools.pgDump!, ["--format=custom", `--snapshot=${snap}`, "--no-owner", "--no-privileges", `--dbname=${ctx.databaseUrl}`]);
     await c.query("COMMIT");
     const manifest: Manifest = { createdAt: now.toISOString(), tables, migrations };
     const base = `backups/sc-${stamp(now)}`;
@@ -245,6 +294,9 @@ export async function verifyBackup(ctx: BackupCtx, dumpKey: string): Promise<Ver
     return problems.push("déchiffrement impossible (mauvaise clé ou fichier altéré)"), result();
   }
 
+  const tools = await checkBackupTools(ctx.db);
+  if (!tools.ok) return problems.push(tools.message), result();
+
   const dbName = `sc_verify_${Date.now()}_${randomBytes(3).toString("hex")}`;
   const tmpFile = path.join(os.tmpdir(), `${dbName}.dump`);
   const scratchUrl = new URL(ctx.databaseUrl);
@@ -253,7 +305,7 @@ export async function verifyBackup(ctx: BackupCtx, dumpKey: string): Promise<Ver
   let scratch: import("pg").Client | undefined;
   try {
     await writeFile(tmpFile, dump, { mode: 0o600 });
-    await run("pg_restore", ["--no-owner", "--no-privileges", "--exit-on-error", `--dbname=${scratchUrl.toString()}`, tmpFile]);
+    await run(tools.pgRestore!, ["--no-owner", "--no-privileges", "--exit-on-error", `--dbname=${scratchUrl.toString()}`, tmpFile]);
     const pg = (await import("pg")).default;
     scratch = new pg.Client({ connectionString: scratchUrl.toString() });
     await scratch.connect();
@@ -318,21 +370,28 @@ export async function backupVerifyPrune(ctx: BackupCtx, policy: Policy = DEFAULT
 
 export interface BackupStatus {
   configured: boolean;
+  storage: "s3" | "local" | null;
+  /** Human-readable schedule. */
+  schedule: string;
+  tools: ToolCheck | null;
   lastBackupAt: string | null;
   lastVerifiedOkAt: string | null;
   lastVerifyFailedAt: string | null;
 }
 
-export async function backupStatus(db: Db, configured: boolean): Promise<BackupStatus> {
+export async function backupStatus(db: Db, storage: "s3" | "local" | null): Promise<BackupStatus> {
+  const configured = storage !== null;
+  const tools = configured ? await checkBackupTools(db) : null;
   const r = await db.query(
     `SELECT (SELECT max(at) FROM backup_runs WHERE kind = 'backup' AND ok) AS b,
             (SELECT max(at) FROM backup_runs WHERE kind = 'verify' AND ok) AS v,
             (SELECT max(at) FROM backup_runs WHERE kind = 'verify' AND NOT ok) AS f`,
   );
   const row = r.rows[0];
-  return { configured, lastBackupAt: row.b?.toISOString() ?? null, lastVerifiedOkAt: row.v?.toISOString() ?? null, lastVerifyFailedAt: row.f?.toISOString() ?? null };
+  return { configured, storage, schedule: SCHEDULE_TEXT, tools, lastBackupAt: row.b?.toISOString() ?? null, lastVerifiedOkAt: row.v?.toISOString() ?? null, lastVerifyFailedAt: row.f?.toISOString() ?? null };
 }
 
+export const SCHEDULE_TEXT = "Une sauvegarde chiffrée par jour (dès que la dernière a plus de 24 h ; contrôle toutes les 10 min par l'application), suivie d'une restauration de vérification.";
 const LOCK = 727_002;
 /** Daily backup + restore check, run by the app itself. One run at a time even if two instances overlap. */
 export function startBackupScheduler(ctx: BackupCtx, log: (m: string) => void, everyMs = 10 * 60_000): () => void {
@@ -340,7 +399,7 @@ export function startBackupScheduler(ctx: BackupCtx, log: (m: string) => void, e
     const c = await ctx.db.connect();
     try {
       if (!(await c.query("SELECT pg_try_advisory_lock($1) AS ok", [LOCK])).rows[0].ok) return;
-      const st = await backupStatus(ctx.db, true);
+      const st = await backupStatus(ctx.db, "s3");
       const due = !st.lastBackupAt || Date.now() - new Date(st.lastBackupAt).getTime() > 24 * 3_600_000;
       if (!due) return;
       const r = await backupVerifyPrune(ctx);

@@ -1,0 +1,8 @@
+**/node_modules
+**/dist
+**/.env
+.git
+e2e
+docs
+server/data
+web/test-results

@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import { loadConfig } from "./config.js";
 import { createPool } from "./db.js";
 import { migrate } from "./migrate.js";
-import { createBackupStore } from "./backup-store.js";
+import { createBackupStorage } from "./backup-store.js";
 import { startBackupScheduler } from "./backup.js";
 import { createPhotoStore } from "./photos.js";
 
@@ -13,11 +13,15 @@ const db = createPool(config.DATABASE_URL);
 await migrate(db);
 if (config.INSTALL_TOKEN) await ensureInstallToken(db, config.INSTALL_TOKEN);
 
-const app = await buildApp({ db, loginRateLimit: { max: config.LOGIN_RATE_MAX, timeWindow: "1 minute" }, store: createPhotoStore(config), webDir: existsSync(config.WEB_DIR) ? config.WEB_DIR : undefined, backupConfigured: !!config.BACKUP_KEY });
+const backup = config.BACKUP_KEY ? createBackupStorage(config) : null;
+const app = await buildApp({ db, loginRateLimit: { max: config.LOGIN_RATE_MAX, timeWindow: "1 minute" }, store: createPhotoStore(config), webDir: existsSync(config.WEB_DIR) ? config.WEB_DIR : undefined, backupStorage: backup?.kind ?? null });
 await app.listen({ port: config.PORT, host: "0.0.0.0" });
 
-if (config.BACKUP_KEY) {
-  startBackupScheduler({ db, databaseUrl: config.DATABASE_URL, store: createBackupStore(config), passphrase: config.BACKUP_KEY }, (m) => app.log.info(m));
+if (backup && config.BACKUP_KEY) {
+  startBackupScheduler({ db, databaseUrl: config.DATABASE_URL, store: backup.store, passphrase: config.BACKUP_KEY }, (m) => app.log.info(m));
+  app.log.info(`Sauvegardes automatiques actives (stockage : ${backup.kind}).`);
+} else if (config.BACKUP_KEY) {
+  app.log.error("BACKUP_KEY présent mais aucun stockage sûr : configurez le bucket (S3_*). Sauvegardes automatiques DÉSACTIVÉES.");
 } else {
   app.log.warn("BACKUP_KEY absent : aucune sauvegarde automatique n'est faite.");
 }

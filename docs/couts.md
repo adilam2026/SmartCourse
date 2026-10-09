@@ -1,57 +1,82 @@
-# Coûts : mesures et prévision
+# Coûts et limites de dépense
 
-Aucun déploiement Railway n'a été fait depuis cet environnement (pas d'accès à votre compte) : **le coût réel reste à constater sur la page « Usage » de Railway** après une semaine. Ce document donne ce qui a été mesuré localement et la façon de le convertir en dollars.
+**Tout ce qui concerne le coût de l'application est une estimation provisoire** : aucun déploiement n'a eu lieu, aucune mesure Railway n'existe. Ce document sépare trois choses qu'il ne faut pas confondre :
 
-## Tarifs relevés (à reconfirmer sur la page tarifs avant engagement)
+1. les **limites de dépense que vous avez configurées** (A) ;
+2. le **coût de cette application seule** (B), estimé ;
+3. la **consommation totale de votre workspace** (C), que je ne peux ni voir ni mesurer d'ici.
 
-| Poste | Tarif | Source |
+## A. Limites configurées par vous (je n'y touche pas)
+
+| Réglage Railway | Valeur | Remarque |
 |---|---|---|
-| Plan Hobby | 5 $/mois, qui incluent 5 $ de consommation | [doc Railway](https://docs.railway.com/pricing/plans) |
-| Mémoire | 10 $ / Go / mois | idem |
-| CPU | 20 $ / vCPU / mois | idem |
-| Volume | 0,15 $ / Go / mois (sources tierces) | à confirmer |
-| Sortie réseau | environ 0,05 $ / Go (sources tierces) | à confirmer |
-| Bucket | 0,015 $ / Go / mois, sortie et requêtes gratuites | [doc buckets](https://docs.railway.com/storage-buckets/billing) |
+| Plafond COMPUTE (limite stricte) | **10 $** | Railway refuse un plafond COMPUTE inférieur à 10 $ |
+| Alerte personnalisée COMPUTE | **5 $** | Railway refuse une alerte personnalisée inférieure à 5 $ |
+| AGENT | **0 $** | |
 
-## Mesures locales (build de production, Node 22, Postgres 16)
+Je ne retire ni n'augmente ces valeurs, et je n'en proposerai pas d'autres sans votre demande. Mes anciennes suggestions (alerte à 4 $, plafond à 15 $) étaient impossibles avec ces minimums et sont retirées.
 
-Charge simulée : une famille de 3 personnes, 40 tours de « ajout par le personnel + achat par un parent + 60 lectures », soit 2 520 requêtes, avec 3 flux SSE ouverts en permanence.
+**Ce que font ces réglages** (documentation Railway pour les limites par workspace, [Cost Control](https://docs.railway.com/reference/usage-limits) ; le détail est à confirmer sur votre page Usage) :
+
+- **L'alerte à 5 $ ne fait que prévenir par e-mail.** Elle n'arrête rien : **une alerte seule ne protège pas contre une facturation supplémentaire.** Si la consommation dépasse 5 $ puis 10 $ sans que vous réagissiez, rien ne s'interrompt avant le plafond.
+- **Le plafond COMPUTE de 10 $ est ce qui protège**, mais il le fait en **mettant les services hors ligne** : à 10 $ de consommation COMPUTE, les workloads du **workspace entier** s'arrêtent, pas seulement cette application. Les services ne redémarrent pas toujours seuls après relèvement du plafond (parfois un redéploiement est nécessaire).
+- Des utilisateurs ont signalé des arrêts alors que l'affichage montrait un usage inférieur au plafond (anomalies de comptage côté Railway).
+- Ce que la catégorie « COMPUTE » englobe exactement (processeur et mémoire seulement, ou aussi disque et sortie réseau) **n'est pas confirmé** : un résumé tiers dit qu'elle inclut CPU, RAM, stockage et sortie réseau ; je n'ai pas pu le vérifier dans la documentation officielle. Les montants du plan Hobby (5 $ d'abonnement) ne sont probablement pas comptés comme consommation, mais ce point est à vérifier.
+
+Conséquence pratique : **l'application peut être arrêtée à cause d'autres services de votre workspace**, même si elle consomme très peu elle-même (voir C).
+
+## B. Coût de cette application seule : estimation provisoire
+
+### Tarifs relevés (à reconfirmer sur la page tarifs)
+
+| Poste | Tarif |
+|---|---|
+| Mémoire | 10 $ / Go / mois |
+| CPU | 20 $ / vCPU / mois |
+| Volume (disque) | 0,15 $ / Go / mois (sources tierces) |
+| Sortie réseau | environ 0,05 $ / Go (sources tierces) |
+| Bucket | 0,015 $ / Go / mois ; sortie et requêtes gratuites |
+
+### Mesures locales (build de production, Node 22, Postgres 16, **pas Railway**)
+
+Charge simulée : une famille de 3 personnes, 2 520 requêtes, 3 flux en direct ouverts.
 
 | Mesure | Résultat |
 |---|---|
-| Mémoire du service Node au repos | 111 Mo |
-| Mémoire du service Node après la charge | 102 Mo |
-| CPU consommé par Node pendant 249 s (charge comprise) | 5 s (≈ 2 % d'un cœur pendant la charge, ≈ 0 au repos) |
-| Mémoire de Postgres (PSS cumulée de tous ses processus) | 86 Mo |
-| Taille de la base après la charge | 8,8 Mo |
-| Erreurs 5xx | 0 |
+| Mémoire du service Node | 102–111 Mo |
+| CPU de Node sur 249 s (charge comprise) | 5 s (environ 2 % d'un cœur pendant la charge, environ 0 au repos) |
+| Mémoire de Postgres (somme PSS de ses processus) | 86 Mo |
+| Base après la charge | 8,8 Mo |
 
-## Prévision (service allumé en continu, 730 h/mois)
+### Estimation mensuelle (service allumé en continu)
 
 | Poste | Calcul | Par mois |
 |---|---|---|
 | Service Node, mémoire | 0,11 Go × 10 $ | 1,1 $ |
-| Service Node, CPU | 0,005 vCPU en moyenne × 20 $ | 0,1 $ |
+| Service Node, CPU | environ 0,005 vCPU × 20 $ | 0,1 $ |
 | Postgres, mémoire | 0,09–0,15 Go × 10 $ | 0,9–1,5 $ |
-| Postgres, CPU | 0,005 vCPU × 20 $ | 0,1 $ |
-| Volume Postgres | moins de 0,1 Go × 0,15 $ | moins de 0,02 $ |
-| Bucket (photos + sauvegardes chiffrées) | moins de 0,05 Go × 0,015 $ | moins de 0,01 $ |
+| Postgres, CPU | environ 0,005 vCPU × 20 $ | 0,1 $ |
+| Volume Postgres | moins de 0,1 Go | moins de 0,02 $ |
+| Bucket (photos et sauvegardes) | moins de 0,05 Go | moins de 0,01 $ |
 | Réseau | photos mises en cache sur les téléphones | négligeable |
-| **Total** | | **environ 2,5 à 3,5 $** |
+| **Total application** | | **environ 2,5 à 3,5 $** |
 
-Cela rentre dans les 5 $ de consommation inclus dans le plan Hobby, **sans garantie** : Railway mesure la mémoire du conteneur (qui peut dépasser la mémoire « utile » mesurée ici), et l'image Postgres de Railway peut consommer plus que mon Postgres local. Si la page Usage indique plus de 5 $ projetés, la consommation excédentaire est facturée en plus du forfait. Mon estimation précédente (6–8 $) supposait 256 Mo par service ; les mesures la ramènent plus bas, mais elle reste à confirmer en réel.
+**Pourquoi c'est provisoire** : Railway mesure la mémoire du conteneur (souvent plus élevée que la mémoire utile mesurée ici), l'image Postgres de Railway n'est pas la mienne, et je n'ai pas mesuré les sauvegardes quotidiennes (un `pg_dump` et une restauration de contrôle par jour : pics brefs de CPU et de mémoire sur une base de moins de 10 Mo). Fourchette réaliste : de **2,5 $ à environ 6 $** tant qu'aucune mesure Railway n'existe.
 
-## À faire après le déploiement
+## C. Consommation totale de votre workspace : non mesurable d'ici
 
-1. Relever sur la page Usage de Railway : mémoire moyenne de chaque service, CPU, volume, sortie réseau. Remplacer le tableau « Prévision » par ces chiffres.
-2. Créer une **alerte** d'usage à 4 $.
+Je n'ai pas accès à votre compte Railway : **je ne connais pas la consommation de vos autres projets.** C'est pourtant elle qui déclenche l'alerte (5 $) et le plafond (10 $), puisque ces limites sont **par workspace**.
 
-## Limite de dépense : ce qu'elle fait
+À remplir après quelques jours, depuis la page Usage de Railway (ou la commande `railway usage`) :
 
-D'après les retours d'utilisateurs sur le forum Railway (la documentation officielle n'a pas pu être ouverte depuis cet environnement) :
-- Une limite **stricte** (« hard limit ») **arrête les services du workspace** quand elle est atteinte : l'application serait alors **hors service** pour toute la famille jusqu'à ce que vous relevez la limite.
-- Les services ne repartent pas toujours seuls : il peut falloir les redéployer.
-- Des anomalies de comptage ont été signalées (arrêt alors que l'usage affiché était inférieur à la limite).
-- Les données de bucket sont conservées, l'accès est suspendu.
+| Ligne | À relever | Valeur |
+|---|---|---|
+| Consommation COMPUTE du mois, **tous projets** | page Usage du workspace | ______ $ |
+| dont cette application (service Node + Postgres + bucket) | détail par projet | ______ $ |
+| dont les autres projets | différence | ______ $ |
+| Marge avant l'alerte de 5 $ | 5 − consommation totale | ______ $ |
+| Marge avant le plafond de 10 $ | 10 − consommation totale | ______ $ |
 
-**Recommandation : ne pas activer de limite stricte** pour une application que la famille utilise en magasin. Utiliser une alerte à 4 $ et, si vous voulez un plafond, le fixer largement au-dessus de la prévision (par exemple 15 $). **Je n'active rien sans votre accord.** Les services étant peu consommateurs, un dépassement imprévu viendrait surtout d'une boucle ou d'un bug : l'alerte suffit à le voir.
+Lecture : si les autres projets consomment déjà, par exemple, 6 $ par mois, l'alerte est déjà passée et il ne reste que 4 $ avant que **tout** s'arrête : l'application, à 3 $, resterait en ligne ; à 5 $ elle serait coupée avec le reste.
+
+**Décision qui vous revient** (je ne la prends pas) : si la marge est faible, soit réduire les autres consommations, soit déplacer cette application dans un workspace séparé, soit relever le plafond. Un plafond trop bas arrête la famille en pleine course ; l'absence de plafond expose à une facture sans limite.

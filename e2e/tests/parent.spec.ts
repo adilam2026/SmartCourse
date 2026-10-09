@@ -123,6 +123,7 @@ test.describe("administration", () => {
     await uiLogin(page, f, "adil", "482913");
     await page.getByTestId("tab-settings").click();
     await expect(page.getByTestId("family-code")).toHaveText(f.code);
+    await expect(page.getByTestId("backup-card")).toContainText("NON configurée"); // pas de clé de sauvegarde dans cet environnement de test
     await page.getByTestId("add-profile").click();
     await page.getByTestId("np-name").fill("Karim");
     await page.getByTestId("np-login").fill("karim");
