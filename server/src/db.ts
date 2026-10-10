@@ -52,7 +52,7 @@ export function assertSafeDatabaseUrl(url: string, opts: { ca?: string; schema?:
     throw new Error("DATABASE_SCHEMA : sur une base Supabase, SmartCourse doit avoir son propre schéma (DATABASE_SCHEMA=smartcourse). Le schéma « public » est partagé avec les autres applications et exposé par l'API de données de Supabase : il ne sera jamais utilisé.");
   }
   if (managed && opts.backupMode !== "external") {
-    throw new Error("BACKUP_MODE : sur une base Supabase, les sauvegardes internes de l'application sont incompatibles (leur restauration de contrôle exige de créer une base sur le même serveur). Définissez BACKUP_MODE=external et laissez la tâche planifiée « Sauvegarde externe » les faire (docs/hebergement-supabase.md).");
+    throw new Error("BACKUP_MODE : sur une base Supabase, les sauvegardes internes de l'application sont incompatibles (leur restauration de contrôle exige de créer une base sur le même serveur). Définissez BACKUP_MODE=external et laissez un job externe les faire.");
   }
   if (managed && !opts.ca) {
     throw new Error("DATABASE_URL : base Supabase sans DATABASE_SSL_CA. Fournissez le certificat racine (Supabase → Database settings → SSL) : la connexion doit être chiffrée ET vérifiée.");

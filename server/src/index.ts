@@ -51,7 +51,7 @@ const app = await buildApp({ db, loginRateLimit: { max: config.LOGIN_RATE_MAX, t
 await app.listen({ port: config.PORT, host: "0.0.0.0" });
 
 if (external) {
-  // The scheduled job (backup-externe.yml) makes, restores elsewhere and records the backups; the app does not run its own, and
+  // The scheduled job (external job, no longer shipped) makes, restores elsewhere and records the backups; the app does not run its own, and
   // says so loudly when the last verified one is old, so that a silent job failure cannot go unnoticed.
   const watch = async () => {
     const r = await db.query("SELECT max(at) AS v FROM backup_runs WHERE kind = 'verify' AND ok");

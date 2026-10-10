@@ -68,6 +68,8 @@ Si aucun administrateur ne peut se connecter : depuis un terminal ayant accès �
 `scripts/verify-docker.sh` (ou GitHub → Actions → « Vérification Docker », lancement manuel) construit l'image, la démarre sur un PostgreSQL jetable et contrôle : 80 WebP seulement, utilisateur `node`, clients `pg_dump` 16/17/18, import des 80 visuels au premier démarrage, **aucun changement** au redémarrage et à l'import manuel, purge sans effet, image personnalisée conservée. Aucun accès à Railway.
 
 
-## Variante retenue : Railway (serveur) + Supabase Free (base)
+## Décision d'hébergement
 
-Le plan, les portes à franchir, les coûts conditionnels, les limites du plan gratuit, les sauvegardes indépendantes et la liste de mise en service sont dans [`hebergement-supabase.md`](hebergement-supabase.md). Les sections 1 à 5 ci-dessus décrivent la variante « tout sur Railway » et ne s'appliquent pas à la variante Supabase pour la base et les sauvegardes.
+**Retenu : Railway seul** (serveur, PostgreSQL, bucket), sauvegardes internes chiffrées avec restauration vérifiée. Supabase, Backblaze B2, Cloudflare R2 et Healthchecks sont abandonnés. Le code de connexion « base gérée » reste dans le dépôt mais inactif : il ne s'active que si `DATABASE_URL` désigne un hôte Supabase, ce qui n'est pas le cas.
+
+**Rien n'a été déployé** : la session d'où ce dépôt est préparé n'a pas accès à Railway (réseau bloqué, aucun jeton). Le déploiement se fait avec les étapes §1 à §3 ci-dessus ; ensuite, mesurer la consommation (page Usage) pendant une semaine.

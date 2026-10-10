@@ -27,7 +27,7 @@ const schema = z.object({
   DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(20).optional(),
   /**
    * "internal" (default): the app makes, restores-to-check and prunes its own backups on the same PostgreSQL server.
-   * "external": backups are made by the scheduled job in .github/workflows/backup-externe.yml, restored into ANOTHER
+   * "external": backups are made by the scheduled job by an external job (no longer shipped; Railway-only hosting uses "internal"), restored into ANOTHER
    * server and recorded in this database; the app only displays their state. Switch ONLY after one external run succeeded.
    */
   BACKUP_MODE: z.enum(["internal", "external"]).default("internal"),
