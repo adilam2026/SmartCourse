@@ -5,6 +5,7 @@ import { HttpError } from "./errors.js";
 import type { Guard } from "./guard.js";
 import { can } from "./permissions.js";
 import type { SseHub } from "./hub.js";
+import { UNITS, type Unit } from "./lists.js";
 import { insertPhotoAsset, MAX_INPUT_BYTES, preparePhoto, type PhotoStore, type PreparedPhoto } from "./photos.js";
 
 interface Deps {
@@ -25,6 +26,10 @@ export const normalizeSearch = (s: string): string =>
     .replace(/’/g, "'")
     .trim();
 
+/** Unit a new article starts with (same rule as the migration); the administrator can change it per article. */
+export const defaultUnit = (category: string): Unit =>
+  category === "legumes" || category === "fruits" || category === "viandes" ? "kg" : category === "boissons" ? "bouteille" : category === "epicerie" || category === "surgeles" ? "paquet" : "piece";
+
 const photoUrl = (id: string | null) => (id ? `/api/photos/${id}` : null);
 
 const productView = (r: any) => ({
@@ -33,6 +38,7 @@ const productView = (r: any) => ({
   name: r.name,
   brand: r.brand,
   active: r.active,
+  unit: r.unit as Unit,
   photoUrl: photoUrl(r.photo_asset_id),
 });
 
@@ -83,6 +89,7 @@ export function catalogRoutes(app: FastifyInstance, { db, store, guard, hub }: D
     category?: string;
     brand?: string | null;
     active?: boolean;
+    unit?: Unit;
     image?: Buffer;
     resetImage?: boolean;
   }
@@ -102,8 +109,8 @@ export function catalogRoutes(app: FastifyInstance, { db, store, guard, hub }: D
           const category = input.category!;
           const pos = (await c.query("SELECT coalesce(max(position), -1) + 1 AS p FROM products WHERE family_id = $1 AND category = $2", [auth.familyId, category])).rows[0].p;
           const r = await c.query(
-            `INSERT INTO products (family_id, category, name, brand, active, photo_asset_id, position) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-            [auth.familyId, category, input.name, input.brand ?? null, input.active ?? true, photoId ?? null, pos],
+            `INSERT INTO products (family_id, category, name, brand, active, photo_asset_id, position, unit) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+            [auth.familyId, category, input.name, input.brand ?? null, input.active ?? true, photoId ?? null, pos, input.unit ?? defaultUnit(category)],
           );
           return r.rows[0];
         }
@@ -116,8 +123,8 @@ export function catalogRoutes(app: FastifyInstance, { db, store, guard, hub }: D
         if (photoId) photo = photoId;
         else if (input.resetImage) photo = cur.catalog_photo ?? null; // back to the catalogue picture (or none for an added article)
         const r = await c.query(
-          `UPDATE products SET name = $3, category = $4, position = $5, brand = $6, active = $7, photo_asset_id = $8 WHERE id = $1 AND family_id = $2 RETURNING *`,
-          [input.id, auth.familyId, input.name ?? cur.name, category, position, input.brand !== undefined ? input.brand : cur.brand, input.active ?? cur.active, photo],
+          `UPDATE products SET name = $3, category = $4, position = $5, brand = $6, active = $7, photo_asset_id = $8, unit = $9 WHERE id = $1 AND family_id = $2 RETURNING *`,
+          [input.id, auth.familyId, input.name ?? cur.name, category, position, input.brand !== undefined ? input.brand : cur.brand, input.active ?? cur.active, photo, input.unit ?? cur.unit],
         );
         return r.rows[0];
       });
@@ -129,9 +136,9 @@ export function catalogRoutes(app: FastifyInstance, { db, store, guard, hub }: D
 
   app.post("/api/products", { preHandler: guard("family.manage"), bodyLimit: 14 * 1024 * 1024 }, async (req, reply) => {
     const body = z
-      .object({ name: z.string().trim().min(1).max(60), category: categoryField, image: imageField.optional(), active: z.boolean().optional() })
+      .object({ name: z.string().trim().min(1).max(60), category: categoryField, image: imageField.optional(), active: z.boolean().optional(), unit: z.enum(UNITS as unknown as [Unit, ...Unit[]]).optional() })
       .parse(req.body);
-    const product = await saveProduct(req.auth!, { name: body.name, category: body.category, active: body.active, image: body.image ? decodeImage(body.image) : undefined });
+    const product = await saveProduct(req.auth!, { name: body.name, category: body.category, active: body.active, unit: body.unit, image: body.image ? decodeImage(body.image) : undefined });
     hub.broadcast(req.auth!.familyId, "catalog.updated", { productId: product.id });
     return reply.code(201).send({ product: productView(product) });
   });
@@ -144,6 +151,7 @@ export function catalogRoutes(app: FastifyInstance, { db, store, guard, hub }: D
         category: categoryField.optional(),
         brand: z.string().trim().min(1).max(40).nullable().optional(),
         active: z.boolean().optional(),
+        unit: z.enum(UNITS as unknown as [Unit, ...Unit[]]).optional(),
         image: imageField.optional(),
         resetImage: z.boolean().optional(),
       })
@@ -187,10 +195,10 @@ export function catalogRoutes(app: FastifyInstance, { db, store, guard, hub }: D
       if (!e) throw new HttpError(404, "not_found", "Produit introuvable dans le catalogue étendu");
       const pos = (await c.query("SELECT coalesce(max(position), -1) + 1 AS p FROM products WHERE family_id = $1 AND category = $2", [familyId, e.category])).rows[0].p;
       const ins = await c.query(
-        `INSERT INTO products (family_id, category, name, brand, photo_asset_id, extended_id, position)
-         VALUES ($1,$2,$3,$4,$5,$6,$7)
+        `INSERT INTO products (family_id, category, name, brand, photo_asset_id, extended_id, position, unit)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
          ON CONFLICT DO NOTHING RETURNING *`,
-        [familyId, e.category, e.name, e.brand, e.photo_asset_id, e.id, pos],
+        [familyId, e.category, e.name, e.brand, e.photo_asset_id, e.id, pos, defaultUnit(e.category)],
       );
       if (!ins.rows[0]) throw new HttpError(409, "product_exists", "Ce produit existe déjà dans le catalogue familial");
       return ins.rows[0];

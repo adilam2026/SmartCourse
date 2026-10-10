@@ -7,9 +7,10 @@ export type Action =
   | "list.close"
   | "purchase.record"
   | "purchase.correct"
-  | "history.read";
+  | "history.read"
+  | "stats.read";
 
-const PARENT: Action[] = ["list.edit_unpurchased", "list.create", "list.close", "purchase.record", "purchase.correct", "history.read"];
+const PARENT: Action[] = ["list.edit_unpurchased", "list.create", "list.close", "purchase.record", "purchase.correct", "history.read", "stats.read"];
 
 const MATRIX: Record<Role, ReadonlySet<Action>> = {
   admin: new Set<Action>(["family.manage", ...PARENT]),

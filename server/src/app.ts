@@ -9,6 +9,7 @@ import { backupStatus } from "./backup.js";
 import { catalogRoutes } from "./catalog-routes.js";
 import { COOKIE, makeGuard } from "./guard.js";
 import { listRoutes } from "./list-routes.js";
+import { statsRoutes } from "./stats-routes.js";
 import type { PhotoStore } from "./photos.js";
 import type { Db } from "./db.js";
 import { HttpError } from "./errors.js";
@@ -150,6 +151,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
   catalogRoutes(app, { db, store: deps.store, guard, hub });
   listRoutes(app, { db, hub, guard });
+  statsRoutes(app, { db, guard });
 
   // --- flux SSE ---
   app.get("/api/events", { preHandler: guard() }, async (req, reply) => {

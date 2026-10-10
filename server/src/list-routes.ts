@@ -8,8 +8,11 @@ import { applyOps, closeList, createList, getActiveListView, getListView, listHi
 import { can, type Action } from "./permissions.js";
 
 const uuid = z.string().uuid();
+const quantity = z.number().positive().max(999);
 const opSchema = z.discriminatedUnion("type", [
-  z.object({ opId: uuid, type: z.literal("add"), productId: uuid }),
+  z.object({ opId: uuid, type: z.literal("add"), productId: uuid, quantity: quantity.optional() }),
+  z.object({ opId: uuid, type: z.literal("set_qty"), productId: uuid, quantity, baseRev: z.number().int().min(1) }),
+  z.object({ opId: uuid, type: z.literal("request_again"), productId: uuid, quantity: quantity.optional() }),
   z.object({ opId: uuid, type: z.literal("remove"), productId: uuid, baseRev: z.number().int().min(1) }),
   z.object({ opId: uuid, type: z.literal("purchase"), itemId: uuid }),
   z.object({ opId: uuid, type: z.literal("correct"), purchaseId: uuid, reason: z.string().max(300).nullish() }),
@@ -17,6 +20,8 @@ const opSchema = z.discriminatedUnion("type", [
 
 const REQUIRED: Record<OpIn["type"], Action> = {
   add: "list.edit_unpurchased",
+  set_qty: "list.edit_unpurchased",
+  request_again: "list.edit_unpurchased",
   remove: "list.edit_unpurchased",
   purchase: "purchase.record",
   correct: "purchase.correct",
@@ -47,10 +52,10 @@ export function listRoutes(app: FastifyInstance, { db, hub, guard }: { db: Db; h
 
   app.post("/api/lists/:id/ops", { preHandler: guard() }, async (req) => {
     const { id } = z.object({ id: uuid }).parse(req.params);
-    const { ops } = z.object({ ops: z.array(opSchema).min(1).max(200) }).parse(req.body);
+    const { ops, batch } = z.object({ ops: z.array(opSchema).min(1).max(200), batch: z.object({ id: uuid, at: z.string().datetime({ offset: true }).optional() }).optional() }).parse(req.body);
     // Rights are checked server-side for every operation before any is applied.
     for (const op of ops) if (!can(req.auth!.role, REQUIRED[op.type])) throw new HttpError(403, "forbidden", "Action non autorisée");
-    return applyOps(db, hub, req.auth!, id, ops);
+    return applyOps(db, hub, req.auth!, id, ops, batch);
   });
 
   app.post("/api/lists/:id/close", { preHandler: guard("list.close") }, async (req) => {
