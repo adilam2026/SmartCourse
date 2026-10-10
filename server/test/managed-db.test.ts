@@ -4,11 +4,11 @@ import os from "node:os";
 import path from "node:path";
 import pg from "pg";
 import sharp from "sharp";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { generateInstallToken, setupFamily } from "../src/auth.js";
-import { backupFamilyPhotos, verifyPhotoBackup } from "../src/backup-photos.js";
+import { backupFamilyPhotos, copySnapshotPhotos, verifyPhotoBackup } from "../src/backup-photos.js";
 import { createBackupStorage } from "../src/backup-store.js";
-import { backupStatus, createBackup, encrypt, LocalBackupStore, S3BackupStore, selectTools, verifyBackup, type BackupCtx } from "../src/backup.js";
+import { backupStatus, backupVerifyPrune, createBackup, encrypt, LocalBackupStore, S3BackupStore, selectTools, verifyBackup, type BackupCtx } from "../src/backup.js";
 import { loadConfig } from "../src/config.js";
 import { assertSafeDatabaseUrl, createPool, createPoolFromConfig, schemaOf, toolsDatabaseUrl, type Db } from "../src/db.js";
 import { migrate } from "../src/migrate.js";
@@ -368,5 +368,98 @@ describe("sauvegarde externe : restauration de contrôle sur un autre serveur, p
     await store.put("backups/sc-autre.dump.enc", encrypt(Buffer.from("PGDMPxx"), "une-autre-phrase-secrete"));
     await store.put("backups/sc-autre.manifest.json", Buffer.from(JSON.stringify({ createdAt: new Date().toISOString(), tables: {}, migrations: [] })));
     expect((await verifyBackup(ctx, "backups/sc-autre.dump.enc")).problems.join(" ")).toMatch(/déchiffrement impossible/);
+  });
+});
+
+describe("sauvegarde pendant que des photos sont créées ou remplacées : jamais un ensemble incohérent", () => {
+  const PASS = "une-phrase-secrete-de-test";
+  const png = (c: string) => sharp({ create: { width: 64, height: 64, channels: 3, background: c } }).png().toBuffer();
+  const meta = { sourceName: "Photo familiale", license: "OWN" };
+  const adminUrl = new URL("/postgres", URL_).toString();
+  let fid = "";
+  // Base propre avant CHAQUE scénario : les photos des essais précédents (assets immuables, fichiers dans d'autres dossiers temporaires)
+  // fausseraient celui-ci.
+  beforeEach(async () => {
+    await resetData(db);
+    fid = (await setupFamily(db, { installToken: await generateInstallToken(db), familyName: "Concurrence", admin: { displayName: "Adil", login: "adil", secret: "482913" } })).auth.familyId;
+  });
+
+  /** La même chaîne que backup-cli en mode externe : copie préalable, instantané, copie des photos de l'instantané, restauration, contrôle. */
+  async function runExternal(photos: ReturnType<typeof testStore>, hooks: { beforeSnapshot?: () => Promise<void>; duringCopy?: (m: { photos?: string[] }) => Promise<void> } = {}) {
+    const store = new LocalBackupStore(mkdtempSync(path.join(os.tmpdir(), "bk-")));
+    const scratch = createPool(adminUrl);
+    try {
+      await backupFamilyPhotos(db, photos, store); // phase A
+      await hooks.beforeSnapshot?.(); // une photo arrive entre la phase A et l'instantané
+      const ctx: BackupCtx = {
+        db, databaseUrl: URL_, store, passphrase: PASS, verify: { db: scratch, url: adminUrl },
+        afterSnapshot: async (m) => {
+          await hooks.duringCopy?.(m); // des événements juste après l'instantané
+          return copySnapshotPhotos(photos, store, m); // phase B
+        },
+        afterRestore: async (scratch2, manifest) => (await verifyPhotoBackup(scratch2, store, manifest.photos)).problems.map((p) => `photos : ${p}`),
+      };
+      const r = await backupVerifyPrune(ctx);
+      return { r, store };
+    } finally {
+      await scratch.end();
+    }
+  }
+  const keyOf = async (id: string) => (await db.query("SELECT storage_key FROM photo_assets WHERE id = $1", [id])).rows[0].storage_key as string;
+
+  it("une photo créée entre la copie préalable et l'instantané est rattrapée par la copie des photos de l'instantané", async () => {
+    const photos = testStore();
+    const base = await savePhotoAsset(db, photos, await png("#101010"), meta, { ownerFamilyId: fid });
+    let late = "";
+    const { r, store } = await runExternal(photos, { beforeSnapshot: async () => void (late = await savePhotoAsset(db, photos, await png("#202020"), meta, { ownerFamilyId: fid })) });
+    expect(r.verify.problems).toEqual([]);
+    expect(r.verify.ok).toBe(true);
+    expect(r.backup.manifest.photos).toContain(await keyOf(late));
+    expect(await store.get(await keyOf(late))).not.toBeNull();
+    expect(await store.get(await keyOf(base))).not.toBeNull();
+  });
+
+  it("une photo créée APRÈS l'instantané n'est pas dans cette sauvegarde, et la sauvegarde reste complète et cohérente", async () => {
+    const photos = testStore();
+    let after = "";
+    const { r, store } = await runExternal(photos, { duringCopy: async () => void (after = await savePhotoAsset(db, photos, await png("#303030"), meta, { ownerFamilyId: fid })) });
+    expect(r.verify.problems).toEqual([]);
+    expect(r.backup.manifest.photos).not.toContain(await keyOf(after)); // elle appartient à la sauvegarde suivante
+    expect(await store.get(await keyOf(after))).toBeNull();
+  });
+
+  it("une photo « modifiée » (remplacée par une autre) pendant la sauvegarde : l'ancienne reste présente, tout est cohérent", async () => {
+    const photos = testStore();
+    const old = await savePhotoAsset(db, photos, await png("#404040"), meta, { ownerFamilyId: fid });
+    const { r, store } = await runExternal(photos, {
+      duringCopy: async () => {
+        // le produit change d'image juste après l'instantané : un NOUVEL asset, l'ancien n'est jamais réécrit
+        await savePhotoAsset(db, photos, await png("#505050"), meta, { ownerFamilyId: fid });
+      },
+    });
+    expect(r.verify.problems).toEqual([]);
+    expect(await store.get(await keyOf(old))).not.toBeNull();
+    const bytes = (await store.get(await keyOf(old)))!;
+    expect((await db.query("SELECT content_hash FROM photo_assets WHERE id = $1", [old])).rows[0].content_hash).toBe(require("node:crypto").createHash("sha256").update(bytes).digest("hex"));
+  });
+
+  it("une photo de l'instantané dont le fichier disparaît avant sa copie : sauvegarde déclarée INVALIDE (pas d'ensemble incohérent), anciennes sauvegardes conservées", async () => {
+    const photos = testStore();
+    let lost = "";
+    const { r } = await runExternal(photos, {
+      beforeSnapshot: async () => void (lost = await savePhotoAsset(db, photos, await png("#606060"), meta, { ownerFamilyId: fid })),
+      duringCopy: async () => void (await photos.delete(await keyOf(lost))), // purge simulée entre l'instantané et la copie
+    });
+    expect(r.verify.ok).toBe(false);
+    expect(r.verify.problems.join("\n")).toContain(await keyOf(lost));
+    expect(r.pruned).toEqual([]); // rien n'est supprimé sur un échec
+  });
+
+  it("la liste des photos de la base restaurée doit être celle du manifeste", async () => {
+    const photos = testStore();
+    const store = new LocalBackupStore(mkdtempSync(path.join(os.tmpdir(), "bk-")));
+    await backupFamilyPhotos(db, photos, store);
+    const rows = await verifyPhotoBackup(db, store, ["photos/" + "0".repeat(64) + ".webp"]); // manifeste différent de la base
+    expect(rows.problems.join("\n")).toMatch(/diffère de celle du manifeste/);
   });
 });

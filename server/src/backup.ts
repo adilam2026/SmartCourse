@@ -205,6 +205,8 @@ export interface Manifest {
   pgDumpVersion?: string;
   tables: Record<string, number>;
   migrations: string[];
+  /** Storage keys of the pictures families added, as listed by the database IN THE SAME SNAPSHOT as the dump. */
+  photos?: string[];
 }
 
 export interface BackupCtx {
@@ -214,7 +216,9 @@ export interface BackupCtx {
   /** Scratch server where a backup is restored to be checked. Default: the same server as `db` (in-app backups). */
   verify?: { db: Db; url: string };
   /** Extra checks run on the RESTORED database (e.g. every picture it references exists, intact, in the backup storage). Returns problems. */
-  afterRestore?: (scratch: pg.Client) => Promise<string[]>;
+  afterRestore?: (scratch: pg.Client, manifest: Manifest) => Promise<string[]>;
+  /** Run right after the snapshot is stored (e.g. copy the pictures it lists). Returns problems: any makes the backup invalid. */
+  afterSnapshot?: (manifest: Manifest) => Promise<string[]>;
   store: BackupStore;
   passphrase: string;
   now?: () => Date;
@@ -252,11 +256,13 @@ export async function createBackup(ctx: BackupCtx): Promise<{ key: string; manif
     const tables: Record<string, number> = {};
     for (const t of await tableNames(c, schemaOf(ctx.db))) tables[t] = (await c.query(`SELECT count(*)::int AS n FROM "${t}"`)).rows[0].n;
     const migrations = (await c.query("SELECT name FROM schema_migrations ORDER BY name")).rows.map((r) => r.name as string);
+    // The pictures this snapshot refers to: listed in the SAME snapshot, so the manifest says exactly what the restored data needs.
+    const photos = (await c.query("SELECT DISTINCT storage_key FROM photo_assets WHERE owner_family_id IS NOT NULL ORDER BY 1")).rows.map((r) => r.storage_key as string);
     // Only SmartCourse's own schema is dumped when it has one (other applications' data is never copied into our backups).
     const only = schemaOf(ctx.db) === "public" ? [] : [`--schema=${schemaOf(ctx.db)}`];
     const dump = await run(tools.pgDump!, ["--format=custom", `--snapshot=${snap}`, "--no-owner", "--no-privileges", ...only, `--dbname=${ctx.databaseUrl}`]);
     await c.query("COMMIT");
-    const manifest: Manifest = { createdAt: now.toISOString(), tables, migrations };
+    const manifest: Manifest = { createdAt: now.toISOString(), tables, migrations, photos };
     const base = `backups/sc-${stamp(now)}`;
     const blob = encrypt(dump.stdout, ctx.passphrase);
     await ctx.store.put(`${base}.dump.enc`, blob);
@@ -345,7 +351,7 @@ export async function verifyBackup(ctx: BackupCtx, dumpKey: string): Promise<Ver
       const n = (await scratch.query(inv.sql)).rows[0].n as number;
       if (n > 0) problems.push(`invariant violé : ${inv.name} (${n})`);
     }
-    if (ctx.afterRestore) problems.push(...(await ctx.afterRestore(scratch)));
+    if (ctx.afterRestore) problems.push(...(await ctx.afterRestore(scratch, manifest)));
     return result(restored.length);
   } catch (e) {
     problems.push(`restauration échouée : ${(e as Error).message}`);
@@ -384,7 +390,13 @@ async function record(db: Db, kind: "backup" | "verify", ok: boolean, backupKey:
 export async function backupVerifyPrune(ctx: BackupCtx, policy: Policy = DEFAULT_POLICY) {
   const b = await createBackup(ctx);
   await record(ctx.db, "backup", true, b.key, { bytes: b.bytes, tables: b.manifest.tables });
+  // Pictures the snapshot lists are copied AFTER it was taken (see backup-photos.ts): a picture that cannot be found invalidates it.
+  const extra = ctx.afterSnapshot ? await ctx.afterSnapshot(b.manifest).catch((e) => [`copie des photos en échec : ${(e as Error).message}`]) : [];
   const v = await verifyBackup(ctx, b.key);
+  if (extra.length) {
+    v.problems.push(...extra);
+    v.ok = false;
+  }
   await record(ctx.db, "verify", v.ok, b.key, { problems: v.problems, restoredTables: v.restoredTables });
   const pruned = v.ok ? await pruneBackups(ctx.store, policy) : []; // never delete older good backups on a bad one
   return { backup: b, verify: v, pruned };

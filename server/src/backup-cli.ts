@@ -1,7 +1,7 @@
 import { type BackupCtx, backupVerifyPrune, checkBackupTools, createBackup, listBackups, pruneBackups, verifyBackup } from "./backup.js";
 import { createBackupStorage } from "./backup-store.js";
 import { loadConfig } from "./config.js";
-import { backupFamilyPhotos, verifyPhotoBackup } from "./backup-photos.js";
+import { backupFamilyPhotos, copySnapshotPhotos, verifyPhotoBackup } from "./backup-photos.js";
 import { createPool, createPoolFromConfig, toolsDatabaseUrl } from "./db.js";
 import { hardenApiRoles } from "./harden.js";
 import { createPhotoStore } from "./photos.js";
@@ -26,6 +26,9 @@ const db = createPoolFromConfig(config);
 const verifyDb = config.VERIFY_DATABASE_URL ? createPool(config.VERIFY_DATABASE_URL) : null;
 const external = config.BACKUP_MODE === "external";
 let photoCheck: { checked: number; bytes: number } | null = null;
+// Pictures of the picture storage (Railway bucket, or local in development). In production without S3_BUCKET there is none to read:
+// the check below then fails if families have pictures, rather than silently skipping them.
+const photoStore = external && (config.S3_BUCKET || config.NODE_ENV !== "production") ? createPhotoStore(config) : null;
 const ctx: BackupCtx = {
   db,
   databaseUrl: toolsDatabaseUrl(config),
@@ -33,9 +36,10 @@ const ctx: BackupCtx = {
   passphrase: config.BACKUP_KEY,
   verify: verifyDb ? { db: verifyDb, url: config.VERIFY_DATABASE_URL! } : undefined,
   // External backups are only declared valid when the restored database AND the pictures it lists are proven complete.
+  afterSnapshot: photoStore ? (m) => copySnapshotPhotos(photoStore, storage.store, m) : undefined,
   afterRestore: external
-    ? async (scratch) => {
-        const r = await verifyPhotoBackup(scratch, storage.store);
+    ? async (scratch, manifest) => {
+        const r = await verifyPhotoBackup(scratch, storage.store, manifest.photos);
         photoCheck = { checked: r.checked, bytes: r.bytes };
         return r.problems.map((p) => `photos : ${p}`);
       }
@@ -53,9 +57,9 @@ try {
     console.log(`${t.ok ? "OK" : "ÉCHEC"} : ${t.message}`);
     if (!t.ok) process.exitCode = 2;
   } else if (cmd === "run") {
-    if (external && (config.S3_BUCKET || config.NODE_ENV !== "production")) {
-      // Pictures first, so that the restoration check below can prove they are all there.
-      const c = await backupFamilyPhotos(db, createPhotoStore(config), ctx.store);
+    if (photoStore) {
+      // Phase A: every picture known now, before the snapshot (phase B, after it, completes the set: see backup-photos.ts).
+      const c = await backupFamilyPhotos(db, photoStore, ctx.store);
       console.log(`Photos de la famille : ${c.total} référencée(s), ${c.copied} copiée(s), ${c.missing.length} absente(s) du stockage d'images.`);
     }
     const r = await backupVerifyPrune(ctx);
