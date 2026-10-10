@@ -9,8 +9,11 @@ export interface Me {
   family?: { code: string; name: string };
 }
 
+export type Unit = "piece" | "paquet" | "bouteille" | "kg";
+
 export interface Product {
   id: string;
+  unit: Unit;
   category: string;
   name: string;
   brand: string | null;
@@ -28,6 +31,40 @@ export interface PurchaseInfo {
   id: string;
   at: string;
   by: { id: string; displayName: string };
+  /** Frozen at purchase; null for purchases made before quantities existed. */
+  quantity?: number | null;
+  unit?: Unit | null;
+}
+
+export interface Person {
+  id: string;
+  displayName: string;
+}
+
+export type EventKind = "add" | "qty" | "remove" | "request_again";
+
+/** One change to the list (parents only): kept forever, never overwritten. */
+export interface ListEvent {
+  id: string;
+  itemId: string;
+  productId: string;
+  validationId: string;
+  kind: EventKind;
+  before: number | null;
+  after: number | null;
+  unit: Unit;
+  at: string;
+  by: Person;
+  name: string;
+  category: string;
+}
+
+/** One press on "Valider": its author, its time, and (through the events) its articles. */
+export interface Validation {
+  id: string;
+  at: string;
+  receivedAt: string;
+  by: Person;
 }
 
 export interface ListItem {
@@ -40,7 +77,14 @@ export interface ListItem {
   productActive: boolean;
   status: "to_buy" | "purchased";
   rev: number;
+  quantity: number;
+  unit: Unit;
   purchase?: PurchaseInfo;
+  /** Parents only: who asked for it and when (its first/last addition). */
+  addedBy?: Person;
+  addedAt?: string;
+  /** Parents only: the latest change when it is not the creation itself. */
+  lastChange?: { kind: EventKind; by: Person; at: string; before: number | null; after: number | null };
 }
 
 export interface Correction {
@@ -62,10 +106,14 @@ export interface ListView {
   closedBy?: { id: string; displayName: string };
   items: ListItem[];
   corrections?: Correction[];
+  events?: ListEvent[];
+  validations?: Validation[];
 }
 
 export type Op =
-  | { opId: string; type: "add"; productId: string }
+  | { opId: string; type: "add"; productId: string; quantity?: number }
+  | { opId: string; type: "set_qty"; productId: string; quantity: number; baseRev: number }
+  | { opId: string; type: "request_again"; productId: string; quantity?: number }
   | { opId: string; type: "remove"; productId: string; baseRev: number }
   | { opId: string; type: "purchase"; itemId: string }
   | { opId: string; type: "correct"; purchaseId: string; reason?: string | null };
@@ -77,6 +125,9 @@ export type RejectReason =
   | "item_unknown"
   | "item_removed"
   | "locked_purchased"
+  | "already_purchased"
+  | "bad_quantity"
+  | "duplicate_open"
   | "stale"
   | "purchase_unknown";
 
@@ -84,7 +135,7 @@ export interface OpResult {
   opId: string;
   status: "applied" | "already" | "rejected";
   reason?: RejectReason;
-  detail?: { purchasedBy?: { id: string; displayName: string }; purchasedAt?: string };
+  detail?: { purchasedBy?: Person; purchasedAt?: string; quantity?: number; unit?: Unit; lastBy?: Person };
   replay?: boolean;
 }
 
@@ -93,11 +144,17 @@ export interface Batch {
   listId: string;
   ops: Op[];
   createdAt: number;
+  /** When the person pressed "Valider" (ISO). Sent with the batch so a validation made offline keeps its real time. */
+  validatedAt?: string;
 }
 
 /** One unvalidated choice of the staff member for one product, relative to what is on the server/outbox. */
 export interface Toggle {
   want: boolean;
+  /** Chosen quantity (undefined = the default, 1, or the quantity already in the list). */
+  qty?: number;
+  /** Explicit new request for a product already bought in this list. */
+  again?: boolean;
   /** Revision of the article when the choice was made: a removal is only valid against that revision. */
   seenRev?: number;
 }

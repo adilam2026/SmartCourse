@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { api, ApiError, NetworkError } from "../api";
 import { CATEGORY_EMOJI } from "../categories";
 import { prepareImage } from "../image";
-import type { Product } from "../types";
+import type { Product, Unit } from "../types";
+import { UNIT_CHOICE, UNITS } from "../units";
 import { Dialog } from "./Dialog";
 
 interface Props {
@@ -23,12 +24,13 @@ export function ProductForm({ product, categories, onClose, onSaved }: Props) {
   const [name, setName] = useState(product?.name ?? "");
   const [category, setCategory] = useState(product?.category ?? categories[0]?.key ?? "");
   const [active, setActive] = useState(product?.active ?? true);
+  const [unit, setUnit] = useState<Unit>(product?.unit ?? "piece");
   const [image, setImage] = useState<{ base64: string; previewUrl: string } | null>(null);
   const [reset, setReset] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const inFlight = useRef(false); // un deuxième appui avant le rendu suivant ne doit pas envoyer deux fois
-  const dirty = !!image || reset || name !== (product?.name ?? "") || category !== (product?.category ?? categories[0]?.key ?? "") || active !== (product?.active ?? true);
+  const dirty = !!image || reset || name !== (product?.name ?? "") || category !== (product?.category ?? categories[0]?.key ?? "") || active !== (product?.active ?? true) || unit !== (product?.unit ?? "piece");
   useEffect(() => () => { if (image) URL.revokeObjectURL(image.previewUrl); }, [image]);
 
   const pick = async (f: File | undefined) => {
@@ -55,8 +57,8 @@ export function ProductForm({ product, categories, onClose, onSaved }: Props) {
         setBusy(true);
         setError(null);
         try {
-          if (product) await api.patchProduct(product.id, { name: name.trim(), category, active, ...(image ? { image: image.base64 } : reset ? { resetImage: true } : {}) });
-          else await api.createProduct({ name: name.trim(), category, active, ...(image ? { image: image.base64 } : {}) });
+          if (product) await api.patchProduct(product.id, { name: name.trim(), category, active, unit, ...(image ? { image: image.base64 } : reset ? { resetImage: true } : {}) });
+          else await api.createProduct({ name: name.trim(), category, active, unit, ...(image ? { image: image.base64 } : {}) });
           onSaved();
         } catch (err) {
           setError(errText(err));
@@ -83,6 +85,12 @@ export function ProductForm({ product, categories, onClose, onSaved }: Props) {
             {categories.map((c) => <option key={c.key} value={c.key}>{CATEGORY_EMOJI[c.key]} {c.label}</option>)}
           </select>
         </label>
+        <label className="field">Unité de la quantité
+          <select value={unit} onChange={(e) => setUnit(e.target.value as Unit)} data-testid="pf-unit">
+            {UNITS.map((u) => <option key={u} value={u}>{UNIT_CHOICE[u]}</option>)}
+          </select>
+        </label>
+        <p className="muted">Une quantité déjà demandée dans la liste en cours garde son unité ; les achats passés et les statistiques ne changent pas.</p>
         <label className="check"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} data-testid="pf-active" /> Article actif</label>
         <p className="muted" data-testid="pf-rule">Désactivé : l'article ne peut plus être ajouté à une liste. S'il est déjà dans la liste en cours, il y reste, marqué « désactivé » : il peut encore être acheté ou retiré. Les listes clôturées ne changent jamais.</p>
         <p className="muted">L'image est réduite automatiquement (512 px, fond blanc, sans rognage).</p>

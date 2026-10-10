@@ -4,14 +4,20 @@ import { Banners } from "../components/Banners";
 import { Dialog } from "../components/Dialog";
 import { Thumb } from "../components/Thumb";
 import { UserSheet } from "../components/UserSheet";
-import { fmtDateTime } from "../format";
+import { fmtWhen } from "../format";
+import { sectionGroups } from "../grouping";
+import { fmtQty } from "../units";
+import { GroupedRows } from "../components/GroupedRows";
+import { ItemDetail, RowMeta } from "../components/ItemDetail";
+import { ValidationHistory } from "../components/ValidationHistory";
+import { Stats } from "./Stats";
 import type { Engine, State } from "../sync/engine";
 import type { ListItem } from "../types";
 import { StaffScreen } from "./Staff";
 import { History } from "./History";
 import { Settings } from "./Settings";
 
-type Tab = "current" | "history" | "settings";
+type Tab = "current" | "history" | "stats" | "settings";
 
 export function ParentApp({ engine, s }: { engine: Engine; s: State }) {
   const [tab, setTab] = useState<Tab>("current");
@@ -25,12 +31,14 @@ export function ParentApp({ engine, s }: { engine: Engine; s: State }) {
     <div className="parent">
       <div className="parent__body">
         {tab === "current" && <Current engine={engine} s={s} onEdit={() => setEditing(true)} />}
-        {tab === "history" && <History />}
+        {tab === "history" && <History categories={s.catalog?.categories ?? []} />}
+        {tab === "stats" && <Stats />}
         {tab === "settings" && isAdmin && <Settings engine={engine} s={s} />}
       </div>
       <nav className="tabbar" aria-label="Navigation">
         <button className={tab === "current" ? "on" : ""} aria-current={tab === "current"} data-testid="tab-current" onClick={() => setTab("current")}>🛒<span>En cours</span></button>
         <button className={tab === "history" ? "on" : ""} aria-current={tab === "history"} data-testid="tab-history" onClick={() => setTab("history")}>🗂️<span>Historique</span></button>
+        <button className={tab === "stats" ? "on" : ""} aria-current={tab === "stats"} data-testid="tab-stats" onClick={() => setTab("stats")}>📊<span>Statistiques</span></button>
         {isAdmin && <button className={tab === "settings" ? "on" : ""} aria-current={tab === "settings"} data-testid="tab-settings" onClick={() => setTab("settings")}>⚙️<span>Réglages</span></button>}
       </nav>
     </div>
@@ -42,6 +50,8 @@ function Current({ engine, s, onEdit }: { engine: Engine; s: State; onEdit(): vo
   const [correcting, setCorrecting] = useState<ListItem | null>(null);
   const [closing, setClosing] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [detail, setDetail] = useState<string | null>(null);
+  const [validations, setValidations] = useState(false);
   const list = s.list;
 
   const header = (
@@ -72,6 +82,11 @@ function Current({ engine, s, onEdit }: { engine: Engine; s: State; onEdit(): vo
   const toBuy = list.items.filter((i) => i.status === "to_buy");
   const bought = list.items.filter((i) => i.status === "purchased");
   const pendingEdits = Object.keys(s.toggles).length;
+  // Presentation only: the same lines, grouped by category (catalogue order). The list itself is never changed.
+  const cats = s.catalog?.categories ?? [];
+  const toBuyGroups = sectionGroups(list, "to_buy", cats);
+  const boughtGroups = sectionGroups(list, "purchased", cats);
+  const detailItem = detail ? list.items.find((i) => i.id === detail) : undefined;
 
   const buy = async (id: string) => {
     setBusy(id);
@@ -88,37 +103,51 @@ function Current({ engine, s, onEdit }: { engine: Engine; s: State; onEdit(): vo
         <button className="btn" data-testid="edit-list" onClick={onEdit}>✏️ Modifier{pendingEdits ? ` (${pendingEdits})` : ""}</button>
         <button className="btn btn--ghost" data-testid="close-list" onClick={() => setClosing(true)}>Clôturer</button>
       </div>
+      {(list.validations?.length ?? 0) > 0 && (
+        <button className="linkbtn" data-testid="open-validations" onClick={() => setValidations(true)}>Historique des validations ({list.validations!.length})</button>
+      )}
 
       <section aria-labelledby="h-tobuy">
         <h2 id="h-tobuy" className="sect">À acheter <span className="count-pill" data-testid="count-tobuy">{toBuy.length}</span></h2>
         {toBuy.length === 0 && <p className="empty">Rien à acheter pour le moment.</p>}
-        <ul className="rows" data-testid="to-buy">
-          {toBuy.map((i) => (
+        <GroupedRows
+          groups={toBuyGroups}
+          testid="to-buy"
+          row={(i) => (
             <li key={i.id} className="row" data-testid={`row-${i.productId}`}>
               <Thumb photoUrl={i.photoUrl} category={i.category} />
-              <span className="row__name">{i.name}{i.brand && <small>{i.brand}</small>}{!i.productActive && <small>désactivé</small>}</span>
+              <button className="row__main" data-testid={`detail-${i.productId}`} aria-label={`Détail des modifications de ${i.name}`} onClick={() => setDetail(i.id)}>
+                <b>{i.name}<span className="qtychip" data-testid={`qty-${i.productId}`}>{fmtQty(i.quantity, i.unit)}</span></b>
+                {i.brand && <small>{i.brand}</small>}
+                {!i.productActive && <small>désactivé</small>}
+                <RowMeta item={i} />
+              </button>
               <button className="btn btn--primary" data-testid={`buy-${i.productId}`} disabled={busy === i.id} onClick={() => void buy(i.id)}>Acheté</button>
             </li>
-          ))}
-        </ul>
+          )}
+        />
       </section>
 
       <section aria-labelledby="h-bought">
         <h2 id="h-bought" className="sect">Déjà achetés <span className="count-pill" data-testid="count-bought">{bought.length}</span></h2>
-        <ul className="rows" data-testid="bought">
-          {bought.map((i) => (
+        <GroupedRows
+          groups={boughtGroups}
+          testid="bought"
+          row={(i) => (
             <li key={i.id} className="row row--bought" data-testid={`row-${i.productId}`}>
               <Thumb photoUrl={i.photoUrl} category={i.category} />
-              <span className="row__name">
-                {i.name}
-                <small data-testid={`by-${i.productId}`}>Acheté par {i.purchase?.by.displayName} · {i.purchase ? fmtDateTime(i.purchase.at) : ""}</small>
-              </span>
+              <button className="row__main" data-testid={`detail-${i.productId}`} aria-label={`Détail de ${i.name}`} onClick={() => setDetail(i.id)}>
+                <b>{i.name}<span className="qtychip">{fmtQty(i.purchase?.quantity ?? i.quantity, i.purchase?.unit ?? i.unit)}</span></b>
+                <small data-testid={`by-${i.productId}`}>Acheté par {i.purchase?.by.displayName} · {i.purchase ? fmtWhen(i.purchase.at) : ""}</small>
+              </button>
               <button className="btn btn--ghost" data-testid={`correct-${i.productId}`} onClick={() => setCorrecting(i)}>Corriger</button>
             </li>
-          ))}
-        </ul>
+          )}
+        />
       </section>
 
+      {detailItem && <ItemDetail list={list} item={detailItem} onClose={() => setDetail(null)} />}
+      {validations && <ValidationHistory list={list} onClose={() => setValidations(false)} />}
       {correcting && <CorrectDialog engine={engine} item={correcting} onClose={() => setCorrecting(null)} />}
       {closing && <CloseDialog engine={engine} remaining={toBuy.length} onClose={() => setClosing(false)} />}
     </>

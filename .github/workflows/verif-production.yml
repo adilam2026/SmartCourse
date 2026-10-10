@@ -1,0 +1,39 @@
+name: Vérification de la production (lecture seule)
+# Interroge l'adresse publique de SmartCourse sur Railway : santé, version du schéma, fichier assetlinks. Aucune écriture, aucun secret.
+on:
+  workflow_dispatch:
+    inputs:
+      app_url:
+        description: "Adresse de production (sans / final)"
+        default: "https://smartcourse-production-c7ce.up.railway.app"
+      schema_attendu:
+        description: "Dernière migration attendue"
+        default: "009_quantities.sql"
+permissions:
+  contents: read
+jobs:
+  verif:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Santé et version du schéma
+        run: |
+          U="${{ inputs.app_url }}"
+          for i in $(seq 1 20); do
+            R=$(curl -fsS -m 15 "$U/health" || true)
+            echo "essai $i : $R"
+            echo "$R" | grep -q '"status":"ok"' && echo "$R" | grep -q "${{ inputs.schema_attendu }}" && { echo "OK : serveur à jour (${{ inputs.schema_attendu }})"; exit 0; }
+            sleep 30
+          done
+          echo "::error::Le serveur de production n'est pas (encore) à jour ou ne répond pas."; exit 1
+      - name: Page d'accueil et assetlinks
+        run: |
+          U="${{ inputs.app_url }}"
+          curl -fsS -m 15 -o /dev/null -w "page d'accueil : HTTP %{http_code}\n" "$U/"
+          curl -fsS -m 15 "$U/.well-known/assetlinks.json" | head -c 400; echo
+      - name: Les routes protégées refusent un visiteur anonyme
+        run: |
+          U="${{ inputs.app_url }}"
+          for p in /api/lists/active /api/stats/purchases /api/catalog; do
+            echo "$p -> $(curl -s -o /dev/null -w '%{http_code}' -m 15 "$U$p")"
+          done

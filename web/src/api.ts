@@ -1,4 +1,4 @@
-import type { Catalog, ListView, Me, Op, OpResult, Product, Role } from "./types";
+import type { Catalog, ListView, Me, Op, OpResult, Product, Role, Unit } from "./types";
 
 /** The server could not be reached (offline, timeout, DNS…): nothing is known about what happened. */
 export class NetworkError extends Error {
@@ -58,7 +58,9 @@ export const api = {
   me: () => request<{ me: Me }>("GET", "/api/me"),
   catalog: () => request<Catalog>("GET", "/api/catalog"),
   activeList: () => request<{ list: ListView | null; catalogRev?: number }>("GET", "/api/lists/active"),
-  postOps: (listId: string, ops: Op[]) => request<{ results: OpResult[]; list: ListView }>("POST", `/api/lists/${listId}/ops`, { ops }),
+  postOps: (listId: string, ops: Op[], batch?: { id: string; at?: string }) =>
+    request<{ results: OpResult[]; list: ListView }>("POST", `/api/lists/${listId}/ops`, { ops, ...(batch ? { batch } : {}) }),
+  purchaseStats: (month?: string) => request<PurchaseStats>("GET", `/api/stats/purchases${month ? `?month=${month}` : ""}`),
   createList: () => request<{ list: ListView }>("POST", "/api/lists"),
   closeList: (listId: string) => request<{ status: string; remaining: number; purchased: number }>("POST", `/api/lists/${listId}/close`),
   history: () => request<{ lists: HistoryEntry[] }>("GET", "/api/lists"),
@@ -73,7 +75,7 @@ export const api = {
   backupStatus: () => request<BackupStatus>("GET", "/api/admin/backup-status"),
   catalogAdmin: () => request<Catalog>("GET", "/api/catalog?includeInactive=1"),
   patchProduct: (id: string, b: ProductPatch) => request<{ product: Product }>("PATCH", `/api/products/${id}`, b),
-  createProduct: (b: { name: string; category: string; image?: string; active?: boolean }) => request<{ product: Product }>("POST", "/api/products", b),
+  createProduct: (b: { name: string; category: string; image?: string; active?: boolean; unit?: Unit }) => request<{ product: Product }>("POST", "/api/products", b),
   searchExtended: (q: string) => request<{ results: ExtendedResult[] }>("GET", `/api/catalog/extended?q=${encodeURIComponent(q)}`),
   addFromExtended: (extendedId: string) => request<{ product: Product }>("POST", "/api/products/from-extended", { extendedId }),
   uploadPhoto: async (id: string, file: Blob) => {
@@ -91,8 +93,35 @@ export interface ProductPatch {
   category?: string;
   brand?: string | null;
   active?: boolean;
+  unit?: Unit;
   image?: string;
   resetImage?: boolean;
+}
+
+export interface StatsCell {
+  purchases: number;
+  quantity: number | null;
+  unknownQuantity: number;
+}
+export interface StatsRow {
+  productId: string;
+  name: string;
+  brand: string | null;
+  active: boolean;
+  category: string;
+  categoryLabel: string;
+  unit: Unit | null;
+  current: StatsCell;
+  previous: StatsCell;
+}
+export interface PurchaseStats {
+  month: string;
+  previousMonth: string;
+  timeZone: string;
+  months: string[];
+  rows: StatsRow[];
+  totals: { purchases: number; previousPurchases: number };
+  spending: null;
 }
 
 export interface BackupStatus {

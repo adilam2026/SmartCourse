@@ -1,7 +1,8 @@
 import { api as realApi, ApiError, NetworkError } from "../api";
 import { AppDbClass, type AppDb, type OrphanRow } from "../db";
 import type { Batch, Catalog, ListView, Me, Op, OpResult, Toggles } from "../types";
-import { buildOps, cancelQueuedAdd, interpretResults, isPurchased, normalizeToggles, projectedPresence, toggleProduct } from "./logic";
+import { clampQty } from "../units";
+import { buildOps, cancelQueuedAdd, editQueuedAdd, interpretResults, isPurchased, normalizeToggles, openItem, projectedPresence, requestAgainToggle, setQuantityToggle, toggleProduct } from "./logic";
 
 export interface Notice {
   id: number;
@@ -32,7 +33,11 @@ export interface State {
   live: boolean;
   /** Family code to show once right after the first installation. */
   welcomeCode: string | null;
+  /** How this person likes the catalogue shown (kept per profile on this phone). */
+  catalogView: CatalogView;
 }
+
+export type CatalogView = "all" | "categories";
 
 /** The subset of EventSource the engine uses (so tests can fake it). */
 export interface EventSourceLike {
@@ -57,7 +62,7 @@ const RETRY_MS = [3_000, 8_000, 20_000, 45_000];
 export class Engine {
   private s: State = {
     phase: "boot", me: null, conn: "online", catalog: null, list: undefined, toggles: {}, draftListId: null, batches: [],
-    sending: false, justSynced: false, notices: [], orphan: null, loginError: null, loggingIn: false, lastLogin: null, live: false, welcomeCode: null,
+    sending: false, justSynced: false, notices: [], orphan: null, loginError: null, loggingIn: false, lastLogin: null, live: false, welcomeCode: null, catalogView: "all",
   };
   private listeners = new Set<() => void>();
   private api: typeof realApi;
@@ -250,7 +255,9 @@ export class Engine {
         draftListId = d.listId;
       }
     }
+    const pref = (await this.db.meta.get(`catalogView:${me.familyId}:${me.id}`))?.value;
     this.set({
+      catalogView: pref === "categories" ? "categories" : "all",
       catalog: cache?.catalog ?? null,
       list: cache ? cache.list : undefined,
       batches: batches.map(({ familyId: _f, profileId: _p, ...b }) => b),
@@ -387,9 +394,9 @@ export class Engine {
   async toggle(productId: string): Promise<void> {
     const { list, batches, toggles } = this.s;
     if (!list || list.status !== "active") return;
-    if (isPurchased(list, productId)) return this.notice("Déjà acheté : ce produit ne peut plus être retiré.");
+    if (isPurchased(list, productId, batches) && !toggles[productId]?.again) return this.notice("Déjà acheté : utilisez « Nouvelle demande » pour en demander encore.");
     const wasPresent = projectedPresence(list, batches, productId);
-    const hasServerRow = list.items.some((i) => i.productId === productId);
+    const hasServerRow = !!openItem(list, productId);
     const wantNow = toggles[productId]?.want ?? wasPresent;
     if (wantNow && !hasServerRow && wasPresent && !toggles[productId]) {
       // Present only because of a queued add: un-selecting means cancelling that queued add.
@@ -403,18 +410,61 @@ export class Engine {
     await this.persistDraft();
   }
 
+  /** The unit of a product: the line's own (frozen when it was requested), else the product's current one. */
+  private unitFor(productId: string) {
+    const line = openItem(this.s.list, productId);
+    if (line) return line.unit;
+    for (const c of this.s.catalog?.categories ?? []) for (const p of c.products) if (p.id === productId) return p.unit ?? "piece";
+    return "piece" as const;
+  }
+
+  /** Sets the wanted quantity of a selected product. Never adds a second line; never touches other articles. */
+  async setQuantity(productId: string, wanted: number): Promise<void> {
+    const { list, batches, toggles } = this.s;
+    if (!list || list.status !== "active") return;
+    const qty = clampQty(wanted, this.unitFor(productId));
+    const present = projectedPresence(list, batches, productId);
+    if (!(toggles[productId]?.want ?? present)) return; // the counter only exists on a selected card
+    if (present && !openItem(list, productId) && !toggles[productId]) {
+      // In the list only through a queued (offline) add: the quantity goes into that very add, so a sync can never add it twice.
+      const r = editQueuedAdd(batches, productId, qty, this.inFlightBatchId);
+      if (!r.ok) return this.notice("Enregistrement en cours. Réessayez dans un instant.");
+      this.set({ batches: r.batches });
+      await this.persistOutbox();
+      return;
+    }
+    this.set({ toggles: setQuantityToggle(list, batches, toggles, productId, qty), draftListId: this.s.draftListId ?? list.id });
+    await this.persistDraft();
+  }
+
+  /** Explicit "new request" for a product that was already bought in this list. */
+  async requestAgain(productId: string): Promise<void> {
+    const { list, batches, toggles } = this.s;
+    if (!list || list.status !== "active") return;
+    if (!isPurchased(list, productId, batches)) return;
+    this.set({ toggles: requestAgainToggle(list, batches, toggles, productId), draftListId: this.s.draftListId ?? list.id });
+    await this.persistDraft();
+  }
+
+  async setCatalogView(view: CatalogView): Promise<void> {
+    const me = this.s.me;
+    this.set({ catalogView: view });
+    if (me) await this.db.meta.put({ key: `catalogView:${me.familyId}:${me.id}`, value: view });
+  }
+
   /** "Valider": move the pending choices into the outbox (persisted first), then try to send. */
   async validate(): Promise<void> {
     const { list, toggles } = this.s;
     // Not refused while a sync is in flight: the new batch is queued and the running loop sends it right after
     // (a second tap is harmless: the first one already emptied the pending choices).
     if (!list || list.status !== "active") return;
-    const ops = buildOps(list, toggles, this.newId);
+    const ops = buildOps(list, this.s.batches, toggles, this.newId);
     if (ops.length === 0) {
       this.set({ toggles: {} });
       return this.persistDraft();
     }
-    const batch: Batch = { id: this.newId(), listId: list.id, ops, createdAt: Date.now() };
+    // The validation keeps the moment the person pressed the button, even if the phone is offline and it is sent hours later.
+    const batch: Batch = { id: this.newId(), listId: list.id, ops, createdAt: Date.now(), validatedAt: new Date().toISOString() };
     this.set({ batches: [...this.s.batches, batch], toggles: {} });
     await Promise.all([this.persistOutbox(), this.persistDraft()]); // on disk before any network call
     await this.flush();
@@ -430,7 +480,7 @@ export class Engine {
       this.set({ sending: true });
       let res: Awaited<ReturnType<typeof this.api.postOps>>;
       try {
-        res = await this.api.postOps(batch.listId, batch.ops);
+        res = await this.api.postOps(batch.listId, batch.ops, { id: batch.id, at: batch.validatedAt });
       } catch (e) {
         this.inFlightBatchId = undefined;
         this.set({ sending: false });

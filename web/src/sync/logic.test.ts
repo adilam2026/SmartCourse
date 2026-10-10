@@ -3,7 +3,7 @@ import type { Batch, ListItem, ListView, OpResult } from "../types";
 import { buildOps, cancelQueuedAdd, effectivePresence, interpretResults, normalizeToggles, toggleProduct } from "./logic";
 
 const item = (productId: string, status: "to_buy" | "purchased" = "to_buy", rev = 1): ListItem => ({
-  id: `item-${productId}`, productId, category: "c", name: productId, brand: null, photoUrl: null, productActive: true, status, rev,
+  id: `item-${productId}`, productId, category: "c", name: productId, brand: null, photoUrl: null, productActive: true, status, rev, quantity: 1, unit: "piece",
 });
 const list = (...items: ListItem[]): ListView => ({ id: "L1", status: "active", createdAt: "", closedAt: null, items });
 let n = 0;
@@ -32,7 +32,7 @@ describe("brouillon", () => {
     const now = list(item("lait", "purchased", 2)); // un parent l'a acheté entre-temps
     expect(normalizeToggles(now, [], draft)).toEqual({});
     expect(toggleProduct(now, [], {}, "lait")).toEqual({});
-    expect(buildOps(now, normalizeToggles(now, [], draft), id)).toEqual([]);
+    expect(buildOps(now, [], normalizeToggles(now, [], draft), id)).toEqual([]);
   });
 
   it("une demande déjà satisfaite par un autre membre disparaît du brouillon", () => {
@@ -45,7 +45,7 @@ describe("brouillon", () => {
     const l = list(item("riz", "to_buy", 3));
     let t = toggleProduct(l, [], {}, "lait");
     t = toggleProduct(l, [], t, "riz");
-    const ops = buildOps(l, t, id);
+    const ops = buildOps(l, [], t, id);
     expect(ops).toEqual([
       expect.objectContaining({ type: "add", productId: "lait" }),
       expect.objectContaining({ type: "remove", productId: "riz", baseRev: 3 }),
@@ -57,7 +57,7 @@ describe("brouillon", () => {
     const seen = list(item("riz", "to_buy", 1));
     const t = toggleProduct(seen, [], {}, "riz");
     const later = list(item("riz", "to_buy", 3)); // acheté puis corrigé entre-temps
-    expect(buildOps(later, normalizeToggles(later, [], t), id)).toEqual([expect.objectContaining({ baseRev: 1 })]);
+    expect(buildOps(later, [], normalizeToggles(later, [], t), id)).toEqual([expect.objectContaining({ baseRev: 1 })]);
   });
 });
 

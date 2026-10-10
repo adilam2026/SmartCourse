@@ -1,3 +1,4 @@
+import { unitLabel } from "../units";
 import { useEffect, useState } from "react";
 import { api, ApiError, NetworkError, type BackupStatus, type ExtendedResult, type Profile } from "../api";
 import { fmtDateTime } from "../format";
@@ -192,7 +193,7 @@ function CatalogAdmin({ engine }: { engine: Engine }) {
             {c.products.map((p) => (
               <li key={p.id} className={`row row--cat ${p.active ? "" : "row--off"}`} data-testid={`prod-${p.name}`}>
                 <Thumb photoUrl={p.photoUrl} category={c.key} />
-                <span className="row__name">{p.name}{p.brand && <small>{p.brand}</small>}{!p.active && <small>désactivé</small>}</span>
+                <span className="row__name">{p.name}{p.brand && <small>{p.brand}</small>}<small>Unité : {unitLabel(p.unit)}</small>{!p.active && <small>désactivé</small>}</span>
                 <span className="rowbtns">
                   <button className="btn btn--small" data-testid={`edit-${p.name}`} aria-label={`Modifier ${p.name}`} onClick={() => setForm({ product: p })}>Modifier</button>
                   <button className="btn btn--small btn--ghost" data-testid={`active-${p.name}`} onClick={() => void act(() => api.patchProduct(p.id, { active: !p.active }))}>{p.active ? "Désactiver" : "Réactiver"}</button>

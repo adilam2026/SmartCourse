@@ -85,8 +85,9 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
   app.get("/health", async (_req, reply) => {
     try {
-      await db.query("SELECT 1");
-      return { status: "ok" };
+      // The latest applied migration tells which version of the schema this server runs (checked after a deployment).
+      const m = await db.query("SELECT name FROM schema_migrations ORDER BY name DESC LIMIT 1");
+      return { status: "ok", schema: (m.rows[0]?.name as string | undefined) ?? null };
     } catch {
       return reply.code(503).send({ status: "db_unavailable" });
     }

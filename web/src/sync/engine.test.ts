@@ -6,10 +6,10 @@ import type { Catalog, ListItem, ListView, Me, Op, OpResult } from "../types";
 import { Engine, type EventSourceLike } from "./engine";
 
 const me = (id = "p1", familyId = "f1"): Me => ({ id, familyId, displayName: "Marie", login: "marie", role: "staff" });
-const product = (id: string, category = "c") => ({ id, category, name: id.toUpperCase(), brand: null, active: true, photoUrl: null });
+const product = (id: string, category = "c", unit: "piece" | "paquet" | "bouteille" | "kg" = "piece") => ({ id, category, name: id.toUpperCase(), brand: null, active: true, photoUrl: null, unit });
 const catalog: Catalog = { categories: [{ key: "c", label: "C", products: ["lait", "riz", "sucre"].map((p) => product(p)) }] };
 const item = (productId: string, status: "to_buy" | "purchased" = "to_buy", rev = 1): ListItem => ({
-  id: `i-${productId}`, productId, category: "c", name: productId.toUpperCase(), brand: null, photoUrl: null, productActive: true, status, rev,
+  id: `i-${productId}`, productId, category: "c", name: productId.toUpperCase(), brand: null, photoUrl: null, productActive: true, status, rev, quantity: 1, unit: "piece",
 });
 
 /** A tiny in-memory server honouring the real semantics we rely on (idempotent op ids, closed lists). */
@@ -18,7 +18,7 @@ class FakeServer {
   items: ListItem[] = [];
   seen = new Map<string, OpResult>();
   down = false;
-  calls: { listId: string; ops: Op[] }[] = [];
+  calls: { listId: string; ops: Op[]; batch?: { id: string; at?: string } }[] = [];
   meOk = true;
   cat: Catalog = catalog;
   catalogRev: number | undefined; // undefined = ancien serveur, sans révision
@@ -33,20 +33,32 @@ class FakeServer {
     logout: async () => ({ ok: true as const }),
     catalog: async () => { this.check(); this.catalogCalls++; return this.catalogRev === undefined ? this.cat : { ...this.cat, rev: this.catalogRev }; },
     activeList: async () => { this.check(); return { list: this.view(), catalogRev: this.catalogRev }; },
-    postOps: async (listId: string, ops: Op[]) => {
+    postOps: async (listId: string, ops: Op[], batch?: { id: string; at?: string }) => {
       this.check();
-      this.calls.push({ listId, ops });
+      this.calls.push({ listId, ops, batch });
       const results: OpResult[] = ops.map((op) => {
         const prev = this.seen.get(op.opId);
         if (prev) return { ...prev, replay: true };
         let r: OpResult;
         if (listId !== this.listId) r = { opId: op.opId, status: "rejected", reason: "list_closed" };
         else if (op.type === "add") {
-          const ex = this.items.find((i) => i.productId === op.productId);
-          if (ex) r = { opId: op.opId, status: "already" };
-          else { this.items.push(item(op.productId)); r = { opId: op.opId, status: "applied" }; }
+          const ex = this.items.find((i) => i.productId === op.productId && i.status === "to_buy");
+          const bought = this.items.find((i) => i.productId === op.productId && i.status === "purchased");
+          if (ex) r = { opId: op.opId, status: "already", detail: { quantity: ex.quantity, unit: ex.unit } };
+          else if (bought) r = { opId: op.opId, status: "rejected", reason: "already_purchased", detail: { quantity: bought.quantity, unit: bought.unit } };
+          else { this.items.push({ ...item(op.productId), quantity: op.quantity ?? 1 }); r = { opId: op.opId, status: "applied" }; }
+        } else if (op.type === "request_again") {
+          const ex = this.items.find((i) => i.productId === op.productId && i.status === "to_buy");
+          if (ex) r = { opId: op.opId, status: "already", detail: { quantity: ex.quantity, unit: ex.unit } };
+          else if (!this.items.some((i) => i.productId === op.productId)) r = { opId: op.opId, status: "rejected", reason: "item_unknown" };
+          else { this.items.push({ ...item(op.productId), id: `i2-${op.productId}`, quantity: op.quantity ?? 1 }); r = { opId: op.opId, status: "applied" }; }
+        } else if (op.type === "set_qty") {
+          const ex = this.items.find((i) => i.productId === op.productId && i.status === "to_buy");
+          if (!ex) r = { opId: op.opId, status: "rejected", reason: "item_unknown" };
+          else if (ex.rev !== op.baseRev) r = { opId: op.opId, status: "rejected", reason: "stale", detail: { quantity: ex.quantity, unit: ex.unit, lastBy: { id: "x", displayName: "Lamiaa" } } };
+          else { ex.quantity = op.quantity; ex.rev++; r = { opId: op.opId, status: "applied" }; }
         } else if (op.type === "remove") {
-          const ex = this.items.find((i) => i.productId === op.productId);
+          const ex = this.items.find((i) => i.productId === op.productId && i.status === "to_buy") ?? this.items.find((i) => i.productId === op.productId);
           if (!ex) r = { opId: op.opId, status: "rejected", reason: "item_unknown" };
           else if (ex.status === "purchased") r = { opId: op.opId, status: "rejected", reason: "locked_purchased" };
           else if (ex.rev !== op.baseRev) r = { opId: op.opId, status: "rejected", reason: "stale" };
@@ -504,3 +516,182 @@ describe("relecture périodique (filet de sécurité quand le flux temps réel e
     });
   });
 });
+
+describe("quantités, nouvelle demande, validations", () => {
+  const kgCatalog: Catalog = { categories: [{ key: "c", label: "C", products: [product("lait"), product("tomates", "c", "kg"), product("riz")] }] };
+
+  it("choisir une quantité puis valider envoie UN ajout avec cette quantité ; le serveur la conserve", async () => {
+    srv.cat = kgCatalog;
+    const e = await boot();
+    await e.toggle("tomates");
+    await e.setQuantity("tomates", 2.5);
+    await e.validate();
+    expect(srv.calls[0]!.ops).toEqual([expect.objectContaining({ type: "add", productId: "tomates", quantity: 2.5 })]);
+    expect(srv.items[0]).toMatchObject({ productId: "tomates", quantity: 2.5 });
+    expect(e.getState().list?.items[0]?.quantity).toBe(2.5);
+  });
+
+  it("une quantité hors limites est ramenée à ce que l'unité accepte (entier pour une pièce, minimum 1)", async () => {
+    const e = await boot();
+    await e.toggle("lait");
+    await e.setQuantity("lait", 2.7);
+    expect(e.getState().toggles["lait"]?.qty).toBe(3);
+    await e.setQuantity("lait", 0);
+    expect(e.getState().toggles["lait"]?.qty).toBe(1);
+  });
+
+  it("ajuster la quantité d'un article déjà dans la liste envoie set_qty avec la révision vue ; la quantité serveur change", async () => {
+    srv.items = [{ ...item("lait", "to_buy", 3), quantity: 2 }];
+    const e = await boot();
+    await e.setQuantity("lait", 5);
+    expect(e.getState().toggles["lait"]).toMatchObject({ want: true, qty: 5, seenRev: 3 });
+    await e.validate();
+    expect(srv.calls[0]!.ops).toEqual([expect.objectContaining({ type: "set_qty", productId: "lait", quantity: 5, baseRev: 3 })]);
+    expect(srv.items[0]).toMatchObject({ quantity: 5, rev: 4 });
+  });
+
+  it("revenir à la quantité du serveur ne laisse aucun changement en attente", async () => {
+    srv.items = [{ ...item("lait", "to_buy", 1), quantity: 2 }];
+    const e = await boot();
+    await e.setQuantity("lait", 3);
+    expect(Object.keys(e.getState().toggles)).toEqual(["lait"]);
+    await e.setQuantity("lait", 2);
+    expect(e.getState().toggles).toEqual({});
+  });
+
+  it("modification simultanée : si quelqu'un a changé la quantité entre-temps, rien n'est écrasé et la personne en est informée", async () => {
+    srv.items = [{ ...item("lait", "to_buy", 1), quantity: 2 }];
+    const e = await boot();
+    await e.setQuantity("lait", 7); // choix fait sur la révision 1
+    srv.items[0]!.quantity = 4; // un autre parent a changé la quantité
+    srv.items[0]!.rev = 2;
+    await e.validate();
+    expect(srv.items[0]).toMatchObject({ quantity: 4 }); // la valeur de l'autre n'a pas été écrasée
+    const msg = e.getState().notices.map((n) => n.text).join("\n");
+    expect(msg).toMatch(/LAIT/);
+    expect(msg).toMatch(/Lamiaa/);
+    expect(msg).toMatch(/4 pièces/);
+    expect(msg).toMatch(/pas été appliqué/);
+  });
+
+  it("hors connexion : la quantité validée est conservée, modifiable dans la file sans second ajout, et envoyée une seule fois au retour du réseau", async () => {
+    const e = await boot();
+    await e.toggle("lait");
+    await e.setQuantity("lait", 3);
+    srv.down = true;
+    await e.validate();
+    expect(e.getState().batches[0]!.ops).toEqual([expect.objectContaining({ type: "add", quantity: 3 })]);
+    await e.setQuantity("lait", 4); // l'article n'existe que dans la file : c'est l'ajout en file qui change
+    expect(e.getState().batches).toHaveLength(1);
+    expect(e.getState().batches[0]!.ops).toHaveLength(1);
+    expect(e.getState().batches[0]!.ops[0]).toMatchObject({ type: "add", quantity: 4 });
+    // fermeture / réouverture sans réseau : la quantité en file est toujours là
+    const e2 = await boot();
+    expect(e2.getState().batches[0]!.ops[0]).toMatchObject({ quantity: 4 });
+    srv.down = false;
+    await e2.retryNow();
+    expect(srv.items).toHaveLength(1);
+    expect(srv.items[0]).toMatchObject({ productId: "lait", quantity: 4 });
+  });
+
+  it("une réponse perdue puis renvoi du même lot ne double ni l'article ni la quantité", async () => {
+    const e = await boot();
+    await e.toggle("lait");
+    await e.setQuantity("lait", 3);
+    await e.validate();
+    const batch = srv.calls[0]!;
+    // le téléphone n'a jamais reçu la réponse : il renvoie exactement le même lot
+    const again = await srv.api.postOps(batch.listId, batch.ops, batch.batch);
+    expect(again.results[0].replay).toBe(true);
+    expect(srv.items).toHaveLength(1);
+    expect(srv.items[0]!.quantity).toBe(3);
+  });
+
+  it("article déjà dans la liste : sélectionner n'en crée pas un second ; la quantité actuelle est affichée et ajustable", async () => {
+    srv.items = [{ ...item("lait"), quantity: 3 }];
+    const e = await boot();
+    expect(e.getState().list?.items.filter((i) => i.productId === "lait")).toHaveLength(1);
+    await e.toggle("lait"); // sur la carte : retirer
+    await e.toggle("lait"); // puis re-sélectionner : retour à l'état du serveur, rien en attente
+    expect(e.getState().toggles).toEqual({});
+    expect(srv.calls).toHaveLength(0);
+  });
+
+  it("un ajout dont le serveur dit « déjà là » avec une autre quantité : aucun doublon, la personne voit la quantité actuelle", async () => {
+    const e = await boot();
+    await e.toggle("lait");
+    await e.setQuantity("lait", 6);
+    srv.items = [{ ...item("lait"), quantity: 2 }]; // un autre membre l'a ajouté (2) avant l'envoi
+    await e.validate();
+    expect(srv.items).toHaveLength(1);
+    expect(srv.items[0]!.quantity).toBe(2);
+    expect(e.getState().notices.map((n) => n.text).join("\n")).toMatch(/déjà dans la liste \(2 pièces\)/);
+  });
+
+  it("un article acheté n'est jamais remis à acheter par un appui : il faut une « nouvelle demande » explicite", async () => {
+    srv.items = [{ ...item("lait", "purchased", 2), quantity: 2 }];
+    const e = await boot();
+    await e.toggle("lait");
+    expect(e.getState().toggles).toEqual({});
+    expect(e.getState().notices.map((n) => n.text).join("")).toMatch(/Nouvelle demande/);
+    await e.requestAgain("lait");
+    await e.setQuantity("lait", 3);
+    await e.validate();
+    expect(srv.calls[0]!.ops).toEqual([expect.objectContaining({ type: "request_again", productId: "lait", quantity: 3 })]);
+    const lines = srv.items.filter((i) => i.productId === "lait");
+    expect(lines.map((l) => [l.status, l.quantity]).sort()).toEqual([["purchased", 2], ["to_buy", 3]]);
+    expect(e.getState().list?.items.filter((i) => i.productId === "lait")).toHaveLength(2);
+  });
+
+  it("annuler une nouvelle demande (la décocher) ne laisse aucun changement", async () => {
+    srv.items = [{ ...item("lait", "purchased", 2), quantity: 2 }];
+    const e = await boot();
+    await e.requestAgain("lait");
+    expect(e.getState().toggles["lait"]).toMatchObject({ want: true, again: true });
+    await e.toggle("lait");
+    expect(e.getState().toggles).toEqual({});
+  });
+
+  it("chaque validation garde l'heure où la personne a appuyé, même envoyée plus tard (hors connexion)", async () => {
+    const e = await boot();
+    await e.toggle("lait");
+    srv.down = true;
+    await e.validate();
+    const at = e.getState().batches[0]!.validatedAt!;
+    expect(new Date(at).getTime()).toBeLessThanOrEqual(Date.now());
+    srv.down = false;
+    await new Promise((r) => setTimeout(r, 15));
+    await e.retryNow();
+    expect(srv.calls[0]!.batch).toEqual({ id: e.getState().batches[0]?.id ?? srv.calls[0]!.batch!.id, at });
+    // une seconde validation = un autre identifiant de lot
+    await e.toggle("riz");
+    await e.validate();
+    expect(srv.calls[1]!.batch!.id).not.toBe(srv.calls[0]!.batch!.id);
+  });
+
+  it("deux validations successives : deux lots distincts, la seconde n'écrase pas la première", async () => {
+    const e = await boot();
+    await e.toggle("lait");
+    await e.toggle("riz");
+    await e.validate();
+    await e.toggle("sucre");
+    await e.validate();
+    expect(srv.calls.map((c) => c.ops.map((o) => (o as { productId: string }).productId).sort())).toEqual([["lait", "riz"], ["sucre"]]);
+    expect(srv.calls[0]!.batch!.id).not.toBe(srv.calls[1]!.batch!.id);
+  });
+
+  it("le choix d'affichage du catalogue est mémorisé par profil et ne touche pas aux sélections", async () => {
+    const e = await boot();
+    await e.toggle("lait");
+    await e.setQuantity("lait", 3);
+    expect(e.getState().catalogView).toBe("all");
+    await e.setCatalogView("categories");
+    expect(e.getState().toggles["lait"]).toMatchObject({ want: true, qty: 3 });
+    const e2 = await boot(); // même profil, nouvelle ouverture
+    expect(e2.getState().catalogView).toBe("categories");
+    expect(e2.getState().toggles["lait"]).toMatchObject({ qty: 3 });
+    await e2.setCatalogView("all");
+    expect((await boot()).getState().catalogView).toBe("all");
+  });
+});
+
