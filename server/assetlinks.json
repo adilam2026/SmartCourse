@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.smartcourse.courses",
+      "sha256_cert_fingerprints": [
+        "33:93:E6:53:89:D6:C9:0B:70:05:B8:AC:62:7A:D1:F3:5C:B7:18:A8:6F:E5:B3:D3:F1:D6:BF:C8:5C:AB:42:79"
+      ]
+    }
+  }
+]

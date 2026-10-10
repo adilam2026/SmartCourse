@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
+import { useBackLayer } from "../useBackLayer";
 
 /**
  * Bottom sheet. It follows the *visual* viewport, so that on a phone the on-screen keyboard never hides it
@@ -6,6 +7,8 @@ import { useEffect, useRef, type ReactNode } from "react";
  */
 export function Dialog({ title, children, onClose, dismissable = true }: { title: string; children: ReactNode; onClose(): void; dismissable?: boolean }) {
   const backdrop = useRef<HTMLDivElement>(null);
+  // Android Back closes the dialog (an unsaved form refuses: the user must choose Annuler or Enregistrer).
+  useBackLayer(true, () => (dismissable ? onClose() : false));
   useEffect(() => {
     const vv = window.visualViewport;
     const el = backdrop.current;

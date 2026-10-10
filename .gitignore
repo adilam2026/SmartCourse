@@ -7,3 +7,13 @@ e2e/playwright-report
 server/data/photos
 server/data/backups
 exports
+
+# Android : jamais de clé de signature dans le dépôt
+*.jks
+*.keystore
+*.b64
+mots-de-passe*
+android/.gradle
+android/build
+android/app/build
+android/local.properties

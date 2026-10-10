@@ -11,7 +11,9 @@ export default defineConfig({
         name: "SmartCourse — liste de courses familiale",
         short_name: "Courses",
         lang: "fr",
+        id: "/",
         start_url: "/",
+        scope: "/",
         display: "standalone",
         background_color: "#fbf7f0",
         theme_color: "#1f7a4d",
@@ -23,7 +25,7 @@ export default defineConfig({
       },
       workbox: {
         navigateFallback: "/index.html",
-        navigateFallbackDenylist: [/^\/api\//],
+        navigateFallbackDenylist: [/^\/api\//, /^\/\.well-known\//],
         // Photos are immutable (content-addressed): cache-first, kept for offline use.
         runtimeCaching: [
           {

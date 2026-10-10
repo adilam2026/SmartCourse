@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, type Credit } from "../api";
+import { useBackLayer } from "../useBackLayer";
 import type { Engine, State } from "../sync/engine";
 
 const ROLE: Record<string, string> = { admin: "Administrateur", parent: "Parent", staff: "Personnel" };
@@ -9,6 +10,7 @@ export function UserSheet({ engine, s, onClose }: { engine: Engine; s: State; on
   const [generated, setGenerated] = useState<{ count: number; source: string } | null>(null);
   const [showCredits, setShowCredits] = useState(false);
   const pending = Object.keys(s.toggles).length + s.batches.length;
+  useBackLayer(true, onClose);
   useEffect(() => {
     if (showCredits && !credits) api.credits().then((r) => { setGenerated(r.generated); setCredits(r.credits); }).catch(() => setCredits([]));
   }, [showCredits, credits]);

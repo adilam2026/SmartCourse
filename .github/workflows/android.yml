@@ -1,0 +1,151 @@
+name: Application Android (APK signé + AAB Google Play)
+# Construit l'application Android (Trusted Web Activity : la PWA SmartCourse du serveur Railway en plein écran, sans barre d'adresse).
+# Lancement manuel : Actions → « Application Android » → Run workflow. Aucun accès à Railway, aucun déploiement.
+#
+# SIGNATURE : la clé n'est JAMAIS dans le dépôt. Quatre secrets de dépôt (Settings → Secrets and variables → Actions → Secrets) :
+#   ANDROID_KEYSTORE_B64      le fichier .jks encodé en base64
+#   ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
+# Sans eux, le workflow produit un APK « ESSAI » signé par une clé jetable créée pendant l'exécution : il sert à vérifier que tout se
+# construit et se lance, il n'est PAS distribuable (impossible à mettre à jour, empreinte différente de assetlinks.json).
+# Le dépôt est public : les fichiers produits sont téléchargeables par tout compte GitHub (ils ne contiennent aucun secret).
+on:
+  workflow_dispatch:
+    inputs:
+      app_url:
+        description: "Adresse de production (sans / final)"
+        default: "https://smartcourse-production-c7ce.up.railway.app"
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    outputs:
+      mode: ${{ steps.key.outputs.mode }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Composants Android (SDK 36)
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" | tail -2
+      - name: Clé de signature
+        id: key
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          F="$RUNNER_TEMP/release.jks"
+          if [ -n "$KS_B64" ] && [ -n "$KS_PASS" ] && [ -n "$KS_ALIAS" ] && [ -n "$KEY_PASS" ]; then
+            echo "$KS_B64" | base64 -d > "$F"
+            echo "mode=production" >> "$GITHUB_OUTPUT"
+            echo "### Signature : clé de production (secrets du dépôt)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            P=$(openssl rand -hex 16); echo "::add-mask::$P"
+            keytool -genkeypair -noprompt -keystore "$F" -storetype PKCS12 -alias essai -keyalg RSA -keysize 2048 -validity 30 -storepass "$P" -keypass "$P" -dname "CN=ESSAI non distribuable" >/dev/null 2>&1
+            KS_PASS="$P"; KS_ALIAS=essai; KEY_PASS="$P"
+            echo "mode=essai" >> "$GITHUB_OUTPUT"
+            echo "### Signature : clé d'ESSAI jetable (secrets absents) — APK NON distribuable" >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning::Secrets de signature absents : APK d'ESSAI signé par une clé jetable. À ne pas installer durablement."
+          fi
+          echo "ANDROID_KEYSTORE_PATH=$F" >> "$GITHUB_ENV"
+          echo "ANDROID_KEYSTORE_PASSWORD=$KS_PASS" >> "$GITHUB_ENV"
+          echo "ANDROID_KEY_ALIAS=$KS_ALIAS" >> "$GITHUB_ENV"
+          echo "ANDROID_KEY_PASSWORD=$KEY_PASS" >> "$GITHUB_ENV"
+      - name: Construction (APK release + AAB)
+        working-directory: android
+        run: ./gradlew --no-daemon assembleRelease bundleRelease -PappUrl="${{ inputs.app_url }}" -PversionCode=${{ github.run_number }} -PversionName="1.0.${{ github.run_number }}"
+      - name: Vérifications du paquet
+        run: |
+          set -euo pipefail
+          BT="$ANDROID_HOME/build-tools/36.0.0"
+          APK=$(ls android/app/build/outputs/apk/release/*.apk); AAB=$(ls android/app/build/outputs/bundle/release/*.aab)
+          echo "APK : $APK ($(stat -c %s "$APK") octets) — AAB : $AAB ($(stat -c %s "$AAB") octets)"
+          "$BT/apksigner" verify --verbose --print-certs "$APK" | tee /tmp/apksigner.txt | grep -E "Verifies|v2|v3|SHA-256"
+          "$BT/aapt2" dump badging "$APK" > /tmp/badging.txt
+          grep -E "^package:|application-label:|launchable-activity|uses-permission|sdkVersion|targetSdkVersion" /tmp/badging.txt
+          grep -q "name='app.smartcourse.courses'" /tmp/badging.txt
+          grep -q "application-label:'Courses'" /tmp/badging.txt
+          ! grep -q "uses-permission: name='android.permission.\(CAMERA\|READ_EXTERNAL_STORAGE\|WRITE_EXTERNAL_STORAGE\|RECORD_AUDIO\|ACCESS_FINE_LOCATION\)" /tmp/badging.txt
+          unzip -l "$APK" | grep -E "ic_launcher|splash" | head -5
+          # L'AAB doit être signé et valide pour Google Play
+          jarsigner -verify "$AAB" | head -1
+          curl -fsSL -o /tmp/bundletool.jar https://github.com/google/bundletool/releases/download/1.18.1/bundletool-all-1.18.1.jar
+          java -jar /tmp/bundletool.jar validate --bundle="$AAB"
+          # Empreinte du certificat de l'APK
+          FP=$(grep -m1 "certificate SHA-256 digest" /tmp/apksigner.txt | sed 's/.*: //' | tr 'a-f' 'A-F' | sed 's/../&:/g; s/:$//')
+          echo "$FP" > /tmp/fingerprint.txt
+          echo "Empreinte SHA-256 du certificat : $FP"
+          echo "### Empreinte du certificat (à mettre dans server/assetlinks.json)" >> "$GITHUB_STEP_SUMMARY"; echo "\`$FP\`" >> "$GITHUB_STEP_SUMMARY"
+          grep -q "$FP" server/assetlinks.json && echo "assetlinks.json du dépôt : empreinte CONFORME" || {
+            if [ "${{ steps.key.outputs.mode }}" = production ]; then echo "::error::L'empreinte de la clé de production n'est pas dans server/assetlinks.json : l'application afficherait la barre d'adresse."; exit 1; fi
+            echo "(mode essai : empreinte différente, normal)"; }
+          mkdir -p dist
+          cp "$APK" dist/SmartCourse.apk; cp "$AAB" dist/SmartCourse.aab; cp /tmp/fingerprint.txt dist/empreinte-sha256.txt
+      - name: Adresse de production — assetlinks.json (informatif)
+        run: |
+          U="${{ inputs.app_url }}"
+          curl -fsS -m 20 "$U/health" -o /dev/null && echo "serveur joignable" || echo "::warning::serveur de production injoignable depuis GitHub"
+          if curl -fsS -m 20 "$U/.well-known/assetlinks.json" -o /tmp/prod-links.json; then
+            FP=$(cat /tmp/fingerprint.txt)
+            grep -q "$FP" /tmp/prod-links.json && echo "PRODUCTION : assetlinks.json contient l'empreinte de cet APK (plein écran sans barre d'adresse)" || echo "::warning::PRODUCTION : assetlinks.json en ligne ne contient pas l'empreinte de cet APK (serveur à redéployer avec le dernier commit, ou mode essai)"
+          else
+            echo "::warning::PRODUCTION : /.well-known/assetlinks.json absent : redéployer le serveur Railway avec le dernier commit pour que l'application s'ouvre sans barre d'adresse"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SmartCourse-android-${{ steps.key.outputs.mode }}-${{ github.run_number }}
+          path: dist/
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-lint-${{ github.run_number }}
+          path: android/app/build/reports/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  emulateur:
+    # Installation et lancement réels sur un émulateur Android (informatif : ne bloque pas le livrable).
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: SmartCourse-android-*
+          merge-multiple: true
+          path: dist
+      - name: Active KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          script: |
+            adb install dist/SmartCourse.apk
+            adb shell pm list packages | grep app.smartcourse.courses
+            adb shell cmd package resolve-activity --brief -c android.intent.category.LAUNCHER app.smartcourse.courses
+            adb shell monkey -p app.smartcourse.courses -c android.intent.category.LAUNCHER 1
+            sleep 20
+            adb exec-out screencap -p > screen-lancement.png
+            adb shell dumpsys activity activities | grep -E "mResumedActivity|topResumedActivity" | head -3
+            adb logcat -d -s AndroidRuntime:E | head -20
+            adb shell pidof app.smartcourse.courses || adb shell pidof com.android.chrome || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: emulateur-capture-${{ github.run_number }}
+          path: screen-lancement.png
+          if-no-files-found: ignore
+          retention-days: 7

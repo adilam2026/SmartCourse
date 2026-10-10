@@ -22,6 +22,8 @@ export interface AppDeps {
   store: PhotoStore;
   /** Built PWA (web/dist). When set, the server also serves the app and falls back to index.html. */
   webDir?: string;
+  /** Digital Asset Links (Android app ↔ this site), served at /.well-known/assetlinks.json: lets the Android app open the site without an address bar. Public data (certificate fingerprints). */
+  assetLinks?: unknown;
   /** Where scheduled backups go (null = not set up). */
   backupStorage?: "s3" | "local" | null;
   /** "external": backups are made by the scheduled job, the app only shows their state. */
@@ -193,6 +195,10 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     write(`event: ready\ndata: {}\n\n`);
   });
 
+  if (deps.assetLinks) {
+    app.get("/.well-known/assetlinks.json", async (_req, reply) => reply.header("Cache-Control", "public, max-age=3600").type("application/json").send(deps.assetLinks));
+  }
+
   if (deps.webDir) {
     const root = path.resolve(deps.webDir);
     await app.register(fastifyStatic, {
@@ -205,7 +211,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       },
     });
     app.setNotFoundHandler((req, reply) => {
-      if (req.method === "GET" && !req.url.startsWith("/api/") && !req.url.startsWith("/health")) return reply.header("Cache-Control", "no-cache").sendFile("index.html");
+      if (req.method === "GET" && !req.url.startsWith("/api/") && !req.url.startsWith("/health") && !req.url.startsWith("/.well-known/")) return reply.header("Cache-Control", "no-cache").sendFile("index.html");
       return reply.code(404).send({ error: "not_found" });
     });
   }

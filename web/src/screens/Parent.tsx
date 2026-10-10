@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useBackLayer } from "../useBackLayer";
 import { Banners } from "../components/Banners";
 import { Dialog } from "../components/Dialog";
 import { Thumb } from "../components/Thumb";
@@ -16,6 +17,9 @@ export function ParentApp({ engine, s }: { engine: Engine; s: State }) {
   const [tab, setTab] = useState<Tab>("current");
   const [editing, setEditing] = useState(false);
   const isAdmin = s.me?.role === "admin";
+  const isEditing = editing && s.list?.status === "active";
+  useBackLayer(isEditing, () => setEditing(false)); // Back leaves the edit screen
+  useBackLayer(!isEditing && tab !== "current", () => setTab("current")); // then goes back to the first tab
   if (editing && s.list?.status === "active") return <StaffScreen engine={engine} s={s} onBack={() => setEditing(false)} />;
   return (
     <div className="parent">

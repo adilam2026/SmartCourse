@@ -1,6 +1,6 @@
 import { buildApp } from "./app.js";
 import { ensureInstallToken } from "./auth.js";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { loadConfig } from "./config.js";
 import { createPoolFromConfig, toolsDatabaseUrl } from "./db.js";
@@ -48,7 +48,8 @@ setInterval(() => void purgeOnce(), 6 * 3_600_000).unref();
 
 const external = config.BACKUP_MODE === "external";
 const backup = config.BACKUP_KEY || external ? createBackupStorage(config) : null;
-const app = await buildApp({ db, loginRateLimit: { max: config.LOGIN_RATE_MAX, timeWindow: "1 minute" }, store: photoStore, webDir: existsSync(config.WEB_DIR) ? config.WEB_DIR : undefined, backupStorage: external ? "s3" : backup?.kind ?? null, backupMode: config.BACKUP_MODE });
+const assetLinks = existsSync("./assetlinks.json") ? JSON.parse(readFileSync("./assetlinks.json", "utf8")) : undefined;
+const app = await buildApp({ db, assetLinks, loginRateLimit: { max: config.LOGIN_RATE_MAX, timeWindow: "1 minute" }, store: photoStore, webDir: existsSync(config.WEB_DIR) ? config.WEB_DIR : undefined, backupStorage: external ? "s3" : backup?.kind ?? null, backupMode: config.BACKUP_MODE });
 await app.listen({ port: config.PORT, host: "0.0.0.0" });
 
 if (external) {
