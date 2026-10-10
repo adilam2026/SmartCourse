@@ -72,7 +72,7 @@ jobs:
           grep -q "name='app.smartcourse.courses'" /tmp/badging.txt
           grep -q "application-label:'Courses'" /tmp/badging.txt
           ! grep -q "uses-permission: name='android.permission.\(CAMERA\|READ_EXTERNAL_STORAGE\|WRITE_EXTERNAL_STORAGE\|RECORD_AUDIO\|ACCESS_FINE_LOCATION\)" /tmp/badging.txt
-          unzip -l "$APK" | grep -E "ic_launcher|splash" | head -5
+          grep -E "^application-icon-" /tmp/badging.txt | head -5; grep -q "^application-icon-" /tmp/badging.txt
           # L'AAB doit être signé et valide pour Google Play
           jarsigner -verify "$AAB" | head -1
           curl -fsSL -o /tmp/bundletool.jar https://github.com/google/bundletool/releases/download/1.18.1/bundletool-all-1.18.1.jar
