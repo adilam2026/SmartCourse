@@ -20,7 +20,7 @@ Pour supprimer la barre d'adresse, Android vérifie que le site déclare l'appli
 
 Si la barre d'adresse s'affiche quand même : (1) fichier non en ligne, (2) empreinte absente (clé différente), (3) Chrome a mis le résultat en cache : désinstaller/réinstaller l'application.
 
-**Google Play** : si vous activez « Play App Signing » (recommandé), Google re-signe l'application avec **sa** clé. Il faut alors ajouter l'empreinte SHA-256 du « certificat de signature d'application » (Play Console → Intégrité de l'application) dans `server/assetlinks.json`, à côté de la première, puis redéployer.
+**Google Play peut utiliser une clé de signature différente de la vôtre.** Si vous activez « Play App Signing » (recommandé), Google re-signe l'application avec **sa** clé. L'application installée depuis Google Play porte alors l'empreinte de **la clé de Google**, pas celle de l'APK direct : sans elle dans `server/assetlinks.json`, la version Play afficherait la barre d'adresse. Il faut donc ajouter l'empreinte SHA-256 du « certificat de signature d'application » (Play Console → Intégrité de l'application → Signature d'application) dans `server/assetlinks.json`, **à côté** de la première (les deux restent : APK direct et Play), puis redéployer le serveur. Si vous utilisez aussi le test interne Play avec la clé de téléversement, l'empreinte de téléversement n'a pas besoin d'y figurer.
 
 ## Signature (clé secrète hors du dépôt)
 - Le dépôt ne contient aucune clé. La clé de production a été créée hors du dépôt (fichier `.jks` + mots de passe), à conserver **en deux exemplaires hors ligne** (gestionnaire de mots de passe + clé USB). **Perdre cette clé = ne plus pouvoir mettre à jour l'application sous le même identifiant.**

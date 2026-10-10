@@ -1,10 +1,12 @@
+import java.net.URI
+
 plugins {
     id("com.android.application")
 }
 
 // Adresse stable du serveur (Railway). Surchargeable : ./gradlew assembleRelease -PappUrl=https://exemple.up.railway.app
 val appUrl = (project.findProperty("appUrl") as String?) ?: "https://smartcourse-production-c7ce.up.railway.app"
-val appHost = java.net.URI(appUrl).host
+val appHost = URI(appUrl).host
 
 android {
     namespace = "app.smartcourse.courses"
