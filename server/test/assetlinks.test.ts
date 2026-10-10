@@ -34,3 +34,30 @@ describe("Digital Asset Links (application Android sans barre d'adresse)", () =>
     await app.close();
   });
 });
+
+describe("fichiers de l'application web", () => {
+  const mk = async () => {
+    const web = mkdtempSync(path.join(os.tmpdir(), "web-"));
+    writeFileSync(path.join(web, "index.html"), "<html>app</html>");
+    writeFileSync(path.join(web, "version.json"), JSON.stringify({ id: "abc-1" }));
+    return buildApp({ db: await testDb(), store: testStore(), webDir: web });
+  };
+  it("une page inconnue renvoie l'application (200) ; un fichier manquant renvoie 404, jamais la page d'accueil", async () => {
+    const app = await mk();
+    expect((await app.inject({ method: "GET", url: "/historique" })).statusCode).toBe(200);
+    for (const u of ["/assets/index-ancien.js", "/assets/style-ancien.css", "/icons/absent.png", "/sw-absent.js"]) {
+      const r = await app.inject({ method: "GET", url: u });
+      expect(r.statusCode, u).toBe(404);
+      expect(r.body).not.toContain("<html>"); // sinon le service worker mettrait la page en cache comme si c'était ce fichier
+    }
+    await app.close();
+  });
+  it("/version.json est publié et jamais mis en cache durablement", async () => {
+    const app = await mk();
+    const r = await app.inject({ method: "GET", url: "/version.json" });
+    expect(r.statusCode).toBe(200);
+    expect(r.json()).toEqual({ id: "abc-1" });
+    expect(r.headers["cache-control"]).toBe("no-cache");
+    await app.close();
+  });
+});

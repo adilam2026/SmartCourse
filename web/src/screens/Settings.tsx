@@ -1,4 +1,5 @@
 import { unitLabel } from "../units";
+import { VersionInfo } from "../components/VersionInfo";
 import { useEffect, useState } from "react";
 import { api, ApiError, NetworkError, type BackupStatus, type ExtendedResult, type Profile } from "../api";
 import { fmtDateTime } from "../format";
@@ -25,7 +26,7 @@ export function Settings({ engine, s }: { engine: Engine; s: State }) {
         <button role="tab" aria-selected={section === "profiles"} className={section === "profiles" ? "on" : ""} data-testid="seg-profiles" onClick={() => setSection("profiles")}>Profils</button>
         <button role="tab" aria-selected={section === "catalog"} className={section === "catalog" ? "on" : ""} data-testid="seg-catalog" onClick={() => setSection("catalog")}>Catalogue</button>
       </div>
-      {section === "profiles" ? <><BackupCard /><Profiles me={s.me!.id} /></> : <CatalogAdmin engine={engine} />}
+      {section === "profiles" ? <><BackupCard /><Profiles me={s.me!.id} /><VersionInfo engine={engine} /></> : <CatalogAdmin engine={engine} />}
     </>
   );
 }

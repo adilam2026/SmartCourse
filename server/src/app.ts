@@ -214,7 +214,10 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       },
     });
     app.setNotFoundHandler((req, reply) => {
-      if (req.method === "GET" && !req.url.startsWith("/api/") && !req.url.startsWith("/health") && !req.url.startsWith("/.well-known/")) return reply.header("Cache-Control", "no-cache").sendFile("index.html");
+      // Only page addresses fall back to the app shell. A missing FILE (a script, a style, an image…) is a real 404: answering it with the
+      // shell would be cached by the service worker as if it were that script and leave the app blank.
+      const isFile = /\.[A-Za-z0-9]{1,8}(\?.*)?$/.test(req.url);
+      if (req.method === "GET" && !isFile && !req.url.startsWith("/api/") && !req.url.startsWith("/health") && !req.url.startsWith("/.well-known/")) return reply.header("Cache-Control", "no-cache").sendFile("index.html");
       return reply.code(404).send({ error: "not_found" });
     });
   }

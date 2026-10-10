@@ -1,10 +1,20 @@
 import { LoginScreen, Welcome } from "./screens/Login";
+import { UpdateBanner } from "./components/VersionInfo";
 import { ParentApp } from "./screens/Parent";
 import { StaffScreen } from "./screens/Staff";
 import { useEngine } from "./useEngine";
 import type { Engine } from "./sync/engine";
 
 export function App({ engine }: { engine: Engine }) {
+  return (
+    <>
+      <UpdateBanner engine={engine} />
+      <Screens engine={engine} />
+    </>
+  );
+}
+
+function Screens({ engine }: { engine: Engine }) {
   const s = useEngine(engine);
   if (s.phase === "boot") return <main className="nolist"><div className="nolist__body"><div className="nolist__icon">🛒</div></div></main>;
   if (s.phase === "loggedOut" || !s.me) return <LoginScreen engine={engine} s={s} />;

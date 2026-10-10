@@ -418,3 +418,26 @@ test.describe("vérifications demandées : kg, heures, corrections", () => {
   });
 });
 
+test.describe("version chargée", () => {
+  test("la version réellement chargée est affichée dans la fiche du profil (personnel, parent) et dans Réglages (administrateur)", async ({ page, playwright, baseURL }) => {
+    const f = await newFamily(playwright, baseURL!);
+    await createList(f);
+    const server = await (await page.request.get("/version.json")).json();
+    expect(server.id).toMatch(/\w+-\w+/);
+    for (const [login, secret] of [[f.staffLogin, "573918"], ["lamiaa", "573918"]] as const) {
+      await page.context().clearCookies();
+      await uiLogin(page, f, login, secret);
+      await page.getByTestId("avatar").click();
+      await expect(page.getByTestId("version-running")).toContainText(server.id); // le bundle chargé est celui que le serveur publie
+      await expect(page.getByTestId("version-status")).toHaveText("À jour");
+      await page.getByRole("button", { name: "Fermer" }).click();
+    }
+    await page.context().clearCookies();
+    await uiLogin(page, f, "adil", "482913");
+    await page.getByTestId("tab-settings").click();
+    await expect(page.getByTestId("version-running")).toContainText(server.id);
+    await expect(page.getByTestId("version-server")).toContainText(server.id);
+    await page.screenshot({ path: "shots/settings-version.png" });
+  });
+});
+

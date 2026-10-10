@@ -32,6 +32,9 @@ WORKDIR /app/web
 COPY web/package*.json ./
 RUN npm ci
 COPY web/ ./
+# The build id shown in the app (Réglages / profil) carries the deployed commit when Railway provides it.
+ARG RAILWAY_GIT_COMMIT_SHA
+ENV RAILWAY_GIT_COMMIT_SHA=$RAILWAY_GIT_COMMIT_SHA
 RUN npm run build
 
 FROM ${NODE_IMAGE} AS build

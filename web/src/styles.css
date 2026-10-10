@@ -233,3 +233,8 @@ h1, h2 { margin: 0; }
 .up { color: var(--green); }
 .down { color: var(--amber); }
 .row__main small em, .row__name small em, .timeline small em, .vgroup p em { color: var(--amber); font-style: normal; font-weight: 700; }
+
+/* ---- version / mise à jour ---- */
+.versioninfo { display: grid; gap: 4px; margin: 10px 12px; padding: 10px; border: 2px solid var(--line); border-radius: 14px; background: var(--surface); }
+.versioninfo p { margin: 0; }
+.updatebar { position: sticky; top: 0; z-index: 60; display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 0; border-radius: 0; }

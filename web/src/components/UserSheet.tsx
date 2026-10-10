@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, type Credit } from "../api";
 import { useBackLayer } from "../useBackLayer";
+import { VersionInfo } from "./VersionInfo";
 import type { Engine, State } from "../sync/engine";
 
 const ROLE: Record<string, string> = { admin: "Administrateur", parent: "Parent", staff: "Personnel" };
@@ -20,6 +21,7 @@ export function UserSheet({ engine, s, onClose }: { engine: Engine; s: State; on
         <h2>{s.me?.displayName}</h2>
         <p className="muted">{s.me ? ROLE[s.me.role] : ""}</p>
         {pending > 0 && <p className="banner banner--pending">Des choix ne sont pas encore enregistrés. Ils resteront sur ce téléphone et seront envoyés à la prochaine connexion.</p>}
+        <VersionInfo engine={engine} />
         <button className="btn btn--ghost" onClick={() => setShowCredits((v) => !v)}>Crédits photos</button>
         {showCredits && (
           <ul className="credits">

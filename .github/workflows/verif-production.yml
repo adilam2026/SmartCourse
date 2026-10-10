@@ -39,9 +39,22 @@ jobs:
           JS=$(grep -o '/assets/index-[A-Za-z0-9_-]*\.js' /tmp/index.html | head -1)
           echo "bundle : $JS"
           curl -fsS -m 30 "$U$JS" -o /tmp/app.js
-          for m in "Statistiques d'achats" "Historique des validations" "Par catégories" "Nouvelle demande" "envoyé plus tard" "autre unité"; do
+          for m in "Statistiques d'achats" "Historique des validations" "Par catégories" "Nouvelle demande" "envoyé plus tard" "autre unité" "Vérifier les mises à jour" "Version de l'application"; do
             grep -q "$m" /tmp/app.js && echo "présent : $m" || { echo "::error::absent du bundle servi : $m"; exit 1; }
           done
+      - name: Identité de la version publiée (/version.json) et fichier manquant
+        run: |
+          U="${{ inputs.app_url }}"; WANT="${{ github.sha }}"
+          V=$(curl -fsS -m 15 "$U/version.json"); echo "version.json : $V"
+          echo "$V" | grep -q '"id":"' || { echo "::error::/version.json absent ou illisible"; exit 1; }
+          C=$(echo "$V" | sed -n 's/.*"commit":"\([0-9a-f]*\)".*/\1/p')
+          if [ -n "$C" ]; then
+            case "$WANT" in "$C"*) echo "OK : le site web publié a été construit depuis le commit $C" ;; *) echo "::error::le site publié vient du commit $C, attendu ${WANT:0:7}"; exit 1 ;; esac
+          else
+            echo "::warning::le commit n'est pas inscrit dans la version publiée (variable de construction non transmise) : seul l'identifiant de construction est affiché"
+          fi
+          CODE=$(curl -s -o /tmp/miss.txt -w '%{http_code}' -m 15 "$U/assets/index-introuvable.js"); echo "fichier manquant -> $CODE"
+          [ "$CODE" = 404 ] || { echo "::error::un fichier manquant doit renvoyer 404, pas la page d'accueil"; exit 1; }
       - name: Assetlinks, accueil, routes protégées
         run: |
           U="${{ inputs.app_url }}"
