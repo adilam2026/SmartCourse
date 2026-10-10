@@ -6,7 +6,7 @@ import pg from "pg";
 import sharp from "sharp";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { generateInstallToken, setupFamily } from "../src/auth.js";
-import { backupFamilyPhotos, copySnapshotPhotos, verifyPhotoBackup } from "../src/backup-photos.js";
+import { backupFamilyPhotos, backupPhotoKey, copySnapshotPhotos, photoBackupHooks, restorePhotos, verifyPhotoBackup } from "../src/backup-photos.js";
 import { createBackupStorage } from "../src/backup-store.js";
 import { backupStatus, backupVerifyPrune, createBackup, encrypt, LocalBackupStore, S3BackupStore, selectTools, verifyBackup, type BackupCtx } from "../src/backup.js";
 import { loadConfig } from "../src/config.js";
@@ -284,11 +284,11 @@ describe("sauvegarde externe : restauration de contrôle sur un autre serveur, p
     expect(r1).toMatchObject({ total: 2, copied: 2, missing: [] });
     const r2 = await backupFamilyPhotos(db, photos, target);
     expect(r2).toMatchObject({ total: 2, copied: 0, missing: [] }); // idempotent
-    expect((await target.list("photos/")).length).toBe(2);
+    expect((await target.list("backup-photos/")).length).toBe(2);
     // un fichier référencé par la base mais absent du stockage d'images : signalé
     const key = (await db.query("SELECT storage_key FROM photo_assets WHERE id = $1", [a])).rows[0].storage_key as string;
     await photos.delete(key);
-    await target.delete(key);
+    await target.delete(backupPhotoKey(key));
     const r3 = await backupFamilyPhotos(db, photos, target);
     expect(r3.missing).toEqual([key]);
   });
@@ -334,20 +334,20 @@ describe("sauvegarde externe : restauration de contrôle sur un autre serveur, p
       expect(all.missing.filter((k) => k !== undefined).length).toBeGreaterThanOrEqual(0);
       const ownKeys = (await db.query("SELECT DISTINCT storage_key FROM photo_assets WHERE owner_family_id IS NOT NULL")).rows.map((r) => r.storage_key as string);
       // (les photos des essais précédents dont le fichier a été retiré du stockage sont signalées par la copie, pas par la restauration)
-      for (const k of ownKeys) if (!(await store.get(k))) { const f = await photos.get(k); if (f) await store.put(k, f.data); }
-      const stillMissing = (await Promise.all(ownKeys.map(async (k) => ((await store.get(k)) ? null : k)))).filter(Boolean) as string[];
+      for (const k of ownKeys) if (!(await store.get(backupPhotoKey(k)))) { const f = await photos.get(k); if (f) await store.put(backupPhotoKey(k), f.data); }
+      const stillMissing = (await Promise.all(ownKeys.map(async (k) => ((await store.get(backupPhotoKey(k))) ? null : k)))).filter(Boolean) as string[];
       if (stillMissing.length === 0) {
         const b2 = await createBackup(mk());
         const v2 = await verifyBackup(mk(), b2.key);
         expect(v2.problems).toEqual([]);
         // 3. altérée : même clé, autre contenu → empreinte différente
-        await store.put(key, await png("#445566"));
+        await store.put(backupPhotoKey(key), await png("#445566"));
         const v3 = await verifyBackup(mk(), (await createBackup(mk())).key);
         expect(v3.ok).toBe(false);
         expect(v3.problems.join("\n")).toMatch(/empreinte SHA-256/);
       }
       // 4. fichier illisible mais de la bonne empreinte : impossible à fabriquer ; on vérifie au moins la détection d'absence après suppression
-      await store.delete(key);
+      await store.delete(backupPhotoKey(key));
       const v4 = await verifyBackup(mk(), (await createBackup(mk())).key);
       expect(v4.ok).toBe(false);
       expect(v4.problems.join("\n")).toContain(key);
@@ -415,8 +415,8 @@ describe("sauvegarde pendant que des photos sont créées ou remplacées : jamai
     expect(r.verify.problems).toEqual([]);
     expect(r.verify.ok).toBe(true);
     expect(r.backup.manifest.photos).toContain(await keyOf(late));
-    expect(await store.get(await keyOf(late))).not.toBeNull();
-    expect(await store.get(await keyOf(base))).not.toBeNull();
+    expect(await store.get(backupPhotoKey(await keyOf(late)))).not.toBeNull();
+    expect(await store.get(backupPhotoKey(await keyOf(base)))).not.toBeNull();
   });
 
   it("une photo créée APRÈS l'instantané n'est pas dans cette sauvegarde, et la sauvegarde reste complète et cohérente", async () => {
@@ -425,7 +425,7 @@ describe("sauvegarde pendant que des photos sont créées ou remplacées : jamai
     const { r, store } = await runExternal(photos, { duringCopy: async () => void (after = await savePhotoAsset(db, photos, await png("#303030"), meta, { ownerFamilyId: fid })) });
     expect(r.verify.problems).toEqual([]);
     expect(r.backup.manifest.photos).not.toContain(await keyOf(after)); // elle appartient à la sauvegarde suivante
-    expect(await store.get(await keyOf(after))).toBeNull();
+    expect(await store.get(backupPhotoKey(await keyOf(after)))).toBeNull();
   });
 
   it("une photo « modifiée » (remplacée par une autre) pendant la sauvegarde : l'ancienne reste présente, tout est cohérent", async () => {
@@ -438,8 +438,8 @@ describe("sauvegarde pendant que des photos sont créées ou remplacées : jamai
       },
     });
     expect(r.verify.problems).toEqual([]);
-    expect(await store.get(await keyOf(old))).not.toBeNull();
-    const bytes = (await store.get(await keyOf(old)))!;
+    expect(await store.get(backupPhotoKey(await keyOf(old)))).not.toBeNull();
+    const bytes = (await store.get(backupPhotoKey(await keyOf(old))))!;
     expect((await db.query("SELECT content_hash FROM photo_assets WHERE id = $1", [old])).rows[0].content_hash).toBe(require("node:crypto").createHash("sha256").update(bytes).digest("hex"));
   });
 
@@ -461,5 +461,39 @@ describe("sauvegarde pendant que des photos sont créées ou remplacées : jamai
     await backupFamilyPhotos(db, photos, store);
     const rows = await verifyPhotoBackup(db, store, ["photos/" + "0".repeat(64) + ".webp"]); // manifeste différent de la base
     expect(rows.problems.join("\n")).toMatch(/diffère de celle du manifeste/);
+  });
+
+  it("sauvegarde INTERNE (celle de l'application) : base + photos de la famille, chiffrées, restauration vérifiée ; puis remise en place réelle des photos perdues", async () => {
+    const photos = testStore();
+    const store = new LocalBackupStore(mkdtempSync(path.join(os.tmpdir(), "bk-")));
+    const a = await savePhotoAsset(db, photos, await png("#aa5500"), meta, { ownerFamilyId: fid });
+    const b = await savePhotoAsset(db, photos, await png("#0055aa"), meta, { ownerFamilyId: fid });
+    const keyA = (await db.query("SELECT storage_key FROM photo_assets WHERE id = $1", [a])).rows[0].storage_key as string;
+    const keyB = (await db.query("SELECT storage_key FROM photo_assets WHERE id = $1", [b])).rows[0].storage_key as string;
+    let checked = 0;
+    const ctx: BackupCtx = { db, databaseUrl: URL_, store, passphrase: PASS, ...photoBackupHooks(db, photos, store, (c) => (checked = c.checked)) };
+    const r = await backupVerifyPrune(ctx);
+    expect(r.verify.problems).toEqual([]);
+    expect(checked).toBe(2);
+    expect(r.backup.manifest.photos).toEqual([keyA, keyB].sort());
+    // les copies sont dans un préfixe à part et intactes
+    expect((await store.list("backup-photos/")).length).toBe(2);
+    // sinistre : les fichiers du stockage d'images disparaissent ; la base restaurée les liste, la sauvegarde les remet en place
+    const before = (await photos.get(keyA))!.data;
+    await photos.delete(keyA);
+    await photos.delete(keyB);
+    const bad = await restorePhotos(db, photos, new LocalBackupStore(mkdtempSync(path.join(os.tmpdir(), "bk-")))); // mauvaise source : rien à restaurer
+    expect(bad.missing.sort()).toEqual([keyA, keyB].sort());
+    const ok = await restorePhotos(db, photos, store);
+    expect(ok).toMatchObject({ total: 2, restored: 2, missing: [] });
+    expect((await photos.get(keyA))!.data.equals(before)).toBe(true);
+    // une copie altérée : détectée à la restauration de contrôle si elle est utilisée telle quelle…
+    await store.put(backupPhotoKey(keyB), await png("#123456"));
+    const v = await verifyBackup(ctx, r.backup.key);
+    expect(v.ok).toBe(false);
+    expect(v.problems.join("\n")).toMatch(/empreinte SHA-256/);
+    // …et réparée (recopiée depuis le stockage d'images) par la sauvegarde suivante, qui redevient valide
+    const r2 = await backupVerifyPrune({ ...ctx, now: () => new Date(Date.now() + 60_000) });
+    expect(r2.verify.problems).toEqual([]);
   });
 });

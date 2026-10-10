@@ -24,7 +24,7 @@ export interface BackupStore {
 export class LocalBackupStore implements BackupStore {
   constructor(private dir: string) {}
   private file(key: string) {
-    if (!/^(backups|photos)\/[\w.-]+$/.test(key)) throw new Error(`Invalid backup key: ${key}`);
+    if (!/^(backups|backup-photos)\/[\w.-]+$/.test(key)) throw new Error(`Invalid backup key: ${key}`);
     return path.join(this.dir, key);
   }
   async put(key: string, data: Buffer) {
@@ -217,6 +217,8 @@ export interface BackupCtx {
   verify?: { db: Db; url: string };
   /** Extra checks run on the RESTORED database (e.g. every picture it references exists, intact, in the backup storage). Returns problems. */
   afterRestore?: (scratch: pg.Client, manifest: Manifest) => Promise<string[]>;
+  /** Run just before the snapshot (e.g. copy the pictures known now). Returns problems; any makes the backup invalid. */
+  beforeSnapshot?: () => Promise<string[]>;
   /** Run right after the snapshot is stored (e.g. copy the pictures it lists). Returns problems: any makes the backup invalid. */
   afterSnapshot?: (manifest: Manifest) => Promise<string[]>;
   store: BackupStore;
@@ -388,11 +390,13 @@ async function record(db: Db, kind: "backup" | "verify", ok: boolean, backupKey:
 
 /** Backup → restore check → prune (only if the new backup restored correctly). */
 export async function backupVerifyPrune(ctx: BackupCtx, policy: Policy = DEFAULT_POLICY) {
+  const before = ctx.beforeSnapshot ? await ctx.beforeSnapshot().catch((e) => [`copie préalable des photos en échec : ${(e as Error).message}`]) : [];
   const b = await createBackup(ctx);
   await record(ctx.db, "backup", true, b.key, { bytes: b.bytes, tables: b.manifest.tables });
   // Pictures the snapshot lists are copied AFTER it was taken (see backup-photos.ts): a picture that cannot be found invalidates it.
   const extra = ctx.afterSnapshot ? await ctx.afterSnapshot(b.manifest).catch((e) => [`copie des photos en échec : ${(e as Error).message}`]) : [];
   const v = await verifyBackup(ctx, b.key);
+  extra.push(...before);
   if (extra.length) {
     v.problems.push(...extra);
     v.ok = false;
@@ -427,7 +431,7 @@ export async function backupStatus(db: Db, storage: "s3" | "local" | null, mode:
   return { configured, storage, schedule: mode === "external" ? EXTERNAL_SCHEDULE_TEXT : SCHEDULE_TEXT, tools, lastBackupAt: row.b?.toISOString() ?? null, lastVerifiedOkAt: row.v?.toISOString() ?? null, lastVerifyFailedAt: row.f?.toISOString() ?? null };
 }
 
-export const SCHEDULE_TEXT = "Une sauvegarde chiffrée par jour (dès que la dernière a plus de 24 h ; contrôle toutes les 10 min par l'application), suivie d'une restauration de vérification.";
+export const SCHEDULE_TEXT = "Une sauvegarde chiffrée par jour (dès que la dernière a plus de 24 h ; contrôle toutes les 10 min par l'application), incluant les photos de la famille, suivie d'une restauration de vérification de la base ET des photos.";
 const LOCK = 727_002;
 /** Daily backup + restore check, run by the app itself. One run at a time even if two instances overlap. */
 export function startBackupScheduler(ctx: BackupCtx, log: (m: string) => void, everyMs = 10 * 60_000): () => void {

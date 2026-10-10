@@ -7,7 +7,7 @@ import type { PhotoStore } from "./photos.js";
 /**
  * Database backups hold the references to pictures, not the files. The 80 catalogue pictures ship with the app and are re-imported
  * from it; the pictures a family added exist only in the picture storage. They are copied (content-addressed, so a file is copied
- * once) to the independent backup storage under the same key (`photos/<sha256>.webp`): restoring is copying them back.
+ * once) to the independent backup storage under `backup-photos/<sha256>.webp` (a second copy even when it is the same bucket): restoring is copying them back (`restorePhotos`).
  *
  * Why a picture created or replaced WHILE a backup runs cannot make an inconsistent set:
  *   - a picture is immutable and named by its content: "modifying" one creates a new picture, the old one stays as long as something
@@ -20,19 +20,27 @@ import type { PhotoStore } from "./photos.js";
  *     purge only removes pictures older than 10 minutes and unreferenced). It is reported, the backup is declared invalid and
  *     the previous good backups are kept; the next run repairs it.
  */
+/** Where the backup copy of a picture lives: its own prefix, so that it is a real second copy even inside the same bucket. */
+export const backupPhotoKey = (key: string) => `backup-photos/${key.slice(key.lastIndexOf("/") + 1)}`;
+
 export async function copyPhotoKeys(photos: PhotoStore, target: BackupStore, keys: string[]): Promise<{ total: number; copied: number; missing: string[]; bytes: number }> {
-  const have = new Set((await target.list("photos/")).map((e) => e.key));
+  const have = new Set((await target.list("backup-photos/")).map((e) => e.key));
   let copied = 0;
   let bytes = 0;
   const missing: string[] = [];
   for (const key of keys) {
-    if (have.has(key)) continue;
+    const dest = backupPhotoKey(key);
+    // An existing copy is trusted only if its content still matches its name (SHA-256): a damaged copy is rewritten, not kept forever.
+    if (have.has(dest)) {
+      const old = await target.get(dest);
+      if (old && createHash("sha256").update(old).digest("hex") === dest.slice("backup-photos/".length, -".webp".length)) continue;
+    }
     const f = await photos.get(key);
     if (!f) {
       missing.push(key); // referenced by the database but absent from the picture storage: reported, never hidden
       continue;
     }
-    await target.put(key, f.data);
+    await target.put(dest, f.data);
     copied++;
     bytes += f.data.length;
   }
@@ -72,7 +80,7 @@ export async function verifyPhotoBackup(
     if (a !== b) problems.push("la liste des photos de la base restaurée diffère de celle du manifeste");
   }
   for (const r of rows) {
-    const data = await target.get(r.storage_key);
+    const data = await target.get(backupPhotoKey(r.storage_key));
     if (!data) {
       problems.push(`${r.storage_key} : absente de la sauvegarde`);
       continue;
@@ -96,4 +104,39 @@ export async function verifyPhotoBackup(
     total += data.length;
   }
   return { problems, checked, bytes: total };
+}
+
+/** Disaster recovery: puts back every family picture the (restored) database lists that the picture storage no longer has. */
+export async function restorePhotos(db: Db, photos: PhotoStore, source: BackupStore): Promise<{ total: number; restored: number; present: number; missing: string[] }> {
+  const keys = (await db.query<{ storage_key: string }>("SELECT DISTINCT storage_key FROM photo_assets WHERE owner_family_id IS NOT NULL ORDER BY 1")).rows.map((r) => r.storage_key);
+  let restored = 0;
+  let present = 0;
+  const missing: string[] = [];
+  for (const key of keys) {
+    if (await photos.get(key)) {
+      present++;
+      continue;
+    }
+    const data = await source.get(backupPhotoKey(key));
+    if (!data) {
+      missing.push(key);
+      continue;
+    }
+    await photos.put(key, data, "image/webp");
+    restored++;
+  }
+  return { total: keys.length, restored, present, missing };
+}
+
+/** The three hooks that make a backup include the pictures: copy before, copy what the snapshot lists after, prove it after restoring. */
+export function photoBackupHooks(db: Db, photos: PhotoStore, target: BackupStore, onChecked?: (c: { checked: number; bytes: number }) => void) {
+  return {
+    beforeSnapshot: async (): Promise<string[]> => (await backupFamilyPhotos(db, photos, target)).missing.map((k) => `photos : ${k} référencée par la base mais absente du stockage d'images`),
+    afterSnapshot: (m: { photos?: string[] }) => copySnapshotPhotos(photos, target, m),
+    afterRestore: async (scratch: { query: Db["query"] }, manifest: { photos?: string[] }): Promise<string[]> => {
+      const r = await verifyPhotoBackup(scratch, target, manifest.photos);
+      onChecked?.({ checked: r.checked, bytes: r.bytes });
+      return r.problems.map((p) => `photos : ${p}`);
+    },
+  };
 }

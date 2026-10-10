@@ -103,5 +103,17 @@ ok "image personnalisée conservée après redémarrage"
 [ "$(sql "SELECT (catalog_rev > 0)::int FROM families LIMIT 1")" = 1 ] || fail "la révision du catalogue n'a pas été incrémentée par la création des produits / le changement d'image"
 ok "révision du catalogue incrémentée (création de la famille, changement d'image)"
 
+echo "== Sauvegarde interne avec photos de la famille (image réelle, PostgreSQL réel)"
+BK="docker exec -e BACKUP_KEY=cle-de-verification-docker-123 -e BACKUP_ALLOW_LOCAL=1 -e BACKUP_DIR=/tmp/bk $APP node dist/backup-cli.js"
+OUT=$($BK run 2>&1) || { echo "$OUT" >&2; fail "sauvegarde interne en échec"; }
+echo "$OUT" | grep -q "Restauration vérifiée" || { echo "$OUT" >&2; fail "restauration non vérifiée"; }
+echo "$OUT" | grep -q "Photos vérifiées après restauration : 1" || { echo "$OUT" >&2; fail "la photo de la famille n'a pas été vérifiée dans la sauvegarde"; }
+ok "sauvegarde chiffrée, base restaurée et photo de la famille vérifiée (SHA-256, taille, décodage)"
+HASH=$(sql "SELECT substring(storage_key from 8 for 64) FROM photo_assets WHERE owner_family_id IS NOT NULL LIMIT 1")
+docker exec "$APP" sh -c "find /app/server/data -name '$HASH.webp' -delete"
+OUT=$($BK restore-photos 2>&1) || { echo "$OUT" >&2; fail "remise en place des photos en échec"; }
+echo "$OUT" | grep -q "1 remise(s) en place" || { echo "$OUT" >&2; fail "photo perdue non restaurée depuis la sauvegarde"; }
+ok "photo perdue du stockage d'images remise en place depuis la sauvegarde"
+
 echo
 echo "Vérification Docker terminée : tout est conforme. Rien n'a été déployé."

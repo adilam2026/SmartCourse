@@ -8,6 +8,7 @@ import { hardenApiRoles } from "./harden.js";
 import { migrate } from "./migrate.js";
 import { createBackupStorage } from "./backup-store.js";
 import { startBackupScheduler } from "./backup.js";
+import { photoBackupHooks } from "./backup-photos.js";
 import { createPhotoStore } from "./photos.js";
 import { purgeOrphanAssets, syncCatalogPhotos } from "./photos-import.js";
 
@@ -62,7 +63,7 @@ if (external) {
   void watch().catch(() => {});
   setInterval(() => void watch().catch(() => {}), 6 * 3_600_000).unref();
 } else if (backup && config.BACKUP_KEY) {
-  startBackupScheduler({ db, databaseUrl: toolsDatabaseUrl(config), store: backup.store, passphrase: config.BACKUP_KEY }, (m) => app.log.info(m));
+  startBackupScheduler({ db, databaseUrl: toolsDatabaseUrl(config), store: backup.store, passphrase: config.BACKUP_KEY, ...photoBackupHooks(db, photoStore, backup.store) }, (m) => app.log.info(m));
   app.log.info(`Sauvegardes automatiques actives (stockage : ${backup.kind}).`);
 } else if (config.BACKUP_KEY) {
   app.log.error("BACKUP_KEY présent mais aucun stockage sûr : configurez le bucket (S3_*). Sauvegardes automatiques DÉSACTIVÉES.");

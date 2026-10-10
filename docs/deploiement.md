@@ -16,7 +16,7 @@ Vérifié ici (9 octobre 2026) :
 
 1. Nouveau projet Railway ; ajouter un service **PostgreSQL** et un **Bucket**.
 2. Ajouter un service depuis le dépôt GitHub `adilam2026/smartcourse` (branche à déployer). Railway utilise le `Dockerfile` à la racine.
-3. **Version de PostgreSQL** : la version du modèle Railway n'est pas stable (les sources que j'ai trouvées indiquent 16, 17 ou 18 selon la date, et Railway propose une mise à niveau majeure sur place). Un client `pg_dump` de version différente du serveur est un problème réel : trop ancien, il refuse ; trop récent, il écrit une sauvegarde que le serveur ne sait pas restaurer. **L'image contient donc les clients 16, 17 et 18 et l'application choisit celui qui correspond au serveur à chaque sauvegarde.** Si Railway passe un jour à une version 19, la sauvegarde s'arrête avec un message clair (visible dans Réglages) : il faut alors ajouter un étage `pg19` au `Dockerfile`. Contrôle à tout moment : `npm run backup -- check`.
+3. **Version de PostgreSQL** : la version du modèle Railway n'est pas stable (les sources que j'ai trouvées indiquent 16, 17 ou 18 selon la date, et Railway propose une mise à niveau majeure sur place). Un client `pg_dump` de version différente du serveur est un problème réel : trop ancien, il refuse ; trop récent, il écrit une sauvegarde que le serveur ne sait pas restaurer. **L'image contient donc les clients 16, 17 et 18 et l'application choisit celui qui correspond au serveur à chaque sauvegarde.** Si Railway passe un jour à une version 19, la sauvegarde s'arrête avec un message clair (visible dans Réglages) : il faut alors ajouter un étage `pg19` au `Dockerfile`. Contrôle à tout moment : `node dist/backup-cli.js check`.
 
 ## 2. Variables du service applicatif
 
@@ -44,7 +44,7 @@ Vérifié ici (9 octobre 2026) :
 
 ## 4. Secours : code administrateur perdu
 
-Si aucun administrateur ne peut se connecter : depuis un terminal ayant accès à la base (`railway run`), `npm run admin -- reset <CODE_FAMILLE> <identifiant>` génère un nouveau code, révoque les sessions et journalise l'opération. `npm run admin -- token` crée un nouveau jeton d'installation.
+Si aucun administrateur ne peut se connecter : depuis le conteneur du service (`railway ssh`, dossier `/app/server` ; ces commandes utilisent `dist/`, car `tsx` n'est pas dans l'image), `node dist/admin-cli.js reset <CODE_FAMILLE> <identifiant>` génère un nouveau code, révoque les sessions et journalise l'opération. `node dist/admin-cli.js token` crée un nouveau jeton d'installation.
 
 ## 5. Sauvegardes : où, quand, comment
 
@@ -56,11 +56,13 @@ Si aucun administrateur ne peut se connecter : depuis un terminal ayant accès �
 
 **Où le voir** : Réglages → Profils (administrateur) : stockage, planification, dernière sauvegarde, dernière restauration vérifiée, compatibilité du client `pg_dump`. Le bloc passe en orange si la dernière vérification a plus de 3 jours, a échoué, ou si le client est incompatible.
 
-**À la demande** : `npm run backup -- check | run | verify [clé] | list | prune`.
+**À la demande** : `node dist/backup-cli.js check | run | verify [clé] | list | prune`.
 
-**Limite** : les sauvegardes couvrent la base (profils, listes, achats, catalogue, références des photos). Les fichiers photo restent dans le bucket mais ne sont pas copiés dans les sauvegardes. Les photos du catalogue initial se réimportent ; une photo prise par la famille perdue serait à reprendre.
+**Photos de la famille** : chaque sauvegarde inclut les photos ajoutées par la famille. Elles sont copiées sous `backup-photos/` dans le bucket (une seconde copie, distincte de `photos/` ; une copie abîmée est réécrite), la liste des photos est relevée dans le même instantané que la base, puis la restauration de contrôle exige que **chaque photo listée par la base restaurée** existe dans la sauvegarde, avec la même empreinte SHA-256, la même taille et une image lisible. Sinon la sauvegarde est invalide et les anciennes sont conservées. Les 80 visuels du catalogue ne sont pas copiés : ils sont dans l'image et se réimportent. Les copies de photos ne sont jamais supprimées par la rétention (quelques Ko chacune).
 
-**Restauration réelle (sinistre)** : créer une base vide du **même numéro de version majeure**, déchiffrer le fichier (fonction `decrypt` de `server/src/backup.ts`), `pg_restore --no-owner --dbname=<url> fichier.dump`, puis pointer `DATABASE_URL` dessus.
+**Limite résiduelle** : un bucket Railway unique contient les photos, leurs copies et les sauvegardes : la perte du bucket entier les emporterait toutes. Seule une copie hors Railway règle cela ; elle est écartée par décision (hébergement 100 % Railway). Exportez de temps en temps un fichier de sauvegarde et notez la `BACKUP_KEY` hors de Railway.
+
+**Restauration réelle (sinistre)** : créer une base vide du **même numéro de version majeure**, déchiffrer le fichier (fonction `decrypt` de `server/src/backup.ts`), `pg_restore --no-owner --dbname=<url> fichier.dump`, puis pointer `DATABASE_URL` dessus. Ensuite `node dist/backup-cli.js restore-photos` remet dans le stockage d'images les photos de la famille que la base restaurée liste et qui manquent.
 
 
 ## Vérifier l'image Docker (sans déployer)
