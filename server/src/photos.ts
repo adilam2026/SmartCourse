@@ -97,13 +97,14 @@ export interface S3Parts {
   region?: string;
   accessKeyId?: string;
   secretAccessKey?: string;
+  forcePathStyle?: boolean;
 }
 
 export function s3ClientFromParts(p: S3Parts): S3Client {
   return new S3Client({
     region: p.region ?? "auto",
     endpoint: p.endpoint,
-    forcePathStyle: true,
+    forcePathStyle: p.forcePathStyle ?? true,
     credentials: { accessKeyId: p.accessKeyId ?? "", secretAccessKey: p.secretAccessKey ?? "" },
     // Recent SDK versions add a CRC32 checksum to every request by default; several S3-compatible services (Backblaze B2,
     // older Cloudflare R2, MinIO…) reject or mishandle it. Only send/validate checksums when an operation requires them.
@@ -113,7 +114,7 @@ export function s3ClientFromParts(p: S3Parts): S3Client {
 }
 
 export function s3ClientFromConfig(config: Config): S3Client {
-  return s3ClientFromParts({ endpoint: config.S3_ENDPOINT, region: config.S3_REGION, accessKeyId: config.S3_ACCESS_KEY_ID, secretAccessKey: config.S3_SECRET_ACCESS_KEY });
+  return s3ClientFromParts({ endpoint: config.S3_ENDPOINT, region: config.S3_REGION, accessKeyId: config.S3_ACCESS_KEY_ID, secretAccessKey: config.S3_SECRET_ACCESS_KEY, forcePathStyle: config.S3_FORCE_PATH_STYLE !== "false" });
 }
 
 export function createPhotoStore(config: Config): PhotoStore {

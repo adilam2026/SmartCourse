@@ -8,6 +8,8 @@ const schema = z.object({
   S3_REGION: z.string().optional(),
   S3_ACCESS_KEY_ID: z.string().optional(),
   S3_SECRET_ACCESS_KEY: z.string().optional(),
+  /** "false" for a service that only accepts virtual-hosted-style addresses (bucket.host). Default: path style (MinIO, R2, B2, s3rver). */
+  S3_FORCE_PATH_STYLE: z.enum(["true", "false"]).optional(),
   /**
    * Root certificate of the managed PostgreSQL (e.g. the Supabase CA downloaded from its Database settings): PEM text, or
    * the path of a PEM file. When set, the connection is encrypted AND the server's certificate is verified.
