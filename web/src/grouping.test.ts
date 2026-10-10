@@ -2,14 +2,14 @@ import { describe, expect, it } from "vitest";
 import { eventsOfItem, groupByCategory, sectionGroups, validationGroups } from "./grouping";
 import type { ListEvent, ListItem, ListView } from "./types";
 import { clampQty, fmtQty, minOf, stepOf, stepQty } from "./units";
-import { fmtMonth, fmtTime, fmtWhen } from "./format";
+import { fmtMonth, fmtTime, fmtWhen, isLate, lateNote } from "./format";
 
 const cats = [{ key: "legumes", label: "Légumes" }, { key: "fruits", label: "Fruits" }, { key: "epicerie", label: "Épicerie" }];
 const line = (id: string, category: string, status: ListItem["status"] = "to_buy"): ListItem => ({
   id, productId: id, category, name: id, brand: null, photoUrl: null, productActive: true, status, rev: 1, quantity: 1, unit: "piece",
 });
 const ev = (id: string, itemId: string, validationId: string, kind: ListEvent["kind"], at: string, by = "Marie"): ListEvent => ({
-  id, itemId, productId: itemId, validationId, kind, before: null, after: 1, unit: "piece", at, by: { id: by, displayName: by }, name: itemId, category: "legumes",
+  id, itemId, productId: itemId, validationId, kind, before: null, after: 1, unit: "piece", at, receivedAt: at, by: { id: by, displayName: by }, name: itemId, category: "legumes",
 });
 
 describe("liste d'achats regroupée par catégorie", () => {
@@ -135,5 +135,40 @@ describe("statistiques : textes", () => {
     expect(quantityText({ purchases: 1, quantity: null, unknownQuantity: 1 }, null)).toBe("quantité non enregistrée");
     expect(quantityText({ purchases: 3, quantity: 2, unknownQuantity: 1 }, "kg")).toBe("2 kg + 1 achat sans quantité");
     expect(quantityText({ purchases: 0, quantity: null, unknownQuantity: 0 }, "kg")).toBe("—");
+  });
+});
+
+describe("heure du téléphone et heure de réception", () => {
+  it("une validation reçue longtemps après l'appui est signalée « envoyé plus tard », avec les deux heures", () => {
+    const now = new Date("2026-10-12T13:30:00Z");
+    expect(isLate("2026-10-12T07:00:00Z", "2026-10-12T13:12:00Z")).toBe(true);
+    expect(lateNote("2026-10-12T07:00:00Z", "2026-10-12T13:12:00Z", now)).toBe("envoyé plus tard (reçu 14:12)");
+  });
+  it("un envoi normal (quelques secondes, ou une courte coupure) n'est pas signalé", () => {
+    expect(isLate("2026-10-12T07:00:00Z", "2026-10-12T07:00:03Z")).toBe(false);
+    expect(isLate("2026-10-12T07:00:00Z", "2026-10-12T07:01:30Z")).toBe(false);
+    expect(lateNote("2026-10-12T07:00:00Z", "2026-10-12T07:00:03Z")).toBe("");
+    expect(lateNote("2026-10-12T07:00:00Z", undefined)).toBe(""); // ancien serveur : rien d'inventé
+  });
+  it("le seuil est de 2 minutes", () => {
+    expect(isLate("2026-10-12T07:00:00Z", "2026-10-12T07:02:00Z")).toBe(false);
+    expect(isLate("2026-10-12T07:00:00Z", "2026-10-12T07:02:01Z")).toBe(true);
+  });
+});
+
+describe("kg : la quantité minimale atteignable est 0,5 kg", () => {
+  it("depuis 1 kg, [−] n'est pas bloqué et mène à 0,5 ; depuis 0,5 il est grisé (décocher retire l'article)", () => {
+    expect(stepQty(1, "kg", -1)).toBe(0.5);
+    expect(stepQty(0.5, "kg", -1)).toBeNull();
+    expect(stepQty(1.5, "kg", -1)).toBe(1);
+    expect(stepQty(0.5, "kg", 1)).toBe(1);
+  });
+  it("une saisie de 0,5 est acceptée telle quelle (0,25 aussi : le minimum absolu est 0,1)", () => {
+    expect(clampQty(0.5, "kg")).toBe(0.5);
+    expect(clampQty(0.25, "kg")).toBe(0.25);
+    expect(clampQty(0.05, "kg")).toBe(0.1);
+  });
+  it("pièces : le minimum reste 1", () => {
+    expect(stepQty(1, "piece", -1)).toBeNull();
   });
 });

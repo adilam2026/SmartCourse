@@ -17,3 +17,9 @@ export const fmtMonth = (month: string) => {
   const s = monthLong.format(new Date(Date.UTC(y, m - 1, 15)));
   return s.charAt(0).toUpperCase() + s.slice(1);
 };
+
+/** A validation counts as "sent later" when the server received it more than 2 minutes after the person pressed the button. */
+export const LATE_MS = 2 * 60_000;
+export const isLate = (at: string, receivedAt?: string | null): boolean => !!receivedAt && new Date(receivedAt).getTime() - new Date(at).getTime() > LATE_MS;
+/** "envoyé plus tard (reçu à 14:12)" or "" — both times are kept, the first one is the one that counts. */
+export const lateNote = (at: string, receivedAt?: string | null, now = new Date()): string => (isLate(at, receivedAt) ? `envoyé plus tard (reçu ${fmtWhen(receivedAt!, now)})` : "");

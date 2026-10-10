@@ -232,3 +232,4 @@ h1, h2 { margin: 0; }
 .stat__nums small { font-weight: 500; color: var(--muted); }
 .up { color: var(--green); }
 .down { color: var(--amber); }
+.row__main small em, .row__name small em, .timeline small em, .vgroup p em { color: var(--amber); font-style: normal; font-weight: 700; }

@@ -332,3 +332,89 @@ test.describe("Statistiques d'achats", () => {
     await page.screenshot({ path: "shots/stats.png" });
   });
 });
+
+test.describe("vérifications demandées : kg, heures, corrections", () => {
+  test("kg : depuis 1 kg le bouton « − » n'est pas bloqué et mène à 0,5 kg ; à 0,5 kg il est grisé", async ({ page, playwright, baseURL }) => {
+    const f = await newFamily(playwright, baseURL!);
+    await createList(f);
+    await uiLogin(page, f);
+    const t = id(f, "Tomates");
+    await card(page, f, "Tomates").click();
+    await expect(page.getByTestId(`qty-input-${t}`)).toHaveValue("1");
+    await expect(page.getByTestId(`minus-${t}`)).toBeEnabled();
+    await page.getByTestId(`minus-${t}`).click();
+    await expect(page.getByTestId(`qty-input-${t}`)).toHaveValue("0,5");
+    await expect(page.getByTestId(`minus-${t}`)).toBeDisabled();
+    await page.getByTestId("validate").click();
+    await expect(page.getByTestId("sync-state")).toContainText("Enregistré");
+    const list = (await (await f.lamiaa.get("/api/lists/active")).json()).list;
+    expect(list.items[0]).toMatchObject({ quantity: 0.5, unit: "kg" });
+    await page.screenshot({ path: "shots/kg-half.png" });
+  });
+
+  test("hors connexion : l'heure du téléphone et l'heure de réception sont toutes deux conservées ; « envoyé plus tard » seulement quand c'est vrai", async ({ page, playwright, baseURL }) => {
+    const f = await newFamily(playwright, baseURL!);
+    const listId = await createList(f);
+    const pressed = new Date(Date.now() - 3 * 3_600_000);
+    await ops(f, "staff", listId, [add(f, "Lait", 2)], { id: randomUUID(), at: pressed.toISOString() }); // validé il y a 3 h, reçu maintenant
+    await ops(f, "lamiaa", listId, [add(f, "Riz")], { id: randomUUID(), at: new Date().toISOString() }); // envoi immédiat
+    await uiLogin(page, f, "lamiaa", "573918");
+    await expect(page.getByTestId(`late-${id(f, "Lait")}`)).toContainText("envoyé plus tard");
+    await expect(page.getByTestId(`late-${id(f, "Lait")}`)).toContainText("reçu");
+    await expect(page.getByTestId(`late-${id(f, "Riz")}`)).toHaveCount(0);
+    await page.getByTestId("open-validations").click();
+    await expect(page.getByTestId("validation-late")).toHaveCount(1); // une seule validation en retard
+    await expect(page.getByTestId("validation-late")).toContainText("validé sur le téléphone");
+    await page.screenshot({ path: "shots/late.png" });
+    // les deux heures existent côté serveur
+    const view = (await (await f.lamiaa.get("/api/lists/active")).json()).list;
+    const v = view.validations.find((x: any) => x.by.displayName === "Marie");
+    expect(new Date(v.clientAt).getTime()).toBe(pressed.getTime());
+    expect(new Date(v.receivedAt).getTime()).toBeGreaterThan(pressed.getTime() + 2.9 * 3_600_000);
+  });
+
+  test("corriger un achat avec une nouvelle demande de même unité : quantités regroupées, historique, auteur de l'achat et de la correction conservés", async ({ page, playwright, baseURL }) => {
+    const f = await newFamily(playwright, baseURL!);
+    const listId = await createList(f);
+    await ops(f, "staff", listId, [add(f, "Tomates", 2)]);
+    const bought = (await (await f.lamiaa.get("/api/lists/active")).json()).list.items[0];
+    await ops(f, "adil", listId, [{ opId: randomUUID(), type: "purchase", itemId: bought.id }]);
+    await ops(f, "staff", listId, [{ opId: randomUUID(), type: "request_again", productId: id(f, "Tomates"), quantity: 1.5 }]);
+    await uiLogin(page, f, "lamiaa", "573918");
+    await expect(page.getByTestId("count-tobuy")).toHaveText("1");
+    await page.getByTestId(`correct-${id(f, "Tomates")}`).click();
+    await page.getByTestId("correct-confirm").click();
+    await expect(page.getByTestId("count-bought")).toHaveText("0");
+    const row = page.getByTestId("to-buy").getByTestId(`row-${id(f, "Tomates")}`);
+    await expect(row).toContainText("3,5 kg"); // 2 + 1,5 : rien perdu
+    await page.getByTestId(`detail-${id(f, "Tomates")}`).click();
+    const tl = page.getByTestId("item-timeline");
+    await expect(tl).toContainText("Nouvelle demande · 1,5 kg");
+    await expect(tl).toContainText("quantité reportée 1,5 kg → 3,5 kg");
+    await expect(page.getByTestId("item-correction")).toContainText("2 kg");
+    await expect(page.getByTestId("item-correction")).toContainText("Acheté par Adil");
+    await expect(page.getByTestId("item-correction")).toContainText("corrigé par Lamiaa");
+    await page.screenshot({ path: "shots/correction-merge.png" });
+  });
+
+  test("corriger un achat avec une nouvelle demande dans une autre unité : refus clair, kg et pièces jamais additionnés", async ({ page, playwright, baseURL }) => {
+    const f = await newFamily(playwright, baseURL!);
+    const listId = await createList(f);
+    await ops(f, "staff", listId, [add(f, "Tomates", 2)]);
+    const bought = (await (await f.lamiaa.get("/api/lists/active")).json()).list.items[0];
+    await ops(f, "adil", listId, [{ opId: randomUUID(), type: "purchase", itemId: bought.id }]);
+    expect((await f.adil.patch(`/api/products/${id(f, "Tomates")}`, { data: { unit: "piece" } })).status()).toBe(200); // l'unité du produit change
+    await ops(f, "staff", listId, [{ opId: randomUUID(), type: "request_again", productId: id(f, "Tomates"), quantity: 4 }]);
+    await uiLogin(page, f, "lamiaa", "573918");
+    await page.getByTestId(`correct-${id(f, "Tomates")}`).click();
+    await page.getByTestId("correct-confirm").click();
+    await expect(page.getByText(/autre unité/)).toBeVisible();
+    await expect(page.getByText(/4 pièces/).first()).toBeVisible();
+    await expect(page.getByTestId("count-bought")).toHaveText("1"); // l'achat est intact
+    await expect(page.getByTestId("count-tobuy")).toHaveText("1");
+    const list = (await (await f.lamiaa.get("/api/lists/active")).json()).list;
+    expect(list.items.map((i: any) => [i.status, i.quantity, i.unit]).sort()).toEqual([["purchased", 2, "kg"], ["to_buy", 4, "piece"]]);
+    await page.screenshot({ path: "shots/correction-units.png" });
+  });
+});
+

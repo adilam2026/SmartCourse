@@ -107,16 +107,19 @@ interface EventCtx {
 async function ensureValidation(c: pg.PoolClient, a: AuthContext, listId: string, batch: BatchIn | undefined, opId: string, now: Date): Promise<{ id: string; at: Date }> {
   const want = batch?.id ?? opId;
   const at = sanitizeAt(batch?.at, now);
-  const ins = await c.query("INSERT INTO validations (id, list_id, family_id, actor_id, at) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (id) DO NOTHING RETURNING id, at", [want, listId, a.familyId, a.profileId, at]);
+  // What the phone announced is kept as is (even when its clock was implausible and the server's time is shown instead).
+  const raw = batch?.at ? new Date(batch.at) : null;
+  const clientAt = raw && !Number.isNaN(raw.getTime()) ? raw : null;
+  const ins = await c.query("INSERT INTO validations (id, list_id, family_id, actor_id, at, client_at) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (id) DO NOTHING RETURNING id, at", [want, listId, a.familyId, a.profileId, at, clientAt]);
   if (ins.rows[0]) return { id: want, at: ins.rows[0].at as Date };
   const cur = (await c.query("SELECT id, at, list_id, actor_id FROM validations WHERE id = $1", [want])).rows[0];
   if (cur && cur.list_id === listId && cur.actor_id === a.profileId) return { id: want, at: cur.at as Date };
   // An id already used by someone else/another list: never attach to it, fall back to the operation's own identity.
-  const own = await c.query("INSERT INTO validations (id, list_id, family_id, actor_id, at) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (id) DO UPDATE SET id = validations.id RETURNING id, at", [opId, listId, a.familyId, a.profileId, at]);
+  const own = await c.query("INSERT INTO validations (id, list_id, family_id, actor_id, at, client_at) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (id) DO UPDATE SET id = validations.id RETURNING id, at", [opId, listId, a.familyId, a.profileId, at, clientAt]);
   return { id: opId, at: own.rows[0].at as Date };
 }
 
-async function logEvent(e: EventCtx, itemId: string, productId: string, kind: "add" | "qty" | "remove" | "request_again", before: number | null, after: number | null, unit: Unit) {
+async function logEvent(e: EventCtx, itemId: string, productId: string, kind: "add" | "qty" | "remove" | "request_again" | "correct" | "merge", before: number | null, after: number | null, unit: Unit) {
   await e.c.query(
     `INSERT INTO list_events (list_id, family_id, item_id, product_id, validation_id, kind, qty_before, qty_after, unit, actor_id, at)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
@@ -260,17 +263,20 @@ async function execCorrect(e: EventCtx, op: Extract<OpIn, { type: "correct" }>):
     const merged = Math.min(999, Math.round((num(open.quantity) + num(item.quantity)) * 1000) / 1000);
     await c.query("UPDATE list_items SET status = 'corrected', rev = rev + 1, updated_at = now() WHERE id = $1", [item.id]);
     await c.query("UPDATE list_items SET quantity = $2, rev = rev + 1, updated_at = now() WHERE id = $1", [open.id, merged]);
-    await logEvent(e, open.id, open.product_id, "qty", num(open.quantity), merged, open.unit);
+    // Nothing is lost: the purchase stays in the corrections (buyer, time, quantity), the quantity joins the open line, and the event
+    // keeps the quantity before and after with the person who corrected.
+    await logEvent(e, open.id, open.product_id, "merge", num(open.quantity), merged, open.unit);
     return { result: { status: "applied" }, itemId: open.id };
   }
   if (open) {
     // A removed line occupies the single open slot: it takes over, the corrected line is retired.
     await c.query("UPDATE list_items SET status = 'corrected', rev = rev + 1, updated_at = now() WHERE id = $1", [item.id]);
     await c.query("UPDATE list_items SET status = 'to_buy', quantity = $2, unit = $3, rev = rev + 1, updated_at = now() WHERE id = $1", [open.id, item.quantity, item.unit]);
-    await logEvent(e, open.id, open.product_id, "add", null, num(item.quantity), item.unit);
+    await logEvent(e, open.id, open.product_id, "correct", null, num(item.quantity), item.unit);
     return { result: { status: "applied" }, itemId: open.id };
   }
   await c.query("UPDATE list_items SET status = 'to_buy', rev = rev + 1, updated_at = now() WHERE id = $1", [item.id]);
+  await logEvent(e, item.id, item.product_id, "correct", null, num(item.quantity), item.unit);
   return { result: { status: "applied" }, itemId: item.id };
 }
 
@@ -412,13 +418,14 @@ export async function getListView(db: Db, a: AuthContext, listId: string) {
   // Journal of the list (parents only): who changed what, and when. Staff only see the resulting quantity.
   const ev = parentView
     ? (await db.query(
-        `SELECT ev.id, ev.seq, ev.item_id, ev.product_id, ev.validation_id, ev.kind, ev.qty_before, ev.qty_after, ev.unit, ev.at, ev.actor_id, pr.display_name AS actor_name,
+        `SELECT ev.id, ev.seq, ev.item_id, ev.product_id, ev.validation_id, ev.kind, ev.qty_before, ev.qty_after, ev.unit, ev.at, va.received_at, ev.actor_id, pr.display_name AS actor_name,
                 ${archived ? "coalesce(i.snapshot_name, p.name)" : "p.name"} AS name, cat.key AS category
            FROM list_events ev
            JOIN list_items i ON i.id = ev.item_id
            JOIN products p ON p.id = ev.product_id
            JOIN categories cat ON cat.key = ${archived ? "coalesce(i.snapshot_category, p.category)" : "p.category"}
            JOIN profiles pr ON pr.id = ev.actor_id
+           JOIN validations va ON va.id = ev.validation_id
           WHERE ev.list_id = $1 ORDER BY ev.seq`,
         [listId],
       )).rows
@@ -433,6 +440,7 @@ export async function getListView(db: Db, a: AuthContext, listId: string) {
     after: r.qty_after === null ? null : num(r.qty_after),
     unit: r.unit as Unit,
     at: r.at.toISOString(),
+    receivedAt: r.received_at.toISOString(),
     by: { id: r.actor_id as string, displayName: r.actor_name as string },
     name: r.name as string,
     category: r.category as string,
@@ -471,8 +479,9 @@ export async function getListView(db: Db, a: AuthContext, listId: string) {
           ? {
               addedBy: start?.by ?? { id: r.adder_id, displayName: r.adder_name },
               addedAt: start?.at ?? r.added_at.toISOString(),
+              addedReceivedAt: start?.receivedAt ?? r.added_at.toISOString(),
               // The latest change, only when it is not the creation itself: shown on the line, details on tap.
-              ...(last && last.id !== start?.id ? { lastChange: { kind: last.kind, by: last.by, at: last.at, before: last.before, after: last.after } } : {}),
+              ...(last && last.id !== start?.id ? { lastChange: { kind: last.kind, by: last.by, at: last.at, receivedAt: last.receivedAt, before: last.before, after: last.after } } : {}),
             }
           : {}),
       };
@@ -481,13 +490,13 @@ export async function getListView(db: Db, a: AuthContext, listId: string) {
   if (parentView) {
     view.events = events;
     const vs = await db.query(
-      `SELECT v.id, v.at, v.received_at, pr.id AS actor_id, pr.display_name FROM validations v JOIN profiles pr ON pr.id = v.actor_id
+      `SELECT v.id, v.at, v.received_at, v.client_at, pr.id AS actor_id, pr.display_name FROM validations v JOIN profiles pr ON pr.id = v.actor_id
         WHERE v.list_id = $1 AND EXISTS (SELECT 1 FROM list_events e WHERE e.validation_id = v.id) ORDER BY v.at, v.received_at`,
       [listId],
     );
-    view.validations = vs.rows.map((v) => ({ id: v.id, at: v.at.toISOString(), receivedAt: v.received_at.toISOString(), by: { id: v.actor_id, displayName: v.display_name } }));
+    view.validations = vs.rows.map((v) => ({ id: v.id, at: v.at.toISOString(), receivedAt: v.received_at.toISOString(), clientAt: v.client_at ? (v.client_at as Date).toISOString() : null, by: { id: v.actor_id, displayName: v.display_name } }));
     const cl = await db.query(
-      `SELECT pu.id, i.product_id, coalesce(i.snapshot_name, p.name) AS name, pu.purchased_at, pu.voided_at, pu.void_reason,
+      `SELECT pu.id, i.product_id, coalesce(i.snapshot_name, p.name) AS name, pu.purchased_at, pu.voided_at, pu.void_reason, pu.quantity AS purchase_qty, pu.unit AS purchase_unit,
               pb.id AS buyer_id, pb.display_name AS buyer_name, vb.id AS voider_id, vb.display_name AS voider_name
          FROM purchases pu
          JOIN list_items i ON i.id = pu.list_item_id
@@ -504,6 +513,8 @@ export async function getListView(db: Db, a: AuthContext, listId: string) {
       name: r.name,
       purchasedBy: { id: r.buyer_id, displayName: r.buyer_name },
       purchasedAt: r.purchased_at.toISOString(),
+      quantity: r.purchase_qty === null ? null : num(r.purchase_qty),
+      unit: (r.purchase_unit ?? null) as Unit | null,
       correctedBy: { id: r.voider_id, displayName: r.voider_name },
       correctedAt: r.voided_at.toISOString(),
       reason: r.void_reason,

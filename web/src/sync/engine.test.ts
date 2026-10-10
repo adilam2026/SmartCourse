@@ -23,6 +23,7 @@ class FakeServer {
   cat: Catalog = catalog;
   catalogRev: number | undefined; // undefined = ancien serveur, sans révision
   catalogCalls = 0;
+  correctClash = false; // une nouvelle demande dans une autre unité empêche la correction
 
   view(): ListView | null {
     return this.listId ? { id: this.listId, status: "active", createdAt: "", closedAt: null, items: this.items.map((i) => ({ ...i })) } : null;
@@ -63,6 +64,8 @@ class FakeServer {
           else if (ex.status === "purchased") r = { opId: op.opId, status: "rejected", reason: "locked_purchased" };
           else if (ex.rev !== op.baseRev) r = { opId: op.opId, status: "rejected", reason: "stale" };
           else { this.items = this.items.filter((i) => i !== ex); r = { opId: op.opId, status: "applied" }; }
+        } else if (op.type === "correct" && this.correctClash) {
+          r = { opId: op.opId, status: "rejected", reason: "duplicate_open", detail: { quantity: 4, unit: "piece" } };
         } else r = { opId: op.opId, status: "rejected", reason: "item_unknown" };
         this.seen.set(op.opId, r);
         return r;
@@ -692,6 +695,18 @@ describe("quantités, nouvelle demande, validations", () => {
     expect(e2.getState().toggles["lait"]).toMatchObject({ qty: 3 });
     await e2.setCatalogView("all");
     expect((await boot()).getState().catalogView).toBe("all");
+  });
+
+  it("corriger un achat alors qu'une nouvelle demande existe dans une autre unité : message clair, aucune addition", async () => {
+    srv.items = [{ ...item("lait", "purchased", 2), quantity: 2, unit: "kg", purchase: { id: "pu1", at: "2026-10-12T07:00:00Z", by: { id: "a", displayName: "Adil" } } }];
+    srv.correctClash = true;
+    const e = await boot();
+    await e.correct("pu1", "");
+    const msg = e.getState().notices.map((n) => n.text).join("\n");
+    expect(msg).toMatch(/autre unité/);
+    expect(msg).toMatch(/4 pièces/);
+    expect(msg).toMatch(/l'achat reste inchangé/);
+    expect(srv.items[0]).toMatchObject({ status: "purchased", quantity: 2, unit: "kg" });
   });
 });
 

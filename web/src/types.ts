@@ -41,7 +41,7 @@ export interface Person {
   displayName: string;
 }
 
-export type EventKind = "add" | "qty" | "remove" | "request_again";
+export type EventKind = "add" | "qty" | "remove" | "request_again" | "correct" | "merge";
 
 /** One change to the list (parents only): kept forever, never overwritten. */
 export interface ListEvent {
@@ -53,7 +53,10 @@ export interface ListEvent {
   before: number | null;
   after: number | null;
   unit: Unit;
+  /** The time shown: when the person pressed "Valider" on their phone. */
   at: string;
+  /** When the server received it (later than `at` for a validation made offline). */
+  receivedAt: string;
   by: Person;
   name: string;
   category: string;
@@ -62,8 +65,11 @@ export interface ListEvent {
 /** One press on "Valider": its author, its time, and (through the events) its articles. */
 export interface Validation {
   id: string;
+  /** The time shown: the phone's time at the press (or the server's when the phone's clock was implausible). */
   at: string;
   receivedAt: string;
+  /** What the phone announced, kept even when it was not retained (null: unknown, older validations). */
+  clientAt?: string | null;
   by: Person;
 }
 
@@ -83,8 +89,9 @@ export interface ListItem {
   /** Parents only: who asked for it and when (its first/last addition). */
   addedBy?: Person;
   addedAt?: string;
+  addedReceivedAt?: string;
   /** Parents only: the latest change when it is not the creation itself. */
-  lastChange?: { kind: EventKind; by: Person; at: string; before: number | null; after: number | null };
+  lastChange?: { kind: EventKind; by: Person; at: string; receivedAt?: string; before: number | null; after: number | null };
 }
 
 export interface Correction {
@@ -93,6 +100,8 @@ export interface Correction {
   name: string;
   purchasedBy: { id: string; displayName: string };
   purchasedAt: string;
+  quantity?: number | null;
+  unit?: Unit | null;
   correctedBy: { id: string; displayName: string };
   correctedAt: string;
   reason: string | null;

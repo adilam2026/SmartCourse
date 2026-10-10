@@ -1,5 +1,8 @@
 name: Vérification de la production (lecture seule)
-# Interroge l'adresse publique de SmartCourse sur Railway : santé, version du schéma, fichier assetlinks. Aucune écriture, aucun secret.
+# Interroge l'adresse publique de SmartCourse sur Railway. Aucune écriture, aucun secret.
+# Prouve ce qui tourne VRAIMENT : le commit exact (variable Railway RAILWAY_GIT_COMMIT_SHA exposée par /health), la dernière migration
+# appliquée, et que l'application web servie contient bien les écrans de ce commit. Le commit attendu est celui du dépôt à l'instant
+# du lancement (github.sha) : si Railway n'a pas encore déployé ce commit, le contrôle attend puis échoue clairement.
 on:
   workflow_dispatch:
     inputs:
@@ -8,32 +11,42 @@ on:
         default: "https://smartcourse-production-c7ce.up.railway.app"
       schema_attendu:
         description: "Dernière migration attendue"
-        default: "009_quantities.sql"
+        default: "010_validation_times.sql"
 permissions:
   contents: read
 jobs:
   verif:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
-      - name: Santé et version du schéma
+      - name: Commit et migration actifs en production
         run: |
-          U="${{ inputs.app_url }}"
-          for i in $(seq 1 20); do
+          U="${{ inputs.app_url }}"; WANT="${{ github.sha }}"; SCHEMA="${{ inputs.schema_attendu }}"
+          echo "commit attendu : $WANT"
+          for i in $(seq 1 24); do
             R=$(curl -fsS -m 15 "$U/health" || true)
             echo "essai $i : $R"
-            echo "$R" | grep -q '"status":"ok"' && echo "$R" | grep -q "${{ inputs.schema_attendu }}" && { echo "OK : serveur à jour (${{ inputs.schema_attendu }})"; exit 0; }
+            if echo "$R" | grep -q '"status":"ok"' && echo "$R" | grep -q "\"schema\":\"$SCHEMA\"" && echo "$R" | grep -q "\"commit\":\"$WANT\""; then
+              echo "OK : commit $WANT et migration $SCHEMA actifs en production"; exit 0
+            fi
             sleep 30
           done
-          echo "::error::Le serveur de production n'est pas (encore) à jour ou ne répond pas."; exit 1
-      - name: Page d'accueil et assetlinks
+          echo "::error::Production pas à jour : commit attendu $WANT, migration $SCHEMA (dernière réponse : $R)"; exit 1
+      - name: L'application web servie est celle de ce commit
+        run: |
+          U="${{ inputs.app_url }}"
+          curl -fsS -m 15 "$U/" -o /tmp/index.html
+          JS=$(grep -o '/assets/index-[A-Za-z0-9_-]*\.js' /tmp/index.html | head -1)
+          echo "bundle : $JS"
+          curl -fsS -m 30 "$U$JS" -o /tmp/app.js
+          for m in "Statistiques d'achats" "Historique des validations" "Par catégories" "Nouvelle demande" "envoyé plus tard" "autre unité"; do
+            grep -q "$m" /tmp/app.js && echo "présent : $m" || { echo "::error::absent du bundle servi : $m"; exit 1; }
+          done
+      - name: Assetlinks, accueil, routes protégées
         run: |
           U="${{ inputs.app_url }}"
           curl -fsS -m 15 -o /dev/null -w "page d'accueil : HTTP %{http_code}\n" "$U/"
           curl -fsS -m 15 "$U/.well-known/assetlinks.json" | head -c 400; echo
-      - name: Les routes protégées refusent un visiteur anonyme
-        run: |
-          U="${{ inputs.app_url }}"
           for p in /api/lists/active /api/stats/purchases /api/catalog; do
             echo "$p -> $(curl -s -o /dev/null -w '%{http_code}' -m 15 "$U$p")"
           done

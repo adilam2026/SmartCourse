@@ -87,7 +87,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     try {
       // The latest applied migration tells which version of the schema this server runs (checked after a deployment).
       const m = await db.query("SELECT name FROM schema_migrations ORDER BY name DESC LIMIT 1");
-      return { status: "ok", schema: (m.rows[0]?.name as string | undefined) ?? null };
+      return { status: "ok", schema: (m.rows[0]?.name as string | undefined) ?? null, commit: process.env.RAILWAY_GIT_COMMIT_SHA ?? process.env.GIT_COMMIT ?? null };
     } catch {
       return reply.code(503).send({ status: "db_unavailable" });
     }

@@ -320,6 +320,119 @@ describe("validations successives (date, heure, auteur)", () => {
   });
 });
 
+describe("heure du téléphone et heure de réception", () => {
+  it("une validation faite hors connexion garde l'heure de l'appui ET l'heure de réception ; l'écart est visible", async () => {
+    const f = await newFamily();
+    const pressed = new Date(Date.now() - 3 * 3_600_000);
+    const before = Date.now();
+    await send(f.marie, f.list, [op.add(f.products["Lait"]!, 2)], { id: randomUUID(), at: pressed.toISOString() });
+    const v = await view(f.adil);
+    const val = v.validations[0];
+    expect(new Date(val.at).getTime()).toBe(pressed.getTime()); // heure d'affichage : celle de l'appui
+    expect(new Date(val.clientAt).getTime()).toBe(pressed.getTime()); // ce que le téléphone a annoncé
+    expect(new Date(val.receivedAt).getTime()).toBeGreaterThanOrEqual(before - 1000); // reçu maintenant
+    const line = lines(v, f.products["Lait"]!)[0];
+    expect(new Date(line.addedAt).getTime()).toBe(pressed.getTime());
+    expect(new Date(line.addedReceivedAt).getTime()).toBeGreaterThanOrEqual(before - 1000);
+    const e = v.events[0];
+    expect(new Date(e.at).getTime()).toBe(pressed.getTime());
+    expect(new Date(e.receivedAt).getTime()).toBeGreaterThanOrEqual(before - 1000);
+  });
+
+  it("une horloge de téléphone incohérente est remplacée à l'affichage, mais l'heure annoncée est conservée", async () => {
+    const f = await newFamily();
+    const future = new Date(Date.now() + 5 * 3_600_000);
+    const before = Date.now();
+    await send(f.marie, f.list, [op.add(f.products["Lait"]!)], { id: randomUUID(), at: future.toISOString() });
+    const val = (await view(f.adil)).validations[0];
+    expect(new Date(val.at).getTime()).toBeLessThan(before + 60_000); // heure du serveur affichée
+    expect(new Date(val.clientAt).getTime()).toBe(future.getTime()); // heure brute du téléphone gardée
+  });
+
+  it("sans heure fournie (ancien client), seule l'heure du serveur existe et clientAt est vide", async () => {
+    const f = await newFamily();
+    await send(f.marie, f.list, [op.add(f.products["Lait"]!)]);
+    expect((await view(f.adil)).validations[0].clientAt).toBeNull();
+  });
+});
+
+describe("corriger un achat quand une nouvelle demande existe", () => {
+  async function bought(f: F, name: string, qty: number) {
+    await one(f.marie, f.list, op.add(f.products[name]!, qty));
+    const l = lines(await view(f.adil), f.products[name]!).find((x: any) => x.status === "to_buy");
+    await one(f.adil, f.list, op.purchase(l.id));
+    return (await view(f.adil)).items.find((x: any) => x.id === l.id);
+  }
+
+  it("même unité : la quantité de l'achat corrigé rejoint la nouvelle demande ; ni quantité, ni auteur, ni historique ne se perdent", async () => {
+    const f = await newFamily();
+    const b = await bought(f, "Tomates", 2); // 2 kg achetés par Adil
+    await one(f.marie, f.list, op.again(f.products["Tomates"]!, 1.5)); // nouvelle demande : 1,5 kg
+    const r = await one(f.lamiaa, f.list, op.correct(b.purchase.id));
+    expect(r.status).toBe("applied");
+    const v = await view(f.adil);
+    const open = lines(v, f.products["Tomates"]!);
+    expect(open).toHaveLength(1);
+    expect(open[0]).toMatchObject({ status: "to_buy", quantity: 3.5, unit: "kg" }); // 2 + 1,5, rien perdu
+    // l'historique de la ligne : l'ajout d'origine, la nouvelle demande, puis la fusion avec avant/après et l'auteur de la correction
+    const hist = v.events.filter((e: any) => e.productId === f.products["Tomates"]);
+    expect(hist.map((e: any) => [e.kind, e.before, e.after, e.by.displayName])).toEqual([
+      ["add", null, 2, "Marie"],
+      ["request_again", null, 1.5, "Marie"],
+      ["merge", 1.5, 3.5, "Lamiaa"],
+    ]);
+    // la correction garde l'achat d'origine : acheteur, heure, quantité, unité, et qui l'a corrigé
+    expect(v.corrections).toHaveLength(1);
+    expect(v.corrections[0]).toMatchObject({ name: "Tomates", quantity: 2, unit: "kg", purchasedBy: { displayName: "Adil" }, correctedBy: { displayName: "Lamiaa" } });
+    // la ligne d'origine est retirée de l'affichage mais reste en base (jamais supprimée)
+    const row = (await db.query("SELECT status FROM list_items WHERE id = $1", [b.id])).rows[0];
+    expect(row.status).toBe("corrected");
+    // statistiques : l'achat corrigé ne compte plus
+    const st = (await app.inject({ method: "GET", url: "/api/stats/purchases", cookies: f.adil })).json();
+    expect(st.rows).toHaveLength(0);
+  });
+
+  it("sans nouvelle demande : l'article revient à acheter avec sa quantité, et la correction est dans le journal", async () => {
+    const f = await newFamily();
+    const b = await bought(f, "Tomates", 2.5);
+    await one(f.lamiaa, f.list, op.correct(b.purchase.id));
+    const v = await view(f.adil);
+    expect(lines(v, f.products["Tomates"]!)[0]).toMatchObject({ status: "to_buy", quantity: 2.5, unit: "kg" });
+    expect(v.events.map((e: any) => [e.kind, e.after, e.by.displayName])).toEqual([["add", 2.5, "Marie"], ["correct", 2.5, "Lamiaa"]]);
+    expect(v.corrections[0]).toMatchObject({ quantity: 2.5, unit: "kg", purchasedBy: { displayName: "Adil" } });
+  });
+
+  it("unités différentes (kg et pièces) : aucune addition ; la correction est refusée, l'achat et la demande restent intacts", async () => {
+    const f = await newFamily();
+    const b = await bought(f, "Tomates", 2); // 2 kg
+    await app.inject({ method: "PATCH", url: `/api/products/${f.products["Tomates"]}`, cookies: f.adil, payload: { unit: "piece" } });
+    await one(f.marie, f.list, op.again(f.products["Tomates"]!, 4)); // nouvelle demande : 4 pièces
+    const r = await one(f.lamiaa, f.list, op.correct(b.purchase.id));
+    expect(r).toMatchObject({ status: "rejected", reason: "duplicate_open", detail: { quantity: 4, unit: "piece" } });
+    const v = await view(f.adil);
+    const ls = lines(v, f.products["Tomates"]!);
+    expect(ls.map((l: any) => [l.status, l.quantity, l.unit]).sort()).toEqual([["purchased", 2, "kg"], ["to_buy", 4, "piece"]]); // ni 6, ni 2,4
+    expect(v.corrections).toHaveLength(0);
+    expect((await db.query("SELECT voided_at FROM purchases WHERE list_item_id = $1", [b.id])).rows[0].voided_at).toBeNull();
+    // une fois la demande en pièces retirée ou achetée, la correction devient possible
+    const open = ls.find((l: any) => l.status === "to_buy");
+    await one(f.lamiaa, f.list, op.remove(f.products["Tomates"]!, open.rev));
+    expect((await one(f.lamiaa, f.list, op.correct(b.purchase.id))).status).toBe("applied");
+    expect(lines(await view(f.adil), f.products["Tomates"]!)[0]).toMatchObject({ status: "to_buy", quantity: 2, unit: "kg" });
+  });
+
+  it("la correction rejouée (réponse perdue) ne fusionne pas deux fois", async () => {
+    const f = await newFamily();
+    const b = await bought(f, "Tomates", 2);
+    await one(f.marie, f.list, op.again(f.products["Tomates"]!, 1));
+    const c = op.correct(b.purchase.id);
+    await send(f.lamiaa, f.list, [c]);
+    await send(f.lamiaa, f.list, [c]);
+    expect(lines(await view(f.adil), f.products["Tomates"]!)[0].quantity).toBe(3);
+    expect((await view(f.adil)).events.filter((e: any) => e.kind === "merge")).toHaveLength(1);
+  });
+});
+
 describe("Statistiques d'achats", () => {
   async function buy(f: F, name: string, qty: number, when: string, by = f.adil) {
     const id = (await db.query("SELECT id FROM lists WHERE family_id = $1 AND status = 'active'", [f.familyId])).rows[0]?.id ?? (await app.inject({ method: "POST", url: "/api/lists", cookies: f.lamiaa })).json().list.id;
@@ -432,7 +545,8 @@ describe("migration 009 sur des données existantes", () => {
       const l2 = (await old.query("INSERT INTO lists (family_id, created_by) VALUES ($1,$2) RETURNING id", [fam, prof])).rows[0].id as string;
       await old.query("INSERT INTO list_items (list_id, family_id, product_id, added_by, status) VALUES ($1,$2,$3,$4,'removed')", [l2, fam, lait, prof]);
 
-      expect(await migrate(old)).toEqual(["009_quantities.sql"]);
+      expect(await migrate(old)).toEqual(["009_quantities.sql", "010_validation_times.sql"]);
+      expect((await old.query("SELECT client_at FROM validations")).rows.every((r) => r.client_at === null)).toBe(true); // anciennes validations : heure du téléphone inconnue
 
       expect((await old.query("SELECT count(*)::int AS n FROM profiles")).rows[0].n).toBe(1);
       const items = (await old.query("SELECT product_id, quantity, unit, status FROM list_items ORDER BY added_at NULLS LAST")).rows;

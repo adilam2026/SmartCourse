@@ -1,7 +1,7 @@
 import { api as realApi, ApiError, NetworkError } from "../api";
 import { AppDbClass, type AppDb, type OrphanRow } from "../db";
 import type { Batch, Catalog, ListView, Me, Op, OpResult, Toggles } from "../types";
-import { clampQty } from "../units";
+import { clampQty, fmtQty } from "../units";
 import { buildOps, cancelQueuedAdd, editQueuedAdd, interpretResults, isPurchased, normalizeToggles, openItem, projectedPresence, requestAgainToggle, setQuantityToggle, toggleProduct } from "./logic";
 
 export interface Notice {
@@ -538,7 +538,9 @@ export class Engine {
           item_unknown: "Cet article n'est plus dans la liste.",
           purchase_unknown: "Cet achat est introuvable.",
         };
-        this.notice(msg[r.reason ?? ""] ?? "Action refusée.");
+        // A new request in another unit exists: adding kilos to pieces would be meaningless, so nothing is merged or changed.
+        const clash = r.reason === "duplicate_open" && r.detail?.quantity !== undefined && r.detail.unit ? `Correction impossible pour l'instant : une nouvelle demande de ce produit existe déjà dans une autre unité (${fmtQty(r.detail.quantity, r.detail.unit)}). Retirez-la ou achetez-la d'abord ; l'achat reste inchangé.` : null;
+        this.notice(clash ?? msg[r.reason ?? ""] ?? "Action refusée.");
         if (r.reason === "list_closed") void this.refresh();
       } else if (okText) {
         const t = okText(r);
