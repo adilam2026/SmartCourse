@@ -9,7 +9,7 @@ if (setup.status !== 201) throw new Error(`création de la famille : ${setup.sta
 const { familyCode } = await j(setup);
 const cookie = setup.headers.get("set-cookie").split(";")[0];
 for (const [displayName, login, role] of [["Lamiaa", "lamiaa", "parent"], ["Marie", "marie", "staff"]]) {
-  const r = await fetch(`${base}/api/profiles`, { method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ displayName, login, role, secret: "573918" }) });
+  const r = await fetch(`${base}/api/profiles`, { method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ displayName, login, role, secret: "573918", secretConfirm: "573918" }) });
   if (r.status !== 201) throw new Error(`profil ${login} : ${r.status}`);
 }
 const l = await fetch(`${base}/api/lists`, { method: "POST", headers: { cookie } });
