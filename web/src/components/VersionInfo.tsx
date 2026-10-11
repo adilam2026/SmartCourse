@@ -28,6 +28,7 @@ export function VersionInfo({ engine }: { engine: Engine }) {
       <button className="btn btn--small" data-testid="update-check" onClick={() => void (u.phase === "available" ? updateNow(makeUpdaterDeps(engine)) : checkForUpdate(makeUpdaterDeps(engine), { force: true }))}>
         {u.phase === "available" ? "Mettre à jour maintenant" : "Vérifier les mises à jour"}
       </button>
+      <p><a className="linkbtn" data-testid="privacy-link" href="/confidentialite.html">Confidentialité et suppression des données</a></p>
       <p className="muted"><small>La mise à jour ne supprime rien : vos choix non validés et les envois hors connexion sont conservés.</small></p>
     </section>
   );

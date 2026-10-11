@@ -84,10 +84,22 @@ jobs:
           jarsigner -verify "$AAB" | head -1
           curl -fsSL -o /tmp/bundletool.jar https://github.com/google/bundletool/releases/download/1.18.1/bundletool-all-1.18.1.jar
           java -jar /tmp/bundletool.jar validate --bundle="$AAB"
+          # Exigences Google Play : niveau d'API cible, version, aucun code natif (page de 16 Ko), non débogable, même clé que l'APK
+          java -jar /tmp/bundletool.jar dump manifest --bundle="$AAB" > /tmp/aab-manifest.xml
+          grep -E 'package=|android:versionCode|android:versionName|android:minSdkVersion|android:targetSdkVersion' /tmp/aab-manifest.xml | head -8
+          grep -q 'package="app.smartcourse.courses"' /tmp/aab-manifest.xml
+          T=$(grep -o 'android:targetSdkVersion="[0-9]*"' /tmp/aab-manifest.xml | head -1 | grep -o '[0-9]*'); [ "$T" -ge 36 ] || { echo "::error::targetSdk $T < 36 (exigence Google Play)"; exit 1; }
+          VC=$(grep -o 'android:versionCode="[0-9]*"' /tmp/aab-manifest.xml | head -1 | grep -o '[0-9]*'); [ "$VC" -ge 7 ] || { echo "::error::versionCode $VC ≤ 6 : l'APK déjà diffusé (6) ne pourrait pas être mis à jour"; exit 1; }
+          ! grep -q 'android:debuggable="true"' /tmp/aab-manifest.xml
+          ! unzip -l "$AAB" | grep -q '\.so$' && echo "aucune bibliothèque native (compatible pages de 16 Ko)"
+          "$BT/zipalign" -c -P 16 -v 4 "$APK" > /tmp/zipalign.txt 2>&1 && echo "APK aligné (pages de 16 Ko)" || { tail -3 /tmp/zipalign.txt; echo "::error::alignement 16 Ko"; exit 1; }
+          AABFP=$(keytool -printcert -jarfile "$AAB" | grep -m1 "SHA256:" | sed 's/.*SHA256: *//')
+          echo "Certificat de l'AAB : $AABFP"
           # Empreinte du certificat de l'APK
           FP=$(grep -m1 "certificate SHA-256 digest" /tmp/apksigner.txt | sed 's/.*: //' | tr 'a-f' 'A-F' | sed 's/../&:/g; s/:$//')
           echo "$FP" > /tmp/fingerprint.txt
           echo "Empreinte SHA-256 du certificat : $FP"
+          [ "$AABFP" = "$FP" ] && echo "AAB et APK signés par la même clé" || { echo "::error::l'AAB et l'APK n'ont pas la même clé de signature ($AABFP / $FP)"; exit 1; }
           echo "### Empreinte du certificat (à mettre dans server/assetlinks.json)" >> "$GITHUB_STEP_SUMMARY"; echo "\`$FP\`" >> "$GITHUB_STEP_SUMMARY"
           grep -q "$FP" server/assetlinks.json && echo "assetlinks.json du dépôt : empreinte CONFORME" || {
             if [ "${{ steps.key.outputs.mode }}" = production ]; then echo "::error::L'empreinte de la clé de production n'est pas dans server/assetlinks.json : l'application afficherait la barre d'adresse."; exit 1; fi
@@ -124,6 +136,10 @@ jobs:
     timeout-minutes: 30
     continue-on-error: true
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
       - uses: actions/download-artifact@v4
         with:
           pattern: SmartCourse-android-*
@@ -139,21 +155,11 @@ jobs:
           target: google_apis
           arch: x86_64
           disable-animations: true
-          script: |
-            adb install dist/SmartCourse.apk
-            adb shell pm list packages | grep app.smartcourse.courses
-            adb shell dumpsys package app.smartcourse.courses | grep -E "POST_NOTIFICATIONS|DelegationService" | head -5
-            adb shell cmd package resolve-activity --brief -c android.intent.category.LAUNCHER app.smartcourse.courses
-            adb shell monkey -p app.smartcourse.courses -c android.intent.category.LAUNCHER 1
-            sleep 20
-            adb exec-out screencap -p > screen-lancement.png
-            adb shell dumpsys activity activities | grep -E "mResumedActivity|topResumedActivity" | head -3
-            adb logcat -d -s AndroidRuntime:E | head -20
-            adb shell pidof app.smartcourse.courses || adb shell pidof com.android.chrome || true
+          script: bash scripts/android-emulator-check.sh "${{ inputs.app_url }}"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: emulateur-capture-${{ github.run_number }}
-          path: screen-lancement.png
+          path: screen-final.png
           if-no-files-found: ignore
           retention-days: 7

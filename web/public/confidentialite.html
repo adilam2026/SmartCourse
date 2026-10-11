@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Courses — Confidentialité et suppression des données</title>
+<style>
+  :root { color-scheme: light dark; --bg: #faf6ef; --ink: #1f2a24; --muted: #5a665f; --link: #17613f; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #14201a; --ink: #eef3ef; --muted: #aab7ae; --link: #7fd1a6; } }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 1rem/1.55 system-ui, sans-serif; }
+  main { max-width: 42rem; margin: 0 auto; padding: 1rem 16px 3rem; }
+  h1 { font-size: 1.5rem; } h2 { font-size: 1.15rem; margin-top: 1.6rem; }
+  a { color: var(--link); } .muted { color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Courses — Confidentialité et suppression des données</h1>
+  <p class="muted">Application « Courses — Liste familiale ». Dernière mise à jour : 12 octobre 2026.</p>
+
+  <h2>À quoi sert l'application</h2>
+  <p>Courses est la liste de courses partagée d'une famille. Elle n'est destinée qu'aux membres d'une même famille ; elle ne contient aucune publicité, aucun traceur publicitaire et ne vend ni ne partage de données à des fins commerciales.</p>
+
+  <h2>Données enregistrées</h2>
+  <ul>
+    <li><b>Famille et profils</b> : nom de la famille, code famille, nom affiché, identifiant et rôle de chaque profil. Le code secret n'est jamais conservé en clair : seule une empreinte irréversible est enregistrée.</li>
+    <li><b>Adresse e-mail de récupération</b> (administrateur principal) : sert uniquement à envoyer le code famille et les liens de récupération ou de vérification.</li>
+    <li><b>Listes de courses</b> : articles demandés, quantités, achats, historique et statistiques de la famille ; photos d'articles ajoutées par la famille.</li>
+    <li><b>Notifications</b> (facultatives) : l'adresse technique d'abonnement de l'appareil, rattachée au profil, pour prévenir les parents et administrateurs d'une nouvelle liste.</li>
+    <li><b>Journaux techniques</b> : événements de sécurité et de fonctionnement (par exemple des échecs de connexion), conservés temporairement, sans code secret.</li>
+  </ul>
+  <p>Aucune donnée de localisation, de contacts, de microphone ni d'appareil photo en continu n'est collectée. Une photo n'est envoyée que si vous choisissez d'en ajouter une à un article.</p>
+
+  <h2>Prestataires techniques</h2>
+  <ul>
+    <li><b>Hébergement et base de données</b> : Railway (serveur de l'application, base de données et stockage des photos).</li>
+    <li><b>Envoi d'e-mails</b> (récupération du code famille, vérification de l'adresse, nouveau code secret) : Brevo, qui reçoit l'adresse du destinataire et le contenu du message.</li>
+    <li><b>Notifications</b> : le service de notifications du téléphone (Google Firebase Cloud Messaging sur Android) transporte un message chiffré ; il ne contient pas de noms de produits.</li>
+  </ul>
+  <p>Les échanges avec le serveur sont chiffrés (HTTPS).</p>
+
+  <h2>Conservation et sauvegardes</h2>
+  <p>Les données sont conservées tant que la famille existe. Des sauvegardes chiffrées de la base sont conservées pour la reprise après incident (7 jours, 4 semaines, 3 mois) puis supprimées automatiquement.</p>
+
+  <h2 id="suppression">Supprimer vos données</h2>
+  <ul>
+    <li><b>Toute la famille</b> : l'administrateur principal ouvre <i>Réglages → Réinitialiser la famille</i>. Après vérification du mot de passe et du code famille, la famille, les profils, les listes, les achats, les historiques, les photos de la famille, les abonnements aux notifications et l'adresse de récupération sont supprimés définitivement. Les sauvegardes existantes contiennent encore ces données jusqu'à leur expiration automatique (3 mois au plus).</li>
+    <li><b>Un profil</b> : un administrateur peut désactiver un profil dans <i>Réglages → Famille et profils</i>, ce qui ferme immédiatement ses accès.</li>
+    <li><b>Une demande de suppression</b> d'une personne qui ne peut plus se connecter : s'adresser à l'administrateur principal de sa famille, ou au contact indiqué sur la fiche de l'application sur Google Play.</li>
+    <li><b>Désinstaller l'application</b> n'efface pas les données de la famille sur le serveur ; elle efface seulement les données locales du téléphone.</li>
+  </ul>
+
+  <h2>Vos droits</h2>
+  <p>Vous pouvez demander l'accès, la rectification ou la suppression de vos données. Pour les exercer, utilisez les moyens ci-dessus ou le contact de la fiche Google Play.</p>
+
+  <p><a href="/">← Retour à l'application</a></p>
+</main>
+</body>
+</html>

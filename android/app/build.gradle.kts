@@ -17,7 +17,8 @@ android {
         minSdk = 24
         targetSdk = 36
         // Google Play exige un versionCode strictement croissant : le workflow passe le numéro d'exécution.
-        versionCode = (project.findProperty("versionCode") as String?)?.toInt() ?: 1
+        // Plancher : le dernier APK diffusé (signé avec la même clé) porte le versionCode 6 ; un numéro plus bas ne pourrait pas le mettre à jour.
+        versionCode = maxOf((project.findProperty("versionCode") as String?)?.toInt() ?: 1, 7)
         versionName = (project.findProperty("versionName") as String?) ?: "1.0.0"
         manifestPlaceholders["appUrl"] = "$appUrl/"
         manifestPlaceholders["appHost"] = appHost
