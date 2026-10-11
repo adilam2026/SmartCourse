@@ -191,10 +191,12 @@ describe("achats, retraits, rev", () => {
     // avec la bonne révision, le retrait d'un article non acheté fonctionne
     expect((await one(f.marie, id, op.remove(f.products["Lait"]!, after.rev))).status).toBe("applied");
 
-    // la correction reste tracée (auteur, date, achat annulé)
-    const cor = (await view(f.adil)).corrections;
-    expect(cor).toHaveLength(1);
-    expect(cor[0]).toMatchObject({ name: "Lait", purchasedBy: { displayName: "Adil" }, correctedBy: { displayName: "Lamiaa" }, reason: null });
+    // la correction reste tracée EN BASE (auteur, date, achat annulé) mais n'est plus envoyée aux écrans
+    const cor = (await db.query("SELECT pb.display_name AS bought_by, vb.display_name AS corrected_by, pu.void_reason FROM purchases pu JOIN profiles pb ON pb.id = pu.purchased_by JOIN profiles vb ON vb.id = pu.voided_by WHERE pu.list_id = $1 AND pu.voided_at IS NOT NULL", [id])).rows;
+    expect(cor).toEqual([{ bought_by: "Adil", corrected_by: "Lamiaa", void_reason: null }]);
+    expect((await db.query("SELECT count(*)::int AS n FROM list_events WHERE list_id = $1 AND kind = 'correct'", [id])).rows[0].n).toBe(1);
+    expect((await view(f.adil)).corrections).toBeUndefined();
+    expect(JSON.stringify(await view(f.adil))).not.toMatch(/correct|voided/);
     expect((await view(f.marie)).corrections).toBeUndefined();
   });
 
@@ -206,9 +208,9 @@ describe("achats, retraits, rev", () => {
     const pid = itemOf(await view(f.adil), f.products["Riz"]!).purchase.id;
     expect((await one(f.lamiaa, id, op.correct(pid, "Mauvais paquet"))).status).toBe("applied");
     expect((await one(f.adil, id, op.correct(pid, "autre"))).status).toBe("already");
-    const cor = (await view(f.adil)).corrections;
-    expect(cor).toHaveLength(1);
-    expect(cor[0].reason).toBe("Mauvais paquet");
+    // le motif est conservé en base, jamais affiché
+    expect((await db.query("SELECT void_reason FROM purchases WHERE list_id = $1 AND voided_at IS NOT NULL", [id])).rows).toEqual([{ void_reason: "Mauvais paquet" }]);
+    expect(JSON.stringify(await view(f.adil))).not.toContain("Mauvais paquet");
   });
 
   it("rejouer une opération (même op_id) ne la rejoue pas : pas de doublon, pas d'annulation d'une correction", async () => {
@@ -439,6 +441,31 @@ describe("clôture et archives", () => {
     expect((await view(f.adil))).toBeNull();
   });
 
+  it("une liste clôturée présente sa liste finale : aucune correction, aucun achat annulé ; les corrections restent en base, données inchangées", async () => {
+    const f = await newFamily();
+    const id = await newList(f);
+    await one(f.marie, id, op.add(f.products["Lait"]!));
+    await one(f.marie, id, op.add(f.products["Riz"]!));
+    await one(f.adil, id, op.purchase(itemOf(await view(f.adil), f.products["Lait"]!).id));
+    const wrong = itemOf(await view(f.adil), f.products["Lait"]!).purchase.id;
+    await one(f.lamiaa, id, op.correct(wrong, "mauvais produit")); // achat annulé…
+    await one(f.lamiaa, id, op.purchase(itemOf(await view(f.lamiaa), f.products["Lait"]!).id)); // …puis racheté
+    await app.inject({ method: "POST", url: `/api/lists/${id}/close`, cookies: f.adil });
+    const before = (await db.query("SELECT (SELECT count(*) FROM purchases WHERE list_id = $1) AS p, (SELECT count(*) FROM purchases WHERE list_id = $1 AND voided_at IS NOT NULL) AS v, (SELECT count(*) FROM list_events WHERE list_id = $1) AS e", [id])).rows[0];
+    const arch = (await app.inject({ method: "GET", url: `/api/lists/${id}`, cookies: f.adil })).json().list;
+    // la liste finale : Lait acheté (une fois, par Lamiaa), Riz non acheté ; rien d'autre
+    expect(arch.items.map((i: any) => [i.name, i.status, i.purchase?.by.displayName ?? null]).sort()).toEqual([["Lait", "purchased", "Lamiaa"], ["Riz", "to_buy", null]]);
+    expect(arch.corrections).toBeUndefined();
+    expect(arch.events.every((e: any) => !["correct", "merge"].includes(e.kind))).toBe(true);
+    expect(JSON.stringify(arch)).not.toMatch(/corrig|correct|mauvais produit|voided/i);
+    const h = (await app.inject({ method: "GET", url: "/api/lists", cookies: f.adil })).json().lists;
+    expect(h[0]).not.toHaveProperty("corrections");
+    // lecture seule : lire l'archive ne modifie rien ; la traçabilité est intacte en base (achat annulé, journal)
+    expect(before.v).toBe("1");
+    const after = (await db.query("SELECT (SELECT count(*) FROM purchases WHERE list_id = $1) AS p, (SELECT count(*) FROM purchases WHERE list_id = $1 AND voided_at IS NOT NULL) AS v, (SELECT count(*) FROM list_events WHERE list_id = $1) AS e", [id])).rows[0];
+    expect(after).toEqual(before);
+  });
+
   it("une nouvelle liste est vide ; l'historique résume chaque clôture", async () => {
     const f = await newFamily();
     const id = await newList(f);
@@ -449,7 +476,7 @@ describe("clôture et archives", () => {
     expect((await view(f.adil)).items).toEqual([]);
     const h = (await app.inject({ method: "GET", url: "/api/lists", cookies: f.lamiaa })).json().lists;
     expect(h).toHaveLength(1);
-    expect(h[0]).toMatchObject({ id, purchased: 0, remaining: 1, corrections: 0, closedBy: { displayName: "Adil" } });
+    expect(h[0]).toMatchObject({ id, purchased: 0, remaining: 1, closedBy: { displayName: "Adil" } });
   });
 
   it("critère 12 : un ancien brouillon ne modifie jamais une liste archivée, ni la nouvelle liste", async () => {

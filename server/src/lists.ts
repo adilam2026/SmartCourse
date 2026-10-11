@@ -423,6 +423,8 @@ export async function getListView(db: Db, a: AuthContext, listId: string) {
     [listId],
   );
   // Journal of the list (parents only): who changed what, and when. Staff only see the resulting quantity.
+  // Purchase corrections ('correct' / 'merge' events, cancelled purchases) stay in the database for traceability but are NEVER sent to the
+  // screens: a list shows its final state (what was bought, what was not), in an archive as in the current list.
   const ev = parentView
     ? (await db.query(
         `SELECT ev.id, ev.seq, ev.item_id, ev.product_id, ev.validation_id, ev.kind, ev.qty_before, ev.qty_after, ev.unit, ev.at, va.received_at, ev.actor_id, pr.display_name AS actor_name,
@@ -433,7 +435,7 @@ export async function getListView(db: Db, a: AuthContext, listId: string) {
            JOIN categories cat ON cat.key = ${archived ? "coalesce(i.snapshot_category, p.category)" : "p.category"}
            JOIN profiles pr ON pr.id = ev.actor_id
            JOIN validations va ON va.id = ev.validation_id
-          WHERE ev.list_id = $1 ORDER BY ev.seq`,
+          WHERE ev.list_id = $1 AND ev.kind NOT IN ('correct','merge') ORDER BY ev.seq`,
         [listId],
       )).rows
     : [];
@@ -498,34 +500,10 @@ export async function getListView(db: Db, a: AuthContext, listId: string) {
     view.events = events;
     const vs = await db.query(
       `SELECT v.id, v.at, v.received_at, v.client_at, pr.id AS actor_id, pr.display_name FROM validations v JOIN profiles pr ON pr.id = v.actor_id
-        WHERE v.list_id = $1 AND EXISTS (SELECT 1 FROM list_events e WHERE e.validation_id = v.id) ORDER BY v.at, v.received_at`,
+        WHERE v.list_id = $1 AND EXISTS (SELECT 1 FROM list_events e WHERE e.validation_id = v.id AND e.kind NOT IN ('correct','merge')) ORDER BY v.at, v.received_at`,
       [listId],
     );
     view.validations = vs.rows.map((v) => ({ id: v.id, at: v.at.toISOString(), receivedAt: v.received_at.toISOString(), clientAt: v.client_at ? (v.client_at as Date).toISOString() : null, by: { id: v.actor_id, displayName: v.display_name } }));
-    const cl = await db.query(
-      `SELECT pu.id, i.product_id, coalesce(i.snapshot_name, p.name) AS name, pu.purchased_at, pu.voided_at, pu.void_reason, pu.quantity AS purchase_qty, pu.unit AS purchase_unit,
-              pb.id AS buyer_id, pb.display_name AS buyer_name, vb.id AS voider_id, vb.display_name AS voider_name
-         FROM purchases pu
-         JOIN list_items i ON i.id = pu.list_item_id
-         JOIN products p ON p.id = i.product_id
-         JOIN profiles pb ON pb.id = pu.purchased_by
-         JOIN profiles vb ON vb.id = pu.voided_by
-        WHERE pu.list_id = $1 AND pu.voided_at IS NOT NULL
-        ORDER BY pu.voided_at`,
-      [listId],
-    );
-    view.corrections = cl.rows.map((r) => ({
-      purchaseId: r.id,
-      productId: r.product_id,
-      name: r.name,
-      purchasedBy: { id: r.buyer_id, displayName: r.buyer_name },
-      purchasedAt: r.purchased_at.toISOString(),
-      quantity: r.purchase_qty === null ? null : num(r.purchase_qty),
-      unit: (r.purchase_unit ?? null) as Unit | null,
-      correctedBy: { id: r.voider_id, displayName: r.voider_name },
-      correctedAt: r.voided_at.toISOString(),
-      reason: r.void_reason,
-    }));
     if (archived) {
       const cb = (await db.query("SELECT id, display_name FROM profiles WHERE id = $1", [l.closed_by])).rows[0];
       view.closedBy = { id: cb.id, displayName: cb.display_name };
@@ -543,8 +521,7 @@ export async function listHistory(db: Db, a: AuthContext, limit: number, before?
   const r = await db.query(
     `SELECT l.id, l.created_at, l.closed_at, pb.display_name AS closed_by_name, pb.id AS closed_by_id,
             count(i.*) FILTER (WHERE i.status = 'purchased')::int AS purchased,
-            count(i.*) FILTER (WHERE i.status = 'to_buy')::int AS remaining,
-            (SELECT count(*)::int FROM purchases pu WHERE pu.list_id = l.id AND pu.voided_at IS NOT NULL) AS corrections
+            count(i.*) FILTER (WHERE i.status = 'to_buy')::int AS remaining
        FROM lists l
        JOIN profiles pb ON pb.id = l.closed_by
        LEFT JOIN list_items i ON i.list_id = l.id
@@ -561,6 +538,5 @@ export async function listHistory(db: Db, a: AuthContext, limit: number, before?
     closedBy: { id: x.closed_by_id, displayName: x.closed_by_name },
     purchased: x.purchased,
     remaining: x.remaining,
-    corrections: x.corrections,
   }));
 }

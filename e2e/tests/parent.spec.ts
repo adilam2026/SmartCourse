@@ -30,26 +30,46 @@ test.describe("parcours des parents", () => {
     await ctxL.close();
   });
 
-  test("critère 8 : corriger sans motif remet l'article à acheter ; la correction est tracée dans l'historique", async ({ page, playwright, baseURL }) => {
+  test("critère 8 : corriger sans motif remet l'article à acheter ; l'archive présente la liste finale, sans trace de correction à l'écran", async ({ page, playwright, baseURL }) => {
     const f = await newFamily(playwright, baseURL!);
     const id = await createList(f);
-    await staffAdds(f, id, ["Lait"]);
+    await staffAdds(f, id, ["Lait", "Riz", "Tomates", "Beurre"]);
     await uiLogin(page, f, "lamiaa", "573918");
     await page.getByTestId(`buy-${f.products["Lait"]}`).click();
     await page.getByTestId(`correct-${f.products["Lait"]}`).click();
     await page.screenshot({ path: "shots/parent-correct.png" });
     await page.getByTestId("correct-confirm").click(); // aucun motif saisi
-    await expect(page.getByTestId("count-tobuy")).toHaveText("1");
+    await expect(page.getByTestId("count-tobuy")).toHaveText("4");
     await expect(page.getByTestId("count-bought")).toHaveText("0");
+    await page.getByTestId(`buy-${f.products["Riz"]}`).click();
+    await page.getByTestId(`buy-${f.products["Tomates"]}`).click();
+    await expect(page.getByTestId("count-bought")).toHaveText("2");
+    // la correction n'est mentionnée nulle part dans la liste en cours, ni dans le détail d'une ligne
+    await expect(page.locator("main, .parent__body").first()).not.toContainText(/corrigé|annulé/i);
+    await page.getByTestId(`detail-${f.products["Lait"]}`).click();
+    await expect(page.getByTestId("item-timeline")).not.toContainText(/corrigé|annulé/i);
+    await page.getByTestId("detail-close").click();
 
-    // clôture pour consulter la correction dans l'archive
+    // clôture : l'archive est la liste finale
     await page.getByTestId("close-list").click();
     await page.getByTestId("close-confirm").click();
     await page.getByTestId("tab-history").click();
+    await expect(page.getByTestId("history-entry")).not.toContainText(/correction/i);
     await page.getByTestId("history-entry").click();
-    await expect(page.getByTestId("corrections")).toContainText("Lait");
-    await expect(page.getByTestId("corrections")).toContainText("Corrigé par Lamiaa");
-    await page.screenshot({ path: "shots/parent-archive.png" });
+    await expect(page.getByTestId("archive")).toBeVisible();
+    await expect(page.getByTestId("corrections")).toHaveCount(0);
+    await expect(page.getByTestId("archive")).not.toContainText(/corrig|annulé|correction/i);
+    await expect(page.getByTestId("archive-bought")).toContainText("Riz");
+    await expect(page.getByTestId("archive-bought")).toContainText("Tomates");
+    await expect(page.getByTestId("archive-bought")).toContainText("Acheté par Lamiaa");
+    await expect(page.getByTestId("archive-bought")).toContainText("1 kg");
+    await expect(page.getByTestId("archive-bought")).not.toContainText("Lait"); // corrigé : revenu à acheter, jamais racheté
+    await expect(page.getByTestId("archive-left")).toHaveText("2"); // Lait et Beurre
+    await expect(page.getByTestId("archive-left-list")).toContainText("Lait");
+    // regroupement par catégorie
+    expect(await page.locator('[data-testid="archive-bought"] .catgroup__title').count()).toBeGreaterThanOrEqual(2);
+    await page.screenshot({ path: "shots/parent-archive.png", fullPage: true });
+    await page.screenshot({ path: "../docs/captures/historique-liste-finale.png", fullPage: true });
   });
 
   test("critère 11 : clôture avec confirmation et nombre restant ; l'archive garde les non achetés ; nouvelle liste vide", async ({ page, playwright, baseURL }) => {

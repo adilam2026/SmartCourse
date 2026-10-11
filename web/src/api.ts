@@ -210,7 +210,6 @@ export interface HistoryEntry {
   closedBy: { id: string; displayName: string };
   purchased: number;
   remaining: number;
-  corrections: number;
 }
 
 export interface Credit {

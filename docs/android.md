@@ -15,6 +15,9 @@
 | Hors connexion | Le service worker de la PWA (catalogue, photos, file d'envoi) |
 | Icône | Icône adaptative (panier vert avec coche), ronde, et monochrome (icônes thématiques Android 13+) |
 
+## Icône
+Source unique : `assets/icone-source.png` ; `python3 scripts/make-icons.py` (Pillow + numpy) régénère toutes les icônes PWA (`web/public/icons/` : normale 192/512, *maskable* 512, monochrome 512, badge 96) et Android (lanceur classique carré arrondi et rond, premier plan adaptatif, monochrome pour les icônes thématiques Android 13+, petite icône blanche des notifications, écran de lancement). Marges : l'illustration reste dans un disque de 76 % (maskable PWA, zone sûre 80 %), 60 % (adaptative Android, zone sûre officielle 61 %) ou 84 % (lanceurs classiques) : les masques ronds ou carrés arrondis ne coupent ni le panier ni les produits. Contrôlé par `e2e/tests/icons.spec.ts`. Le fond adaptatif est le vert uni `#01532A` de l'image. Le `versionCode` de l'APK est le numéro d'exécution du workflow : toujours croissant, donc installable par-dessus l'ancienne version sans désinstaller (même clé et même identifiant `app.smartcourse.courses`).
+
 ## Notifications
 L'application déclare la **délégation des notifications** (`DelegationService`, `NotificationPermissionRequestActivity`) et la permission `POST_NOTIFICATIONS` : voir [notifications.md](notifications.md). C'est la seule permission déclarée ; elle n'est demandée qu'au toucher de « Activer les notifications ».
 

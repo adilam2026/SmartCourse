@@ -372,7 +372,7 @@ test.describe("vérifications demandées : kg, heures, corrections", () => {
     expect(new Date(v.receivedAt).getTime()).toBeGreaterThan(pressed.getTime() + 2.9 * 3_600_000);
   });
 
-  test("corriger un achat avec une nouvelle demande de même unité : quantités regroupées, historique, auteur de l'achat et de la correction conservés", async ({ page, playwright, baseURL }) => {
+  test("corriger un achat avec une nouvelle demande de même unité : quantités regroupées, rien de perdu, correction non affichée (conservée en base)", async ({ page, playwright, baseURL }) => {
     const f = await newFamily(playwright, baseURL!);
     const listId = await createList(f);
     await ops(f, "staff", listId, [add(f, "Tomates", 2)]);
@@ -389,10 +389,9 @@ test.describe("vérifications demandées : kg, heures, corrections", () => {
     await page.getByTestId(`detail-${id(f, "Tomates")}`).click();
     const tl = page.getByTestId("item-timeline");
     await expect(tl).toContainText("Nouvelle demande · 1,5 kg");
-    await expect(tl).toContainText("quantité reportée 1,5 kg → 3,5 kg");
-    await expect(page.getByTestId("item-correction")).toContainText("2 kg");
-    await expect(page.getByTestId("item-correction")).toContainText("Acheté par Adil");
-    await expect(page.getByTestId("item-correction")).toContainText("corrigé par Lamiaa");
+    // la correction (et son report de quantité) n'est plus affichée : la ligne montre l'état final (3,5 kg) et ce qui a été demandé
+    await expect(tl).not.toContainText(/corrig|reportée/i);
+    await expect(page.getByTestId("item-correction")).toHaveCount(0);
     await page.screenshot({ path: "shots/correction-merge.png" });
   });
 

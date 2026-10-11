@@ -13,6 +13,7 @@ self.addEventListener("push", (event) => {
     // Même identifiant pour une même validation : une livraison en double remplace la notification, elle ne s'empile pas.
     tag: data.tag || "smartcourse",
     icon: "/icons/icon-192.png",
+    badge: "/icons/badge-96.png", // silhouette blanche (barre d'état)
     lang: "fr",
     timestamp: Date.now(),
     data: { url: typeof data.url === "string" && data.url.charAt(0) === "/" ? data.url : "/", listId: data.listId || null },

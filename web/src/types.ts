@@ -94,19 +94,6 @@ export interface ListItem {
   lastChange?: { kind: EventKind; by: Person; at: string; receivedAt?: string; before: number | null; after: number | null };
 }
 
-export interface Correction {
-  purchaseId: string;
-  productId: string;
-  name: string;
-  purchasedBy: { id: string; displayName: string };
-  purchasedAt: string;
-  quantity?: number | null;
-  unit?: Unit | null;
-  correctedBy: { id: string; displayName: string };
-  correctedAt: string;
-  reason: string | null;
-}
-
 export interface ListView {
   id: string;
   status: "active" | "archived";
@@ -114,7 +101,6 @@ export interface ListView {
   closedAt: string | null;
   closedBy?: { id: string; displayName: string };
   items: ListItem[];
-  corrections?: Correction[];
   events?: ListEvent[];
   validations?: Validation[];
 }

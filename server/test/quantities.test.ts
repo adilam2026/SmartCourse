@@ -394,16 +394,23 @@ describe("corriger un achat quand une nouvelle demande existe", () => {
     const open = lines(v, f.products["Tomates"]!);
     expect(open).toHaveLength(1);
     expect(open[0]).toMatchObject({ status: "to_buy", quantity: 3.5, unit: "kg" }); // 2 + 1,5, rien perdu
-    // l'historique de la ligne : l'ajout d'origine, la nouvelle demande, puis la fusion avec avant/après et l'auteur de la correction
+    // ce que montrent les écrans : l'ajout d'origine et la nouvelle demande, SANS trace de la correction
     const hist = v.events.filter((e: any) => e.productId === f.products["Tomates"]);
     expect(hist.map((e: any) => [e.kind, e.before, e.after, e.by.displayName])).toEqual([
       ["add", null, 2, "Marie"],
       ["request_again", null, 1.5, "Marie"],
+    ]);
+    expect(v.corrections).toBeUndefined();
+    // le journal interne, lui, garde la fusion avec avant/après et l'auteur de la correction…
+    const journal = (await db.query("SELECT e.kind, e.qty_before, e.qty_after, p.display_name FROM list_events e JOIN profiles p ON p.id = e.actor_id WHERE e.list_id = $1 AND e.product_id = $2 ORDER BY e.seq", [f.list, f.products["Tomates"]])).rows;
+    expect(journal.map((e) => [e.kind, e.qty_before === null ? null : Number(e.qty_before), e.qty_after === null ? null : Number(e.qty_after), e.display_name])).toEqual([
+      ["add", null, 2, "Marie"],
+      ["request_again", null, 1.5, "Marie"],
       ["merge", 1.5, 3.5, "Lamiaa"],
     ]);
-    // la correction garde l'achat d'origine : acheteur, heure, quantité, unité, et qui l'a corrigé
-    expect(v.corrections).toHaveLength(1);
-    expect(v.corrections[0]).toMatchObject({ name: "Tomates", quantity: 2, unit: "kg", purchasedBy: { displayName: "Adil" }, correctedBy: { displayName: "Lamiaa" } });
+    // … et l'achat d'origine : acheteur, quantité, unité, et qui l'a corrigé
+    const kept = (await db.query("SELECT pu.quantity, pu.unit, pb.display_name AS bought_by, vb.display_name AS corrected_by FROM purchases pu JOIN profiles pb ON pb.id = pu.purchased_by JOIN profiles vb ON vb.id = pu.voided_by WHERE pu.id = $1", [b.purchase.id])).rows[0];
+    expect({ quantity: Number(kept.quantity), unit: kept.unit, bought_by: kept.bought_by, corrected_by: kept.corrected_by }).toEqual({ quantity: 2, unit: "kg", bought_by: "Adil", corrected_by: "Lamiaa" });
     // la ligne d'origine est retirée de l'affichage mais reste en base (jamais supprimée)
     const row = (await db.query("SELECT status FROM list_items WHERE id = $1", [b.id])).rows[0];
     expect(row.status).toBe("corrected");
@@ -418,8 +425,9 @@ describe("corriger un achat quand une nouvelle demande existe", () => {
     await one(f.lamiaa, f.list, op.correct(b.purchase.id));
     const v = await view(f.adil);
     expect(lines(v, f.products["Tomates"]!)[0]).toMatchObject({ status: "to_buy", quantity: 2.5, unit: "kg" });
-    expect(v.events.map((e: any) => [e.kind, e.after, e.by.displayName])).toEqual([["add", 2.5, "Marie"], ["correct", 2.5, "Lamiaa"]]);
-    expect(v.corrections[0]).toMatchObject({ quantity: 2.5, unit: "kg", purchasedBy: { displayName: "Adil" } });
+    expect(v.events.map((e: any) => [e.kind, e.after, e.by.displayName])).toEqual([["add", 2.5, "Marie"]]); // rien de la correction à l'écran
+    expect((await db.query("SELECT kind FROM list_events WHERE list_id = $1 ORDER BY seq", [f.list])).rows.map((r) => r.kind)).toEqual(["add", "correct"]); // mais tracée en base
+    expect(v.corrections).toBeUndefined();
   });
 
   it("unités différentes (kg et pièces) : aucune addition ; la correction est refusée, l'achat et la demande restent intacts", async () => {
@@ -432,7 +440,6 @@ describe("corriger un achat quand une nouvelle demande existe", () => {
     const v = await view(f.adil);
     const ls = lines(v, f.products["Tomates"]!);
     expect(ls.map((l: any) => [l.status, l.quantity, l.unit]).sort()).toEqual([["purchased", 2, "kg"], ["to_buy", 4, "piece"]]); // ni 6, ni 2,4
-    expect(v.corrections).toHaveLength(0);
     expect((await db.query("SELECT voided_at FROM purchases WHERE list_item_id = $1", [b.id])).rows[0].voided_at).toBeNull();
     // une fois la demande en pièces retirée ou achetée, la correction devient possible
     const open = ls.find((l: any) => l.status === "to_buy");
@@ -449,7 +456,7 @@ describe("corriger un achat quand une nouvelle demande existe", () => {
     await send(f.lamiaa, f.list, [c]);
     await send(f.lamiaa, f.list, [c]);
     expect(lines(await view(f.adil), f.products["Tomates"]!)[0].quantity).toBe(3);
-    expect((await view(f.adil)).events.filter((e: any) => e.kind === "merge")).toHaveLength(1);
+    expect((await db.query("SELECT count(*)::int AS n FROM list_events WHERE list_id = $1 AND kind = 'merge'", [f.list])).rows[0].n).toBe(1);
   });
 });
 

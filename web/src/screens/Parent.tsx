@@ -187,7 +187,7 @@ function CorrectDialog({ engine, item, onClose }: { engine: Engine; item: ListIt
   const [busy, setBusy] = useState(false);
   return (
     <Dialog title={`Corriger l'achat : ${item.name}`} onClose={onClose}>
-      <p>L'article reviendra dans « À acheter ». L'achat annulé reste conservé dans l'historique avec votre nom.</p>
+      <p>L'article reviendra dans « À acheter » et cet achat ne comptera plus.</p>
       <label className="field">Motif (facultatif)
         <input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={300} placeholder="Ex. mauvais produit" data-testid="correct-reason" />
       </label>

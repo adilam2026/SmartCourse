@@ -34,7 +34,7 @@ export function History({ categories, openId, onOpened }: { categories: { key: s
             <button className="row row--btn" data-testid="history-entry" onClick={() => api.listById(e.id).then((r) => setOpen(r.list)).catch(() => setError(true))}>
               <span className="row__name">
                 {fmtDay(e.closedAt)}
-                <small>Clôturée par {e.closedBy.displayName} · {e.purchased} acheté{e.purchased > 1 ? "s" : ""} · {e.remaining} non acheté{e.remaining > 1 ? "s" : ""}{e.corrections ? ` · ${e.corrections} correction${e.corrections > 1 ? "s" : ""}` : ""}</small>
+                <small>Clôturée par {e.closedBy.displayName} · {e.purchased} acheté{e.purchased > 1 ? "s" : ""} · {e.remaining} non acheté{e.remaining > 1 ? "s" : ""}</small>
               </span>
               <span aria-hidden="true">›</span>
             </button>
@@ -82,22 +82,6 @@ function Archive({ list, categories, onBack }: { list: ListView; categories: { k
           </li>
         )}
       />
-      {(list.corrections?.length ?? 0) > 0 && (
-        <>
-          <h2 className="sect">Corrections</h2>
-          <ul className="rows" data-testid="corrections">
-            {list.corrections!.map((c) => (
-              <li key={c.purchaseId} className="row">
-                <span className="row__name">
-                  {c.name}
-                  <small>Acheté par {c.purchasedBy.displayName} le {fmtWhen(c.purchasedAt)}</small>
-                  <small>Corrigé par {c.correctedBy.displayName} le {fmtWhen(c.correctedAt)}{c.reason ? ` — « ${c.reason} »` : ""}</small>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
     </div>
   );
 }
