@@ -187,6 +187,126 @@ export function catalogRoutes(app: FastifyInstance, { db, store, guard, hub }: D
     };
   });
 
+  // Tous les produits (catalogue de départ + étendu), navigables sans recherche : par catégorie, page par page.
+  // Chaque entrée dit où en est la famille : absent (Ajouter), actif (Déjà disponible), désactivé (Réactiver).
+  // Parcourir ne donne aucun droit : lecture réservée à family.manage, comme le reste du catalogue.
+  app.get("/api/catalog/all", { preHandler: guard("family.manage") }, async (req) => {
+    const qs = z
+      .object({
+        category: z.string().min(1).max(40).optional(),
+        q: z.string().trim().max(60).optional(),
+        offset: z.coerce.number().int().min(0).max(5000).default(0),
+        limit: z.coerce.number().int().min(1).max(60).default(24),
+      })
+      .parse(req.query);
+    const needle = qs.q ? normalizeSearch(qs.q).replace(/[\\%_]/g, (c) => `\\${c}`) : null;
+    const familyId = req.auth!.familyId;
+    // One row per catalogue entry. The family product is matched by link (catalog_key / extended_id) or, failing that,
+    // by exact name+brand — so a product the family typed by hand shows up as already there, never as a duplicate.
+    const flat = (col: string) => `replace(translate(lower(${col}), 'àâäéèêëîïôöùûüç’', 'aaaeeeeiioouuuc'''), 'œ', 'oe')`;
+    const base = `
+      WITH ref AS (
+        SELECT 'initial'::text AS origin, i.key, i.category, i.name, NULL::text AS brand, i.photo_asset_id, i.position AS pos,
+               lower(i.name) AS lname, ''::text AS lbrand, ${flat("i.name")} AS stext, i.key AS catalog_key, NULL::uuid AS extended_id
+          FROM initial_catalog i
+        UNION ALL
+        SELECT 'extended', e.key, e.category, e.name, e.brand, e.photo_asset_id, 1000,
+               lower(e.name), coalesce(lower(e.brand),''), e.search_text, NULL, e.id
+          FROM extended_catalog e
+        UNION ALL
+        -- Articles propres à la famille (créés à la main) : ils apparaissent aussi, pour que la recherche soit commune.
+        SELECT 'family', f.id::text, f.category, f.name, f.brand, f.photo_asset_id, 2000,
+               lower(f.name), coalesce(lower(f.brand),''), ${flat("f.name")}, NULL, NULL
+          FROM products f
+         WHERE f.family_id = $1 AND f.catalog_key IS NULL AND f.extended_id IS NULL
+           AND NOT EXISTS (SELECT 1 FROM extended_catalog e WHERE lower(e.name) = lower(f.name) AND coalesce(lower(e.brand),'') = coalesce(lower(f.brand),''))
+      )
+      SELECT r.origin, r.key, r.category, r.name, r.brand, r.pos, r.photo_asset_id AS ref_photo,
+             p.id AS product_id, p.active AS product_active, p.unit AS product_unit, p.photo_asset_id AS product_photo
+        FROM ref r
+        LEFT JOIN LATERAL (
+          SELECT p.* FROM products p
+           WHERE p.family_id = $1
+             AND ((r.catalog_key IS NOT NULL AND p.catalog_key = r.catalog_key)
+               OR (r.extended_id IS NOT NULL AND p.extended_id = r.extended_id)
+               OR (lower(p.name) = r.lname AND coalesce(lower(p.brand),'') = r.lbrand))
+           ORDER BY (p.catalog_key = r.catalog_key OR p.extended_id = r.extended_id) DESC NULLS LAST, p.active DESC
+           LIMIT 1
+        ) p ON true
+       WHERE ($2::text IS NULL OR r.category = $2)
+         AND ($3::text IS NULL OR r.stext LIKE '%' || $3 || '%')`;
+    const params = [familyId, qs.category ?? null, needle];
+    const total = Number((await db.query(`SELECT count(*) AS n FROM (${base}) t`, params)).rows[0].n);
+    const r = await db.query(
+      `SELECT t.* FROM (${base}) t JOIN categories c ON c.key = t.category
+        ORDER BY c.position, (t.origin = 'initial') DESC, t.pos, lower(t.name) LIMIT $4 OFFSET $5`,
+      [...params, qs.limit, qs.offset],
+    );
+    return {
+      total,
+      offset: qs.offset,
+      items: r.rows.map((x) => ({
+        key: x.key as string,
+        origin: x.origin as "initial" | "extended" | "family",
+        name: x.name as string,
+        brand: x.brand as string | null,
+        category: x.category as string,
+        // The picture the family sees: its own article's if it has one, else the catalogue's. Never another product's.
+        photoUrl: photoUrl(x.product_photo ?? x.ref_photo),
+        status: (x.product_id ? (x.product_active ? "active" : "inactive") : "absent") as "active" | "inactive" | "absent",
+        productId: (x.product_id as string | null) ?? null,
+        unit: ((x.product_unit as Unit | null) ?? defaultUnit(x.category)) as Unit,
+      })),
+    };
+  });
+
+  // Ajout depuis le catalogue complet par clé stable (initiale ou étendue) ; réactive plutôt que de recréer.
+  app.post("/api/products/from-catalog", { preHandler: guard("family.manage") }, async (req, reply) => {
+    const { origin, key } = z.object({ origin: z.enum(["initial", "extended"]), key: z.string().min(1).max(80) }).parse(req.body);
+    const familyId = req.auth!.familyId;
+    const out = await withTx(db, async (c) => {
+      const e = (await c.query(origin === "initial" ? "SELECT * FROM initial_catalog WHERE key = $1" : "SELECT * FROM extended_catalog WHERE key = $1", [key])).rows[0];
+      if (!e) throw new HttpError(404, "not_found", "Produit introuvable dans le catalogue");
+      const brand: string | null = origin === "extended" ? e.brand : null;
+      const link = origin === "initial" ? "catalog_key = $2" : "extended_id = $2";
+      const existing = (
+        await c.query(
+          `SELECT * FROM products WHERE family_id = $1 AND (${link} OR (lower(name) = lower($3) AND coalesce(lower(brand),'') = coalesce(lower($4),''))) ORDER BY active DESC LIMIT 1 FOR UPDATE`,
+          [familyId, origin === "initial" ? e.key : e.id, e.name, brand],
+        )
+      ).rows[0];
+      if (existing) {
+        if (existing.active) return { product: existing, created: false, reactivated: false };
+        const r = await c.query("UPDATE products SET active = true WHERE id = $1 RETURNING *", [existing.id]);
+        return { product: r.rows[0], created: false, reactivated: true };
+      }
+      const pos = (await c.query("SELECT coalesce(max(position), -1) + 1 AS p FROM products WHERE family_id = $1 AND category = $2", [familyId, e.category])).rows[0].p;
+      const ins = await c.query(
+        `INSERT INTO products (family_id, category, name, brand, photo_asset_id, ${origin === "initial" ? "catalog_key" : "extended_id"}, position, unit)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+        [familyId, e.category, e.name, brand, e.photo_asset_id, origin === "initial" ? e.key : e.id, pos, defaultUnit(e.category)],
+      );
+      return { product: ins.rows[0], created: true, reactivated: false };
+    });
+    if (out.created || out.reactivated) hub.broadcast(familyId, "catalog.updated", { productId: out.product.id });
+    return reply.code(out.created ? 201 : 200).send({ product: productView(out.product), created: out.created, reactivated: out.reactivated });
+  });
+
+  // Audit des articles de la famille : d'où vient la photo, et laquelle est partagée par des noms différents (à vérifier).
+  app.get("/api/catalog/audit", { preHandler: guard("family.manage") }, async (req) => {
+    const r = await db.query(
+      `SELECT p.id, p.name, p.category, p.active,
+              CASE WHEN p.photo_asset_id IS NULL THEN 'none' WHEN a.owner_family_id IS NULL THEN 'catalogue' ELSE 'famille' END AS photo_source,
+              (SELECT count(DISTINCT lower(q.name)) FROM products q WHERE q.family_id = p.family_id AND q.photo_asset_id = p.photo_asset_id) AS names_sharing
+         FROM products p LEFT JOIN photo_assets a ON a.id = p.photo_asset_id
+        WHERE p.family_id = $1 ORDER BY p.category, lower(p.name)`,
+      [req.auth!.familyId],
+    );
+    return {
+      products: r.rows.map((x) => ({ id: x.id as string, name: x.name as string, category: x.category as string, active: x.active as boolean, photoSource: x.photo_source as "none" | "catalogue" | "famille", sharedWithOtherNames: Number(x.names_sharing) > 1 })),
+    };
+  });
+
   app.post("/api/products/from-extended", { preHandler: guard("family.manage") }, async (req, reply) => {
     const { extendedId } = z.object({ extendedId: z.string().uuid() }).parse(req.body);
     const familyId = req.auth!.familyId;

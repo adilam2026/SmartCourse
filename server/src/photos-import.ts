@@ -31,7 +31,7 @@ export interface ImportResult {
   skipped: string[];
 }
 
-const where = (it: Item) => (it.target === "initial" ? { table: "initial_catalog", idCol: "key" } : { table: "extended_catalog", idCol: "id" });
+const where = (it: Item) => (it.target === "initial" ? { table: "initial_catalog", idCol: "key" } : { table: "extended_catalog", idCol: "key" });
 const sha = (b: Buffer) => createHash("sha256").update(b).digest("hex");
 
 /**
@@ -109,6 +109,18 @@ export async function syncCatalogPhotos(db: Db, store: PhotoStore, manifestPath:
             WHERE catalog_key = $1
               AND (photo_asset_id IS NULL OR photo_asset_id IN (SELECT id FROM photo_assets WHERE owner_family_id IS NULL))`,
           [it.key, assetId],
+        );
+      }
+      if (it.target === "extended") {
+        // Family articles added from this entry (or carrying exactly its name, e.g. created by hand) follow the catalogue
+        // picture — unless the family chose its own (owner_family_id set), which is never touched. Ids, units,
+        // purchases and archive snapshots are not affected: only the product's current picture moves.
+        const e = (await c.query("SELECT id, name, brand FROM extended_catalog WHERE key = $1", [it.key])).rows[0];
+        await c.query(
+          `UPDATE products SET extended_id = coalesce(extended_id, $1), photo_asset_id = $2
+            WHERE (extended_id = $1 OR (extended_id IS NULL AND catalog_key IS NULL AND lower(name) = lower($3) AND coalesce(lower(brand),'') = coalesce(lower($4),'')))
+              AND (photo_asset_id IS NULL OR photo_asset_id IN (SELECT id FROM photo_assets WHERE owner_family_id IS NULL))`,
+          [e.id, assetId, e.name, e.brand],
         );
       }
       result.imported.push(`${it.target}:${it.key}`);

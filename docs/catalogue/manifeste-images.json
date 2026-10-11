@@ -1,0 +1,1482 @@
+{
+ "version": 1,
+ "style": "fond blanc ou très clair, produit entier reconnaissable, sans marque ni texte publicitaire, 512x512 WebP, même style que les 80 photos existantes",
+ "items": [
+  {
+   "target": "extended",
+   "key": "aneth",
+   "name": "Aneth",
+   "file": "files/aneth.webp",
+   "category": "legumes",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Botte d'aneth frais aux feuilles fines et plumeuses"
+  },
+  {
+   "target": "extended",
+   "key": "betteraves",
+   "name": "Betteraves",
+   "file": "files/betteraves.webp",
+   "category": "legumes",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Betteraves rouges entières avec fanes, une coupée en deux"
+  },
+  {
+   "target": "extended",
+   "key": "brocolis",
+   "name": "Brocolis",
+   "file": "files/brocolis.webp",
+   "category": "legumes",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Un brocoli entier et quelques fleurettes"
+  },
+  {
+   "target": "extended",
+   "key": "champignons",
+   "name": "Champignons",
+   "file": "files/champignons.webp",
+   "category": "legumes",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Champignons de Paris blancs, entiers et un coupé en deux, sur fond blanc"
+  },
+  {
+   "target": "extended",
+   "key": "chou",
+   "name": "Chou",
+   "file": "files/chou.webp",
+   "category": "legumes",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Un chou vert pommé entier, un quart coupé montrant les feuilles serrées"
+  },
+  {
+   "target": "extended",
+   "key": "choux-fleurs",
+   "name": "Choux-fleurs",
+   "file": "files/choux-fleurs.webp",
+   "category": "legumes",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Un chou-fleur entier avec feuilles vertes, un morceau de fleurette devant"
+  },
+  {
+   "target": "extended",
+   "key": "celeri",
+   "name": "Céleri",
+   "file": "files/celeri.webp",
+   "category": "legumes",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Branches de céleri vert (céleri-branche) avec feuilles"
+  },
+  {
+   "target": "extended",
+   "key": "fenouil",
+   "name": "Fenouil",
+   "file": "files/fenouil.webp",
+   "category": "legumes",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Un bulbe de fenouil blanc avec tiges et feuilles vertes"
+  },
+  {
+   "target": "extended",
+   "key": "gingembre",
+   "name": "Gingembre",
+   "file": "files/gingembre.webp",
+   "category": "legumes",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Racine de gingembre frais, un morceau coupé montrant l'intérieur jaune pâle"
+  },
+  {
+   "target": "extended",
+   "key": "mais",
+   "name": "Maïs",
+   "file": "files/mais.webp",
+   "category": "legumes",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Deux épis de maïs frais avec quelques feuilles, grains jaunes visibles"
+  },
+  {
+   "target": "extended",
+   "key": "navets",
+   "name": "Navets",
+   "file": "files/navets.webp",
+   "category": "legumes",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Trois navets blancs à collerette violette avec fanes"
+  },
+  {
+   "target": "extended",
+   "key": "petits-pois",
+   "name": "Petits pois",
+   "file": "files/petits-pois.webp",
+   "category": "legumes",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Cosses de petits pois ouvertes avec des pois verts visibles (frais, pas surgelés)"
+  },
+  {
+   "target": "extended",
+   "key": "piments",
+   "name": "Piments",
+   "file": "files/piments.webp",
+   "category": "legumes",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Piments verts et rouges frais, entiers, avec queue"
+  },
+  {
+   "target": "extended",
+   "key": "poireaux",
+   "name": "Poireaux",
+   "file": "files/poireaux.webp",
+   "category": "legumes",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Trois poireaux entiers avec le vert et la racine barbue"
+  },
+  {
+   "target": "extended",
+   "key": "potiron",
+   "name": "Potiron",
+   "file": "files/potiron.webp",
+   "category": "legumes",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Un quartier de potiron/courge orange avec la chair visible et graines"
+  },
+  {
+   "target": "extended",
+   "key": "radis",
+   "name": "Radis",
+   "file": "files/radis.webp",
+   "category": "legumes",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Botte de radis rouges ronds avec fanes"
+  },
+  {
+   "target": "extended",
+   "key": "salade-verte",
+   "name": "Salade verte",
+   "file": "files/salade-verte.webp",
+   "category": "legumes",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Salade à feuilles vertes séparées (batavia/feuille de chêne), pas une laitue pommée"
+  },
+  {
+   "target": "extended",
+   "key": "epinards",
+   "name": "Épinards",
+   "file": "files/epinards.webp",
+   "category": "legumes",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Botte de feuilles d'épinards fraîches"
+  },
+  {
+   "target": "extended",
+   "key": "basilic",
+   "name": "Basilic",
+   "file": "files/basilic.webp",
+   "category": "legumes",
+   "origin": "Ajout proposé",
+   "description": "Botte de basilic frais aux larges feuilles vertes brillantes"
+  },
+  {
+   "target": "extended",
+   "key": "ciboulette",
+   "name": "Ciboulette",
+   "file": "files/ciboulette.webp",
+   "category": "legumes",
+   "origin": "Ajout proposé",
+   "description": "Petite botte de ciboulette aux tiges fines et vertes"
+  },
+  {
+   "target": "extended",
+   "key": "feves-fraiches",
+   "name": "Fèves fraîches",
+   "file": "files/feves-fraiches.webp",
+   "category": "legumes",
+   "origin": "Ajout proposé",
+   "description": "Cosses de fèves fraîches ouvertes avec fèves vertes visibles"
+  },
+  {
+   "target": "extended",
+   "key": "romarin",
+   "name": "Romarin",
+   "file": "files/romarin.webp",
+   "category": "legumes",
+   "origin": "Ajout proposé",
+   "description": "Brins de romarin frais aux aiguilles vertes"
+  },
+  {
+   "target": "extended",
+   "key": "roquette",
+   "name": "Roquette",
+   "file": "files/roquette.webp",
+   "category": "legumes",
+   "origin": "Ajout proposé",
+   "description": "Poignée de feuilles de roquette découpées, vert foncé"
+  },
+  {
+   "target": "extended",
+   "key": "sauge",
+   "name": "Sauge",
+   "file": "files/sauge.webp",
+   "category": "legumes",
+   "origin": "Ajout proposé",
+   "description": "Brins de sauge aux feuilles gris-vert veloutées"
+  },
+  {
+   "target": "extended",
+   "key": "thym",
+   "name": "Thym",
+   "file": "files/thym.webp",
+   "category": "legumes",
+   "origin": "Ajout proposé",
+   "description": "Brins de thym frais aux petites feuilles"
+  },
+  {
+   "target": "extended",
+   "key": "abricots",
+   "name": "Abricots",
+   "file": "files/abricots.webp",
+   "category": "fruits",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Quatre abricots, un coupé en deux avec noyau"
+  },
+  {
+   "target": "extended",
+   "key": "ananas",
+   "name": "Ananas",
+   "file": "files/ananas.webp",
+   "category": "fruits",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Un ananas entier avec sa couronne et deux rondelles devant"
+  },
+  {
+   "target": "extended",
+   "key": "cerises",
+   "name": "Cerises",
+   "file": "files/cerises.webp",
+   "category": "fruits",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Grappe de cerises rouges avec queues"
+  },
+  {
+   "target": "extended",
+   "key": "dattes",
+   "name": "Dattes",
+   "file": "files/dattes.webp",
+   "category": "fruits",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Dattes brunes (type Medjool) en petit tas, certaines avec noyau visible"
+  },
+  {
+   "target": "extended",
+   "key": "figues",
+   "name": "Figues",
+   "file": "files/figues.webp",
+   "category": "fruits",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Figues fraîches violettes, une coupée en deux montrant l'intérieur rose"
+  },
+  {
+   "target": "extended",
+   "key": "grenades",
+   "name": "Grenades",
+   "file": "files/grenades.webp",
+   "category": "fruits",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Une grenade entière et une ouverte avec graines rouges visibles"
+  },
+  {
+   "target": "extended",
+   "key": "kiwis",
+   "name": "Kiwis",
+   "file": "files/kiwis.webp",
+   "category": "fruits",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Trois kiwis dont un coupé en deux montrant la chair verte et les pépins"
+  },
+  {
+   "target": "extended",
+   "key": "mangues",
+   "name": "Mangues",
+   "file": "files/mangues.webp",
+   "category": "fruits",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Une mangue entière rouge-jaune et une moitié coupée"
+  },
+  {
+   "target": "extended",
+   "key": "melon",
+   "name": "Melon",
+   "file": "files/melon.webp",
+   "category": "fruits",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Un melon entier brodé et une tranche montrant la chair orange"
+  },
+  {
+   "target": "extended",
+   "key": "pasteque",
+   "name": "Pastèque",
+   "file": "files/pasteque.webp",
+   "category": "fruits",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Une demi-pastèque rouge avec écorce verte et une tranche triangulaire devant"
+  },
+  {
+   "target": "extended",
+   "key": "prunes",
+   "name": "Prunes",
+   "file": "files/prunes.webp",
+   "category": "fruits",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Prunes violettes, une coupée en deux avec noyau"
+  },
+  {
+   "target": "extended",
+   "key": "peches",
+   "name": "Pêches",
+   "file": "files/peches.webp",
+   "category": "fruits",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Trois pêches avec feuille, une coupée montrant le noyau"
+  },
+  {
+   "target": "extended",
+   "key": "chataignes",
+   "name": "Châtaignes",
+   "file": "files/chataignes.webp",
+   "category": "fruits",
+   "origin": "Ajout proposé",
+   "description": "Châtaignes brunes brillantes en tas, une ouverte avec bogue"
+  },
+  {
+   "target": "extended",
+   "key": "coings",
+   "name": "Coings",
+   "file": "files/coings.webp",
+   "category": "fruits",
+   "origin": "Ajout proposé",
+   "description": "Coings jaunes duveteux avec une feuille, un coupé en deux"
+  },
+  {
+   "target": "extended",
+   "key": "framboises",
+   "name": "Framboises",
+   "file": "files/framboises.webp",
+   "category": "fruits",
+   "origin": "Ajout proposé",
+   "description": "Barquette ouverte de framboises rouges fraîches"
+  },
+  {
+   "target": "extended",
+   "key": "fruit-de-la-passion",
+   "name": "Fruit de la passion",
+   "file": "files/fruit-de-la-passion.webp",
+   "category": "fruits",
+   "origin": "Ajout proposé",
+   "description": "Fruits de la passion violets, un coupé montrant la pulpe jaune et les graines"
+  },
+  {
+   "target": "extended",
+   "key": "mures",
+   "name": "Mûres",
+   "file": "files/mures.webp",
+   "category": "fruits",
+   "origin": "Ajout proposé",
+   "description": "Barquette ouverte de mûres noires fraîches"
+  },
+  {
+   "target": "extended",
+   "key": "noix-de-coco",
+   "name": "Noix de coco",
+   "file": "files/noix-de-coco.webp",
+   "category": "fruits",
+   "origin": "Ajout proposé",
+   "description": "Une noix de coco brune entière et une moitié avec chair blanche"
+  },
+  {
+   "target": "extended",
+   "key": "pamplemousse",
+   "name": "Pamplemousse",
+   "file": "files/pamplemousse.webp",
+   "category": "fruits",
+   "origin": "Ajout proposé",
+   "description": "Pamplemousse rose entier et un coupé en deux, chair rose"
+  },
+  {
+   "target": "extended",
+   "key": "papaye",
+   "name": "Papaye",
+   "file": "files/papaye.webp",
+   "category": "fruits",
+   "origin": "Ajout proposé",
+   "description": "Une papaye entière jaune-orange et une moitié avec graines noires"
+  },
+  {
+   "target": "extended",
+   "key": "raisins-secs",
+   "name": "Raisins secs",
+   "file": "files/raisins-secs.webp",
+   "category": "fruits",
+   "origin": "Ajout proposé",
+   "description": "Bol de raisins secs bruns/dorés ridés (surtout pas du raisin frais)"
+  },
+  {
+   "target": "extended",
+   "key": "creme-dessert",
+   "name": "Crème dessert",
+   "file": "files/creme-dessert.webp",
+   "category": "laitages",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Trois pots individuels de crème dessert (chocolat/vanille), un avec cuillère, sans marque"
+  },
+  {
+   "target": "extended",
+   "key": "fromage-blanc",
+   "name": "Fromage blanc",
+   "file": "files/fromage-blanc.webp",
+   "category": "laitages",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Pot de fromage blanc ouvert avec une cuillère, texture lisse blanche"
+  },
+  {
+   "target": "extended",
+   "key": "fromage-frais",
+   "name": "Fromage frais",
+   "file": "files/fromage-frais.webp",
+   "category": "laitages",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Fromage frais blanc en petit pot ouvert, et une portion étalée"
+  },
+  {
+   "target": "extended",
+   "key": "lait-concentre",
+   "name": "Lait concentré",
+   "file": "files/lait-concentre.webp",
+   "category": "laitages",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Boîte de lait concentré sucré ouverte versant un filet épais crémeux, sans marque"
+  },
+  {
+   "target": "extended",
+   "key": "lait-en-poudre",
+   "name": "Lait en poudre",
+   "file": "files/lait-en-poudre.webp",
+   "category": "laitages",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Boîte de lait en poudre avec une mesure et de la poudre blanche, sans marque"
+  },
+  {
+   "target": "extended",
+   "key": "lben",
+   "name": "Lben",
+   "file": "files/lben.webp",
+   "category": "laitages",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Bouteille ou verre de lben (lait fermenté) blanc, sans marque"
+  },
+  {
+   "target": "extended",
+   "key": "mozzarella",
+   "name": "Mozzarella",
+   "file": "files/mozzarella.webp",
+   "category": "laitages",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Boule de mozzarella blanche dans un peu de liquide, une tranche coupée"
+  },
+  {
+   "target": "extended",
+   "key": "creme-chantilly",
+   "name": "Crème chantilly",
+   "file": "files/creme-chantilly.webp",
+   "category": "laitages",
+   "origin": "Ajout proposé",
+   "description": "Bombe de crème chantilly avec une rosace de chantilly sur une coupe de fraises"
+  },
+  {
+   "target": "extended",
+   "key": "creme-de-cuisson",
+   "name": "Crème de cuisson",
+   "file": "files/creme-de-cuisson.webp",
+   "category": "laitages",
+   "origin": "Ajout proposé",
+   "description": "Petite brique de crème de cuisson avec filet de crème versée"
+  },
+  {
+   "target": "extended",
+   "key": "fromage-en-tranches",
+   "name": "Fromage en tranches",
+   "file": "files/fromage-en-tranches.webp",
+   "category": "laitages",
+   "origin": "Ajout proposé",
+   "description": "Paquet de tranches de fromage jaune individuelles avec quelques tranches empilées, sans marque"
+  },
+  {
+   "target": "extended",
+   "key": "margarine",
+   "name": "Margarine",
+   "file": "files/margarine.webp",
+   "category": "laitages",
+   "origin": "Ajout proposé",
+   "description": "Barquette de margarine ouverte avec couteau, sans marque"
+  },
+  {
+   "target": "extended",
+   "key": "smen",
+   "name": "Smen",
+   "file": "files/smen.webp",
+   "category": "laitages",
+   "origin": "Ajout proposé",
+   "description": "Pot en verre ou en terre de smen (beurre rance marocain) ouvert, jaune pâle, cuillère"
+  },
+  {
+   "target": "extended",
+   "key": "amandes",
+   "name": "Amandes",
+   "file": "files/amandes.webp",
+   "category": "epicerie",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Bol d'amandes entières avec quelques amandes devant"
+  },
+  {
+   "target": "extended",
+   "key": "biscuits",
+   "name": "Biscuits",
+   "file": "files/biscuits.webp",
+   "category": "epicerie",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Paquet de biscuits secs ronds ouvert avec quelques biscuits devant, sans marque"
+  },
+  {
+   "target": "extended",
+   "key": "cacao-en-poudre",
+   "name": "Cacao en poudre",
+   "file": "files/cacao-en-poudre.webp",
+   "category": "epicerie",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Boîte ou bol de cacao en poudre brun foncé avec une cuillère"
+  },
+  {
+   "target": "extended",
+   "key": "cannelle",
+   "name": "Cannelle",
+   "file": "files/cannelle.webp",
+   "category": "epicerie",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Bâtons de cannelle et un petit tas de cannelle en poudre"
+  },
+  {
+   "target": "extended",
+   "key": "couscous",
+   "name": "Couscous",
+   "file": "files/couscous.webp",
+   "category": "epicerie",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Paquet de couscous avec un bol de grains de couscous cuit/sec, sans marque"
+  },
+  {
+   "target": "extended",
+   "key": "curcuma",
+   "name": "Curcuma",
+   "file": "files/curcuma.webp",
+   "category": "epicerie",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Pot et cuillère de curcuma jaune vif en poudre, racine de curcuma à côté"
+  },
+  {
+   "target": "extended",
+   "key": "cereales",
+   "name": "Céréales",
+   "file": "files/cereales.webp",
+   "category": "epicerie",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Bol de céréales du petit-déjeuner avec lait et boîte de céréales, sans marque"
+  },
+  {
+   "target": "extended",
+   "key": "farine-complete",
+   "name": "Farine complète",
+   "file": "files/farine-complete.webp",
+   "category": "epicerie",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Sac de farine complète beige avec cuillère en bois et épis de blé"
+  },
+  {
+   "target": "extended",
+   "key": "haricots-blancs",
+   "name": "Haricots blancs",
+   "file": "files/haricots-blancs.webp",
+   "category": "epicerie",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Bol de haricots blancs secs avec quelques haricots épars"
+  },
+  {
+   "target": "extended",
+   "key": "harissa",
+   "name": "Harissa",
+   "file": "files/harissa.webp",
+   "category": "epicerie",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Petit pot ou tube de harissa rouge avec une cuillère, piments rouges à côté"
+  },
+  {
+   "target": "extended",
+   "key": "ketchup",
+   "name": "Ketchup",
+   "file": "files/ketchup.webp",
+   "category": "epicerie",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Flacon de ketchup rouge souple, sans marque"
+  },
+  {
+   "target": "extended",
+   "key": "levure-de-boulanger",
+   "name": "Levure de boulanger",
+   "file": "files/levure-de-boulanger.webp",
+   "category": "epicerie",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Sachets de levure de boulanger sèche et un peu de poudre/granulés, sans marque"
+  },
+  {
+   "target": "extended",
+   "key": "mayonnaise",
+   "name": "Mayonnaise",
+   "file": "files/mayonnaise.webp",
+   "category": "epicerie",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Pot ou tube de mayonnaise avec une cuillère, sans marque"
+  },
+  {
+   "target": "extended",
+   "key": "mais-en-conserve",
+   "name": "Maïs en conserve",
+   "file": "files/mais-en-conserve.webp",
+   "category": "epicerie",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Boîte de maïs ouverte avec grains jaunes visibles, sans marque"
+  },
+  {
+   "target": "extended",
+   "key": "moutarde",
+   "name": "Moutarde",
+   "file": "files/moutarde.webp",
+   "category": "epicerie",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Pot de moutarde jaune avec une cuillère"
+  },
+  {
+   "target": "extended",
+   "key": "noix",
+   "name": "Noix",
+   "file": "files/noix.webp",
+   "category": "epicerie",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Noix entières en coque et cerneaux de noix dans un bol"
+  },
+  {
+   "target": "extended",
+   "key": "olives",
+   "name": "Olives",
+   "file": "files/olives.webp",
+   "category": "epicerie",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Bocal d'olives vertes et noires avec bol d'olives, sans marque"
+  },
+  {
+   "target": "extended",
+   "key": "paprika",
+   "name": "Paprika",
+   "file": "files/paprika.webp",
+   "category": "epicerie",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Petit pot et cuillère de paprika rouge en poudre"
+  },
+  {
+   "target": "extended",
+   "key": "pate-a-tartiner",
+   "name": "Pâte à tartiner",
+   "file": "files/pate-a-tartiner.webp",
+   "category": "epicerie",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Pot ouvert de pâte à tartiner chocolat-noisette avec couteau, sans marque"
+  },
+  {
+   "target": "extended",
+   "key": "sucre-glace",
+   "name": "Sucre glace",
+   "file": "files/sucre-glace.webp",
+   "category": "epicerie",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Sachet de sucre glace blanc très fin avec un bol et tamis"
+  },
+  {
+   "target": "extended",
+   "key": "sucre-vanille",
+   "name": "Sucre vanillé",
+   "file": "files/sucre-vanille.webp",
+   "category": "epicerie",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Petits sachets de sucre vanillé avec une gousse de vanille"
+  },
+  {
+   "target": "extended",
+   "key": "vinaigre",
+   "name": "Vinaigre",
+   "file": "files/vinaigre.webp",
+   "category": "epicerie",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Bouteille de vinaigre (blanc ou de cidre), étiquette neutre"
+  },
+  {
+   "target": "extended",
+   "key": "bicarbonate-alimentaire",
+   "name": "Bicarbonate alimentaire",
+   "file": "files/bicarbonate-alimentaire.webp",
+   "category": "epicerie",
+   "origin": "Ajout proposé",
+   "description": "Boîte ou sachet de bicarbonate blanc, un petit tas de poudre avec cuillère"
+  },
+  {
+   "target": "extended",
+   "key": "bouillon",
+   "name": "Bouillon",
+   "file": "files/bouillon.webp",
+   "category": "epicerie",
+   "origin": "Ajout proposé",
+   "description": "Boîte de cubes de bouillon avec deux cubes emballés/déballés, sans marque"
+  },
+  {
+   "target": "extended",
+   "key": "chapelure",
+   "name": "Chapelure",
+   "file": "files/chapelure.webp",
+   "category": "epicerie",
+   "origin": "Ajout proposé",
+   "description": "Bol de chapelure dorée avec un sachet, sans marque"
+  },
+  {
+   "target": "extended",
+   "key": "citrons-confits",
+   "name": "Citrons confits",
+   "file": "files/citrons-confits.webp",
+   "category": "epicerie",
+   "origin": "Ajout proposé",
+   "description": "Bocal de citrons confits au sel avec une moitié devant"
+  },
+  {
+   "target": "extended",
+   "key": "cornichons",
+   "name": "Cornichons",
+   "file": "files/cornichons.webp",
+   "category": "epicerie",
+   "origin": "Ajout proposé",
+   "description": "Bocal de cornichons verts avec quelques cornichons devant"
+  },
+  {
+   "target": "extended",
+   "key": "feuilles-de-brick",
+   "name": "Feuilles de brick",
+   "file": "files/feuilles-de-brick.webp",
+   "category": "epicerie",
+   "origin": "Ajout proposé",
+   "description": "Paquet ouvert de feuilles de brick rondes très fines, une feuille dépliée en transparence"
+  },
+  {
+   "target": "extended",
+   "key": "feves-seches",
+   "name": "Fèves sèches",
+   "file": "files/feves-seches.webp",
+   "category": "epicerie",
+   "origin": "Ajout proposé",
+   "description": "Bol de fèves sèches brun-beige décortiquées, plusieurs fèves visibles devant"
+  },
+  {
+   "target": "extended",
+   "key": "fecule-de-mais",
+   "name": "Fécule de maïs",
+   "file": "files/fecule-de-mais.webp",
+   "category": "epicerie",
+   "origin": "Ajout proposé",
+   "description": "Boîte ou sachet de fécule de maïs avec bol de poudre blanche très fine"
+  },
+  {
+   "target": "extended",
+   "key": "graines-de-sesame",
+   "name": "Graines de sésame",
+   "file": "files/graines-de-sesame.webp",
+   "category": "epicerie",
+   "origin": "Ajout proposé",
+   "description": "Bol de graines de sésame blanches avec cuillère"
+  },
+  {
+   "target": "extended",
+   "key": "huile-d-argan-alimentaire",
+   "name": "Huile d'argan alimentaire",
+   "file": "files/huile-d-argan-alimentaire.webp",
+   "category": "epicerie",
+   "origin": "Ajout proposé",
+   "description": "Petite bouteille en verre foncé d'huile d'argan alimentaire avec noix d'argan"
+  },
+  {
+   "target": "extended",
+   "key": "melange-d-epices",
+   "name": "Mélange d'épices",
+   "file": "files/melange-d-epices.webp",
+   "category": "epicerie",
+   "origin": "Ajout proposé",
+   "description": "Pot d'épices moulues brun-orangé avec cuillère et épices entières autour"
+  },
+  {
+   "target": "extended",
+   "key": "noix-de-cajou",
+   "name": "Noix de cajou",
+   "file": "files/noix-de-cajou.webp",
+   "category": "epicerie",
+   "origin": "Ajout proposé",
+   "description": "Bol de noix de cajou entières, courbes, couleur crème"
+  },
+  {
+   "target": "extended",
+   "key": "pesto",
+   "name": "Pesto",
+   "file": "files/pesto.webp",
+   "category": "epicerie",
+   "origin": "Ajout proposé",
+   "description": "Pot de pesto vert ouvert avec cuillère et feuilles de basilic"
+  },
+  {
+   "target": "extended",
+   "key": "piment-en-poudre",
+   "name": "Piment en poudre",
+   "file": "files/piment-en-poudre.webp",
+   "category": "epicerie",
+   "origin": "Ajout proposé",
+   "description": "Pot et cuillère de piment rouge en poudre, piments séchés autour"
+  },
+  {
+   "target": "extended",
+   "key": "pois-casses",
+   "name": "Pois cassés",
+   "file": "files/pois-casses.webp",
+   "category": "epicerie",
+   "origin": "Ajout proposé",
+   "description": "Bol de pois cassés jaune-verts secs avec quelques pois devant"
+  },
+  {
+   "target": "extended",
+   "key": "safran",
+   "name": "Safran",
+   "file": "files/safran.webp",
+   "category": "epicerie",
+   "origin": "Ajout proposé",
+   "description": "Petit pot de filaments de safran rouge-orangé avec quelques filaments sur une cuillère"
+  },
+  {
+   "target": "extended",
+   "key": "sauce-tomate",
+   "name": "Sauce tomate",
+   "file": "files/sauce-tomate.webp",
+   "category": "epicerie",
+   "origin": "Ajout proposé",
+   "description": "Boîte ou bocal de sauce tomate avec filet de sauce sur cuillère, tomate à côté"
+  },
+  {
+   "target": "extended",
+   "key": "edulcorant",
+   "name": "Édulcorant",
+   "file": "files/edulcorant.webp",
+   "category": "epicerie",
+   "origin": "Ajout proposé",
+   "description": "Boîte distributrice de comprimés édulcorants avec quelques pastilles blanches"
+  },
+  {
+   "target": "extended",
+   "key": "agneau",
+   "name": "Agneau",
+   "file": "files/agneau.webp",
+   "category": "viandes",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Côtelettes et morceau d'épaule d'agneau cru sur plateau blanc"
+  },
+  {
+   "target": "extended",
+   "key": "crevettes",
+   "name": "Crevettes",
+   "file": "files/crevettes.webp",
+   "category": "viandes",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Crevettes crues roses/grises dans un bol, quelques-unes devant"
+  },
+  {
+   "target": "extended",
+   "key": "dinde",
+   "name": "Dinde",
+   "file": "files/dinde.webp",
+   "category": "viandes",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Escalopes de dinde crues sur plateau blanc"
+  },
+  {
+   "target": "extended",
+   "key": "jambon-de-dinde",
+   "name": "Jambon de dinde",
+   "file": "files/jambon-de-dinde.webp",
+   "category": "viandes",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Tranches de jambon de dinde roulées/empilées sur assiette"
+  },
+  {
+   "target": "extended",
+   "key": "merguez",
+   "name": "Merguez",
+   "file": "files/merguez.webp",
+   "category": "viandes",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Cinq merguez rouges crues en chapelet, sur plateau blanc"
+  },
+  {
+   "target": "extended",
+   "key": "sardines-en-conserve",
+   "name": "Sardines en conserve",
+   "file": "files/sardines-en-conserve.webp",
+   "category": "viandes",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Boîte de sardines ouverte montrant les poissons à l'huile, sans marque"
+  },
+  {
+   "target": "extended",
+   "key": "saucisses",
+   "name": "Saucisses",
+   "file": "files/saucisses.webp",
+   "category": "viandes",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Saucisses de volaille/bœuf crues alignées sur plateau"
+  },
+  {
+   "target": "extended",
+   "key": "glaces",
+   "name": "Glaces",
+   "file": "files/glaces.webp",
+   "category": "surgeles",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Bac de crème glacée vanille avec une boule dans une coupe"
+  },
+  {
+   "target": "extended",
+   "key": "legumes-surgeles",
+   "name": "Légumes surgelés",
+   "file": "files/legumes-surgeles.webp",
+   "category": "surgeles",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Sachet transparent de macédoine/mélange de légumes surgelés (carottes, petits pois, haricots)"
+  },
+  {
+   "target": "extended",
+   "key": "poisson-pane",
+   "name": "Poisson pané",
+   "file": "files/poisson-pane.webp",
+   "category": "surgeles",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Bâtonnets de poisson panés dorés dans un paquet, sans marque"
+  },
+  {
+   "target": "extended",
+   "key": "pate-feuilletee",
+   "name": "Pâte feuilletée",
+   "file": "files/pate-feuilletee.webp",
+   "category": "surgeles",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Rouleau de pâte feuilletée déroulé avec papier cuisson, bords feuilletés visibles"
+  },
+  {
+   "target": "extended",
+   "key": "baguette",
+   "name": "Baguette",
+   "file": "files/baguette.webp",
+   "category": "pain",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Deux baguettes de pain croustillantes, un morceau coupé"
+  },
+  {
+   "target": "extended",
+   "key": "biscottes",
+   "name": "Biscottes",
+   "file": "files/biscottes.webp",
+   "category": "pain",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Paquet de biscottes avec quelques biscottes empilées, sans marque"
+  },
+  {
+   "target": "extended",
+   "key": "brioche",
+   "name": "Brioche",
+   "file": "files/brioche.webp",
+   "category": "pain",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Une brioche dorée tressée ou ronde avec une tranche coupée"
+  },
+  {
+   "target": "extended",
+   "key": "crepes",
+   "name": "Crêpes",
+   "file": "files/crepes.webp",
+   "category": "pain",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Pile de crêpes pliées avec un filet de sirop/miel"
+  },
+  {
+   "target": "extended",
+   "key": "gateaux-secs",
+   "name": "Gâteaux secs",
+   "file": "files/gateaux-secs.webp",
+   "category": "pain",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Assortiment de gâteaux secs marocains (sablés, cornes de gazelle) sur assiette"
+  },
+  {
+   "target": "extended",
+   "key": "pain-complet",
+   "name": "Pain complet",
+   "file": "files/pain-complet.webp",
+   "category": "pain",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Pain complet en tranches avec graines, miche entamée"
+  },
+  {
+   "target": "extended",
+   "key": "amlou",
+   "name": "Amlou",
+   "file": "files/amlou.webp",
+   "category": "pain",
+   "origin": "Ajout proposé",
+   "description": "Pot d'amlou (pâte d'amande, huile d'argan et miel), texture brune, avec pain trempé"
+  },
+  {
+   "target": "extended",
+   "key": "beurre-de-cacahuetes",
+   "name": "Beurre de cacahuètes",
+   "file": "files/beurre-de-cacahuetes.webp",
+   "category": "pain",
+   "origin": "Ajout proposé",
+   "description": "Pot de beurre de cacahuètes ouvert avec couteau et quelques cacahuètes"
+  },
+  {
+   "target": "extended",
+   "key": "caramel-a-tartiner",
+   "name": "Caramel à tartiner",
+   "file": "files/caramel-a-tartiner.webp",
+   "category": "pain",
+   "origin": "Ajout proposé",
+   "description": "Pot de caramel à tartiner (spéculoos/caramel) ouvert avec un couteau"
+  },
+  {
+   "target": "extended",
+   "key": "compote-de-fruits",
+   "name": "Compote de fruits",
+   "file": "files/compote-de-fruits.webp",
+   "category": "pain",
+   "origin": "Ajout proposé",
+   "description": "Pot ou gourde de compote de pommes avec cuillère et pomme à côté"
+  },
+  {
+   "target": "extended",
+   "key": "flocons-d-avoine",
+   "name": "Flocons d'avoine",
+   "file": "files/flocons-d-avoine.webp",
+   "category": "pain",
+   "origin": "Ajout proposé",
+   "description": "Sachet ou bol de flocons d'avoine avec épis d'avoine"
+  },
+  {
+   "target": "extended",
+   "key": "boisson-gazeuse",
+   "name": "Boisson gazeuse",
+   "file": "files/boisson-gazeuse.webp",
+   "category": "boissons",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Bouteille de boisson gazeuse brune avec verre et glaçons, étiquette neutre sans logo"
+  },
+  {
+   "target": "extended",
+   "key": "cafe-en-capsules",
+   "name": "Café en capsules",
+   "file": "files/cafe-en-capsules.webp",
+   "category": "boissons",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Boîte de capsules de café avec 3 capsules et une tasse"
+  },
+  {
+   "target": "extended",
+   "key": "eau-gazeuse",
+   "name": "Eau gazeuse",
+   "file": "files/eau-gazeuse.webp",
+   "category": "boissons",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Bouteille d'eau gazeuse avec bulles et verre, étiquette neutre"
+  },
+  {
+   "target": "extended",
+   "key": "lait-d-amande",
+   "name": "Lait d'amande",
+   "file": "files/lait-d-amande.webp",
+   "category": "boissons",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Brique de boisson végétale à l'amande avec verre et amandes (à faire évoluer en « Boisson végétale »)"
+  },
+  {
+   "target": "extended",
+   "key": "sirop",
+   "name": "Sirop",
+   "file": "files/sirop.webp",
+   "category": "boissons",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Bouteille de sirop coloré (grenadine/menthe) avec un verre dilué"
+  },
+  {
+   "target": "extended",
+   "key": "tisane",
+   "name": "Tisane",
+   "file": "files/tisane.webp",
+   "category": "boissons",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Boîte de sachets de tisane avec un sachet et une tasse, feuilles de verveine"
+  },
+  {
+   "target": "extended",
+   "key": "the-glace",
+   "name": "Thé glacé",
+   "file": "files/the-glace.webp",
+   "category": "boissons",
+   "origin": "Ajout proposé",
+   "description": "Bouteille de thé glacé avec verre, glaçons, citron et menthe, sans marque"
+  },
+  {
+   "target": "extended",
+   "key": "ampoules",
+   "name": "Ampoules",
+   "file": "files/ampoules.webp",
+   "category": "maison",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Ampoules LED à culot à vis, une allumée"
+  },
+  {
+   "target": "extended",
+   "key": "degraissant",
+   "name": "Dégraissant",
+   "file": "files/degraissant.webp",
+   "category": "maison",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Flacon spray dégraissant de cuisine avec plaque de cuisson propre"
+  },
+  {
+   "target": "extended",
+   "key": "desodorisant",
+   "name": "Désodorisant",
+   "file": "files/desodorisant.webp",
+   "category": "maison",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Flacon spray désodorisant d'intérieur avec fleurs/citron, sans marque"
+  },
+  {
+   "target": "extended",
+   "key": "detartrant",
+   "name": "Détartrant",
+   "file": "files/detartrant.webp",
+   "category": "maison",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Flacon de détartrant avec pommeau de douche/robinet sans calcaire"
+  },
+  {
+   "target": "extended",
+   "key": "film-alimentaire",
+   "name": "Film alimentaire",
+   "file": "files/film-alimentaire.webp",
+   "category": "maison",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Rouleau de film alimentaire transparent dans sa boîte avec un bout déroulé"
+  },
+  {
+   "target": "extended",
+   "key": "papier-aluminium",
+   "name": "Papier aluminium",
+   "file": "files/papier-aluminium.webp",
+   "category": "maison",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Rouleau de papier aluminium dans sa boîte avec quelques centimètres déroulés"
+  },
+  {
+   "target": "extended",
+   "key": "pastilles-lave-vaisselle",
+   "name": "Pastilles lave-vaisselle",
+   "file": "files/pastilles-lave-vaisselle.webp",
+   "category": "maison",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Pastilles de lave-vaisselle emballées et une pastille dans un lave-vaisselle, sans marque"
+  },
+  {
+   "target": "extended",
+   "key": "piles",
+   "name": "Piles",
+   "file": "files/piles.webp",
+   "category": "maison",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Quatre piles alcalines AA/AAA génériques, sans marque"
+  },
+  {
+   "target": "extended",
+   "key": "sacs-congelation",
+   "name": "Sacs congélation",
+   "file": "files/sacs-congelation.webp",
+   "category": "maison",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Boîte de sacs zip de congélation transparents avec un sac contenant des légumes"
+  },
+  {
+   "target": "extended",
+   "key": "aide-au-repassage",
+   "name": "Aide au repassage",
+   "file": "files/aide-au-repassage.webp",
+   "category": "maison",
+   "origin": "Ajout proposé",
+   "description": "Flacon spray d'aide au repassage avec fer à repasser et chemise"
+  },
+  {
+   "target": "extended",
+   "key": "allume-feu",
+   "name": "Allume-feu",
+   "file": "files/allume-feu.webp",
+   "category": "maison",
+   "origin": "Ajout proposé",
+   "description": "Paquet de cubes allume-feu blancs avec un cube posé sur du charbon"
+  },
+  {
+   "target": "extended",
+   "key": "allumettes",
+   "name": "Allumettes",
+   "file": "files/allumettes.webp",
+   "category": "maison",
+   "origin": "Ajout proposé",
+   "description": "Boîte d'allumettes en bois entrouverte avec quelques allumettes, sans marque"
+  },
+  {
+   "target": "extended",
+   "key": "blocs-wc",
+   "name": "Blocs WC",
+   "file": "files/blocs-wc.webp",
+   "category": "maison",
+   "origin": "Ajout proposé",
+   "description": "Bloc WC bleu accroché au bord d'une cuvette de toilettes"
+  },
+  {
+   "target": "extended",
+   "key": "briquet",
+   "name": "Briquet",
+   "file": "files/briquet.webp",
+   "category": "maison",
+   "origin": "Ajout proposé",
+   "description": "Un briquet de cuisine/ordinaire plastique coloré, sans marque"
+  },
+  {
+   "target": "extended",
+   "key": "diffuseur-antimoustiques",
+   "name": "Diffuseur antimoustiques",
+   "file": "files/diffuseur-antimoustiques.webp",
+   "category": "maison",
+   "origin": "Ajout proposé",
+   "description": "Diffuseur électrique antimoustiques branché sur une prise, avec recharge liquide"
+  },
+  {
+   "target": "extended",
+   "key": "deboucheur",
+   "name": "Déboucheur",
+   "file": "files/deboucheur.webp",
+   "category": "maison",
+   "origin": "Ajout proposé",
+   "description": "Flacon de déboucheur d'évier avec évier propre ou ventouse"
+  },
+  {
+   "target": "extended",
+   "key": "desinfectant-du-linge",
+   "name": "Désinfectant du linge",
+   "file": "files/desinfectant-du-linge.webp",
+   "category": "maison",
+   "origin": "Ajout proposé",
+   "description": "Flacon de désinfectant pour le linge avec pile de linge blanc"
+  },
+  {
+   "target": "extended",
+   "key": "desinfectant-menager",
+   "name": "Désinfectant ménager",
+   "file": "files/desinfectant-menager.webp",
+   "category": "maison",
+   "origin": "Ajout proposé",
+   "description": "Flacon de désinfectant ménager avec gants et lingette, étiquette neutre"
+  },
+  {
+   "target": "extended",
+   "key": "detachant-du-linge",
+   "name": "Détachant du linge",
+   "file": "files/detachant-du-linge.webp",
+   "category": "maison",
+   "origin": "Ajout proposé",
+   "description": "Flacon ou spray détachant avec un vêtement blanc taché puis propre"
+  },
+  {
+   "target": "extended",
+   "key": "insecticide",
+   "name": "Insecticide",
+   "file": "files/insecticide.webp",
+   "category": "maison",
+   "origin": "Ajout proposé",
+   "description": "Bombe aérosol insecticide générique, étiquette neutre sans logo ni insecte dessiné"
+  },
+  {
+   "target": "extended",
+   "key": "liquide-de-rincage-pour-lave-vaisselle",
+   "name": "Liquide de rinçage pour lave-vaisselle",
+   "file": "files/liquide-de-rincage-pour-lave-vaisselle.webp",
+   "category": "maison",
+   "origin": "Ajout proposé",
+   "description": "Flacon de liquide de rinçage pour lave-vaisselle bleu avec verres brillants"
+  },
+  {
+   "target": "extended",
+   "key": "nettoyant-multiusage",
+   "name": "Nettoyant multiusage",
+   "file": "files/nettoyant-multiusage.webp",
+   "category": "maison",
+   "origin": "Ajout proposé",
+   "description": "Flacon spray nettoyant multisurface avec éponge et plan de travail propre"
+  },
+  {
+   "target": "extended",
+   "key": "nettoyant-vitres",
+   "name": "Nettoyant vitres",
+   "file": "files/nettoyant-vitres.webp",
+   "category": "maison",
+   "origin": "Ajout proposé",
+   "description": "Spray nettoyant vitres bleu avec chiffon microfibre et vitre propre"
+  },
+  {
+   "target": "extended",
+   "key": "papier-cuisson",
+   "name": "Papier cuisson",
+   "file": "files/papier-cuisson.webp",
+   "category": "maison",
+   "origin": "Ajout proposé",
+   "description": "Un rouleau de papier cuisson sulfurisé beige dans sa boîte et une feuille déroulée sur un moule"
+  },
+  {
+   "target": "extended",
+   "key": "savon-noir-menager",
+   "name": "Savon noir ménager",
+   "file": "files/savon-noir-menager.webp",
+   "category": "maison",
+   "origin": "Ajout proposé",
+   "description": "Pot ou bouteille de savon noir pâteux brun-noir avec éponge"
+  },
+  {
+   "target": "extended",
+   "key": "sel-regenerant-pour-lave-vaisselle",
+   "name": "Sel régénérant pour lave-vaisselle",
+   "file": "files/sel-regenerant-pour-lave-vaisselle.webp",
+   "category": "maison",
+   "origin": "Ajout proposé",
+   "description": "Sac ou boîte générique de gros sel blanc avec un petit tas de gros cristaux et un lave-vaisselle à côté, sans marque"
+  },
+  {
+   "target": "extended",
+   "key": "apres-shampooing",
+   "name": "Après-shampooing",
+   "file": "files/apres-shampooing.webp",
+   "category": "hygiene",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Flacon d'après-shampooing crème avec mèche de cheveux brillants"
+  },
+  {
+   "target": "extended",
+   "key": "brosse-a-dents",
+   "name": "Brosse à dents",
+   "file": "files/brosse-a-dents.webp",
+   "category": "hygiene",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Deux brosses à dents manuelles de couleurs différentes"
+  },
+  {
+   "target": "extended",
+   "key": "coton",
+   "name": "Coton",
+   "file": "files/coton.webp",
+   "category": "hygiene",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Paquet de cotons-tiges ou rondelles de coton démaquillantes"
+  },
+  {
+   "target": "extended",
+   "key": "couches",
+   "name": "Couches",
+   "file": "files/couches.webp",
+   "category": "hygiene",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Paquet de couches bébé et une couche dépliée, sans marque"
+  },
+  {
+   "target": "extended",
+   "key": "creme-hydratante",
+   "name": "Crème hydratante",
+   "file": "files/creme-hydratante.webp",
+   "category": "hygiene",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Pot de crème hydratante ouvert avec texture blanche"
+  },
+  {
+   "target": "extended",
+   "key": "deodorant",
+   "name": "Déodorant",
+   "file": "files/deodorant.webp",
+   "category": "hygiene",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Déodorant bille ou stick générique blanc/bleu, sans marque"
+  },
+  {
+   "target": "extended",
+   "key": "protections-hygieniques",
+   "name": "Protections hygiéniques",
+   "file": "files/protections-hygieniques.webp",
+   "category": "hygiene",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Paquet de serviettes hygiéniques et quelques serviettes dépliées"
+  },
+  {
+   "target": "extended",
+   "key": "rasoirs",
+   "name": "Rasoirs",
+   "file": "files/rasoirs.webp",
+   "category": "hygiene",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Trois rasoirs jetables avec lames visibles"
+  },
+  {
+   "target": "extended",
+   "key": "serum-physiologique",
+   "name": "Sérum physiologique",
+   "file": "files/serum-physiologique.webp",
+   "category": "hygiene",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Boîte de dosettes de sérum physiologique stériles, quelques dosettes devant"
+  },
+  {
+   "target": "extended",
+   "key": "bain-de-bouche",
+   "name": "Bain de bouche",
+   "file": "files/bain-de-bouche.webp",
+   "category": "hygiene",
+   "origin": "Ajout proposé",
+   "description": "Bouteille de bain de bouche bleu clair avec petit gobelet doseur (pas de dentifrice)"
+  },
+  {
+   "target": "extended",
+   "key": "savon-solide",
+   "name": "Savon solide",
+   "file": "files/savon-solide.webp",
+   "category": "hygiene",
+   "origin": "Ajout proposé",
+   "description": "Un pain de savon solide rectangulaire clair avec un peu de mousse sur un support"
+  }
+ ]
+}

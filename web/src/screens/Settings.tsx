@@ -1,7 +1,7 @@
 import { unitLabel } from "../units";
 import { VersionInfo } from "../components/VersionInfo";
 import { useEffect, useState } from "react";
-import { api, ApiError, NetworkError, type BackupStatus, type ExtendedResult, type Profile } from "../api";
+import { api, ApiError, NetworkError, type BackupStatus, type Profile } from "../api";
 import { fmtDateTime } from "../format";
 import { CATEGORY_EMOJI } from "../categories";
 import { Dialog } from "../components/Dialog";
@@ -11,8 +11,12 @@ import { PageHead } from "../components/PageHead";
 import { useBackLayer } from "../useBackLayer";
 import { ProductForm } from "../components/ProductForm";
 import { Thumb } from "../components/Thumb";
+import { CatalogBrowser } from "./CatalogBrowser";
 import type { Engine, State } from "../sync/engine";
 import type { Catalog, Product, Role } from "../types";
+
+/** Accents and case flattened, for the local filter of the family list. */
+const flatten = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/œ/g, "oe").trim();
 
 const ROLE_LABEL: Record<Role, string> = { admin: "Administrateur", parent: "Parent", staff: "Personnel" };
 
@@ -189,25 +193,18 @@ function AddProfile({ onClose, onCreated }: { onClose(): void; onCreated(name: s
 }
 
 function CatalogAdmin({ engine }: { engine: Engine }) {
+  const [view, setView] = useState<"mine" | "all">("mine");
   const [cat, setCat] = useState<Catalog | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
-  const [results, setResults] = useState<ExtendedResult[] | null>(null);
   const [form, setForm] = useState<{ product?: Product } | null>(null);
   const load = () => api.catalogAdmin().then(setCat).catch((e) => setError(errText(e)));
   useEffect(() => void load(), []);
-  useEffect(() => {
-    if (q.trim().length < 2) return setResults(null);
-    const t = setTimeout(() => api.searchExtended(q.trim()).then((r) => setResults(r.results)).catch((e) => setError(errText(e))), 250);
-    return () => clearTimeout(t);
-  }, [q]);
-
   const act = async (fn: () => Promise<unknown>) => {
     setError(null);
     try {
       await fn();
       await Promise.all([load(), engine.refresh()]);
-      if (q.trim().length >= 2) setResults((await api.searchExtended(q.trim())).results);
     } catch (e) {
       setError(errText(e));
     }
@@ -216,7 +213,12 @@ function CatalogAdmin({ engine }: { engine: Engine }) {
   return (
     <>
       {error && <p className="error" role="alert">{error}</p>}
-      <button className="btn btn--primary btn--big addbtn" data-testid="add-article" onClick={() => setForm({})}>+ Ajouter un article</button>
+      <div className="seg seg--wrap" role="tablist" aria-label="Affichage du catalogue">
+        <button role="tab" aria-selected={view === "mine"} className={view === "mine" ? "on" : ""} data-testid="cat-view-mine" onClick={() => setView("mine")}>Mes produits</button>
+        <button role="tab" aria-selected={view === "all"} className={view === "all" ? "on" : ""} data-testid="cat-view-all" onClick={() => setView("all")}>Tous les produits</button>
+      </div>
+      {view === "all" && cat && <CatalogBrowser categories={cat.categories.map((c) => ({ key: c.key, label: c.label }))} onChanged={() => Promise.all([load(), engine.refresh()])} />}
+      {view === "mine" && <><button className="btn btn--primary btn--big addbtn" data-testid="add-article" onClick={() => setForm({})}>+ Ajouter un article</button>
       {form && cat && (
         <ProductForm
           product={form.product}
@@ -225,26 +227,18 @@ function CatalogAdmin({ engine }: { engine: Engine }) {
           onSaved={() => { setForm(null); void act(async () => {}); }}
         />
       )}
-      <label className="field search">Chercher un produit à ajouter
-        <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ex. pêches, couscous…" data-testid="ext-search" />
+      <label className="field search">Chercher dans mes produits
+        <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ex. lait, lessive…" data-testid="mine-search" />
       </label>
-      {results && (
-        <ul className="rows" data-testid="ext-results">
-          {results.length === 0 && <li className="empty">Aucun résultat.</li>}
-          {results.map((r) => (
-            <li key={r.id} className="row">
-              <Thumb photoUrl={r.photoUrl} category={r.category} />
-              <span className="row__name">{r.name}{r.brand && <small>{r.brand}</small>}</span>
-              {r.alreadyAdded ? <span className="muted">Déjà ajouté</span> : <button className="btn btn--small btn--primary" data-testid={`ext-add-${r.name}`} onClick={() => void act(() => api.addFromExtended(r.id))}>Ajouter</button>}
-            </li>
-          ))}
-        </ul>
-      )}
-      {cat?.categories.map((c) => (
+      {cat?.categories.map((c) => {
+        const needle = flatten(q);
+        const prods = c.products.filter((p) => !needle || flatten(p.name).includes(needle));
+        if (!prods.length) return null;
+        return (
         <section key={c.key}>
           <h2 className="sect">{CATEGORY_EMOJI[c.key]} {c.label}</h2>
           <ul className="rows">
-            {c.products.map((p) => (
+            {prods.map((p) => (
               <li key={p.id} className={`row row--cat ${p.active ? "" : "row--off"}`} data-testid={`prod-${p.name}`}>
                 <Thumb photoUrl={p.photoUrl} category={c.key} />
                 <span className="row__name">{p.name}{p.brand && <small>{p.brand}</small>}<small>Unité : {unitLabel(p.unit)}</small>{!p.active && <small>désactivé</small>}</span>
@@ -256,7 +250,9 @@ function CatalogAdmin({ engine }: { engine: Engine }) {
             ))}
           </ul>
         </section>
-      ))}
+        );
+      })}
+      </>}
     </>
   );
 }

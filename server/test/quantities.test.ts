@@ -662,7 +662,7 @@ describe("migration 009 sur des données existantes", () => {
       const l2 = (await old.query("INSERT INTO lists (family_id, created_by) VALUES ($1,$2) RETURNING id", [fam, prof])).rows[0].id as string;
       await old.query("INSERT INTO list_items (list_id, family_id, product_id, added_by, status) VALUES ($1,$2,$3,$4,'removed')", [l2, fam, lait, prof]);
 
-      expect(await migrate(old)).toEqual(["009_quantities.sql", "010_validation_times.sql", "011_units_more.sql", "012_push_notifications.sql"]);
+      expect(await migrate(old)).toEqual(["009_quantities.sql", "010_validation_times.sql", "011_units_more.sql", "012_push_notifications.sql", "013_catalog_keys.sql"]);
       expect((await old.query("SELECT client_at FROM validations")).rows.every((r) => r.client_at === null)).toBe(true); // anciennes validations : heure du téléphone inconnue
 
       expect((await old.query("SELECT count(*)::int AS n FROM profiles")).rows[0].n).toBe(1);

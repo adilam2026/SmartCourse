@@ -185,11 +185,12 @@ test.describe("administration", () => {
     await page.getByTestId("active-Tomates").click();
     await expect(page.getByTestId("prod-Tomates")).toContainText("désactivé");
 
-    await page.getByTestId("ext-search").fill("pêche");
-    await expect(page.getByTestId("ext-results")).toContainText("Pêches");
+    await page.getByTestId("cat-view-all").click();
+    await page.getByTestId("all-search").fill("pêche");
+    await expect(page.getByTestId("all-list")).toContainText("Pêches");
     await page.screenshot({ path: "shots/admin-catalog.png" });
-    await page.getByTestId("ext-add-Pêches").click();
-    await expect(page.getByTestId("ext-results")).toContainText("Déjà ajouté");
+    await page.getByTestId("all-add-Pêches").click();
+    await expect(page.getByTestId("all-have-Pêches")).toContainText("Déjà disponible");
 
     const cat = (await (await f.staff.get("/api/catalog")).json()).categories.flatMap((c: any) => c.products.map((p: any) => p.name));
     expect(cat).toContain("Pêches");

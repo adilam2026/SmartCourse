@@ -385,3 +385,20 @@ h3 { font-size: 1.05rem; font-weight: 800; }
 .panel.backupcard { margin: 0.5rem 1rem; }
 
 .nowrap { white-space: nowrap; }
+
+/* ---------- catalogue : « Tous les produits » ---------- */
+.catchips { display: flex; gap: 0.5rem; overflow-x: auto; padding: 0.25rem 1rem 0.5rem; scrollbar-width: none; }
+.catchips::-webkit-scrollbar { display: none; }
+.catchip { flex: none; min-height: var(--tap); padding: 0 0.9rem; border-radius: 999px; border: 1.5px solid var(--line); background: var(--surface); font-weight: 700; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.catchip.on { border-color: var(--green); color: var(--green-ink); background: var(--green-soft, var(--surface)); }
+.allcount { margin: 0 1rem 0.4rem; }
+.allrows { padding-bottom: 0.5rem; }
+.allcell { display: grid; gap: 0.5rem; list-style: none; }
+.allhead { margin: 0.9rem 0 0; font-size: 1.05rem; display: flex; align-items: center; gap: 0.5rem; }
+.allrow { flex-wrap: wrap; }
+.allrow .row__name { flex: 1 1 8rem; }
+.catphoto { width: 4.5rem; height: 4.5rem; border-radius: 12px; object-fit: contain; flex: none; background: #fff; border: 1px solid var(--line); }
+.catphoto--todo { display: grid; place-items: center; align-content: center; gap: 0.1rem; color: var(--muted); background: var(--surface-2); border-style: dashed; text-align: center; padding: 0.2rem; }
+.catphoto--todo small { font-size: 0.68rem; line-height: 1.1; font-weight: 600; }
+.allrow .btn, .allrow .statebadge { flex: none; }
+.notice { margin: 0 1rem 0.5rem; padding: 0.5rem 0.75rem; border-radius: 12px; background: var(--green-soft, var(--surface-2)); color: var(--green-ink); font-weight: 600; }

@@ -89,6 +89,16 @@ export const api = {
   createProduct: (b: { name: string; category: string; image?: string; active?: boolean; unit?: Unit }) => request<{ product: Product }>("POST", "/api/products", b),
   searchExtended: (q: string) => request<{ results: ExtendedResult[] }>("GET", `/api/catalog/extended?q=${encodeURIComponent(q)}`),
   addFromExtended: (extendedId: string) => request<{ product: Product }>("POST", "/api/products/from-extended", { extendedId }),
+  catalogAll: (o: { category?: string; q?: string; offset?: number; limit?: number }) => {
+    const qs = new URLSearchParams();
+    if (o.category) qs.set("category", o.category);
+    if (o.q) qs.set("q", o.q);
+    qs.set("offset", String(o.offset ?? 0));
+    qs.set("limit", String(o.limit ?? 24));
+    return request<CatalogAllPage>("GET", `/api/catalog/all?${qs}`);
+  },
+  addFromCatalog: (origin: "initial" | "extended", key: string) =>
+    request<{ product: Product; created: boolean; reactivated: boolean }>("POST", "/api/products/from-catalog", { origin, key }),
   uploadPhoto: async (id: string, file: Blob) => {
     const res = await fetch(`/api/products/${id}/photo`, { method: "POST", credentials: "same-origin", headers: { "content-type": file.type || "image/jpeg" }, body: file }).catch(() => {
       throw new NetworkError();
@@ -192,6 +202,23 @@ export interface Profile {
   login: string;
   role: Role;
   active: boolean;
+}
+
+export interface CatalogAllItem {
+  key: string;
+  origin: "initial" | "extended" | "family";
+  name: string;
+  brand: string | null;
+  category: string;
+  photoUrl: string | null;
+  status: "absent" | "active" | "inactive";
+  productId: string | null;
+  unit: Unit;
+}
+export interface CatalogAllPage {
+  total: number;
+  offset: number;
+  items: CatalogAllItem[];
 }
 
 export interface ExtendedResult {
