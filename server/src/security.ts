@@ -39,6 +39,11 @@ export const hashToken = (token: string): string => createHash("sha256").update(
 export const SECRET_PATTERN = /^[^\s\p{C}]{6}$/u;
 export const isValidSecret = (s: string): boolean => SECRET_PATTERN.test(s);
 
+/** A NEW code (installation, new profile, change of code) is exactly 6 digits, chosen by hand and typed twice. Existing codes with letters or
+ *  symbols keep working at login (SECRET_PATTERN) ; they are never converted nor rejected, only replaced when somebody sets a new code. */
+export const NEW_SECRET_PATTERN = /^\d{6}$/;
+export const isValidNewSecret = (s: string): boolean => NEW_SECRET_PATTERN.test(s);
+
 export function isWeakSecret(s: string): boolean {
   if (/^(.)\1{5}$/u.test(s)) return true; // même caractère six fois
   if (!/^\d{6}$/.test(s)) return false;

@@ -21,7 +21,7 @@ import { createProfile, listProfiles, resetSecret, updateProfile } from "./profi
 import { mailerFromEnv } from "./mail.js";
 import { countFamilyData, identifyFamily, purgeFamily } from "./family-purge.js";
 import { RecoveryService, secretMatches } from "./recovery.js";
-import { SECRET_PATTERN } from "./security.js";
+import { NEW_SECRET_PATTERN, SECRET_PATTERN } from "./security.js";
 
 export interface AppDeps {
   db: Db;
@@ -58,7 +58,8 @@ const loginSchema = z.object({
   secret: z.string().regex(SECRET_PATTERN),
 });
 const loginField = z.string().trim().toLowerCase().regex(/^[a-z0-9._-]{2,30}$/);
-const secretField = z.string().regex(SECRET_PATTERN, "6 caractères");
+/** Un NOUVEAU code : exactement 6 chiffres (les anciens mots de passe à lettres restent acceptés à la connexion seulement). */
+const secretField = z.string().regex(NEW_SECRET_PATTERN, "6 chiffres");
 const emailField = z.string().trim().toLowerCase().email().max(254);
 const roleField = z.enum(["admin", "parent", "staff"]);
 const nameField = z.string().trim().min(1).max(40);
@@ -117,7 +118,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const requireEmail = deps.requireRecoveryEmail ?? !(process.env.NODE_ENV === "test" && process.env.SC_LEGACY_SETUP === "1");
   app.post("/api/setup/family", { config: { rateLimit: limit } }, async (req, reply) => {
     const input = setupSchema.parse(req.body);
-    if (input.admin.secretConfirm !== undefined && input.admin.secretConfirm !== input.admin.secret) throw new HttpError(400, "secret_mismatch", "Les deux mots de passe ne sont pas identiques");
+    if (input.admin.secretConfirm !== undefined && input.admin.secretConfirm !== input.admin.secret) throw new HttpError(400, "secret_mismatch", "Les deux codes secrets ne sont pas identiques");
     const { recoveryEmail, secretConfirm: _c, ...admin } = input.admin;
     if (requireEmail) {
       // Avant toute création (et sans consommer le jeton) : une installation ne doit jamais laisser un compte inutilisable.

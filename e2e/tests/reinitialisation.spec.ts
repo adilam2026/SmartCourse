@@ -85,8 +85,8 @@ test("réinitialiser ma famille : suppression de cette famille seulement, accès
   await page.getByTestId("setup-family").fill("Nouvelle famille");
   await page.getByTestId("setup-name").fill("Adil");
   await page.getByTestId("setup-login").fill("adil");
-  await page.getByTestId("setup-secret").fill("Ab3$xy");
-  await page.getByTestId("setup-again").fill("Ab3$xy");
+  await page.getByTestId("setup-secret").fill("408213");
+  await page.getByTestId("setup-again").fill("408213");
   await page.getByTestId("setup-email").fill(email);
   await page.getByTestId("setup-submit").click();
   await expect(page.getByTestId("setup-verify")).toBeVisible();
@@ -103,7 +103,7 @@ test("réinitialiser ma famille : suppression de cette famille seulement, accès
   await expect(phone2.getByTestId("login-submit")).toBeVisible(); // ancienne session fermée
   await phone2.getByTestId("login-family").fill(newCode);
   await phone2.getByTestId("login-id").fill("adil");
-  await phone2.getByTestId("login-secret").fill("Ab3$xy");
+  await phone2.getByTestId("login-secret").fill("408213");
   await phone2.getByTestId("login-submit").click();
   await expect(phone2.getByTestId("tab-settings")).toBeVisible();
   const after = await idb(phone2);

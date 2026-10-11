@@ -4,7 +4,7 @@ import { revokeProfileSessions, type AuthContext } from "./auth.js";
 import { HttpError } from "./errors.js";
 import type { SseHub } from "./hub.js";
 import type { Role } from "./permissions.js";
-import { generateSecret, hashSecret, isValidSecret, isWeakSecret } from "./security.js";
+import { generateSecret, hashSecret, isValidNewSecret, isWeakSecret } from "./security.js";
 
 export interface ProfileView {
   id: string;
@@ -69,11 +69,11 @@ export interface CreateProfileInput {
   secretConfirm: string;
 }
 
-/** Same rules everywhere a password is chosen by a person: 6 visible characters, typed twice, not trivially guessable. */
+/** Same rules everywhere a code is chosen by a person: exactly 6 digits (leading zeros kept), typed twice, not trivially guessable. */
 export function checkChosenSecret(secret: string, confirm: string): void {
-  if (!isValidSecret(secret)) throw new HttpError(400, "invalid_secret", "Le mot de passe doit comporter 6 caractères");
-  if (secret !== confirm) throw new HttpError(400, "secret_mismatch", "Les deux mots de passe ne sont pas identiques");
-  if (isWeakSecret(secret)) throw new HttpError(400, "weak_secret", "Mot de passe trop simple (évitez 123456, 111111…)");
+  if (!isValidNewSecret(secret)) throw new HttpError(400, "invalid_secret", "Le code secret doit comporter exactement 6 chiffres");
+  if (secret !== confirm) throw new HttpError(400, "secret_mismatch", "Les deux codes secrets ne sont pas identiques");
+  if (isWeakSecret(secret)) throw new HttpError(400, "weak_secret", "Code secret trop simple (évitez 123456, 111111…)");
 }
 
 export async function createProfile(db: Db, actor: AuthContext, input: CreateProfileInput): Promise<{ profile: ProfileView }> {

@@ -7,6 +7,7 @@ import { CATEGORY_EMOJI } from "../categories";
 import { Dialog } from "../components/Dialog";
 import { Icon, type IconName } from "../components/Icon";
 import { RecoveryPanel } from "../components/RecoveryPanel";
+import { isAnySecret, isNewSecret, SecretInput } from "../components/SecretInput";
 import { NotificationSettings, usePushControl } from "../components/NotificationSettings";
 import { PageHead } from "../components/PageHead";
 import { useBackLayer } from "../useBackLayer";
@@ -23,7 +24,7 @@ const ROLE_LABEL: Record<Role, string> = { admin: "Administrateur", parent: "Par
 
 const errText = (e: unknown): string =>
   e instanceof NetworkError ? "Pas de connexion."
-  : e instanceof ApiError ? (e.code === "last_admin" ? "Impossible : c'est le dernier administrateur actif." : e.code === "admin_cannot_deactivate" ? "Un administrateur ne peut pas être désactivé." : e.code === "primary_admin_protected" ? "Le rôle de l'administrateur principal ne peut pas être modifié." : e.code === "login_taken" ? "Cet identifiant existe déjà." : e.code === "weak_secret" ? "Mot de passe trop simple (évitez 123456, 111111…)." : e.code === "secret_mismatch" ? "Les deux mots de passe ne sont pas identiques." : e.code === "invalid_secret" ? "Le mot de passe doit comporter 6 caractères." : e.message)
+  : e instanceof ApiError ? (e.code === "last_admin" ? "Impossible : c'est le dernier administrateur actif." : e.code === "admin_cannot_deactivate" ? "Un administrateur ne peut pas être désactivé." : e.code === "primary_admin_protected" ? "Le rôle de l'administrateur principal ne peut pas être modifié." : e.code === "login_taken" ? "Cet identifiant existe déjà." : e.code === "weak_secret" ? "Code secret trop simple (évitez 123456, 111111…)." : e.code === "secret_mismatch" ? "Les deux codes secrets ne sont pas identiques." : e.code === "invalid_secret" ? "Le code secret doit comporter exactement 6 chiffres." : e.message)
   : "Erreur.";
 
 type Section = "profiles" | "recovery" | "reset" | "catalog" | "notifications" | "backups" | "about";
@@ -117,10 +118,6 @@ function BackupCard({ st }: { st: BackupStatus | null }) {
   );
 }
 
-/** Six visible characters; typed twice. Never generated, never displayed afterwards. */
-const six = (v: string) => [...v].length === 6 && !/\s/.test(v);
-const clean = (v: string) => v.replace(/\s/g, "").slice(0, 6);
-
 function Profiles({ me }: { me: string }) {
   const [list, setList] = useState<Profile[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -164,19 +161,20 @@ function Profiles({ me }: { me: string }) {
         ))}
       </ul>
       <button className="btn btn--primary btn--big addbtn" data-testid="add-profile" onClick={() => setAdding(true)}>+ Ajouter un profil</button>
-      {adding && <AddProfile onClose={() => setAdding(false)} onCreated={(name) => { setAdding(false); setNotice(`Profil créé : ${name}. Communiquez-lui le mot de passe que vous avez choisi.`); void load(); }} />}
-      {changing && <ChangePassword profile={changing} onClose={() => setChanging(null)} onDone={() => { setNotice(`Mot de passe de ${changing.displayName} modifié. Ses sessions ont été fermées.`); setChanging(null); void load(); }} />}
+      {adding && <AddProfile onClose={() => setAdding(false)} onCreated={(name) => { setAdding(false); setNotice(`Profil créé : ${name}. Communiquez-lui le code secret que vous avez choisi.`); void load(); }} />}
+      {changing && <ChangePassword profile={changing} onClose={() => setChanging(null)} onDone={() => { setNotice(`Code secret de ${changing.displayName} modifié. Ses sessions ont été fermées.`); setChanging(null); void load(); }} />}
     </>
   );
 }
 
+/** Un NOUVEAU code secret : exactement 6 chiffres, choisi à la main, saisi deux fois, clavier numérique, saisie masquée. */
 function PasswordFields({ secret, again, setSecret, setAgain, prefix }: { secret: string; again: string; setSecret(v: string): void; setAgain(v: string): void; prefix: string }) {
   const mismatch = again.length > 0 && secret !== again;
   return (
     <>
-      <label className="field">Mot de passe — 6 caractères<input type="password" maxLength={6} autoComplete="new-password" value={secret} onChange={(e) => setSecret(clean(e.target.value))} required data-testid={`${prefix}-secret`} /></label>
-      <label className="field">Confirmer le mot de passe<input type="password" maxLength={6} autoComplete="new-password" value={again} onChange={(e) => setAgain(clean(e.target.value))} required data-testid={`${prefix}-secret2`} /></label>
-      {mismatch && <p className="error" data-testid={`${prefix}-mismatch`}>Les deux mots de passe ne sont pas identiques.</p>}
+      <label className="field">Code secret — 6 chiffres<SecretInput kind="new" value={secret} onChange={setSecret} testid={`${prefix}-secret`} /></label>
+      <label className="field">Confirmer le code secret<SecretInput kind="new" value={again} onChange={setAgain} testid={`${prefix}-secret2`} /></label>
+      {mismatch && <p className="error" data-testid={`${prefix}-mismatch`}>Les deux codes secrets ne sont pas identiques.</p>}
     </>
   );
 }
@@ -201,9 +199,9 @@ function ChangePassword({ profile, onClose, onDone }: { profile: Profile; onClos
         }
       }}>
         <PasswordFields secret={secret} again={again} setSecret={setSecret} setAgain={setAgain} prefix="pw" />
-        <p className="muted">L'ancien mot de passe n'est jamais affiché. Toutes les sessions de ce profil seront fermées.</p>
+        <p className="muted">L'ancien code n'est jamais affiché. Toutes les sessions de ce profil seront fermées.</p>
         {error && <p className="error" role="alert" data-testid="pw-error">{error}</p>}
-        <button className="btn btn--primary btn--big" disabled={busy || !six(secret) || secret !== again} data-testid="pw-submit">{busy ? "Enregistrement…" : "Enregistrer le mot de passe"}</button>
+        <button className="btn btn--primary btn--big" disabled={busy || !isNewSecret(secret) || secret !== again} data-testid="pw-submit">{busy ? "Enregistrement…" : "Enregistrer le code secret"}</button>
         <button type="button" className="btn btn--ghost" onClick={onClose}>Annuler</button>
       </form>
     </Dialog>
@@ -236,9 +234,9 @@ function AddProfile({ onClose, onCreated }: { onClose(): void; onCreated(name: s
           </select>
         </label>
         <PasswordFields secret={secret} again={again} setSecret={setSecret} setAgain={setAgain} prefix="np" />
-        <p className="muted">Vous choisissez ce mot de passe : chiffres, lettres ou symboles. Rien n'est généré automatiquement.</p>
+        <p className="muted">Vous choisissez ce code : 6 chiffres. Rien n'est généré automatiquement.</p>
         {error && <p className="error" role="alert" data-testid="np-error">{error}</p>}
-        <button className="btn btn--primary btn--big" disabled={!six(secret) || secret !== again || !displayName.trim() || !login.trim()} data-testid="np-submit">Créer</button>
+        <button className="btn btn--primary btn--big" disabled={!isNewSecret(secret) || secret !== again || !displayName.trim() || !login.trim()} data-testid="np-submit">Créer</button>
         <button type="button" className="btn btn--ghost" onClick={onClose}>Annuler</button>
       </form>
     </Dialog>
@@ -282,11 +280,11 @@ function ResetFamily({ engine }: { engine: Engine }) {
           setBusy(false);
         }
       }}>
-        <label className="field">Votre mot de passe<input type="password" maxLength={6} autoComplete="current-password" value={password} onChange={(e) => setPassword(clean(e.target.value))} required data-testid="reset-password" /></label>
+        <label className="field">Votre mot de passe actuel<SecretInput kind="current" value={password} onChange={setPassword} testid="reset-password" /></label>
         <label className="field">Retapez le code famille ({pv.family.code})<input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} autoCapitalize="characters" autoComplete="off" required data-testid="reset-confirm-code" /></label>
         <label className="check"><input type="checkbox" checked={sure} onChange={(e) => setSure(e.target.checked)} data-testid="reset-sure" /> Je comprends que c'est définitif et irréversible.</label>
         {error && <p className="error" role="alert" data-testid="reset-error">{error}</p>}
-        <button className="btn btn--danger btn--big" disabled={busy || !ready || !sure || !six(password) || code.trim().toUpperCase() !== pv.family.code} data-testid="reset-submit">{busy ? "Suppression…" : "Supprimer définitivement la famille"}</button>
+        <button className="btn btn--danger btn--big" disabled={busy || !ready || !sure || !isAnySecret(password) || code.trim().toUpperCase() !== pv.family.code} data-testid="reset-submit">{busy ? "Suppression…" : "Supprimer définitivement la famille"}</button>
       </form>
     </div>
   );

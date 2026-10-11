@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { hashSecret } from "../src/security.js";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
 import { generateInstallToken } from "../src/auth.js";
@@ -299,7 +300,7 @@ describe("désactivation et réinitialisation", () => {
   it("la réinitialisation révoque les sessions, remplace le code et lève le verrou", async () => {
     const f = await familyWithStaff();
     for (let i = 0; i < 5; i++) await doLogin(f.familyCode, "marie", "000111");
-    const secret = "x7Q!pz";
+    const secret = "516240";
     const r = await app.inject({ method: "POST", url: `/api/profiles/${f.staffId}/reset-secret`, cookies: f.cookies, payload: { secret, secretConfirm: secret } });
     expect(r.statusCode).toBe(200);
     expect(JSON.stringify(r.json())).not.toContain(secret); // le mot de passe n'est jamais renvoyé
@@ -343,29 +344,49 @@ describe("codes secrets", () => {
     expect((await addProfile(f.cookies, { displayName: "x", login: "wshort", role: "staff", secret: "12ab" })).statusCode).toBe(400);
   });
 
-  it("mot de passe choisi à la main : 6 caractères (pas seulement des chiffres), saisi deux fois, jamais généré ni renvoyé", async () => {
+  it("nouveau code secret choisi à la main : exactement 6 chiffres (zéros initiaux conservés), saisi deux fois, jamais généré ni renvoyé", async () => {
     const f = await newFamily();
-    const ok = await addProfile(f.cookies, { displayName: "Sara", login: "sara", role: "parent", secret: "Ab3$xy", secretConfirm: "Ab3$xy" });
+    const ok = await addProfile(f.cookies, { displayName: "Sara", login: "sara", role: "parent", secret: "008213", secretConfirm: "008213" });
     expect(ok.statusCode).toBe(201);
-    expect(JSON.stringify(ok.json())).not.toContain("Ab3$xy");
-    expect((await doLogin(f.familyCode, "sara", "Ab3$xy")).statusCode).toBe(200);
-    expect((await doLogin(f.familyCode, "sara", "ab3$xy")).statusCode).toBe(401); // la casse compte
-    // refus : trop court / trop long / espace / confirmation différente / absence (aucune génération automatique)
-    for (const [i, secret] of ["Ab3$x", "Ab3$xyz", "Ab 3xy", "a\tb3xy"].entries())
+    expect(JSON.stringify(ok.json())).not.toContain("008213");
+    expect((await doLogin(f.familyCode, "sara", "008213")).statusCode).toBe(200); // le zéro initial est conservé
+    expect([400, 401]).toContain((await doLogin(f.familyCode, "sara", "8213")).statusCode); // sans le zéro : refusé
+    expect((await doLogin(f.familyCode, "sara", "408213")).statusCode).toBe(401);
+    // refus : trop court / trop long / espace / lettres / symboles / confirmation différente / absence (aucune génération automatique)
+    for (const [i, secret] of ["40821", "4082134", "408 213", "40\t213", "40821a", "Ab3$xy", "408.13", "٤٠٨٢١٣"].entries())
       expect((await addProfile(f.cookies, { displayName: "x", login: `bad${i}`, role: "staff", secret, secretConfirm: secret })).statusCode).toBe(400);
-    const mismatch = await addProfile(f.cookies, { displayName: "x", login: "mism", role: "staff", secret: "Ab3$xy", secretConfirm: "Ab3$xz" });
+    const mismatch = await addProfile(f.cookies, { displayName: "x", login: "mism", role: "staff", secret: "408213", secretConfirm: "408214" });
     expect([mismatch.statusCode, mismatch.json().error]).toEqual([400, "secret_mismatch"]);
     const none = await app.inject({ method: "POST", url: "/api/profiles", cookies: f.cookies, payload: { displayName: "x", login: "none", role: "staff" } });
     expect(none.statusCode).toBe(400);
-    expect((await db.query("SELECT 1 FROM profiles WHERE login IN ('mism','none') AND family_id = (SELECT family_id FROM profiles WHERE id = $1)", [f.adminId])).rowCount).toBe(0);
+    for (const weak of ["111111", "123456", "654321", "000000"]) expect((await addProfile(f.cookies, { displayName: "x", login: `w${weak}`, role: "staff", secret: weak, secretConfirm: weak })).statusCode).toBe(400);
+    expect((await db.query("SELECT 1 FROM profiles WHERE login ~ '^(mism|none|bad|w)' AND family_id = (SELECT family_id FROM profiles WHERE id = $1)", [f.adminId])).rowCount).toBe(0);
+  });
+
+  it("compatibilité : un mot de passe existant avec lettres ou symboles continue de fonctionner (connexion, confirmation avant suppression) et n'est jamais modifié d'office ; on ne peut pas en choisir de nouveau", async () => {
+    const f = await newFamily();
+    const legacy = "Ab3$xy";
+    await db.query("INSERT INTO profiles (family_id, display_name, login, role, secret_hash) SELECT family_id, 'Ancien', 'ancien', 'parent', $2 FROM profiles WHERE id = $1", [f.adminId, await hashSecret(legacy)]);
+    const hashBefore = (await db.query("SELECT secret_hash FROM profiles WHERE login = 'ancien' AND family_id = (SELECT family_id FROM profiles WHERE id = $1)", [f.adminId])).rows[0].secret_hash;
+    const c = cookieOf(await doLogin(f.familyCode, "ancien", legacy))!;
+    expect((await app.inject({ method: "GET", url: "/api/me", cookies: c })).statusCode).toBe(200);
+    expect((await doLogin(f.familyCode, "ancien", "ab3$xy")).statusCode).toBe(401); // la casse compte toujours
+    expect((await db.query("SELECT secret_hash FROM profiles WHERE login = 'ancien' AND family_id = (SELECT family_id FROM profiles WHERE id = $1)", [f.adminId])).rows[0].secret_hash).toBe(hashBefore);
+    // un administrateur ne peut pas lui mettre un nouveau code à lettres, mais peut en choisir un à 6 chiffres
+    const id = (await db.query("SELECT id FROM profiles WHERE login = 'ancien' AND family_id = (SELECT family_id FROM profiles WHERE id = $1)", [f.adminId])).rows[0].id;
+    expect((await app.inject({ method: "POST", url: `/api/profiles/${id}/reset-secret`, cookies: f.cookies, payload: { secret: "Zz9#qq", secretConfirm: "Zz9#qq" } })).statusCode).toBe(400);
+    expect((await doLogin(f.familyCode, "ancien", legacy)).statusCode).toBe(200); // rien n'a changé
+    expect((await app.inject({ method: "POST", url: `/api/profiles/${id}/reset-secret`, cookies: f.cookies, payload: { secret: "739104", secretConfirm: "739104" } })).statusCode).toBe(200);
+    expect((await doLogin(f.familyCode, "ancien", legacy)).statusCode).toBe(401);
+    expect((await doLogin(f.familyCode, "ancien", "739104")).statusCode).toBe(200);
   });
 
   it("les codes à 6 chiffres actuels fonctionnent toujours ; le verrouillage après 5 échecs s'applique aussi aux mots de passe mixtes", async () => {
     const f = await newFamily();
     expect((await doLogin(f.familyCode, "adil", "482913")).statusCode).toBe(200);
-    await addProfile(f.cookies, { displayName: "Sara", login: "sara", role: "parent", secret: "Ab3$xy" });
-    for (let i = 0; i < 5; i++) expect((await doLogin(f.familyCode, "sara", "Zz9#qq")).statusCode).toBe(401);
-    expect((await doLogin(f.familyCode, "sara", "Ab3$xy")).statusCode).toBe(401); // verrouillé même avec le bon mot de passe
+    await addProfile(f.cookies, { displayName: "Sara", login: "sara", role: "parent", secret: "408213" });
+    for (let i = 0; i < 5; i++) expect((await doLogin(f.familyCode, "sara", "739104")).statusCode).toBe(401);
+    expect((await doLogin(f.familyCode, "sara", "408213")).statusCode).toBe(401); // verrouillé même avec le bon mot de passe
   });
 
   it("modifier le mot de passe : confirmation obligatoire, ancien mot de passe inutilisable, sessions révoquées", async () => {
@@ -373,15 +394,15 @@ describe("codes secrets", () => {
     const c = await addProfile(f.cookies, { displayName: "Sara", login: "sara", role: "parent" });
     const id = c.json().profile.id as string;
     const sara = cookieOf(await doLogin(f.familyCode, "sara", "573918"))!;
-    const bad = await app.inject({ method: "POST", url: `/api/profiles/${id}/reset-secret`, cookies: f.cookies, payload: { secret: "Ab3$xy", secretConfirm: "Ab3$xz" } });
+    const bad = await app.inject({ method: "POST", url: `/api/profiles/${id}/reset-secret`, cookies: f.cookies, payload: { secret: "408213", secretConfirm: "408214" } });
     expect([bad.statusCode, bad.json().error]).toEqual([400, "secret_mismatch"]);
     expect((await app.inject({ method: "GET", url: "/api/me", cookies: sara })).statusCode).toBe(200); // rien n'a changé
-    const ok = await app.inject({ method: "POST", url: `/api/profiles/${id}/reset-secret`, cookies: f.cookies, payload: { secret: "Ab3$xy", secretConfirm: "Ab3$xy" } });
+    const ok = await app.inject({ method: "POST", url: `/api/profiles/${id}/reset-secret`, cookies: f.cookies, payload: { secret: "408213", secretConfirm: "408213" } });
     expect(ok.statusCode).toBe(200);
     expect((await app.inject({ method: "GET", url: "/api/me", cookies: sara })).statusCode).toBe(401);
     expect((await doLogin(f.familyCode, "sara", "573918")).statusCode).toBe(401);
-    expect((await doLogin(f.familyCode, "sara", "Ab3$xy")).statusCode).toBe(200);
+    expect((await doLogin(f.familyCode, "sara", "408213")).statusCode).toBe(200);
     // sans session administrateur : refusé
-    expect((await app.inject({ method: "POST", url: `/api/profiles/${id}/reset-secret`, payload: { secret: "Ab3$xy", secretConfirm: "Ab3$xy" } })).statusCode).toBe(401);
+    expect((await app.inject({ method: "POST", url: `/api/profiles/${id}/reset-secret`, payload: { secret: "408213", secretConfirm: "408213" } })).statusCode).toBe(401);
   });
 });

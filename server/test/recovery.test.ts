@@ -176,16 +176,18 @@ describe("mot de passe oublié", () => {
     const token = tokenIn(m, "reset");
     expect((await post("/api/auth/reset-password/check", { token })).json()).toEqual({ valid: true });
     // validations
-    expect((await post("/api/auth/reset-password", { token, secret: "Ab3$xy", secretConfirm: "Ab3$xz" })).json().error).toBe("secret_mismatch");
+    expect((await post("/api/auth/reset-password", { token, secret: "408213", secretConfirm: "408214" })).json().error).toBe("secret_mismatch");
     expect((await post("/api/auth/reset-password", { token, secret: "123456", secretConfirm: "123456" })).json().error).toBe("weak_secret");
     expect((await post("/api/auth/reset-password", { token, secret: "court", secretConfirm: "court" })).statusCode).toBe(400);
+    expect((await post("/api/auth/reset-password", { token, secret: "Ab3$xy", secretConfirm: "Ab3$xy" })).statusCode).toBe(400); // un nouveau code = 6 chiffres
+    expect((await post("/api/auth/reset-password", { token, secret: "00 123", secretConfirm: "00 123" })).statusCode).toBe(400);
     expect((await post("/api/auth/reset-password/check", { token })).json()).toEqual({ valid: true }); // les échecs n'ont pas consommé le lien
-    const ok = await post("/api/auth/reset-password", { token, secret: "Ab3$xy", secretConfirm: "Ab3$xy" });
+    const ok = await post("/api/auth/reset-password", { token, secret: "408213", secretConfirm: "408213" });
     expect(ok.statusCode).toBe(200);
     expect((await app.inject({ method: "GET", url: "/api/me", cookies: session })).statusCode).toBe(401);
     expect((await login(f.code, "adil", "482913")).statusCode).toBe(401);
-    expect((await login(f.code, "adil", "Ab3$xy")).statusCode).toBe(200);
-    const again = await post("/api/auth/reset-password", { token, secret: "Zz9#qq", secretConfirm: "Zz9#qq" });
+    expect((await login(f.code, "adil", "408213")).statusCode).toBe(200);
+    const again = await post("/api/auth/reset-password", { token, secret: "739104", secretConfirm: "739104" });
     expect([again.statusCode, again.json().error]).toEqual([400, "invalid_link"]);
     expect((await post("/api/auth/reset-password/check", { token })).json()).toEqual({ valid: false });
   });
@@ -198,16 +200,16 @@ describe("mot de passe oublié", () => {
     await post("/api/auth/forgot-password", { email: f.addr });
     await recovery.idle();
     const t2 = tokenIn(mailer.sent.at(-1)!, "reset");
-    expect((await post("/api/auth/reset-password", { token: t1, secret: "Ab3$xy", secretConfirm: "Ab3$xy" })).statusCode).toBe(400); // remplacé
+    expect((await post("/api/auth/reset-password", { token: t1, secret: "408213", secretConfirm: "408213" })).statusCode).toBe(400); // remplacé
     await db.query("UPDATE auth_tokens SET expires_at = now() - interval '1 minute' WHERE profile_id = $1 AND purpose = 'reset_password'", [f.id]);
-    expect((await post("/api/auth/reset-password", { token: t2, secret: "Ab3$xy", secretConfirm: "Ab3$xy" })).statusCode).toBe(400); // expiré
+    expect((await post("/api/auth/reset-password", { token: t2, secret: "408213", secretConfirm: "408213" })).statusCode).toBe(400); // expiré
     expect((await login(f.code, "adil", "482913")).statusCode).toBe(200); // rien n'a changé
     const f2 = await verifiedFamily();
     await post("/api/auth/forgot-password", { email: f2.addr });
     await recovery.idle();
     const t3 = tokenIn(mailer.sent.at(-1)!, "reset");
     await app.inject({ method: "PUT", url: "/api/recovery-email", cookies: f2.admin, payload: { email: email() } });
-    expect((await post("/api/auth/reset-password", { token: t3, secret: "Ab3$xy", secretConfirm: "Ab3$xy" })).statusCode).toBe(400);
+    expect((await post("/api/auth/reset-password", { token: t3, secret: "408213", secretConfirm: "408213" })).statusCode).toBe(400);
   });
 
   it("seuls les profils à adresse vérifiée (administrateur principal) reçoivent un lien ; les autres profils n'en reçoivent jamais", async () => {

@@ -155,7 +155,7 @@ test.describe("administration", () => {
     await page.getByTestId("np-name").fill("Karim");
     await page.getByTestId("np-login").fill("karim");
     await page.getByTestId("np-role").selectOption("staff");
-    const secret = "k4$Mpq"; // choisi par l'administrateur : lettres, chiffres et symboles acceptés
+    const secret = "516240"; // choisi par l'administrateur : 6 chiffres
     await page.getByTestId("np-secret").fill(secret);
     await page.getByTestId("np-secret2").fill(secret);
     await page.getByTestId("np-submit").click();

@@ -34,7 +34,7 @@ for (const w of [360, 390, 412]) {
     await expect(login.getByRole("heading", { name: "Se connecter" })).toBeVisible();
     await expect(login.getByText("Code famille", { exact: true })).toBeVisible();
     await expect(login.getByText("Identifiant", { exact: true })).toBeVisible();
-    await expect(login.getByText("Mot de passe", { exact: true })).toBeVisible();
+    await expect(login.locator("label", { hasText: "Mot de passe" })).toBeVisible();
     await expect(login.getByTestId("go-forgot-code")).toHaveText("Code famille oublié ?");
     await expect(login.getByTestId("go-forgot-password")).toHaveText("Mot de passe oublié ?");
     await expect(setup.getByRole("heading", { name: "Première installation" })).toBeVisible();
@@ -42,8 +42,8 @@ for (const w of [360, 390, 412]) {
     expect(await noOverflow(page)).toBe(true);
     await page.screenshot({ path: `${OUT}/connexion-${w}.png`, fullPage: true });
     await setup.getByTestId("go-setup").click();
-    await expect(page.getByText("Mot de passe — 6 caractères")).toBeVisible();
-    await expect(page.getByText("Confirmer le mot de passe")).toBeVisible();
+    await expect(page.getByText("Code secret — 6 chiffres")).toBeVisible();
+    await expect(page.getByText("Confirmer le code secret")).toBeVisible();
     expect(await noOverflow(page)).toBe(true);
     if (w === 390) await page.screenshot({ path: `${OUT}/installation-${w}.png`, fullPage: true });
   });
@@ -71,32 +71,32 @@ test("administration : pas de bouton Désactiver pour un administrateur, rôle d
   await page.getByTestId("np-name").fill("Sara");
   await page.getByTestId("np-login").fill("sara");
   await page.getByTestId("np-role").selectOption("parent");
-  await expect(page.getByText("Mot de passe — 6 caractères")).toBeVisible();
-  await expect(page.getByText("Confirmer le mot de passe")).toBeVisible();
-  await page.getByTestId("np-secret").fill("Ab3$xy");
-  await page.getByTestId("np-secret2").fill("Ab3$xz");
+  await expect(page.getByText("Code secret — 6 chiffres")).toBeVisible();
+  await expect(page.getByText("Confirmer le code secret")).toBeVisible();
+  await page.getByTestId("np-secret").fill("408213");
+  await page.getByTestId("np-secret2").fill("408214");
   await expect(page.getByTestId("np-mismatch")).toBeVisible();
   await expect(page.getByTestId("np-submit")).toBeDisabled();
   await page.screenshot({ path: `${OUT}/nouveau-profil-390.png` });
-  await page.getByTestId("np-secret2").fill("Ab3$xy");
+  await page.getByTestId("np-secret2").fill("408213");
   await page.getByTestId("np-submit").click();
   await expect(page.getByTestId("settings-notice")).toContainText("Sara");
   const ok = await playwright.request.newContext({ baseURL });
-  expect((await ok.post("/api/auth/login", { data: { familyCode: f.code, login: "sara", secret: "Ab3$xy" } })).status()).toBe(200);
+  expect((await ok.post("/api/auth/login", { data: { familyCode: f.code, login: "sara", secret: "408213" } })).status()).toBe(200);
 
   // « Modifier le mot de passe » : deux champs, l'ancien reste inaccessible, sessions révoquées
   await expect(page.getByTestId("reset-sara")).toHaveText("Modifier le mot de passe");
   await page.getByTestId("reset-sara").click();
   await expect(page.getByTestId("pw-secret")).toHaveValue("");
-  await page.getByTestId("pw-secret").fill("Zz9#qq");
-  await page.getByTestId("pw-secret2").fill("Zz9#qq");
+  await page.getByTestId("pw-secret").fill("739104");
+  await page.getByTestId("pw-secret2").fill("739104");
   await page.screenshot({ path: `${OUT}/modifier-mot-de-passe-390.png` });
   await page.getByTestId("pw-submit").click();
   await expect(page.getByTestId("settings-notice")).toContainText("modifié");
   expect((await ok.get("/api/me")).status()).toBe(401);
   const again = await playwright.request.newContext({ baseURL });
-  expect((await again.post("/api/auth/login", { data: { familyCode: f.code, login: "sara", secret: "Ab3$xy" } })).status()).toBe(401);
-  expect((await again.post("/api/auth/login", { data: { familyCode: f.code, login: "sara", secret: "Zz9#qq" } })).status()).toBe(200);
+  expect((await again.post("/api/auth/login", { data: { familyCode: f.code, login: "sara", secret: "408213" } })).status()).toBe(401);
+  expect((await again.post("/api/auth/login", { data: { familyCode: f.code, login: "sara", secret: "739104" } })).status()).toBe(200);
 });
 
 const gotoRecovery = async (page: any, f: any) => {
@@ -193,17 +193,17 @@ test("récupération : code famille et mot de passe oubliés par e-mail réel (c
   expect((await session.get("/api/me")).status()).toBe(200);
   const token = await linkTokenFor(f.email, "reset");
   await page.goto(`/#/reset/${token}`);
-  await expect(page.getByText("Nouveau mot de passe — 6 caractères")).toBeVisible();
-  await page.getByTestId("reset-new").fill("Ab3$xy");
-  await page.getByTestId("reset-confirm").fill("Ab3$xz");
+  await expect(page.getByText("Code secret — 6 chiffres")).toBeVisible();
+  await page.getByTestId("reset-new").fill("408213");
+  await page.getByTestId("reset-confirm").fill("408214");
   await expect(page.getByTestId("reset-submit")).toBeDisabled();
-  await page.getByTestId("reset-confirm").fill("Ab3$xy");
+  await page.getByTestId("reset-confirm").fill("408213");
   await page.screenshot({ path: `${OUT}/nouveau-mot-de-passe-390.png` });
   await page.getByTestId("reset-submit").click();
   await expect(page.getByTestId("reset-saved")).toBeVisible();
   expect((await session.get("/api/me")).status()).toBe(401); // sessions révoquées
   await page.getByTestId("link-continue").click();
-  await uiLogin(page, f, "adil", "Ab3$xy");
+  await uiLogin(page, f, "adil", "408213");
   await expect(page.getByTestId("tab-settings")).toBeVisible();
   await page.goto(`/#/reset/${token}`);
   await expect(page.getByTestId("link-bad")).toBeVisible(); // usage unique

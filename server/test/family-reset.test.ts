@@ -51,6 +51,17 @@ const setupBody = async (over: object = {}, token?: string) => ({
 });
 
 describe("première installation : adresse de récupération obligatoire et vérifiée", () => {
+  it("le code secret du premier administrateur est exactement 6 chiffres (zéros initiaux conservés) ; lettres et codes triviaux refusés sans consommer le jeton", async () => {
+    const token = await generateInstallToken(db);
+    for (const secret of ["Ab3$xy", "12345", "1234567", "40821a", "111111", "123456"]) {
+      const r = await app.inject({ method: "POST", url: "/api/setup/family", payload: await setupBody({ secret, secretConfirm: secret }, token) });
+      expect([secret, r.statusCode]).toEqual([secret, 400]);
+    }
+    const ok = await app.inject({ method: "POST", url: "/api/setup/family", payload: await setupBody({ secret: "001389", secretConfirm: "001389" }, token) });
+    expect(ok.statusCode).toBe(201);
+    expect((await app.inject({ method: "POST", url: "/api/auth/login", payload: { familyCode: ok.json().familyCode, login: "adil", secret: "001389" } })).statusCode).toBe(200);
+  });
+
   it("refuse l'installation sans adresse, sans consommer le jeton ; refuse aussi si l'envoi d'e-mails n'est pas configuré", async () => {
     const token = await generateInstallToken(db);
     const noMail = await app.inject({ method: "POST", url: "/api/setup/family", payload: await setupBody({ recoveryEmail: undefined }, token) });

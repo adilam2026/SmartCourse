@@ -440,3 +440,7 @@ h3 { font-size: 1.05rem; font-weight: 800; }
 .tech { border-top: 1px solid var(--line); padding-top: 0.6rem; }
 .tech summary { cursor: pointer; font-weight: 700; color: var(--muted); min-height: var(--tap); display: flex; align-items: center; }
 .tech p { overflow-wrap: anywhere; font-size: 0.9rem; }
+
+/* ---------- saisie du code secret ---------- */
+.kbtoggle { margin: 0.1rem 0 0; justify-self: start; }
+.field input[inputmode="numeric"], .auth input[inputmode="numeric"] { letter-spacing: 0.3em; font-variant-numeric: tabular-nums; }
