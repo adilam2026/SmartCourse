@@ -5,6 +5,10 @@ import { api, ApiError, NetworkError, type BackupStatus, type ExtendedResult, ty
 import { fmtDateTime } from "../format";
 import { CATEGORY_EMOJI } from "../categories";
 import { Dialog } from "../components/Dialog";
+import { Icon, type IconName } from "../components/Icon";
+import { NotificationSettings, usePushControl } from "../components/NotificationSettings";
+import { PageHead } from "../components/PageHead";
+import { useBackLayer } from "../useBackLayer";
 import { ProductForm } from "../components/ProductForm";
 import { Thumb } from "../components/Thumb";
 import type { Engine, State } from "../sync/engine";
@@ -17,40 +21,89 @@ const errText = (e: unknown): string =>
   : e instanceof ApiError ? (e.code === "last_admin" ? "Impossible : c'est le dernier administrateur actif." : e.code === "login_taken" ? "Cet identifiant existe déjà." : e.code === "weak_secret" ? "Code trop simple (évitez 123456, 111111…)." : e.message)
   : "Erreur.";
 
+type Section = "profiles" | "catalog" | "notifications" | "backups" | "about";
+
+/** Backup state in one word (the technical detail is one touch away). */
+function backupSummary(st: BackupStatus | null): { ok: boolean; text: string } {
+  if (!st) return { ok: true, text: "Vérification…" };
+  const old = (iso: string | null, days: number) => !iso || Date.now() - new Date(iso).getTime() > days * 86_400_000;
+  const failedSince = st.lastVerifyFailedAt && (!st.lastVerifiedOkAt || st.lastVerifyFailedAt > st.lastVerifiedOkAt);
+  const toolsBad = st.tools && !st.tools.ok;
+  if (!st.configured) return { ok: false, text: "Sauvegarde non configurée" };
+  if (failedSince) return { ok: false, text: "Dernière vérification en échec" };
+  if (toolsBad) return { ok: false, text: "Outils de sauvegarde à vérifier" };
+  if (old(st.lastVerifiedOkAt, 3)) return { ok: false, text: "Sauvegarde à vérifier" };
+  return { ok: true, text: "Sauvegardes à jour" };
+}
+
 export function Settings({ engine, s }: { engine: Engine; s: State }) {
-  const [section, setSection] = useState<"profiles" | "catalog">("profiles");
+  const [section, setSection] = useState<Section | null>(null);
+  const [backup, setBackup] = useState<BackupStatus | null>(null);
+  const push = usePushControl();
+  useEffect(() => void api.backupStatus().then(setBackup).catch(() => {}), []);
+  useBackLayer(section !== null, () => setSection(null)); // Android Back: from a section to the list of settings
+  const bs = backupSummary(backup);
+  const pushText = push.status === "on" ? "Activées sur cet appareil" : push.status === "denied" ? "Bloquées par le téléphone" : push.status === "unsupported" ? "Non prises en charge" : "Désactivées sur cet appareil";
+
+  if (section === null) {
+    const items: { key: Section; icon: IconName; title: string; text: string; testid: string }[] = [
+      { key: "profiles", icon: "users", title: "Famille et profils", text: "Profils, rôles, codes d'accès", testid: "seg-profiles" },
+      { key: "catalog", icon: "grid", title: "Catalogue", text: "Produits, photos et unités", testid: "seg-catalog" },
+      { key: "notifications", icon: "bell", title: "Notifications", text: pushText, testid: "seg-notifications" },
+      { key: "backups", icon: "shield", title: "Sauvegardes", text: bs.text, testid: "seg-backups" },
+      { key: "about", icon: "info", title: "À propos et version", text: "Version installée, mises à jour", testid: "seg-about" },
+    ];
+    return (
+      <>
+        <PageHead engine={engine} s={s} title="Réglages" subtitle={s.me?.family ? <>Famille « {s.me.family.name} » · code <b data-testid="family-code">{s.me.family.code}</b></> : undefined} />
+        <nav className="menu" aria-label="Réglages">
+          {items.map((i) => (
+            <button key={i.key} className="menuitem" data-testid={i.testid} onClick={() => setSection(i.key)}>
+              <span className="menuitem__icon"><Icon name={i.icon} size={24} /></span>
+              <span className="menuitem__text"><b>{i.title}</b><small className={i.key === "backups" && !bs.ok ? "bad" : ""}>{i.text}</small></span>
+              <Icon name="chevron-right" />
+            </button>
+          ))}
+        </nav>
+      </>
+    );
+  }
+  const titles: Record<Section, string> = { profiles: "Famille et profils", catalog: "Catalogue", notifications: "Notifications", backups: "Sauvegardes", about: "À propos et version" };
   return (
     <>
-      <header className="topbar"><div className="topbar__title"><strong>Réglages</strong>{s.me?.family && <span className="muted">Code famille : <b data-testid="family-code">{s.me.family.code}</b></span>}</div></header>
-      <div className="seg" role="tablist">
-        <button role="tab" aria-selected={section === "profiles"} className={section === "profiles" ? "on" : ""} data-testid="seg-profiles" onClick={() => setSection("profiles")}>Profils</button>
-        <button role="tab" aria-selected={section === "catalog"} className={section === "catalog" ? "on" : ""} data-testid="seg-catalog" onClick={() => setSection("catalog")}>Catalogue</button>
-      </div>
-      {section === "profiles" ? <><BackupCard /><Profiles me={s.me!.id} /><VersionInfo engine={engine} /></> : <CatalogAdmin engine={engine} />}
+      <PageHead engine={engine} s={s} title={titles[section]} onBack={() => setSection(null)} backLabel="Réglages" backTestId="settings-back" subtitle={section === "profiles" && s.me?.family ? <>Code de la famille : <b data-testid="family-code">{s.me.family.code}</b></> : undefined} />
+      {section === "profiles" && <Profiles me={s.me!.id} />}
+      {section === "catalog" && <CatalogAdmin engine={engine} />}
+      {section === "notifications" && <div className="menu"><NotificationSettings /></div>}
+      {section === "backups" && <BackupCard st={backup} />}
+      {section === "about" && <div className="versioninfo--page"><VersionInfo engine={engine} /></div>}
     </>
   );
 }
 
-function BackupCard() {
-  const [st, setSt] = useState<BackupStatus | null>(null);
-  useEffect(() => void api.backupStatus().then(setSt).catch(() => {}), []);
-  if (!st) return null;
-  const old = (iso: string | null, days: number) => !iso || Date.now() - new Date(iso).getTime() > days * 86_400_000;
+function BackupCard({ st }: { st: BackupStatus | null }) {
+  const [details, setDetails] = useState(false);
+  if (!st) return <p className="empty">Vérification…</p>;
+  const sum = backupSummary(st);
   const failedSince = st.lastVerifyFailedAt && (!st.lastVerifiedOkAt || st.lastVerifyFailedAt > st.lastVerifiedOkAt);
   const toolsBad = st.tools && !st.tools.ok;
-  const bad = !st.configured || old(st.lastVerifiedOkAt, 3) || !!failedSince || !!toolsBad;
   return (
-    <div className={`banner ${bad ? "banner--pending" : "banner--info"} backupcard`} data-testid="backup-card">
-      <span>
-        <strong>Sauvegarde {st.configured ? "automatique" : "NON configurée (aucun bucket sûr ou clé absente)"}</strong>
-        {st.configured && <><br />Stockage : {st.storage === "s3" ? "bucket (chiffré)" : "dossier local"} · {st.schedule}</>}
-        <br />
-        Dernière sauvegarde : {st.lastBackupAt ? fmtDateTime(st.lastBackupAt) : "aucune"}
-        <br />
-        Dernière restauration vérifiée : {st.lastVerifiedOkAt ? fmtDateTime(st.lastVerifiedOkAt) : "jamais"}
-        {failedSince ? " — ÉCHEC de la dernière vérification" : ""}
-        {toolsBad && <><br /><strong>Outils : </strong>{st.tools!.message}</>}
-      </span>
+    <div className="panel backupcard" data-testid="backup-card">
+      <p><span className={`statebadge ${sum.ok ? "" : "statebadge--bad"}`} data-testid="backup-state"><Icon name={sum.ok ? "check" : "info"} size={16} /> {sum.text}</span></p>
+      <p className="muted">{st.lastBackupAt ? `Dernière sauvegarde : ${fmtDateTime(st.lastBackupAt)}` : "Aucune sauvegarde pour le moment."}</p>
+      <button className="disclose" data-testid="backup-details-toggle" aria-expanded={details} onClick={() => setDetails((v) => !v)}>{details ? "Masquer les détails techniques" : "Détails techniques"}</button>
+      {details && (
+        <div data-testid="backup-details" className="muted">
+          <strong>Sauvegarde {st.configured ? "automatique" : "NON configurée (aucun bucket sûr ou clé absente)"}</strong>
+          {st.configured && <><br />Stockage : {st.storage === "s3" ? "bucket (chiffré)" : "dossier local"} · {st.schedule}</>}
+          <br />
+          Dernière sauvegarde : {st.lastBackupAt ? fmtDateTime(st.lastBackupAt) : "aucune"}
+          <br />
+          Dernière restauration vérifiée : {st.lastVerifiedOkAt ? fmtDateTime(st.lastVerifiedOkAt) : "jamais"}
+          {failedSince ? " — ÉCHEC de la dernière vérification" : ""}
+          {toolsBad && <><br /><strong>Outils : </strong>{st.tools!.message}</>}
+        </div>
+      )}
     </div>
   );
 }

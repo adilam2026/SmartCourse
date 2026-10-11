@@ -59,3 +59,13 @@ export const fmtMonthShort = (month: string): string => {
   const [y, m] = month.split("-").map(Number) as [number, number];
   return new Intl.DateTimeFormat("fr-FR", { timeZone: "UTC", month: "short" }).format(new Date(Date.UTC(y, m - 1, 15)));
 };
+
+const todayLong = new Intl.DateTimeFormat("fr-FR", { timeZone: TIME_ZONE, weekday: "long", day: "numeric", month: "long" });
+/** « Dimanche 11 octobre » (household calendar). */
+export const fmtToday = (now = new Date()): string => {
+  const t = todayLong.format(now);
+  return t.charAt(0).toUpperCase() + t.slice(1);
+};
+const closedWhen = new Intl.DateTimeFormat("fr-FR", { timeZone: TIME_ZONE, weekday: "short", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
+/** « dim. 11 octobre 2026 à 14:31 » — date AND time, so two lists closed the same day stay distinguishable. */
+export const fmtClosed = (iso: string): string => closedWhen.format(new Date(iso)).replace(" à ", " · ").replace(",", "");

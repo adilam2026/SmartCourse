@@ -210,6 +210,7 @@ export interface HistoryEntry {
   closedBy: { id: string; displayName: string };
   purchased: number;
   remaining: number;
+  thumbs?: { name: string; photoUrl: string | null }[];
 }
 
 export interface Credit {

@@ -26,7 +26,7 @@ function Screens({ engine }: { engine: Engine }) {
     if (meId && role) void reconcilePush(role);
     if (role === "staff") clearOpenTarget(); // lists are for parents and administrators
   }, [meId, role]);
-  if (s.phase === "boot") return <main className="nolist"><div className="nolist__body"><div className="nolist__icon">🛒</div></div></main>;
+  if (s.phase === "boot") return <main className="nolist"><div className="nolist__body"><img className="nolist__logo" src="/icons/icon-192.png" alt="" width="96" height="96" /></div></main>;
   if (s.phase === "loggedOut" || !s.me) return <LoginScreen engine={engine} s={s} />;
   if (s.welcomeCode) return <Welcome code={s.welcomeCode} onDone={engine.dismissWelcome} />;
   if (s.me.role === "staff") return <StaffScreen engine={engine} s={s} />;

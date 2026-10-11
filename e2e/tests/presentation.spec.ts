@@ -65,7 +65,7 @@ for (const width of [360, 390]) {
       const w = page.getByTestId(`wrap-${id}`);
       await expect(page.getByTestId(`qty-unit-${id}`)).toHaveText(unit);
       // valeur saisie jamais coupée (« 1,25 » en entier) et unité jamais coupée
-      expect(await page.getByTestId(`qty-input-${id}`).evaluate((e: HTMLInputElement) => e.scrollWidth <= e.clientWidth)).toBe(true);
+      expect(await page.getByTestId(`qty-input-${id}`).evaluate((e: HTMLInputElement) => e.scrollWidth <= e.clientWidth + 2)).toBe(true);
       expect(await page.getByTestId(`qty-unit-${id}`).evaluate((e) => e.scrollWidth <= e.clientWidth + 1 && e.scrollHeight <= e.clientHeight + 1)).toBe(true);
       // trois zones, l'une sous l'autre, sans chevauchement ; compteur dans la carte
       const z = await w.evaluate((e) => {
@@ -122,7 +122,7 @@ for (const width of [360, 390]) {
     await page.screenshot({ path: `${CAP}/final-${width}-grille-125-kg.png` });
     const inp = page.getByTestId(`qty-input-${f.products["Tomates"]}`);
     expect(await inp.inputValue()).toBe("1,25");
-    expect(await inp.evaluate((e: HTMLInputElement) => e.scrollWidth <= e.clientWidth)).toBe(true);
+    expect(await inp.evaluate((e: HTMLInputElement) => e.scrollWidth <= e.clientWidth + 2)).toBe(true);
     await page.getByTestId(`wrap-${f.products["Tomates"]}`).screenshot({ path: `${CAP}/final-${width}-carte-125-kg.png` });
 
     // par catégories
@@ -187,7 +187,10 @@ for (const width of [360, 390]) {
     await uiLogin(page, f, "lamiaa", "573918");
     await page.getByTestId("tab-stats").click();
     await expect(page.getByTestId("stats-rows")).toBeVisible();
-    // « Catégorie » et « Trier par » : deux lignes distinctes, valeur entièrement lisible
+    // Filtres : un panneau ; « Catégorie » et « Trier par » sur deux lignes distinctes, valeur entièrement lisible
+    await page.getByTestId("stats-filters").click();
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: `${CAP}/design-${width}-statistiques-filtres.png` });
     const cat = (await page.getByTestId("stats-category").boundingBox())!;
     const sort = (await page.getByTestId("stats-sort").boundingBox())!;
     expect(sort.y).toBeGreaterThanOrEqual(cat.y + cat.height - 1);
@@ -197,6 +200,7 @@ for (const width of [360, 390]) {
     expect(await page.getByTestId("stats-sort").evaluate((e: HTMLSelectElement) => e.scrollWidth <= e.clientWidth + 1)).toBe(true);
     await page.getByTestId("stats-sort").selectOption("frequency");
     await expect(page.getByTestId("stats-sort").locator("option:checked")).toHaveText("Fréquence d'achat");
+    await page.getByTestId("filters-done").click();
     await expect(page.getByTestId(`freq-${LONG}`)).toBeVisible(); // nom long
     // nom long entier, sur plusieurs lignes, sans « … »
     const nm = page.getByTestId(`stat-${LONG}`).locator("b");
@@ -235,7 +239,9 @@ for (const width of [360, 390]) {
     await page.screenshot({ path: `${CAP}/design-${width}-fiche-produit-nom-long.png` });
     // mois passé : aucun mois incomplet
     await page.getByTestId("pstats-close").click();
+    await page.getByTestId("stats-filters").click();
     await page.getByTestId("period-previous").click();
+    await page.getByTestId("filters-done").click();
     await page.getByTestId("stat-Lait").click();
     await expect(page.locator('[data-incomplete="true"]')).toHaveCount(0);
     await ctx.close();

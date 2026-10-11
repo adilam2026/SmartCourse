@@ -15,8 +15,12 @@ function Login({ engine, s, onSetup }: { engine: Engine; s: State; onSetup(): vo
     void engine.login(familyCode, login, secret).then(() => setSecret(""));
   };
   return (
-    <main className="login">
-      <h1>🛒 Courses</h1>
+    <main className="auth">
+      <div className="auth__logo">
+        <img src="/icons/icon-192.png" alt="" width="96" height="96" />
+        <h1>Courses</h1>
+        <p>La liste de courses de la famille</p>
+      </div>
       <form onSubmit={submit}>
         <label>
           Code de la famille
@@ -45,8 +49,12 @@ function Setup({ engine, s, onBack }: { engine: Engine; s: State; onBack(): void
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: k === "secret" || k === "again" ? e.target.value.replace(/\D/g, "").slice(0, 6) : e.target.value });
   const mismatch = f.again.length > 0 && f.secret !== f.again;
   return (
-    <main className="login">
-      <h1>Première installation</h1>
+    <main className="auth">
+      <div className="auth__logo">
+        <img src="/icons/icon-192.png" alt="" width="96" height="96" />
+        <h1>Première installation</h1>
+        <p>Créez la famille et le compte administrateur</p>
+      </div>
       <form onSubmit={async (e) => { e.preventDefault(); await engine.setup(f); }}>
         <label>Jeton d'installation<input value={f.installToken} onChange={set("installToken")} autoComplete="off" required data-testid="setup-token" /></label>
         <label>Nom de la famille<input value={f.familyName} onChange={set("familyName")} required maxLength={60} data-testid="setup-family" /></label>
@@ -65,12 +73,17 @@ function Setup({ engine, s, onBack }: { engine: Engine; s: State; onBack(): void
 
 export function Welcome({ code, onDone }: { code: string; onDone(): void }) {
   return (
-    <main className="login">
-      <h1>Famille créée 🎉</h1>
-      <p>Code de la famille, à donner aux autres membres (avec leur identifiant et leur code secret) :</p>
-      <p className="secret" data-testid="setup-family-code">{code}</p>
-      <p className="muted">Vous pourrez le retrouver dans Réglages.</p>
-      <button className="btn btn--primary btn--big" data-testid="welcome-continue" onClick={onDone}>Continuer</button>
+    <main className="auth">
+      <div className="auth__logo">
+        <img src="/icons/icon-192.png" alt="" width="96" height="96" />
+        <h1>Famille créée</h1>
+      </div>
+      <section className="panel">
+        <p>Code de la famille, à donner aux autres membres (avec leur identifiant et leur code secret) :</p>
+        <p className="secret" data-testid="setup-family-code">{code}</p>
+        <p className="muted">Vous pourrez le retrouver dans Réglages.</p>
+        <button className="btn btn--primary btn--big" data-testid="welcome-continue" onClick={onDone}>Continuer</button>
+      </section>
     </main>
   );
 }

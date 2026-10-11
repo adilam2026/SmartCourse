@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { api, type HistoryEntry } from "../api";
 import { Thumb } from "../components/Thumb";
-import { fmtDay, fmtWhen } from "../format";
+import { fmtDay, fmtTime, fmtWhen } from "../format";
+import { Icon } from "../components/Icon";
+import { PageHead } from "../components/PageHead";
+import type { Engine, State } from "../sync/engine";
 import { sectionGroups } from "../grouping";
 import { GroupedRows } from "../components/GroupedRows";
 import { RowMeta } from "../components/ItemDetail";
@@ -9,7 +12,7 @@ import { ValidationHistory } from "../components/ValidationHistory";
 import { fmtQty } from "../units";
 import type { ListView } from "../types";
 
-export function History({ categories, openId, onOpened }: { categories: { key: string; label: string }[]; openId?: string | null; onOpened?(): void }) {
+export function History({ engine, s, categories, openId, onOpened }: { engine: Engine; s: State; categories: { key: string; label: string }[]; openId?: string | null; onOpened?(): void }) {
   const [entries, setEntries] = useState<HistoryEntry[] | null>(null);
   const [open, setOpen] = useState<ListView | null>(null);
   const [error, setError] = useState(false);
@@ -22,21 +25,31 @@ export function History({ categories, openId, onOpened }: { categories: { key: s
     api.history().then((r) => setEntries(r.lists)).catch(() => setError(true));
   }, []);
 
-  if (open) return <Archive list={open} categories={categories} onBack={() => setOpen(null)} />;
+  if (open) return <Archive engine={engine} s={s} list={open} categories={categories} onBack={() => setOpen(null)} />;
   return (
     <>
-      <header className="topbar"><div className="topbar__title"><strong>Historique</strong></div></header>
+      <PageHead engine={engine} s={s} title="Historique" subtitle="Les listes clôturées, de la plus récente à la plus ancienne" />
       {error && <p className="empty" data-testid="history-error">Historique indisponible hors connexion.</p>}
       {entries?.length === 0 && <p className="empty">Aucune liste clôturée.</p>}
       <ul className="rows" data-testid="history">
         {entries?.map((e) => (
           <li key={e.id}>
-            <button className="row row--btn" data-testid="history-entry" onClick={() => api.listById(e.id).then((r) => setOpen(r.list)).catch(() => setError(true))}>
-              <span className="row__name">
-                {fmtDay(e.closedAt)}
-                <small>Clôturée par {e.closedBy.displayName} · {e.purchased} acheté{e.purchased > 1 ? "s" : ""} · {e.remaining} non acheté{e.remaining > 1 ? "s" : ""}</small>
+            <button className="hcard" data-testid="history-entry" aria-label={`Liste clôturée le ${fmtDay(e.closedAt)} à ${fmtTime(e.closedAt)}`} onClick={() => api.listById(e.id).then((r) => setOpen(r.list)).catch(() => setError(true))}>
+              <span className="hcard__top">
+                <span>
+                  <span className="hcard__date" data-testid="history-date">{fmtDay(e.closedAt)}</span>
+                  <br />
+                  <span className="hcard__time" data-testid="history-time">Clôturée à {fmtTime(e.closedAt)} par {e.closedBy.displayName}</span>
+                </span>
+                <Icon name="chevron-right" className="chev" />
               </span>
-              <span aria-hidden="true">›</span>
+              <span className="hcard__sum">{e.purchased} produit{e.purchased > 1 ? "s" : ""} acheté{e.purchased > 1 ? "s" : ""}{e.remaining ? ` · ${e.remaining} non acheté${e.remaining > 1 ? "s" : ""}` : ""}</span>
+              {(e.thumbs?.length ?? 0) > 0 && (
+                <span className="thumbs" aria-hidden="true">
+                  {e.thumbs!.map((t, i) => (t.photoUrl ? <img key={i} className="thumb" src={t.photoUrl} alt="" loading="lazy" /> : <span key={i} className="thumb thumb--empty"><Icon name="cart" size={22} /></span>))}
+                  {e.purchased > e.thumbs!.length && <span className="thumbs__more">+{e.purchased - e.thumbs!.length}</span>}
+                </span>
+              )}
             </button>
           </li>
         ))}
@@ -45,20 +58,18 @@ export function History({ categories, openId, onOpened }: { categories: { key: s
   );
 }
 
-function Archive({ list, categories, onBack }: { list: ListView; categories: { key: string; label: string }[]; onBack(): void }) {
+function Archive({ engine, s, list, categories, onBack }: { engine: Engine; s: State; list: ListView; categories: { key: string; label: string }[]; onBack(): void }) {
   const bought = list.items.filter((i) => i.status === "purchased");
   const left = list.items.filter((i) => i.status === "to_buy");
   const [validations, setValidations] = useState(false);
   return (
     <div data-testid="archive">
-      <header className="topbar">
-        <button className="avatar avatar--back" aria-label="Retour" data-testid="archive-back" onClick={onBack}>←</button>
-        <div className="topbar__title">
-          <strong>{list.closedAt ? fmtDay(list.closedAt) : "Liste"}</strong>
-          <span className="muted">Clôturée par {list.closedBy?.displayName} · lecture seule</span>
+      <PageHead engine={engine} s={s} onBack={onBack} backLabel="Historique" backTestId="archive-back" title={list.closedAt ? fmtDay(list.closedAt) : "Liste"} subtitle={list.closedAt ? `Clôturée à ${fmtTime(list.closedAt)} par ${list.closedBy?.displayName} · lecture seule` : "Lecture seule"} />
+      {(list.validations?.length ?? 0) > 0 && (
+        <div className="actions">
+          <button className="btn btn--small" data-testid="archive-validations" onClick={() => setValidations(true)}><Icon name="history" size={20} /> Validations ({list.validations!.length})</button>
         </div>
-      </header>
-      {(list.validations?.length ?? 0) > 0 && <button className="linkbtn" data-testid="archive-validations" onClick={() => setValidations(true)}>Historique des validations ({list.validations!.length})</button>}
+      )}
       {validations && <ValidationHistory list={list} onClose={() => setValidations(false)} />}
       <h2 className="sect">Achetés <span className="count-pill">{bought.length}</span></h2>
       <GroupedRows

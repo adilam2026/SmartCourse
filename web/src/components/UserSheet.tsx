@@ -19,12 +19,16 @@ export function UserSheet({ engine, s, onClose }: { engine: Engine; s: State; on
   return (
     <div className="sheet-backdrop" onClick={onClose}>
       <div className="sheet" role="dialog" aria-label="Mon profil" onClick={(e) => e.stopPropagation()}>
-        <h2>{s.me?.displayName}</h2>
-        <p className="muted">{s.me ? ROLE[s.me.role] : ""}</p>
+        <div className="phead">
+          <span className="avatar" aria-hidden="true">{s.me?.displayName.slice(0, 1).toUpperCase()}</span>
+          <div>
+            <h2>{s.me?.displayName}</h2>
+            <p className="muted">{s.me ? ROLE[s.me.role] : ""}</p>
+          </div>
+        </div>
         {pending > 0 && <p className="banner banner--pending">Des choix ne sont pas encore enregistrés. Ils resteront sur ce téléphone et seront envoyés à la prochaine connexion.</p>}
         {s.me && s.me.role !== "staff" && <NotificationSettings />}
-        <VersionInfo engine={engine} />
-        <button className="btn btn--ghost" onClick={() => setShowCredits((v) => !v)}>Crédits photos</button>
+        <button className="btn" onClick={() => setShowCredits((v) => !v)}>Crédits photos</button>
         {showCredits && (
           <ul className="credits">
             {credits === null ? <li>Chargement…</li> : <>
@@ -37,6 +41,10 @@ export function UserSheet({ engine, s, onClose }: { engine: Engine; s: State; on
           </ul>
         )}
         <button className="btn btn--danger" data-testid="logout" onClick={() => { void engine.logout(); onClose(); }}>Se déconnecter</button>
+        <section className="sheetsection sheetsection--secondary" aria-label="À propos et version">
+          <h3>À propos et version</h3>
+          <VersionInfo engine={engine} />
+        </section>
         <button className="btn btn--ghost" onClick={onClose}>Fermer</button>
       </div>
     </div>

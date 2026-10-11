@@ -322,11 +322,12 @@ test.describe("Statistiques d'achats", () => {
     await uiLogin(page, f, "lamiaa", "573918");
     await page.getByTestId("tab-stats").click();
     await expect(page.getByTestId("stats-month")).toBeVisible();
-    await expect(page.getByTestId("stats-total")).toContainText("2 achats · 2 produits");
+    await expect(page.getByTestId("sum-purchases")).toHaveText("2");
+    await expect(page.getByTestId("sum-products")).toHaveText("2");
     await expect(page.getByTestId("freq-Tomates")).toHaveText("1 achat · 2 kg");
     await expect(page.getByTestId("freq-Lait")).toHaveText("1 achat · 3 pièces");
     await expect(page.getByTestId("stats-no-spending")).toContainText("pas de statistiques de dépenses");
-    await expect(page.getByText("Statistiques d'achats").first()).toBeVisible();
+    await expect(page.getByText("Vos achats").first()).toBeVisible();
     await expect(page.getByTestId("stats-prev")).toBeDisabled(); // aucun mois plus ancien
     await page.screenshot({ path: "shots/stats.png" });
   });
@@ -433,6 +434,7 @@ test.describe("version chargée", () => {
     await page.context().clearCookies();
     await uiLogin(page, f, "adil", "482913");
     await page.getByTestId("tab-settings").click();
+    await page.getByTestId("seg-about").click();
     await expect(page.getByTestId("version-running")).toContainText(server.id);
     await expect(page.getByTestId("version-server")).toContainText(server.id);
     await page.screenshot({ path: "shots/settings-version.png" });

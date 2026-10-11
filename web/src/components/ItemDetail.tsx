@@ -23,10 +23,10 @@ export function RowMeta({ item }: { item: ListItem }) {
   const lateChange = item.lastChange ? lateNote(item.lastChange.at, item.lastChange.receivedAt) : "";
   return (
     <>
-      {item.addedBy && item.addedAt && <small data-testid={`added-${item.productId}`}>Ajouté par {item.addedBy.displayName} · {fmtWhen(item.addedAt)}{late && <em data-testid={`late-${item.productId}`}> · {late}</em>}</small>}
+      {item.addedBy && item.addedAt && <small data-testid={`added-${item.productId}`}>Ajouté par {item.addedBy.displayName} <span className="nowrap">· {fmtWhen(item.addedAt)}</span>{late && <em data-testid={`late-${item.productId}`}> · {late}</em>}</small>}
       {item.lastChange && (
         <small data-testid={`changed-${item.productId}`}>
-          {item.lastChange.kind === "qty" ? `Quantité ${String(item.lastChange.before ?? "?").replace(".", ",")} → ${String(item.lastChange.after ?? "?").replace(".", ",")}` : "Modifié"} par {item.lastChange.by.displayName} · {fmtWhen(item.lastChange.at)}{lateChange && <em> · {lateChange}</em>}
+          {item.lastChange.kind === "qty" ? `Quantité ${String(item.lastChange.before ?? "?").replace(".", ",")} → ${String(item.lastChange.after ?? "?").replace(".", ",")}` : "Modifié"} par {item.lastChange.by.displayName} <span className="nowrap">· {fmtWhen(item.lastChange.at)}</span>{lateChange && <em> · {lateChange}</em>}
         </small>
       )}
     </>

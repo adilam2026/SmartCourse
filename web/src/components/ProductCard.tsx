@@ -76,6 +76,9 @@ export const ProductCard = memo(function ProductCard({ productId, name, brand, p
         {brand ? <small>{brand}</small> : null}
         {inactive ? <small>désactivé</small> : null}
         {again ? <small className="card__again">Nouvelle demande</small> : null}
+        {state === "saved" ? <span className="card__tag" data-testid={`tag-${productId}`}>✓ Dans la liste</span> : null}
+        {state === "unsaved" ? <span className="card__tag card__tag--unsaved" data-testid={`tag-${productId}`}>● À valider</span> : null}
+        {state === "removing" ? <span className="card__tag card__tag--removing" data-testid={`tag-${productId}`}>✕ À retirer</span> : null}
       </button>
       {selected && qty !== undefined && onQty && <QtyCounter productId={productId} name={name} unit={unit} qty={qty} onChange={onQty} />}
       {state === "bought" && onAgain && (

@@ -320,8 +320,11 @@ test.describe("5 et 6 · statistiques lisibles et fiche d'achats par produit", (
     await page.getByTestId("tab-stats").click();
     await expect(page.getByTestId("stats-rows")).toBeVisible();
 
-    // période « Ce mois » par défaut ; dates affichées
+    // période « Ce mois » par défaut ; dates affichées ; aucun filtre actif
+    await expect(page.getByTestId("active-filters")).toHaveCount(0);
+    await page.getByTestId("stats-filters").click();
     await expect(page.getByTestId("period-current")).toHaveAttribute("aria-selected", "true");
+    await page.getByTestId("filters-done").click();
     await expect(page.getByTestId("stats-window")).toContainText("du 1");
     await expect(page.getByTestId("stats-window")).toContainText("(mois en cours)");
     // produit : « 3 achats · 5 briques », dernier achat, aucune phrase « nouveau »
@@ -344,26 +347,39 @@ test.describe("5 et 6 · statistiques lisibles et fiche d'achats par produit", (
     // tri, recherche, catégorie
     const order = async () => (await page.locator('[data-testid^="stat-"] .row__name b').allTextContents());
     expect((await order())[0]).toBe("Lait"); // le plus souvent acheté
+    await page.getByTestId("stats-filters").click();
     await page.getByTestId("stats-sort").selectOption("name");
     await expect.poll(async () => (await order())[0]).toBe("Beurre");
     await page.getByTestId("stats-sort").selectOption("last");
     await expect.poll(async () => (await order()).length).toBeGreaterThan(3);
+    await page.getByTestId("filters-done").click();
+    await expect(page.getByTestId("active-filters")).toContainText("Tri : dernier achat"); // filtre actif visible
     await page.getByTestId("stats-search").fill("TOMA");
     await expect.poll(order).toEqual(["Tomates"]);
     await page.getByTestId("stats-search").fill("");
+    await page.getByTestId("stats-filters").click();
     await page.getByTestId("stats-category").selectOption("laitages");
+    await page.getByTestId("filters-done").click();
     await expect.poll(async () => (await order()).includes("Tomates")).toBe(false);
     await expect(page.getByTestId("stat-Lait")).toBeVisible();
-    await page.getByTestId("stats-category").selectOption("");
+    await expect(page.getByTestId("active-filters")).toContainText("Laitages");
+    // un seul geste remet tout à zéro
+    await page.getByTestId("stats-reset").click();
+    await expect(page.getByTestId("active-filters")).toHaveCount(0);
+    await expect.poll(async () => (await order())[0]).toBe("Lait");
 
     // mois précédent, puis trois derniers mois
+    await page.getByTestId("stats-filters").click();
     await page.getByTestId("period-previous").click();
     await expect(page.getByTestId("period-previous")).toHaveAttribute("aria-selected", "true");
+    await page.getByTestId("filters-done").click();
     await expect(page.getByTestId("freq-Lait")).toHaveText("1 achat · 3 briques");
     await expect(page.getByTestId("stats-window")).not.toContainText("(mois en cours)");
+    await page.getByTestId("stats-filters").click();
     await page.getByTestId("period-last3").click();
+    await page.getByTestId("filters-done").click();
     await expect(page.getByTestId("freq-Lait")).toHaveText("5 achats · 14 briques"); // 5 + 3 + 6 : trois mois, une seule unité
-    await page.getByTestId("period-current").click();
+    await page.getByTestId("stats-reset").click();
 
     // choisir directement un mois et une année
     await page.getByTestId("stats-month").click();
@@ -376,7 +392,7 @@ test.describe("5 et 6 · statistiques lisibles et fiche d'achats par produit", (
     await expect(page.getByTestId("freq-Lait")).toHaveText("1 achat · 6 briques");
 
     // fiche d'un produit
-    await page.getByTestId("period-current").click();
+    await page.getByTestId("stats-reset").click();
     await page.getByTestId("stat-Lait").click();
     const sheet = page.getByTestId("pstats");
     await expect(sheet).toBeVisible();

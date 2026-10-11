@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { Icon } from "./Icon";
 import { disablePush, enablePush, pushStatus, type PushStatus } from "../push";
 
 const LABEL: Record<PushStatus, string> = {
@@ -48,8 +49,8 @@ export function usePushControl() {
 export function NotificationSettings() {
   const { status, busy, error, enable, disable } = usePushControl();
   return (
-    <section className="versioninfo" data-testid="notif-settings" aria-label="Notifications">
-      <p><strong>Notifications</strong></p>
+    <section className="sheetsection" data-testid="notif-settings" aria-label="Notifications">
+      <h3><Icon name="bell" size={20} /> Notifications</h3>
       <p className="muted" data-testid="notif-status" data-status={status ?? "loading"}>{status ? LABEL[status] : "Vérification…"}</p>
       {status === "off" && <button className="btn btn--small btn--primary" data-testid="notif-enable" disabled={busy} onClick={() => void enable()}>Activer les notifications</button>}
       {status === "on" && <button className="btn btn--small" data-testid="notif-disable" disabled={busy} onClick={() => void disable()}>Désactiver sur cet appareil</button>}

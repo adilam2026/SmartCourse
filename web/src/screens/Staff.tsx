@@ -1,7 +1,8 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Banners, bannerCount } from "../components/Banners";
 import { ProductCard, type CardState } from "../components/ProductCard";
-import { UserSheet } from "../components/UserSheet";
+import { Icon } from "../components/Icon";
+import { PageHead } from "../components/PageHead";
 import { CATEGORY_EMOJI } from "../categories";
 import { boughtItem, effectiveQty, openItem, projectedPresence, projectedQty } from "../sync/logic";
 import { useBackLayer } from "../useBackLayer";
@@ -12,11 +13,11 @@ export function NoList({ engine, s }: { engine: Engine; s: State }) {
   const hasDraft = Object.keys(s.toggles).length > 0;
   return (
     <main className="nolist" data-testid="no-list">
-      <TopBar engine={engine} s={s} validate={false} />
+      <PageHead engine={engine} s={s} title="Préparer les courses" />
       <div className="nolist__body">
-        <div className="nolist__icon" aria-hidden="true">🛒</div>
-        <h1>Aucune liste en cours</h1>
-        <p>Un parent doit ouvrir une nouvelle liste. Cet écran se mettra à jour tout seul.</p>
+        <img className="nolist__logo" src="/icons/icon-192.png" alt="" width="96" height="96" />
+        <h2>Aucune liste en cours</h2>
+        <p className="muted">Un parent doit ouvrir une nouvelle liste. Cet écran se mettra à jour tout seul.</p>
         {hasDraft && <p className="muted">Vos choix non enregistrés sont gardés pour la prochaine liste.</p>}
       </div>
     </main>
@@ -40,34 +41,48 @@ export function syncState(s: State, unsent: number): { kind: SyncKind; text: str
   return { kind: "ok", text: "Liste à jour" };
 }
 
-export function TopBar({ engine, s, validate, onBack, title = "Courses" }: { engine: Engine; s: State; validate: boolean; onBack?: () => void; title?: string }) {
-  const [open, setOpen] = useState(false);
-  const pending = Object.keys(s.toggles).length;
-  const sync = syncState(s, pending);
-  const label = s.sending ? "Enregistrement…" : "Valider";
-  const disabled = s.sending || pending === 0;
+/** The single status line under the title (see syncState). */
+function SyncLine({ s }: { s: State }) {
+  const sync = syncState(s, Object.keys(s.toggles).length);
   return (
-    <header className="topbar">
-      {onBack ? (
-        <button className="avatar avatar--back" aria-label="Retour" data-testid="back" onClick={onBack}>←</button>
-      ) : (
-        <button className="avatar" aria-label="Mon profil" data-testid="avatar" onClick={() => setOpen(true)}>
-          {s.me?.displayName.slice(0, 1).toUpperCase()}
-        </button>
-      )}
-      <div className="topbar__title">
-        <strong>{title}</strong>
-        <span className={`syncstate syncstate--${sync.kind}`} data-testid="sync-state" data-kind={sync.kind}>
-          {sync.text}
-        </span>
-      </div>
-      {validate && (
-        <button className="btn btn--primary validate" disabled={disabled} aria-busy={s.sending} data-testid="validate" onClick={() => void engine.validate()}>
-          {label}
-        </button>
-      )}
-      {open && <UserSheet engine={engine} s={s} onClose={() => setOpen(false)} />}
-    </header>
+    <span className={`syncstate syncstate--${sync.kind}`} data-testid="sync-state" data-kind={sync.kind}>
+      {sync.text}
+    </span>
+  );
+}
+
+/** True while the on-screen keyboard is up (the visible viewport is much shorter than the window): fixed bars then give way to the field. */
+function useKeyboardOpen(): boolean {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const check = () => setOpen(vv.height < window.innerHeight * 0.75 && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName ?? ""));
+    check();
+    vv.addEventListener("resize", check);
+    document.addEventListener("focusin", check);
+    document.addEventListener("focusout", check);
+    return () => {
+      vv.removeEventListener("resize", check);
+      document.removeEventListener("focusin", check);
+      document.removeEventListener("focusout", check);
+    };
+  }, []);
+  return open;
+}
+
+/** Fixed bottom button « Valider N modifications »: always reachable, never over the last cards (the page keeps room for it). */
+function ValidateBar({ engine, s }: { engine: Engine; s: State }) {
+  const pending = Object.keys(s.toggles).length;
+  const keyboard = useKeyboardOpen();
+  const label = s.sending ? "Enregistrement…" : pending > 0 ? `Valider ${pending} modification${pending > 1 ? "s" : ""}` : "Aucune modification à valider";
+  return (
+    <div className={`actionbar ${keyboard ? "actionbar--hidden" : ""}`} data-testid="actionbar">
+      <button className="btn btn--primary validate" disabled={s.sending || pending === 0} aria-busy={s.sending} data-testid="validate" onClick={() => void engine.validate()}>
+        {pending > 0 && !s.sending && <Icon name="check" size={22} />}
+        {label}
+      </button>
+    </div>
   );
 }
 
@@ -119,7 +134,7 @@ export function StaffScreen({ engine, s, onBack }: { engine: Engine; s: State; o
     return (
       <main className="nolist">
         <div className="nolist__body">
-          <div className="nolist__icon" aria-hidden="true">{s.conn === "offline" ? "📵" : "⏳"}</div>
+          <img className="nolist__logo" src="/icons/icon-192.png" alt="" width="96" height="96" />
           <h1>{s.conn === "offline" ? "Connexion nécessaire" : "Chargement…"}</h1>
           {s.conn === "offline" && <p>La première ouverture demande internet. Ensuite, le catalogue reste disponible sans connexion.</p>}
         </div>
@@ -166,7 +181,7 @@ export function StaffScreen({ engine, s, onBack }: { engine: Engine; s: State; o
       />
     );
   };
-  const grid = (c: CatSection, products: CatProduct[]) => <div className="grid">{products.map((p) => card(c, p))}</div>;
+  const grid = (c: CatSection, products: CatProduct[]) => <div className="gridhost"><div className="grid">{products.map((p) => card(c, p))}</div></div>;
 
   const q = norm(query);
   const found = searching
@@ -178,8 +193,8 @@ export function StaffScreen({ engine, s, onBack }: { engine: Engine; s: State; o
 
   return (
     <div className="staff">
+      <PageHead engine={engine} s={s} title="Préparer les courses" onBack={onBack} backLabel="Retour à la liste" subtitle={<SyncLine s={s} />} />
       <div className={`stickyhead ${bannerCount(s) > 0 ? "has-banners" : ""}`}>
-      <TopBar engine={engine} s={s} validate onBack={onBack} title={onBack ? "Modifier la liste" : undefined} />
       <Banners engine={engine} s={s} />
       {view === "all" && !searching && (
         <nav className="chips" aria-label="Catégories">
@@ -198,7 +213,8 @@ export function StaffScreen({ engine, s, onBack }: { engine: Engine; s: State; o
             <button role="tab" aria-selected={view === "categories"} className={view === "categories" ? "on" : ""} data-testid="view-categories" onClick={() => { setOpenCat(null); void engine.setCatalogView("categories"); }}>Par catégories</button>
           </div>
           <label className="searchbox">
-            <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="🔎 Chercher un produit" aria-label="Chercher un produit dans toutes les catégories" data-testid="catalog-search" />
+            <Icon name="search" size={20} />
+            <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Rechercher un produit…" aria-label="Chercher un produit dans toutes les catégories" data-testid="catalog-search" />
           </label>
         </div>
         {searching ? (
@@ -247,6 +263,7 @@ export function StaffScreen({ engine, s, onBack }: { engine: Engine; s: State; o
           </div>
         )}
       </main>
+      <ValidateBar engine={engine} s={s} />
     </div>
   );
 }

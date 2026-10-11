@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { card, createList, newFamily, uiLogin } from "./helpers";
 
 /*
- * « Valider » must stay entirely visible and tappable on small phones, even with every banner shown
+ * « Valider N modifications » is a bar fixed at the bottom: it must stay entirely visible and tappable on small phones, even with every banner shown
  * (offline, pending sync, notice, resume-draft). We check on the app itself, not on a screenshot viewer:
  *  - its box lies inside the viewport with a margin on every side,
  *  - the element at each corner and at the centre IS the button (nothing overlaps it),
@@ -79,6 +79,17 @@ for (const size of SIZES) {
     await page.mouse.wheel(0, 2500);
     await page.waitForTimeout(300);
     await expectFullyUsable(page, size.width, size.height, "catalogue défilé");
+    // la barre fixe ne masque jamais les dernières cartes : en bas de page, la dernière carte se termine au-dessus d'elle
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await page.waitForTimeout(300);
+    const geo = await page.evaluate(() => {
+      const wraps = [...document.querySelectorAll("[data-testid^=wrap-]")];
+      const last = wraps[wraps.length - 1]!.getBoundingClientRect();
+      const bar = document.querySelector("[data-testid=actionbar]")!.getBoundingClientRect();
+      return { lastBottom: last.bottom, barTop: bar.top };
+    });
+    expect(geo.lastBottom, "dernière carte visible au-dessus de la barre fixe").toBeLessThanOrEqual(geo.barTop);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth), "aucun débordement horizontal").toBeLessThanOrEqual(0);
     await page.screenshot({ path: `shots/valider-${size.width}x${size.height}.png` });
 
     // 4. le clic réel passe (Playwright vérifie qu'aucun élément ne recouvre la cible)

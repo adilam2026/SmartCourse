@@ -44,7 +44,7 @@ test("états distincts : enregistré sur le serveur / validé en attente / chois
   await ctx.setOffline(false);
   await page.evaluate(() => (window as any).__engine.retryNow());
   await expect(page.getByTestId("banner-pending")).toHaveCount(0); // le choix validé hors connexion est parti et confirmé
-  await expect(page.getByTestId("validate")).toHaveText("Valider"); // plus d'envoi en cours : le bouton est de nouveau actif
+  await expect(page.getByTestId("validate")).toHaveText("Valider 1 modification"); // plus d'envoi en cours : le bouton est de nouveau actif (Sucre)
   await page.getByTestId("validate").click(); // envoie maintenant Sucre
   await expect(page.getByTestId("sync-state")).toHaveText("Liste à jour");
   await expect(card(page, f, "Riz")).toHaveAttribute("data-state", "saved");

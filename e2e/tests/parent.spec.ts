@@ -88,7 +88,7 @@ test.describe("parcours des parents", () => {
 
     await page.getByTestId("tab-history").click();
     await expect(page.getByTestId("history-entry")).toHaveCount(1);
-    await expect(page.getByTestId("history-entry")).toContainText("1 acheté");
+    await expect(page.getByTestId("history-entry")).toContainText("1 produit acheté");
     await expect(page.getByTestId("history-entry")).toContainText("2 non achetés");
     await page.getByTestId("history-entry").click();
     await expect(page.getByTestId("archive-left")).toHaveText("2");
@@ -143,7 +143,14 @@ test.describe("administration", () => {
     await uiLogin(page, f, "adil", "482913");
     await page.getByTestId("tab-settings").click();
     await expect(page.getByTestId("family-code")).toHaveText(f.code);
-    await expect(page.getByTestId("backup-card")).toContainText("NON configurée"); // pas de clé de sauvegarde dans cet environnement de test
+    // sauvegardes : un état simple, les détails techniques sont à un toucher
+    await page.getByTestId("seg-backups").click();
+    await expect(page.getByTestId("backup-state")).toContainText("non configurée"); // pas de clé de sauvegarde dans cet environnement de test
+    await expect(page.getByTestId("backup-details")).toHaveCount(0);
+    await page.getByTestId("backup-details-toggle").click();
+    await expect(page.getByTestId("backup-details")).toContainText("NON configurée");
+    await page.getByTestId("settings-back").click();
+    await page.getByTestId("seg-profiles").click();
     await page.getByTestId("add-profile").click();
     await page.getByTestId("np-name").fill("Karim");
     await page.getByTestId("np-login").fill("karim");

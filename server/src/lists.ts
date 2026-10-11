@@ -531,6 +531,26 @@ export async function listHistory(db: Db, a: AuthContext, limit: number, before?
       LIMIT $2`,
     [a.familyId, limit, before ?? null],
   );
+  // A few pictures of what was bought (photos first), for the history cards.
+  const thumbs = new Map<string, { name: string; photoUrl: string | null }[]>();
+  if (r.rows.length) {
+    const t = await db.query(
+      `SELECT list_id, name, photo FROM (
+         SELECT i.list_id, coalesce(i.snapshot_name, p.name) AS name, i.snapshot_photo_asset_id AS photo,
+                row_number() OVER (PARTITION BY i.list_id ORDER BY (i.snapshot_photo_asset_id IS NULL), pu.purchased_at, i.id) AS rn
+           FROM list_items i
+           JOIN products p ON p.id = i.product_id
+           JOIN purchases pu ON pu.list_item_id = i.id AND pu.voided_at IS NULL
+          WHERE i.list_id = ANY($1::uuid[]) AND i.status = 'purchased') x
+        WHERE rn <= 4 ORDER BY list_id, rn`,
+      [r.rows.map((x) => x.id)],
+    );
+    for (const row of t.rows) {
+      const arr = thumbs.get(row.list_id) ?? [];
+      arr.push({ name: row.name, photoUrl: photoUrl(row.photo) });
+      thumbs.set(row.list_id, arr);
+    }
+  }
   return r.rows.map((x) => ({
     id: x.id,
     createdAt: x.created_at.toISOString(),
@@ -538,5 +558,6 @@ export async function listHistory(db: Db, a: AuthContext, limit: number, before?
     closedBy: { id: x.closed_by_id, displayName: x.closed_by_name },
     purchased: x.purchased,
     remaining: x.remaining,
+    thumbs: thumbs.get(x.id) ?? [],
   }));
 }
