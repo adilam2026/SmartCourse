@@ -69,3 +69,10 @@ Réponses : données chiffrées en transit (HTTPS) : **oui** ; suppression deman
 `scripts/android-emulator-check.sh` installe l'APK sur Android 14 et vérifie : permission et service de **notifications**, **plein écran** (adresse vérifiée par Android → aucune barre d'adresse), réponse du serveur à une tentative de **connexion** (identifiants inconnus : rien n'est créé), un **lien d'e-mail** (faux jeton) attribué à l'application et reçu par la page, ouverture d'une adresse externe (**WhatsApp**), **ouverture hors connexion**.
 
 **Non vérifiable automatiquement** (à faire sur un vrai téléphone) : connexion avec vos vrais identifiants, réception réelle d'une notification, ouverture réelle de WhatsApp avec le message prérempli (WhatsApp n'est pas installé sur l'émulateur), clic sur un lien dans l'application Gmail, mode avion avec envois en attente puis reprise.
+
+## Certificat de signature d'application Google Play (constaté)
+Play Console affiche pour **Courses** le certificat de signature d'application SHA-256
+`4E:E7:9A:55:D6:11:80:C2:6A:25:30:DD:AD:3E:12:17:35:EA:25:E2:F1:34:B4:41:95:C4:68:F8:3E:E1:7A:33`.
+Il est **différent** de celui de l'APK distribué directement (`33:93:E6:…:AB:42:79`) : Google signe avec **sa** clé (choix A ci-dessus). `server/assetlinks.json` contient **les deux** empreintes pour `app.smartcourse.courses` : l'application Play et l'APK direct s'ouvrent en plein écran.
+Conséquence : une installation faite depuis Play **ne peut pas mettre à jour** un APK installé à la main (signatures différentes) : sur ces téléphones, désinstaller l'APK puis installer depuis Play (les données de la famille sont sur le serveur).
+Aucune clé de signature n'a été modifiée.

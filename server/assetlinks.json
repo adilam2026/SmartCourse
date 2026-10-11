@@ -1,11 +1,14 @@
 [
   {
-    "relation": ["delegate_permission/common.handle_all_urls"],
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
     "target": {
       "namespace": "android_app",
       "package_name": "app.smartcourse.courses",
       "sha256_cert_fingerprints": [
-        "33:93:E6:53:89:D6:C9:0B:70:05:B8:AC:62:7A:D1:F3:5C:B7:18:A8:6F:E5:B3:D3:F1:D6:BF:C8:5C:AB:42:79"
+        "33:93:E6:53:89:D6:C9:0B:70:05:B8:AC:62:7A:D1:F3:5C:B7:18:A8:6F:E5:B3:D3:F1:D6:BF:C8:5C:AB:42:79",
+        "4E:E7:9A:55:D6:11:80:C2:6A:25:30:DD:AD:3E:12:17:35:EA:25:E2:F1:34:B4:41:95:C4:68:F8:3E:E1:7A:33"
       ]
     }
   }
