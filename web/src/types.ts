@@ -7,6 +7,8 @@ export interface Me {
   login: string;
   role: Role;
   family?: { code: string; name: string };
+  /** Administrateur principal (seul à gérer l'adresse de récupération). */
+  primary?: boolean;
 }
 
 export type Unit = "piece" | "paquet" | "bouteille" | "brique" | "pot" | "boite" | "kg";

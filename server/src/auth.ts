@@ -2,7 +2,7 @@ import type pg from "pg";
 import { withTx, type Db } from "./db.js";
 import { HttpError, invalidCredentials } from "./errors.js";
 import type { Role } from "./permissions.js";
-import { dummyHash, generateFamilyCode, hashSecret, hashToken, isWeakSecret, newToken, verifySecret } from "./security.js";
+import { dummyHash, generateFamilyCode, hashSecret, hashToken, isValidSecret, isWeakSecret, newToken, verifySecret } from "./security.js";
 
 export interface AuthContext {
   sessionId: string;
@@ -126,7 +126,8 @@ export interface SetupInput {
  * Everything happens in one transaction, so a failure after consumption gives the token back.
  */
 export async function setupFamily(db: Db, input: SetupInput): Promise<{ token: string; familyCode: string; auth: AuthContext }> {
-  if (isWeakSecret(input.admin.secret)) throw new HttpError(400, "weak_secret", "Code trop simple");
+  if (!isValidSecret(input.admin.secret)) throw new HttpError(400, "invalid_secret", "Le mot de passe doit comporter 6 caractères");
+  if (isWeakSecret(input.admin.secret)) throw new HttpError(400, "weak_secret", "Mot de passe trop simple (évitez 123456, 111111…)");
   const secretHash = await hashSecret(input.admin.secret);
   return withTx(db, async (c) => {
     const consumed = await c.query<{ id: string }>(
@@ -139,8 +140,8 @@ export async function setupFamily(db: Db, input: SetupInput): Promise<{ token: s
     const familyId = fam.rows[0]!.id;
     await c.query("UPDATE install_tokens SET family_id = $2 WHERE id = $1", [consumed.rows[0].id, familyId]);
     const prof = await c.query<{ id: string }>(
-      `INSERT INTO profiles (family_id, display_name, login, role, secret_hash)
-       VALUES ($1, $2, $3, 'admin', $4) RETURNING id`,
+      `INSERT INTO profiles (family_id, display_name, login, role, secret_hash, is_primary)
+       VALUES ($1, $2, $3, 'admin', $4, true) RETURNING id`,
       [familyId, input.admin.displayName, input.admin.login, secretHash],
     );
     const profileId = prof.rows[0]!.id;

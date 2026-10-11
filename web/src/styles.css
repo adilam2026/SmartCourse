@@ -406,3 +406,11 @@ h3 { font-size: 1.05rem; font-weight: 800; }
 .cmp figure { margin: 0; display: grid; justify-items: center; gap: 0.3rem; }
 .cmp .catphoto { width: 7rem; height: 7rem; }
 .cmp figcaption { font-weight: 700; color: var(--muted); }
+
+/* ---------- connexion : deux parcours distincts ---------- */
+.authsec { display: grid; gap: 0.6rem; }
+.authsec h2 { font-size: 1.15rem; color: var(--green-ink); margin: 0 0.25rem; }
+.authsec--first { border-top: 2px dashed var(--line-strong, var(--line)); padding-top: 1.2rem; }
+.authsec .panel { display: grid; gap: 0.8rem; }
+.authlinks { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.25rem 1rem; }
+.authlinks .linkbtn { margin: 0; }

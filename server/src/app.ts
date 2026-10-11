@@ -18,6 +18,9 @@ import { HttpError } from "./errors.js";
 import { SseHub } from "./hub.js";
 import { can, type Action } from "./permissions.js";
 import { createProfile, listProfiles, resetSecret, updateProfile } from "./profiles.js";
+import { mailerFromEnv } from "./mail.js";
+import { RecoveryService, secretMatches } from "./recovery.js";
+import { SECRET_PATTERN } from "./security.js";
 
 export interface AppDeps {
   db: Db;
@@ -37,29 +40,37 @@ export interface AppDeps {
   sseRevalidateMs?: number;
   /** Notifications service (tests give it a sender that records instead of calling a push service). */
   push?: PushService;
+  /** Récupération par e-mail (tests : expéditeur factice ; production : Brevo si les paramètres sont présents). */
+  recovery?: RecoveryService;
+  /** Jeton de l'adresse du webhook Brevo (BREVO_WEBHOOK_SECRET) ; sans lui, le webhook est fermé. */
+  brevoWebhookSecret?: string;
+  /** Demandes de récupération sans session, par IP (par défaut 5 par heure, comme Petits Héros). */
+  recoveryRateLimit?: { max: number; timeWindow: string };
 }
 
 
 const loginSchema = z.object({
   familyCode: z.string().trim().toUpperCase().min(1).max(20),
   login: z.string().trim().toLowerCase().min(1).max(40),
-  secret: z.string().regex(/^\d{6}$/),
+  secret: z.string().regex(SECRET_PATTERN),
 });
 const loginField = z.string().trim().toLowerCase().regex(/^[a-z0-9._-]{2,30}$/);
-const secretField = z.string().regex(/^\d{6}$/);
+const secretField = z.string().regex(SECRET_PATTERN, "6 caractères");
+const emailField = z.string().trim().toLowerCase().email().max(254);
 const roleField = z.enum(["admin", "parent", "staff"]);
 const nameField = z.string().trim().min(1).max(40);
 
 const setupSchema = z.object({
   installToken: z.string().min(16).max(200),
   familyName: z.string().trim().min(1).max(60),
-  admin: z.object({ displayName: nameField, login: loginField, secret: secretField }),
+  admin: z.object({ displayName: nameField, login: loginField, secret: secretField, secretConfirm: z.string().optional(), recoveryEmail: emailField.optional() }),
 });
 
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const { db } = deps;
   const hub = deps.hub ?? new SseHub();
   const push = deps.push ?? new PushService(db);
+  const recovery = deps.recovery ?? new RecoveryService(db, mailerFromEnv());
   const app = Fastify({ logger: process.env.NODE_ENV !== "test", trustProxy: true });
 
   // Plugins must be fully loaded before routes are declared, or per-route rateLimit config is silently ignored.
@@ -92,7 +103,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     try {
       // The latest applied migration tells which version of the schema this server runs (checked after a deployment).
       const m = await db.query("SELECT name FROM schema_migrations ORDER BY name DESC LIMIT 1");
-      return { status: "ok", schema: (m.rows[0]?.name as string | undefined) ?? null, commit: process.env.RAILWAY_GIT_COMMIT_SHA ?? process.env.GIT_COMMIT ?? null };
+      return { status: "ok", schema: (m.rows[0]?.name as string | undefined) ?? null, mail: recovery.enabled ? "brevo" : "off", commit: process.env.RAILWAY_GIT_COMMIT_SHA ?? process.env.GIT_COMMIT ?? null };
     } catch {
       return reply.code(503).send({ status: "db_unavailable" });
     }
@@ -100,7 +111,11 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
   app.post("/api/setup/family", { config: { rateLimit: limit } }, async (req, reply) => {
     const input = setupSchema.parse(req.body);
-    const r = await setupFamily(db, input);
+    if (input.admin.secretConfirm !== undefined && input.admin.secretConfirm !== input.admin.secret) throw new HttpError(400, "secret_mismatch", "Les deux mots de passe ne sont pas identiques");
+    const { recoveryEmail, secretConfirm: _c, ...admin } = input.admin;
+    const r = await setupFamily(db, { ...input, admin });
+    // Adresse de récupération saisie à la création : enregistrée, puis vérifiée par le lien envoyé (la création ne dépend pas de l'envoi).
+    if (recoveryEmail) await recovery.setEmail(r.auth.profileId, recoveryEmail).catch(() => {});
     setSessionCookie(reply, r.token);
     return reply.code(201).send({ familyCode: r.familyCode, me: publicMe(r.auth) });
   });
@@ -124,6 +139,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     if (can(a.role, "family.manage")) {
       const f = await db.query("SELECT code, name FROM families WHERE id = $1", [a.familyId]);
       me.family = { code: f.rows[0].code, name: f.rows[0].name };
+      me.primary = !!(await db.query("SELECT is_primary FROM profiles WHERE id = $1", [a.profileId])).rows[0]?.is_primary;
     }
     return { me };
   });
@@ -135,10 +151,9 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
   app.post("/api/profiles", { preHandler: guard("family.manage") }, async (req, reply) => {
     const body = z
-      .object({ displayName: nameField, login: loginField, role: roleField, secret: secretField.optional() })
+      .object({ displayName: nameField, login: loginField, role: roleField, secret: secretField, secretConfirm: z.string() })
       .parse(req.body);
-    const r = await createProfile(db, req.auth!, body);
-    return reply.code(201).send(r); // the secret is shown once, here
+    return reply.code(201).send(await createProfile(db, req.auth!, body)); // le mot de passe est choisi par l'administrateur : il n'est jamais renvoyé
   });
 
   app.patch("/api/profiles/:id", { preHandler: guard("family.manage") }, async (req) => {
@@ -147,10 +162,59 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     return { profile: await updateProfile(db, hub, req.auth!, id, body) };
   });
 
+  // « Modifier le mot de passe » : deux champs, jamais de génération ni d'affichage ; les sessions du profil sont révoquées.
   app.post("/api/profiles/:id/reset-secret", { preHandler: guard("family.manage") }, async (req) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
-    const body = z.object({ secret: secretField.optional() }).parse(req.body ?? {});
-    return { secret: await resetSecret(db, hub, req.auth!, id, body.secret) };
+    const body = z.object({ secret: secretField, secretConfirm: z.string() }).parse(req.body ?? {});
+    await resetSecret(db, hub, req.auth!, id, body.secret, body.secretConfirm);
+    return { ok: true };
+  });
+
+  // --- adresse de récupération (administrateur principal) ---
+  app.get("/api/recovery-email", { preHandler: guard("family.manage") }, async (req) => recovery.state(req.auth!.profileId));
+  app.put("/api/recovery-email", { preHandler: guard("family.manage") }, async (req) => {
+    const { email } = z.object({ email: emailField }).parse(req.body);
+    await recovery.setEmail(req.auth!.profileId, email);
+    return recovery.state(req.auth!.profileId);
+  });
+  app.post("/api/recovery-email/resend", { preHandler: guard("family.manage") }, async (req) => {
+    await recovery.resendVerification(req.auth!.profileId);
+    return recovery.state(req.auth!.profileId);
+  });
+
+  // --- récupération sans session : réponses identiques que l'adresse soit connue ou non ---
+  const recoveryLimit = deps.recoveryRateLimit ?? { max: 5, timeWindow: "1 hour" }; // envois d'e-mails
+  const linkLimit = deps.loginRateLimit ?? { max: 20, timeWindow: "1 minute" }; // ouverture des liens
+  const NEUTRAL = { ok: true, message: "Si cette adresse est enregistrée et vérifiée, un e-mail vient d'être envoyé." };
+  app.post("/api/auth/verify-email", { config: { rateLimit: linkLimit } }, async (req) => {
+    await recovery.verifyEmail(z.object({ token: z.string().min(20).max(200) }).parse(req.body).token);
+    return { ok: true };
+  });
+  app.post("/api/auth/forgot-family-code", { config: { rateLimit: recoveryLimit } }, async (req) => {
+    await recovery.forgotFamilyCode(z.object({ email: emailField }).parse(req.body).email);
+    return NEUTRAL;
+  });
+  app.post("/api/auth/forgot-password", { config: { rateLimit: recoveryLimit } }, async (req) => {
+    const b = z.object({ email: emailField, familyCode: z.string().trim().max(20).optional() }).parse(req.body);
+    await recovery.forgotPassword(b.email, b.familyCode || undefined);
+    return NEUTRAL;
+  });
+  app.post("/api/auth/reset-password/check", { config: { rateLimit: linkLimit } }, async (req) => ({
+    valid: await recovery.checkResetToken(z.object({ token: z.string().min(20).max(200) }).parse(req.body).token),
+  }));
+  app.post("/api/auth/reset-password", { config: { rateLimit: linkLimit } }, async (req) => {
+    const b = z.object({ token: z.string().min(20).max(200), secret: secretField, secretConfirm: z.string() }).parse(req.body);
+    await recovery.resetPassword(hub, b.token, b.secret, b.secretConfirm);
+    return { ok: true };
+  });
+
+  // Retour du service d'envoi : seul canal qui peut faire passer un message de « accepté » à « remis » (ou « rejeté »).
+  app.post("/api/email/brevo-webhook/:secret", async (req, reply) => {
+    const { secret } = req.params as { secret: string };
+    if (!deps.brevoWebhookSecret || !secretMatches(secret, deps.brevoWebhookSecret)) return reply.code(404).send({ error: "not_found" });
+    const b = (req.body ?? {}) as { event?: string; "message-id"?: string };
+    await recovery.providerEvent(String(b.event ?? ""), typeof b["message-id"] === "string" ? b["message-id"] : undefined);
+    return { ok: true };
   });
 
   app.get("/api/admin/backup-status", { preHandler: guard("family.manage") }, async () => backupStatus(db, deps.backupStorage ?? null, deps.backupMode ?? "internal"));

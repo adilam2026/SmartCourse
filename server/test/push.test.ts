@@ -46,9 +46,9 @@ async function newFamily() {
   const adil = cookieOf(res);
   const profiles: Record<string, string> = {};
   const mk = async (role: string, login: string, display: string) => {
-    const r = await app.inject({ method: "POST", url: "/api/profiles", cookies: adil, payload: { displayName: display, login, role, secret: "573918" } });
+    const r = await app.inject({ method: "POST", url: "/api/profiles", cookies: adil, payload: { displayName: display, login, role, secret: "573918", secretConfirm: "573918" } });
     profiles[login] = r.json().profile.id;
-    return cookieOf(await app.inject({ method: "POST", url: "/api/auth/login", payload: { familyCode, login, secret: "573918" } }));
+    return cookieOf(await app.inject({ method: "POST", url: "/api/auth/login", payload: { familyCode, login, secret: "573918", secretConfirm: "573918" } }));
   };
   const lamiaa = await mk("parent", "lamiaa", "Lamiaa");
   const marie = await mk("staff", "marie", "Marie");
@@ -277,8 +277,8 @@ describe("notifications : destinataires, contenu, une seule fois", () => {
     await validate(f, f.adil, [add(f, f.names[1]!)]);
     expect(take()).toEqual([]); // l'auteur (Adil) exclu ; Marie (personnel) jamais
     // profil désactivé
-    await app.inject({ method: "POST", url: "/api/profiles", cookies: f.adil, payload: { displayName: "Sophie", login: "sophie", role: "parent", secret: "573918" } });
-    const sophie = cookieOf(await app.inject({ method: "POST", url: "/api/auth/login", payload: { familyCode: f.familyCode, login: "sophie", secret: "573918" } }));
+    await app.inject({ method: "POST", url: "/api/profiles", cookies: f.adil, payload: { displayName: "Sophie", login: "sophie", role: "parent", secret: "573918", secretConfirm: "573918" } });
+    const sophie = cookieOf(await app.inject({ method: "POST", url: "/api/auth/login", payload: { familyCode: f.familyCode, login: "sophie", secret: "573918", secretConfirm: "573918" } }));
     await subscribe(sophie, ep("sophie"));
     const sid = (await db.query("SELECT id FROM profiles WHERE family_id = $1 AND login = 'sophie'", [f.familyId])).rows[0].id;
     await app.inject({ method: "PATCH", url: `/api/profiles/${sid}`, cookies: f.adil, payload: { active: false } });
@@ -337,8 +337,8 @@ describe("transport Web Push réel (faux service push local)", () => {
       const f = await (async () => {
         const res = await realApp.inject({ method: "POST", url: "/api/setup/family", payload: { installToken: await generateInstallToken(db), familyName: "Réel", admin: { displayName: "Adil", login: "adil", secret: "482913" } } });
         const adil = cookieOf(res);
-        await realApp.inject({ method: "POST", url: "/api/profiles", cookies: adil, payload: { displayName: "Marie", login: "marie", role: "staff", secret: "573918" } });
-        const marie = cookieOf(await realApp.inject({ method: "POST", url: "/api/auth/login", payload: { familyCode: res.json().familyCode, login: "marie", secret: "573918" } }));
+        await realApp.inject({ method: "POST", url: "/api/profiles", cookies: adil, payload: { displayName: "Marie", login: "marie", role: "staff", secret: "573918", secretConfirm: "573918" } });
+        const marie = cookieOf(await realApp.inject({ method: "POST", url: "/api/auth/login", payload: { familyCode: res.json().familyCode, login: "marie", secret: "573918", secretConfirm: "573918" } }));
         const cat = (await realApp.inject({ method: "GET", url: "/api/catalog", cookies: adil })).json().categories;
         const list = (await realApp.inject({ method: "POST", url: "/api/lists", cookies: adil })).json().list.id;
         return { adil, marie, list, products: cat.flatMap((c: any) => c.products.slice(0, 2)).slice(0, 3).map((p: any) => p.id) as string[] };

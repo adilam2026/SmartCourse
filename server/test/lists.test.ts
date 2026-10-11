@@ -36,8 +36,8 @@ async function newFamily() {
   const familyCode = res.json().familyCode as string;
   const adil = cookieOf(res);
   const mk = async (role: string, login: string, display = login) => {
-    await app.inject({ method: "POST", url: "/api/profiles", cookies: adil, payload: { displayName: display, login, role, secret: "573918" } });
-    return cookieOf(await app.inject({ method: "POST", url: "/api/auth/login", payload: { familyCode, login, secret: "573918" } }));
+    await app.inject({ method: "POST", url: "/api/profiles", cookies: adil, payload: { displayName: display, login, role, secret: "573918", secretConfirm: "573918" } });
+    return cookieOf(await app.inject({ method: "POST", url: "/api/auth/login", payload: { familyCode, login, secret: "573918", secretConfirm: "573918" } }));
   };
   const lamiaa = await mk("parent", "lamiaa", "Lamiaa");
   const marie = await mk("staff", "marie", "Marie");

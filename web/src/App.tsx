@@ -1,8 +1,8 @@
-import { LoginScreen, Welcome } from "./screens/Login";
+import { LinkScreen, LoginScreen, Welcome } from "./screens/Login";
 import { UpdateBanner } from "./components/VersionInfo";
 import { ParentApp } from "./screens/Parent";
 import { StaffScreen } from "./screens/Staff";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { reconcilePush } from "./push";
 import { clearOpenTarget } from "./openTarget";
 import { useEngine } from "./useEngine";
@@ -17,8 +17,37 @@ export function App({ engine }: { engine: Engine }) {
   );
 }
 
+/** E-mail links open SmartCourse itself: /#/verify/<jeton> (adresse de récupération) or /#/reset/<jeton> (nouveau mot de passe).
+ *  Le jeton est dans le fragment : il n'est jamais envoyé au serveur ni consigné dans ses journaux. */
+function readLink(): { kind: "verify" | "reset"; token: string } | null {
+  try {
+    const m = window.location.hash.match(/^#\/(verify|reset)\/([A-Za-z0-9_%.-]{16,200})$/);
+    if (m) return { kind: m[1] as "verify" | "reset", token: decodeURIComponent(m[2]!) };
+  } catch {
+    /* no address bar */
+  }
+  return null;
+}
+
 function Screens({ engine }: { engine: Engine }) {
   const s = useEngine(engine);
+  const [link, setLink] = useState(readLink);
+  useEffect(() => {
+    const on = () => {
+      const l = readLink();
+      if (l) setLink(l); // un retour arrière du système ne doit pas faire disparaître un lien déjà ouvert
+    };
+    window.addEventListener("hashchange", on);
+    return () => window.removeEventListener("hashchange", on);
+  }, []);
+  const leaveLink = () => {
+    try {
+      window.history.replaceState(null, "", "/"); // the single-use token must not stay in the address bar or history
+    } catch {
+      /* ignore */
+    }
+    setLink(null);
+  };
   // A phone keeps no notification subscription of a previous profile, nor any for staff.
   const meId = s.me?.id;
   const role = s.me?.role;
@@ -26,6 +55,7 @@ function Screens({ engine }: { engine: Engine }) {
     if (meId && role) void reconcilePush(role);
     if (role === "staff") clearOpenTarget(); // lists are for parents and administrators
   }, [meId, role]);
+  if (link && s.phase !== "boot") return <LinkScreen key={link.token} kind={link.kind} token={link.token} onDone={leaveLink} />;
   if (s.phase === "boot") return <main className="nolist"><div className="nolist__body"><img className="nolist__logo" src="/icons/icon-192.png" alt="" width="96" height="96" /></div></main>;
   if (s.phase === "loggedOut" || !s.me) return <LoginScreen engine={engine} s={s} />;
   if (s.welcomeCode) return <Welcome code={s.welcomeCode} onDone={engine.dismissWelcome} />;

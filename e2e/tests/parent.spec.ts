@@ -155,11 +155,12 @@ test.describe("administration", () => {
     await page.getByTestId("np-name").fill("Karim");
     await page.getByTestId("np-login").fill("karim");
     await page.getByTestId("np-role").selectOption("staff");
+    const secret = "k4$Mpq"; // choisi par l'administrateur : lettres, chiffres et symboles acceptés
+    await page.getByTestId("np-secret").fill(secret);
+    await page.getByTestId("np-secret2").fill(secret);
     await page.getByTestId("np-submit").click();
-    const secret = await page.getByTestId("shown-secret").innerText();
-    expect(secret).toMatch(/^\d{6}$/);
+    await expect(page.getByTestId("settings-notice")).toContainText("Karim");
     await page.screenshot({ path: "shots/admin-secret.png" });
-    await page.getByRole("button", { name: "J'ai noté le code" }).click();
     await expect(page.getByTestId("profile-karim")).toBeVisible();
 
     // le nouveau profil peut se connecter avec ce code
@@ -170,9 +171,8 @@ test.describe("administration", () => {
     await expect(page.getByTestId("profile-karim")).toContainText("désactivé");
     expect((await ok.get("/api/me")).status()).toBe(401); // session révoquée
 
-    // seul administrateur : ne peut pas se désactiver
-    await page.getByTestId("toggle-adil").click();
-    await expect(page.getByTestId("settings-error")).toContainText("dernier administrateur");
+    // un administrateur n'a pas de bouton « Désactiver » (et le serveur refuse aussi)
+    await expect(page.getByTestId("toggle-adil")).toHaveCount(0);
     await page.screenshot({ path: "shots/admin-profiles.png" });
   });
 

@@ -58,7 +58,7 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
 
 export const api = {
   login: (familyCode: string, login: string, secret: string) => request<{ me: Me }>("POST", "/api/auth/login", { familyCode, login, secret }),
-  setupFamily: (b: { installToken: string; familyName: string; admin: { displayName: string; login: string; secret: string } }) =>
+  setupFamily: (b: { installToken: string; familyName: string; admin: { displayName: string; login: string; secret: string; secretConfirm: string; recoveryEmail?: string } }) =>
     request<{ familyCode: string; me: Me }>("POST", "/api/setup/family", b),
   logout: () => request<{ ok: true }>("POST", "/api/auth/logout"),
   pushConfig: () => request<{ publicKey: string }>("GET", "/api/push/config"),
@@ -79,10 +79,18 @@ export const api = {
   credits: () => request<{ generated: { count: number; source: string } | null; credits: Credit[] }>("GET", "/api/credits"),
   // administration
   profiles: () => request<{ profiles: Profile[] }>("GET", "/api/profiles"),
-  createProfile: (b: { displayName: string; login: string; role: Role; secret?: string }) =>
-    request<{ profile: Profile; secret: string }>("POST", "/api/profiles", b),
+  createProfile: (b: { displayName: string; login: string; role: Role; secret: string; secretConfirm: string }) =>
+    request<{ profile: Profile }>("POST", "/api/profiles", b),
   updateProfile: (id: string, b: { displayName?: string; role?: Role; active?: boolean }) => request<{ profile: Profile }>("PATCH", `/api/profiles/${id}`, b),
-  resetSecret: (id: string) => request<{ secret: string }>("POST", `/api/profiles/${id}/reset-secret`, {}),
+  resetSecret: (id: string, secret: string, secretConfirm: string) => request<{ ok: true }>("POST", `/api/profiles/${id}/reset-secret`, { secret, secretConfirm }),
+  recoveryState: () => request<RecoveryState>("GET", "/api/recovery-email"),
+  setRecoveryEmail: (email: string) => request<RecoveryState>("PUT", "/api/recovery-email", { email }),
+  resendRecovery: () => request<RecoveryState>("POST", "/api/recovery-email/resend", {}),
+  verifyEmail: (token: string) => request<{ ok: true }>("POST", "/api/auth/verify-email", { token }),
+  forgotFamilyCode: (email: string) => request<{ ok: true; message: string }>("POST", "/api/auth/forgot-family-code", { email }),
+  forgotPassword: (email: string, familyCode?: string) => request<{ ok: true; message: string }>("POST", "/api/auth/forgot-password", { email, familyCode }),
+  checkResetToken: (token: string) => request<{ valid: boolean }>("POST", "/api/auth/reset-password/check", { token }),
+  resetPassword: (token: string, secret: string, secretConfirm: string) => request<{ ok: true }>("POST", "/api/auth/reset-password", { token, secret, secretConfirm }),
   backupStatus: () => request<BackupStatus>("GET", "/api/admin/backup-status"),
   catalogAdmin: () => request<Catalog>("GET", "/api/catalog?includeInactive=1"),
   patchProduct: (id: string, b: ProductPatch) => request<{ product: Product }>("PATCH", `/api/products/${id}`, b),
@@ -203,6 +211,18 @@ export interface Profile {
   login: string;
   role: Role;
   active: boolean;
+  /** Administrateur principal : rôle figé, jamais désactivé. */
+  primary: boolean;
+}
+
+export interface RecoveryState {
+  canEdit: boolean;
+  /** Le service d'envoi d'e-mails est-il configuré sur le serveur ? */
+  configured: boolean;
+  email: string | null;
+  verified: boolean;
+  /** « accepted » = pris en charge par le service d'envoi, pas une preuve de réception ; « delivered » = remis au serveur du destinataire. */
+  lastMail: { kind: string; status: "queued" | "accepted" | "delivered" | "bounced" | "failed" | "not_configured"; at: string; detail: string | null } | null;
 }
 
 export interface AuditProduct {

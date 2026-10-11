@@ -44,7 +44,7 @@ async function newFamily(adminLogin = "adil") {
 }
 
 async function addProfile(cookies: Record<string, string>, body: object) {
-  const res = await app.inject({ method: "POST", url: "/api/profiles", cookies, payload: body });
+  const res = await app.inject({ method: "POST", url: "/api/profiles", cookies, payload: { secret: "573918", secretConfirm: "573918", ...body, ...("secret" in body && !("secretConfirm" in body) ? { secretConfirm: (body as any).secret } : {}) } });
   return res;
 }
 
@@ -177,34 +177,62 @@ describe("droits et isolation", () => {
     const list = await app.inject({ method: "GET", url: "/api/profiles", cookies: b.cookies });
     expect(list.json().profiles.map((p: any) => p.id)).not.toContain(targetId);
     expect((await app.inject({ method: "PATCH", url: `/api/profiles/${targetId}`, cookies: b.cookies, payload: { active: false } })).statusCode).toBe(404);
-    expect((await app.inject({ method: "POST", url: `/api/profiles/${targetId}/reset-secret`, cookies: b.cookies, payload: {} })).statusCode).toBe(404);
+    expect((await app.inject({ method: "POST", url: `/api/profiles/${targetId}/reset-secret`, cookies: b.cookies, payload: { secret: "649201", secretConfirm: "649201" } })).statusCode).toBe(404);
     // le code de la famille A ne permet pas d'entrer sans le bon secret ; et le bon identifiant dans la famille B n'est pas celui de A
     expect((await doLogin(b.familyCode, "marie", "573918")).statusCode).toBe(401);
   });
 });
 
-describe("dernier administrateur", () => {
-  it("refuse de désactiver ou rétrograder le dernier administrateur actif", async () => {
+describe("protection de l'administration", () => {
+  const patch = (cookies: Record<string, string>, id: string, payload: object) => app.inject({ method: "PATCH", url: `/api/profiles/${id}`, cookies, payload });
+
+  it("un administrateur ne peut pas être désactivé (refus côté serveur) ; le profil principal ne peut pas changer de rôle", async () => {
     const f = await newFamily();
-    const off = await app.inject({ method: "PATCH", url: `/api/profiles/${f.adminId}`, cookies: f.cookies, payload: { active: false } });
-    expect(off.statusCode).toBe(409);
-    expect(off.json().error).toBe("last_admin");
-    const down = await app.inject({ method: "PATCH", url: `/api/profiles/${f.adminId}`, cookies: f.cookies, payload: { role: "parent" } });
-    expect(down.statusCode).toBe(409);
+    const second = await addProfile(f.cookies, { displayName: "Lamiaa", login: "lamiaa", role: "admin" });
+    const lamiaaId = second.json().profile.id as string;
+    expect(second.json().profile.primary).toBe(false);
+    const off1 = await patch(f.cookies, f.adminId, { active: false });
+    expect([off1.statusCode, off1.json().error]).toEqual([409, "admin_cannot_deactivate"]);
+    const off2 = await patch(f.cookies, lamiaaId, { active: false });
+    expect([off2.statusCode, off2.json().error]).toEqual([409, "admin_cannot_deactivate"]);
+    // rôle + désactivation dans le même appel : refusé aussi (on ne contourne pas la règle)
+    expect((await patch(f.cookies, lamiaaId, { role: "parent", active: false })).statusCode).toBe(409);
+    const down = await patch(f.cookies, f.adminId, { role: "parent" });
+    expect([down.statusCode, down.json().error]).toEqual([409, "primary_admin_protected"]);
+    // l'administrateur principal est identifié, l'autre peut être rétrogradé puis désactivé en deux étapes volontaires
+    expect((await app.inject({ method: "GET", url: "/api/profiles", cookies: f.cookies })).json().profiles.find((p: any) => p.id === f.adminId).primary).toBe(true);
+    expect((await patch(f.cookies, lamiaaId, { role: "parent" })).statusCode).toBe(200);
+    expect((await patch(f.cookies, lamiaaId, { active: false })).statusCode).toBe(200);
+    const row = await db.query("SELECT role, active, is_primary FROM profiles WHERE id = $1", [f.adminId]);
+    expect(row.rows[0]).toMatchObject({ role: "admin", active: true, is_primary: true });
   });
 
-  it("deux administrateurs qui se désactivent en même temps : un seul reste actif", async () => {
+  it("l'administrateur principal est le premier de la famille et il n'y en a qu'un", async () => {
     const f = await newFamily();
-    const second = await addProfile(f.cookies, { displayName: "Lamiaa", login: "lamiaa", role: "admin", secret: "573918" });
-    const lamiaaId = second.json().profile.id as string;
-    const lamiaa = cookieOf(await doLogin(f.familyCode, "lamiaa", "573918"))!;
-    const [r1, r2] = await Promise.all([
-      app.inject({ method: "PATCH", url: `/api/profiles/${lamiaaId}`, cookies: f.cookies, payload: { active: false } }),
-      app.inject({ method: "PATCH", url: `/api/profiles/${f.adminId}`, cookies: lamiaa, payload: { active: false } }),
-    ]);
-    expect([r1.statusCode, r2.statusCode].sort()).toEqual([200, 409]);
-    const act = await db.query("SELECT count(*)::int AS n FROM profiles WHERE id = ANY($1) AND active", [[lamiaaId, f.adminId]]);
-    expect(act.rows[0].n).toBe(1);
+    await addProfile(f.cookies, { displayName: "L", login: "lamiaa", role: "admin" });
+    expect((await db.query("SELECT count(*)::int AS n FROM profiles WHERE family_id = (SELECT family_id FROM profiles WHERE id = $1) AND is_primary", [f.adminId])).rows[0].n).toBe(1);
+    await expect(db.query("UPDATE profiles SET is_primary = true WHERE login = 'lamiaa' AND family_id = (SELECT family_id FROM profiles WHERE id = $1)", [f.adminId])).rejects.toThrow();
+  });
+
+  it("dernier administrateur actif : refus de rétrograder, même sans profil principal (anciennes données)", async () => {
+    const f = await newFamily();
+    await db.query("UPDATE profiles SET is_primary = false WHERE id = $1", [f.adminId]);
+    const down = await patch(f.cookies, f.adminId, { role: "parent" });
+    expect([down.statusCode, down.json().error]).toEqual([409, "last_admin"]);
+  });
+
+  it("deux administrateurs qui se rétrogradent en même temps (anciennes données) : un seul des deux reste administrateur", async () => {
+    for (let i = 0; i < 5; i++) {
+      const f = await newFamily();
+      const second = await addProfile(f.cookies, { displayName: "Lamiaa", login: "lamiaa", role: "admin" });
+      const lamiaaId = second.json().profile.id as string;
+      await db.query("UPDATE profiles SET is_primary = false WHERE id = ANY($1)", [[f.adminId, lamiaaId]]);
+      const lamiaa = cookieOf(await doLogin(f.familyCode, "lamiaa", "573918"))!;
+      const [r1, r2] = await Promise.all([patch(f.cookies, lamiaaId, { role: "parent" }), patch(lamiaa, f.adminId, { role: "parent" })]);
+      expect([r1.statusCode, r2.statusCode].sort()).toEqual([200, 409]);
+      const adm = await db.query("SELECT count(*)::int AS n FROM profiles WHERE id = ANY($1) AND role = 'admin' AND active", [[lamiaaId, f.adminId]]);
+      expect(adm.rows[0].n).toBe(1);
+    }
   });
 });
 
@@ -271,9 +299,10 @@ describe("désactivation et réinitialisation", () => {
   it("la réinitialisation révoque les sessions, remplace le code et lève le verrou", async () => {
     const f = await familyWithStaff();
     for (let i = 0; i < 5; i++) await doLogin(f.familyCode, "marie", "000111");
-    const r = await app.inject({ method: "POST", url: `/api/profiles/${f.staffId}/reset-secret`, cookies: f.cookies, payload: {} });
-    const secret = r.json().secret as string;
-    expect(secret).toMatch(/^\d{6}$/);
+    const secret = "x7Q!pz";
+    const r = await app.inject({ method: "POST", url: `/api/profiles/${f.staffId}/reset-secret`, cookies: f.cookies, payload: { secret, secretConfirm: secret } });
+    expect(r.statusCode).toBe(200);
+    expect(JSON.stringify(r.json())).not.toContain(secret); // le mot de passe n'est jamais renvoyé
     expect((await app.inject({ method: "GET", url: "/api/me", cookies: f.staff })).statusCode).toBe(401);
     expect((await doLogin(f.familyCode, "marie", "573918")).statusCode).toBe(401);
     expect((await doLogin(f.familyCode, "marie", secret)).statusCode).toBe(200);
@@ -286,7 +315,7 @@ describe("désactivation et réinitialisation", () => {
       method: "POST",
       url: `/api/profiles/${second.json().profile.id}/reset-secret`,
       cookies: f.cookies,
-      payload: { secret: "649201" },
+      payload: { secret: "649201", secretConfirm: "649201" },
     });
     expect(r.statusCode).toBe(200);
     expect((await doLogin(f.familyCode, "lamiaa", "649201")).statusCode).toBe(200);
@@ -312,5 +341,47 @@ describe("codes secrets", () => {
       expect((await addProfile(f.cookies, { displayName: "x", login: `w${weak}`, role: "staff", secret: weak })).statusCode).toBe(400);
     }
     expect((await addProfile(f.cookies, { displayName: "x", login: "wshort", role: "staff", secret: "12ab" })).statusCode).toBe(400);
+  });
+
+  it("mot de passe choisi à la main : 6 caractères (pas seulement des chiffres), saisi deux fois, jamais généré ni renvoyé", async () => {
+    const f = await newFamily();
+    const ok = await addProfile(f.cookies, { displayName: "Sara", login: "sara", role: "parent", secret: "Ab3$xy", secretConfirm: "Ab3$xy" });
+    expect(ok.statusCode).toBe(201);
+    expect(JSON.stringify(ok.json())).not.toContain("Ab3$xy");
+    expect((await doLogin(f.familyCode, "sara", "Ab3$xy")).statusCode).toBe(200);
+    expect((await doLogin(f.familyCode, "sara", "ab3$xy")).statusCode).toBe(401); // la casse compte
+    // refus : trop court / trop long / espace / confirmation différente / absence (aucune génération automatique)
+    for (const [i, secret] of ["Ab3$x", "Ab3$xyz", "Ab 3xy", "a\tb3xy"].entries())
+      expect((await addProfile(f.cookies, { displayName: "x", login: `bad${i}`, role: "staff", secret, secretConfirm: secret })).statusCode).toBe(400);
+    const mismatch = await addProfile(f.cookies, { displayName: "x", login: "mism", role: "staff", secret: "Ab3$xy", secretConfirm: "Ab3$xz" });
+    expect([mismatch.statusCode, mismatch.json().error]).toEqual([400, "secret_mismatch"]);
+    const none = await app.inject({ method: "POST", url: "/api/profiles", cookies: f.cookies, payload: { displayName: "x", login: "none", role: "staff" } });
+    expect(none.statusCode).toBe(400);
+    expect((await db.query("SELECT 1 FROM profiles WHERE login IN ('mism','none') AND family_id = (SELECT family_id FROM profiles WHERE id = $1)", [f.adminId])).rowCount).toBe(0);
+  });
+
+  it("les codes à 6 chiffres actuels fonctionnent toujours ; le verrouillage après 5 échecs s'applique aussi aux mots de passe mixtes", async () => {
+    const f = await newFamily();
+    expect((await doLogin(f.familyCode, "adil", "482913")).statusCode).toBe(200);
+    await addProfile(f.cookies, { displayName: "Sara", login: "sara", role: "parent", secret: "Ab3$xy" });
+    for (let i = 0; i < 5; i++) expect((await doLogin(f.familyCode, "sara", "Zz9#qq")).statusCode).toBe(401);
+    expect((await doLogin(f.familyCode, "sara", "Ab3$xy")).statusCode).toBe(401); // verrouillé même avec le bon mot de passe
+  });
+
+  it("modifier le mot de passe : confirmation obligatoire, ancien mot de passe inutilisable, sessions révoquées", async () => {
+    const f = await newFamily();
+    const c = await addProfile(f.cookies, { displayName: "Sara", login: "sara", role: "parent" });
+    const id = c.json().profile.id as string;
+    const sara = cookieOf(await doLogin(f.familyCode, "sara", "573918"))!;
+    const bad = await app.inject({ method: "POST", url: `/api/profiles/${id}/reset-secret`, cookies: f.cookies, payload: { secret: "Ab3$xy", secretConfirm: "Ab3$xz" } });
+    expect([bad.statusCode, bad.json().error]).toEqual([400, "secret_mismatch"]);
+    expect((await app.inject({ method: "GET", url: "/api/me", cookies: sara })).statusCode).toBe(200); // rien n'a changé
+    const ok = await app.inject({ method: "POST", url: `/api/profiles/${id}/reset-secret`, cookies: f.cookies, payload: { secret: "Ab3$xy", secretConfirm: "Ab3$xy" } });
+    expect(ok.statusCode).toBe(200);
+    expect((await app.inject({ method: "GET", url: "/api/me", cookies: sara })).statusCode).toBe(401);
+    expect((await doLogin(f.familyCode, "sara", "573918")).statusCode).toBe(401);
+    expect((await doLogin(f.familyCode, "sara", "Ab3$xy")).statusCode).toBe(200);
+    // sans session administrateur : refusé
+    expect((await app.inject({ method: "POST", url: `/api/profiles/${id}/reset-secret`, payload: { secret: "Ab3$xy", secretConfirm: "Ab3$xy" } })).statusCode).toBe(401);
   });
 });

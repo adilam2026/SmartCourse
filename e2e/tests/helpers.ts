@@ -28,7 +28,7 @@ export async function newFamily(playwright: { request: { newContext(o: object): 
   const code = (await setup.json()).familyCode as string;
   const staffLogin = `marie${Math.floor(Math.random() * 1e6)}`;
   for (const [login, role, display] of [["lamiaa", "parent", "Lamiaa"], [staffLogin, "staff", "Marie"]] as const) {
-    const r = await adil.post("/api/profiles", { data: { displayName: display, login, role, secret: "573918" } });
+    const r = await adil.post("/api/profiles", { data: { displayName: display, login, role, secret: "573918", secretConfirm: "573918" } });
     expect(r.status()).toBe(201);
   }
   const lamiaa = await playwright.request.newContext({ baseURL });

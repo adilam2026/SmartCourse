@@ -153,13 +153,13 @@ export class Engine {
   }
 
   /** First installation: consumes the one-shot install token, creates the family and its first administrator. */
-  async setup(input: { installToken: string; familyName: string; displayName: string; login: string; secret: string }): Promise<string | null> {
+  async setup(input: { installToken: string; familyName: string; displayName: string; login: string; secret: string; secretConfirm: string; recoveryEmail?: string }): Promise<string | null> {
     this.set({ loggingIn: true, loginError: null });
     try {
       const r = await this.api.setupFamily({
         installToken: input.installToken.trim(),
         familyName: input.familyName,
-        admin: { displayName: input.displayName, login: input.login.trim().toLowerCase(), secret: input.secret },
+        admin: { displayName: input.displayName, login: input.login.trim().toLowerCase(), secret: input.secret, secretConfirm: input.secretConfirm, ...(input.recoveryEmail?.trim() ? { recoveryEmail: input.recoveryEmail.trim() } : {}) },
       });
       const lastLogin = { familyCode: r.familyCode, login: input.login.trim().toLowerCase() };
       await this.db.meta.put({ key: "lastLogin", value: lastLogin });
@@ -172,7 +172,7 @@ export class Engine {
         loginError:
           e instanceof NetworkError ? "Pas de connexion. Réessayez."
           : e instanceof ApiError && e.status === 403 ? "Jeton d'installation invalide ou déjà utilisé."
-          : e instanceof ApiError && e.code === "weak_secret" ? "Code trop simple (évitez 123456, 111111…)."
+          : e instanceof ApiError && e.code === "weak_secret" ? "Mot de passe trop simple (évitez 123456, 111111…)."
           : e instanceof ApiError && e.status === 400 ? "Vérifiez les champs (identifiant : lettres minuscules, chiffres, . _ -)."
           : "Installation impossible.",
       });

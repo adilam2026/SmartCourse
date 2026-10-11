@@ -4,7 +4,7 @@ import { revokeProfileSessions, type AuthContext } from "./auth.js";
 import { HttpError } from "./errors.js";
 import type { SseHub } from "./hub.js";
 import type { Role } from "./permissions.js";
-import { generateSecret, hashSecret, isWeakSecret } from "./security.js";
+import { generateSecret, hashSecret, isValidSecret, isWeakSecret } from "./security.js";
 
 export interface ProfileView {
   id: string;
@@ -12,6 +12,8 @@ export interface ProfileView {
   login: string;
   role: Role;
   active: boolean;
+  /** Administrateur principal : le premier de la famille. Son rôle ne peut pas être changé et il ne peut pas être désactivé. */
+  primary: boolean;
 }
 
 const toView = (r: any): ProfileView => ({
@@ -20,6 +22,7 @@ const toView = (r: any): ProfileView => ({
   login: r.login,
   role: r.role,
   active: r.active,
+  primary: r.is_primary,
 });
 
 export async function listProfiles(db: Db, familyId: string): Promise<ProfileView[]> {
@@ -61,13 +64,21 @@ export interface CreateProfileInput {
   displayName: string;
   login: string;
   role: Role;
-  secret?: string;
+  /** Choisi et saisi par l'administrateur : jamais généré automatiquement. */
+  secret: string;
+  secretConfirm: string;
 }
 
-export async function createProfile(db: Db, actor: AuthContext, input: CreateProfileInput): Promise<{ profile: ProfileView; secret: string }> {
-  const secret = input.secret ?? generateSecret();
-  if (isWeakSecret(secret)) throw new HttpError(400, "weak_secret", "Code trop simple");
-  const hash = await hashSecret(secret);
+/** Same rules everywhere a password is chosen by a person: 6 visible characters, typed twice, not trivially guessable. */
+export function checkChosenSecret(secret: string, confirm: string): void {
+  if (!isValidSecret(secret)) throw new HttpError(400, "invalid_secret", "Le mot de passe doit comporter 6 caractères");
+  if (secret !== confirm) throw new HttpError(400, "secret_mismatch", "Les deux mots de passe ne sont pas identiques");
+  if (isWeakSecret(secret)) throw new HttpError(400, "weak_secret", "Mot de passe trop simple (évitez 123456, 111111…)");
+}
+
+export async function createProfile(db: Db, actor: AuthContext, input: CreateProfileInput): Promise<{ profile: ProfileView }> {
+  checkChosenSecret(input.secret, input.secretConfirm);
+  const hash = await hashSecret(input.secret);
   return withTx(db, async (c) => {
     await lockFamily(c, actor.familyId);
     try {
@@ -76,7 +87,7 @@ export async function createProfile(db: Db, actor: AuthContext, input: CreatePro
         [actor.familyId, input.displayName, input.login, input.role, hash],
       );
       await audit(c, actor.familyId, actor.profileId, "profile.created", r.rows[0].id, { role: input.role });
-      return { profile: toView(r.rows[0]), secret };
+      return { profile: toView(r.rows[0]) };
     } catch (err: any) {
       if (err.code === "23505") throw new HttpError(409, "login_taken", "Cet identifiant existe déjà dans la famille");
       throw err;
@@ -96,6 +107,10 @@ export async function updateProfile(db: Db, hub: SseHub, actor: AuthContext, id:
     const t = await loadTarget(c, actor.familyId, id);
     const role: Role = input.role ?? t.role;
     const active: boolean = input.active ?? t.active;
+    // Protection de l'administration : un administrateur n'est jamais désactivé (il faut d'abord lui retirer ce rôle), et
+    // l'administrateur principal ne peut pas perdre son rôle, ce qui empêcherait de le désactiver ensuite.
+    if (t.is_primary && role !== "admin") throw new HttpError(409, "primary_admin_protected", "Le rôle de l'administrateur principal ne peut pas être modifié");
+    if (!active && t.active && t.role === "admin") throw new HttpError(409, "admin_cannot_deactivate", "Un administrateur ne peut pas être désactivé");
     const wasActiveAdmin = t.role === "admin" && t.active;
     const staysActiveAdmin = role === "admin" && active;
     if (wasActiveAdmin && !staysActiveAdmin && (await otherActiveAdmins(c, actor.familyId, id)) === 0) {
@@ -119,10 +134,10 @@ export async function updateProfile(db: Db, hub: SseHub, actor: AuthContext, id:
   return view;
 }
 
-export async function resetSecret(db: Db, hub: SseHub, actor: AuthContext, id: string, secret?: string): Promise<string> {
-  const code = secret ?? generateSecret();
-  if (isWeakSecret(code)) throw new HttpError(400, "weak_secret", "Code trop simple");
-  const hash = await hashSecret(code);
+/** « Modifier le mot de passe » : l'ancien n'est jamais affiché ni renvoyé ; toutes les sessions du profil sont révoquées. */
+export async function resetSecret(db: Db, hub: SseHub, actor: AuthContext, id: string, secret: string, secretConfirm: string): Promise<void> {
+  checkChosenSecret(secret, secretConfirm);
+  const hash = await hashSecret(secret);
   await withTx(db, async (c) => {
     await lockFamily(c, actor.familyId);
     await loadTarget(c, actor.familyId, id);
@@ -131,7 +146,6 @@ export async function resetSecret(db: Db, hub: SseHub, actor: AuthContext, id: s
     await audit(c, actor.familyId, actor.profileId, "profile.secret_reset", id);
   });
   hub.disconnectProfile(id);
-  return code;
 }
 
 /** Emergency path for the operator (no session): see admin-cli.ts. */

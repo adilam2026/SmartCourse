@@ -1,7 +1,7 @@
 import { unitLabel } from "../units";
 import { VersionInfo } from "../components/VersionInfo";
 import { useEffect, useState } from "react";
-import { api, ApiError, NetworkError, type AuditProduct, type BackupStatus, type Profile } from "../api";
+import { api, ApiError, NetworkError, type AuditProduct, type BackupStatus, type Profile, type RecoveryState } from "../api";
 import { fmtDateTime } from "../format";
 import { CATEGORY_EMOJI } from "../categories";
 import { Dialog } from "../components/Dialog";
@@ -22,10 +22,10 @@ const ROLE_LABEL: Record<Role, string> = { admin: "Administrateur", parent: "Par
 
 const errText = (e: unknown): string =>
   e instanceof NetworkError ? "Pas de connexion."
-  : e instanceof ApiError ? (e.code === "last_admin" ? "Impossible : c'est le dernier administrateur actif." : e.code === "login_taken" ? "Cet identifiant existe déjà." : e.code === "weak_secret" ? "Code trop simple (évitez 123456, 111111…)." : e.message)
+  : e instanceof ApiError ? (e.code === "last_admin" ? "Impossible : c'est le dernier administrateur actif." : e.code === "admin_cannot_deactivate" ? "Un administrateur ne peut pas être désactivé." : e.code === "primary_admin_protected" ? "Le rôle de l'administrateur principal ne peut pas être modifié." : e.code === "login_taken" ? "Cet identifiant existe déjà." : e.code === "weak_secret" ? "Mot de passe trop simple (évitez 123456, 111111…)." : e.code === "secret_mismatch" ? "Les deux mots de passe ne sont pas identiques." : e.code === "invalid_secret" ? "Le mot de passe doit comporter 6 caractères." : e.message)
   : "Erreur.";
 
-type Section = "profiles" | "catalog" | "notifications" | "backups" | "about";
+type Section = "profiles" | "recovery" | "catalog" | "notifications" | "backups" | "about";
 
 /** Backup state in one word (the technical detail is one touch away). */
 function backupSummary(st: BackupStatus | null): { ok: boolean; text: string } {
@@ -52,6 +52,7 @@ export function Settings({ engine, s }: { engine: Engine; s: State }) {
   if (section === null) {
     const items: { key: Section; icon: IconName; title: string; text: string; testid: string }[] = [
       { key: "profiles", icon: "users", title: "Famille et profils", text: "Profils, rôles, codes d'accès", testid: "seg-profiles" },
+      { key: "recovery", icon: "lock", title: "Adresse de récupération", text: "Code famille et mot de passe oubliés", testid: "seg-recovery" },
       { key: "catalog", icon: "grid", title: "Catalogue", text: "Produits, photos et unités", testid: "seg-catalog" },
       { key: "notifications", icon: "bell", title: "Notifications", text: pushText, testid: "seg-notifications" },
       { key: "backups", icon: "shield", title: "Sauvegardes", text: bs.text, testid: "seg-backups" },
@@ -72,11 +73,12 @@ export function Settings({ engine, s }: { engine: Engine; s: State }) {
       </>
     );
   }
-  const titles: Record<Section, string> = { profiles: "Famille et profils", catalog: "Catalogue", notifications: "Notifications", backups: "Sauvegardes", about: "À propos et version" };
+  const titles: Record<Section, string> = { profiles: "Famille et profils", recovery: "Adresse de récupération", catalog: "Catalogue", notifications: "Notifications", backups: "Sauvegardes", about: "À propos et version" };
   return (
     <>
       <PageHead engine={engine} s={s} title={titles[section]} onBack={() => setSection(null)} backLabel="Réglages" backTestId="settings-back" subtitle={section === "profiles" && s.me?.family ? <>Code de la famille : <b data-testid="family-code">{s.me.family.code}</b></> : undefined} />
       {section === "profiles" && <Profiles me={s.me!.id} />}
+      {section === "recovery" && <Recovery />}
       {section === "catalog" && <CatalogAdmin engine={engine} />}
       {section === "notifications" && <div className="menu"><NotificationSettings /></div>}
       {section === "backups" && <BackupCard st={backup} />}
@@ -112,11 +114,16 @@ function BackupCard({ st }: { st: BackupStatus | null }) {
   );
 }
 
+/** Six visible characters; typed twice. Never generated, never displayed afterwards. */
+const six = (v: string) => [...v].length === 6 && !/\s/.test(v);
+const clean = (v: string) => v.replace(/\s/g, "").slice(0, 6);
+
 function Profiles({ me }: { me: string }) {
   const [list, setList] = useState<Profile[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
-  const [shown, setShown] = useState<{ title: string; secret: string } | null>(null);
+  const [changing, setChanging] = useState<Profile | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const load = () => api.profiles().then((r) => setList(r.profiles)).catch((e) => setError(errText(e)));
   useEffect(() => void load(), []);
 
@@ -133,45 +140,87 @@ function Profiles({ me }: { me: string }) {
   return (
     <>
       {error && <p className="error" role="alert" data-testid="settings-error">{error}</p>}
+      {notice && <p className="notice" role="status" data-testid="settings-notice">{notice}</p>}
       <ul className="rows" data-testid="profiles">
         {list?.map((p) => (
           <li key={p.id} className={`row row--stack ${p.active ? "" : "row--off"}`} data-testid={`profile-${p.login}`}>
-            <span className="row__name">{p.displayName}{p.id === me && " (vous)"}<small>@{p.login} · {ROLE_LABEL[p.role]}{p.active ? "" : " · désactivé"}</small></span>
+            <span className="row__name">{p.displayName}{p.id === me && " (vous)"}<small>@{p.login} · {ROLE_LABEL[p.role]}{p.primary ? " principal" : ""}{p.active ? "" : " · désactivé"}</small></span>
             <span className="row__actions">
-              <select aria-label="Rôle" value={p.role} onChange={(e) => void run(() => api.updateProfile(p.id, { role: e.target.value as Role }))}>
-                {(["admin", "parent", "staff"] as Role[]).map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
-              </select>
-              <button className="btn btn--small" data-testid={`reset-${p.login}`} onClick={() => void run(async () => setShown({ title: `Nouveau code de ${p.displayName}`, secret: (await api.resetSecret(p.id)).secret }))}>Nouveau code</button>
-              <button className="btn btn--small btn--ghost" data-testid={`toggle-${p.login}`} onClick={() => void run(() => api.updateProfile(p.id, { active: !p.active }))}>{p.active ? "Désactiver" : "Réactiver"}</button>
+              {p.primary ? (
+                <span className="muted" data-testid={`primary-${p.login}`}>Rôle protégé</span>
+              ) : (
+                <select aria-label="Rôle" value={p.role} onChange={(e) => void run(() => api.updateProfile(p.id, { role: e.target.value as Role }))}>
+                  {(["admin", "parent", "staff"] as Role[]).map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
+                </select>
+              )}
+              <button className="btn btn--small" data-testid={`reset-${p.login}`} onClick={() => { setNotice(null); setChanging(p); }}>Modifier le mot de passe</button>
+              {/* Un administrateur n'est jamais désactivé : le bouton n'existe pas (et le serveur refuse aussi). */}
+              {p.role !== "admin" && <button className="btn btn--small btn--ghost" data-testid={`toggle-${p.login}`} onClick={() => void run(() => api.updateProfile(p.id, { active: !p.active }))}>{p.active ? "Désactiver" : "Réactiver"}</button>}
             </span>
           </li>
         ))}
       </ul>
       <button className="btn btn--primary btn--big addbtn" data-testid="add-profile" onClick={() => setAdding(true)}>+ Ajouter un profil</button>
-      {adding && <AddProfile onClose={() => setAdding(false)} onCreated={(name, secret) => { setAdding(false); setShown({ title: `Profil créé : ${name}`, secret }); void load(); }} />}
-      {shown && (
-        <Dialog title={shown.title} onClose={() => setShown(null)}>
-          <p>Code secret à 6 chiffres. Il ne sera plus affiché : notez-le et donnez-le à la personne.</p>
-          <p className="secret" data-testid="shown-secret">{shown.secret}</p>
-          <button className="btn btn--primary btn--big" onClick={() => setShown(null)}>J'ai noté le code</button>
-        </Dialog>
-      )}
+      {adding && <AddProfile onClose={() => setAdding(false)} onCreated={(name) => { setAdding(false); setNotice(`Profil créé : ${name}. Communiquez-lui le mot de passe que vous avez choisi.`); void load(); }} />}
+      {changing && <ChangePassword profile={changing} onClose={() => setChanging(null)} onDone={() => { setNotice(`Mot de passe de ${changing.displayName} modifié. Ses sessions ont été fermées.`); setChanging(null); void load(); }} />}
     </>
   );
 }
 
-function AddProfile({ onClose, onCreated }: { onClose(): void; onCreated(name: string, secret: string): void }) {
+function PasswordFields({ secret, again, setSecret, setAgain, prefix }: { secret: string; again: string; setSecret(v: string): void; setAgain(v: string): void; prefix: string }) {
+  const mismatch = again.length > 0 && secret !== again;
+  return (
+    <>
+      <label className="field">Mot de passe — 6 caractères<input type="password" maxLength={6} autoComplete="new-password" value={secret} onChange={(e) => setSecret(clean(e.target.value))} required data-testid={`${prefix}-secret`} /></label>
+      <label className="field">Confirmer le mot de passe<input type="password" maxLength={6} autoComplete="new-password" value={again} onChange={(e) => setAgain(clean(e.target.value))} required data-testid={`${prefix}-secret2`} /></label>
+      {mismatch && <p className="error" data-testid={`${prefix}-mismatch`}>Les deux mots de passe ne sont pas identiques.</p>}
+    </>
+  );
+}
+
+function ChangePassword({ profile, onClose, onDone }: { profile: Profile; onClose(): void; onDone(): void }) {
+  const [secret, setSecret] = useState("");
+  const [again, setAgain] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  return (
+    <Dialog title={`Modifier le mot de passe de ${profile.displayName}`} onClose={onClose}>
+      <form className="form" onSubmit={async (e) => {
+        e.preventDefault();
+        setBusy(true);
+        setError(null);
+        try {
+          await api.resetSecret(profile.id, secret, again);
+          onDone();
+        } catch (err) {
+          setError(errText(err));
+          setBusy(false);
+        }
+      }}>
+        <PasswordFields secret={secret} again={again} setSecret={setSecret} setAgain={setAgain} prefix="pw" />
+        <p className="muted">L'ancien mot de passe n'est jamais affiché. Toutes les sessions de ce profil seront fermées.</p>
+        {error && <p className="error" role="alert" data-testid="pw-error">{error}</p>}
+        <button className="btn btn--primary btn--big" disabled={busy || !six(secret) || secret !== again} data-testid="pw-submit">{busy ? "Enregistrement…" : "Enregistrer le mot de passe"}</button>
+        <button type="button" className="btn btn--ghost" onClick={onClose}>Annuler</button>
+      </form>
+    </Dialog>
+  );
+}
+
+function AddProfile({ onClose, onCreated }: { onClose(): void; onCreated(name: string): void }) {
   const [displayName, setName] = useState("");
   const [login, setLogin] = useState("");
   const [role, setRole] = useState<Role>("staff");
+  const [secret, setSecret] = useState("");
+  const [again, setAgain] = useState("");
   const [error, setError] = useState<string | null>(null);
   return (
     <Dialog title="Nouveau profil" onClose={onClose}>
       <form className="form" onSubmit={async (e) => {
         e.preventDefault();
         try {
-          const r = await api.createProfile({ displayName, login: login.trim().toLowerCase(), role });
-          onCreated(r.profile.displayName, r.secret);
+          const r = await api.createProfile({ displayName, login: login.trim().toLowerCase(), role, secret, secretConfirm: again });
+          onCreated(r.profile.displayName);
         } catch (err) {
           setError(errText(err));
         }
@@ -183,12 +232,64 @@ function AddProfile({ onClose, onCreated }: { onClose(): void; onCreated(name: s
             {(["staff", "parent", "admin"] as Role[]).map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
           </select>
         </label>
-        <p className="muted">Un code secret à 6 chiffres sera généré.</p>
-        {error && <p className="error" role="alert">{error}</p>}
-        <button className="btn btn--primary btn--big" data-testid="np-submit">Créer</button>
+        <PasswordFields secret={secret} again={again} setSecret={setSecret} setAgain={setAgain} prefix="np" />
+        <p className="muted">Vous choisissez ce mot de passe : chiffres, lettres ou symboles. Rien n'est généré automatiquement.</p>
+        {error && <p className="error" role="alert" data-testid="np-error">{error}</p>}
+        <button className="btn btn--primary btn--big" disabled={!six(secret) || secret !== again || !displayName.trim() || !login.trim()} data-testid="np-submit">Créer</button>
         <button type="button" className="btn btn--ghost" onClick={onClose}>Annuler</button>
       </form>
     </Dialog>
+  );
+}
+
+const MAIL_STATE: Record<string, string> = {
+  queued: "en cours d'envoi",
+  accepted: "accepté par le service d'envoi (Brevo) — réception dans la boîte non confirmée",
+  delivered: "remis au serveur de la boîte mail (à vérifier dans vos courriers, y compris indésirables)",
+  bounced: "rejeté par la boîte du destinataire — vérifiez l'adresse",
+  failed: "refusé par le service d'envoi",
+  not_configured: "envoi d'e-mails non configuré sur le serveur",
+};
+
+/** Adresse de récupération : enregistrée par l'administrateur principal, utilisable seulement après vérification par e-mail. */
+function Recovery() {
+  const [st, setSt] = useState<RecoveryState | null>(null);
+  const [email, setEmail] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const load = () => api.recoveryState().then((r) => { setSt(r); setEmail((cur) => cur || r.email || ""); }).catch((e) => setError(errText(e)));
+  useEffect(() => void load(), []);
+  const run = async (fn: () => Promise<RecoveryState>) => {
+    setBusy(true);
+    setError(null);
+    try {
+      setSt(await fn());
+    } catch (e) {
+      setError(e instanceof ApiError && e.code === "too_many_mails" ? e.message : errText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  if (!st) return <p className="empty">{error ?? "Chargement…"}</p>;
+  const badge = st.email ? (st.verified ? "Adresse vérifiée" : "À vérifier : ouvrez le lien reçu par e-mail") : "Aucune adresse enregistrée";
+  return (
+    <div className="panel recovery" data-testid="recovery">
+      <p><span className={`statebadge ${st.verified ? "" : "statebadge--bad"}`} data-testid="recovery-state"><Icon name={st.verified ? "check" : "info"} size={16} /> {badge}</span></p>
+      {st.email && <p data-testid="recovery-email">{st.email}</p>}
+      {!st.configured && <p className="muted" data-testid="recovery-unconfigured">L'envoi d'e-mails n'est pas encore configuré sur le serveur : l'adresse peut être enregistrée mais aucun message ne partira.</p>}
+      {st.lastMail && <p className="muted" data-testid="recovery-lastmail">Dernier e-mail de vérification : {MAIL_STATE[st.lastMail.status]} ({fmtDateTime(st.lastMail.at)}).</p>}
+      {st.canEdit ? (
+        <form className="form" onSubmit={(e) => { e.preventDefault(); void run(() => api.setRecoveryEmail(email.trim())); }}>
+          <label className="field">Adresse e-mail de récupération<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" maxLength={254} required data-testid="recovery-input" /></label>
+          <button className="btn btn--primary btn--big" disabled={busy || !email.includes("@")} data-testid="recovery-save">{st.email ? "Enregistrer et envoyer le lien de vérification" : "Enregistrer et vérifier"}</button>
+          {st.email && !st.verified && <button type="button" className="btn" disabled={busy} data-testid="recovery-resend" onClick={() => void run(() => api.resendRecovery())}>Renvoyer le lien</button>}
+        </form>
+      ) : (
+        <p className="muted">Seul l'administrateur principal gère l'adresse de récupération de la famille.</p>
+      )}
+      <p className="muted">Elle sert à recevoir le code famille et un lien temporaire pour choisir un nouveau mot de passe. L'ancien mot de passe n'est jamais envoyé.</p>
+      {error && <p className="error" role="alert" data-testid="recovery-error">{error}</p>}
+    </div>
   );
 }
 

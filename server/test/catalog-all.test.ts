@@ -23,8 +23,8 @@ const cookieOf = (res: { cookies: { name: string; value: string }[] }) => ({ sc_
 async function newFamily() {
   const res = await app.inject({ method: "POST", url: "/api/setup/family", payload: { installToken: await generateInstallToken(db), familyName: `A${++n}`, admin: { displayName: "Adil", login: "adil", secret: "482913" } } });
   const admin = cookieOf(res);
-  await app.inject({ method: "POST", url: "/api/profiles", cookies: admin, payload: { displayName: "marie", login: "marie", role: "staff", secret: "573918" } });
-  const staff = cookieOf(await app.inject({ method: "POST", url: "/api/auth/login", payload: { familyCode: res.json().familyCode, login: "marie", secret: "573918" } }));
+  await app.inject({ method: "POST", url: "/api/profiles", cookies: admin, payload: { displayName: "marie", login: "marie", role: "staff", secret: "573918", secretConfirm: "573918" } });
+  const staff = cookieOf(await app.inject({ method: "POST", url: "/api/auth/login", payload: { familyCode: res.json().familyCode, login: "marie", secret: "573918", secretConfirm: "573918" } }));
   return { admin, staff };
 }
 const all = async (cookies: any, qs = "") => (await app.inject({ method: "GET", url: `/api/catalog/all${qs}`, cookies })).json();

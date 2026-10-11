@@ -1,12 +1,31 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { api, ApiError, NetworkError } from "../api";
 import type { Engine, State } from "../sync/engine";
 
+type Mode = "login" | "setup" | "forgot-code" | "forgot-password";
+
 export function LoginScreen(props: { engine: Engine; s: State }) {
-  const [mode, setMode] = useState<"login" | "setup">("login");
-  return mode === "login" ? <Login {...props} onSetup={() => setMode("setup")} /> : <Setup {...props} onBack={() => setMode("login")} />;
+  const [mode, setMode] = useState<Mode>("login");
+  const back = () => setMode("login");
+  if (mode === "setup") return <Setup {...props} onBack={back} />;
+  if (mode === "forgot-code" || mode === "forgot-password") return <Forgot kind={mode} onBack={back} />;
+  return <Login {...props} onMode={setMode} />;
 }
 
-function Login({ engine, s, onSetup }: { engine: Engine; s: State; onSetup(): void }) {
+function Logo({ title, text }: { title: string; text: string }) {
+  return (
+    <div className="auth__logo">
+      <img src="/icons/icon-192.png" alt="" width="96" height="96" />
+      <h1>{title}</h1>
+      <p>{text}</p>
+    </div>
+  );
+}
+
+/** Six visible characters of any kind (digits, letters, symbols): the current six-digit codes are among them. */
+const SIX = (v: string) => [...v].length === 6 && !/\s/.test(v);
+
+function Login({ engine, s, onMode }: { engine: Engine; s: State; onMode(m: Mode): void }) {
   const [familyCode, setFamilyCode] = useState(s.lastLogin?.familyCode ?? "");
   const [login, setLogin] = useState(s.lastLogin?.login ?? "");
   const [secret, setSecret] = useState("");
@@ -16,57 +35,151 @@ function Login({ engine, s, onSetup }: { engine: Engine; s: State; onSetup(): vo
   };
   return (
     <main className="auth">
-      <div className="auth__logo">
-        <img src="/icons/icon-192.png" alt="" width="96" height="96" />
-        <h1>Courses</h1>
-        <p>La liste de courses de la famille</p>
-      </div>
-      <form onSubmit={submit}>
-        <label>
-          Code de la famille
-          <input value={familyCode} onChange={(e) => setFamilyCode(e.target.value.toUpperCase())} autoCapitalize="characters" autoComplete="off" required data-testid="login-family" />
-        </label>
-        <label>
-          Identifiant
-          <input value={login} onChange={(e) => setLogin(e.target.value)} autoCapitalize="none" autoCorrect="off" autoComplete="username" required data-testid="login-id" />
-        </label>
-        <label>
-          Code secret (6 chiffres)
-          <input value={secret} onChange={(e) => setSecret(e.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" type="password" autoComplete="current-password" pattern="\d{6}" required data-testid="login-secret" />
-        </label>
-        {s.loginError && <p className="error" role="alert" data-testid="login-error">{s.loginError}</p>}
-        <button className="btn btn--primary btn--big" disabled={s.loggingIn || secret.length !== 6} data-testid="login-submit">
-          {s.loggingIn ? "Connexion…" : "Se connecter"}
-        </button>
-      </form>
-      <button className="linkbtn" data-testid="go-setup" onClick={onSetup}>Première installation ? Créer la famille</button>
+      <Logo title="Courses" text="La liste de courses de la famille" />
+      <section className="authsec" aria-labelledby="h-login" data-testid="path-login">
+        <h2 id="h-login">Se connecter</h2>
+        <form onSubmit={submit}>
+          <label>
+            Code famille
+            <input value={familyCode} onChange={(e) => setFamilyCode(e.target.value.toUpperCase())} autoCapitalize="characters" autoComplete="off" required data-testid="login-family" />
+          </label>
+          <label>
+            Identifiant
+            <input value={login} onChange={(e) => setLogin(e.target.value)} autoCapitalize="none" autoCorrect="off" autoComplete="username" required data-testid="login-id" />
+          </label>
+          <label>
+            Mot de passe
+            <input value={secret} onChange={(e) => setSecret(e.target.value.replace(/\s/g, "").slice(0, 6))} type="password" autoComplete="current-password" maxLength={6} required data-testid="login-secret" />
+          </label>
+          {s.loginError && <p className="error" role="alert" data-testid="login-error">{s.loginError}</p>}
+          <button className="btn btn--primary btn--big" disabled={s.loggingIn || !SIX(secret)} data-testid="login-submit">
+            {s.loggingIn ? "Connexion…" : "Se connecter"}
+          </button>
+        </form>
+        <div className="authlinks">
+          <button className="linkbtn" data-testid="go-forgot-code" onClick={() => onMode("forgot-code")}>Code famille oublié ?</button>
+          <button className="linkbtn" data-testid="go-forgot-password" onClick={() => onMode("forgot-password")}>Mot de passe oublié ?</button>
+        </div>
+      </section>
+      <section className="authsec authsec--first" aria-labelledby="h-setup" data-testid="path-setup">
+        <h2 id="h-setup">Première installation</h2>
+        <div className="panel">
+          <p>Vous installez SmartCourse pour la première fois ? Paramétrez la famille et son premier administrateur.</p>
+          <button className="btn btn--big" data-testid="go-setup" onClick={() => onMode("setup")}>Créer ma famille</button>
+        </div>
+      </section>
     </main>
   );
 }
 
 function Setup({ engine, s, onBack }: { engine: Engine; s: State; onBack(): void }) {
-  const [f, setF] = useState({ installToken: "", familyName: "", displayName: "", login: "", secret: "", again: "" });
-  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: k === "secret" || k === "again" ? e.target.value.replace(/\D/g, "").slice(0, 6) : e.target.value });
+  const [f, setF] = useState({ installToken: "", familyName: "", displayName: "", login: "", secret: "", again: "", email: "" });
+  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: k === "secret" || k === "again" ? e.target.value.replace(/\s/g, "").slice(0, 6) : e.target.value });
   const mismatch = f.again.length > 0 && f.secret !== f.again;
   return (
     <main className="auth">
-      <div className="auth__logo">
-        <img src="/icons/icon-192.png" alt="" width="96" height="96" />
-        <h1>Première installation</h1>
-        <p>Créez la famille et le compte administrateur</p>
-      </div>
-      <form onSubmit={async (e) => { e.preventDefault(); await engine.setup(f); }}>
+      <Logo title="Première installation" text="Créer ma famille : paramétrage de la famille et du premier administrateur" />
+      <form onSubmit={async (e) => { e.preventDefault(); await engine.setup({ installToken: f.installToken, familyName: f.familyName, displayName: f.displayName, login: f.login, secret: f.secret, secretConfirm: f.again, recoveryEmail: f.email }); }}>
         <label>Jeton d'installation<input value={f.installToken} onChange={set("installToken")} autoComplete="off" required data-testid="setup-token" /></label>
         <label>Nom de la famille<input value={f.familyName} onChange={set("familyName")} required maxLength={60} data-testid="setup-family" /></label>
         <label>Votre nom affiché<input value={f.displayName} onChange={set("displayName")} required maxLength={40} data-testid="setup-name" /></label>
         <label>Votre identifiant<input value={f.login} onChange={set("login")} required autoCapitalize="none" pattern="[a-zA-Z0-9._-]{2,30}" data-testid="setup-login" /></label>
-        <label>Code secret (6 chiffres)<input value={f.secret} onChange={set("secret")} inputMode="numeric" type="password" pattern="\d{6}" required data-testid="setup-secret" /></label>
-        <label>Répétez le code<input value={f.again} onChange={set("again")} inputMode="numeric" type="password" pattern="\d{6}" required data-testid="setup-again" /></label>
-        {mismatch && <p className="error">Les deux codes ne sont pas identiques.</p>}
+        <label>Mot de passe — 6 caractères<input value={f.secret} onChange={set("secret")} type="password" maxLength={6} autoComplete="new-password" required data-testid="setup-secret" /></label>
+        <label>Confirmer le mot de passe<input value={f.again} onChange={set("again")} type="password" maxLength={6} autoComplete="new-password" required data-testid="setup-again" /></label>
+        {mismatch && <p className="error">Les deux mots de passe ne sont pas identiques.</p>}
+        <label>E-mail de récupération (recommandé)<input value={f.email} onChange={set("email")} type="email" autoComplete="email" maxLength={254} data-testid="setup-email" /></label>
+        <p className="muted">Pour retrouver le code famille ou changer un mot de passe oublié. Un lien de confirmation y sera envoyé.</p>
         {s.loginError && <p className="error" role="alert" data-testid="setup-error">{s.loginError}</p>}
-        <button className="btn btn--primary btn--big" disabled={s.loggingIn || f.secret.length !== 6 || f.secret !== f.again} data-testid="setup-submit">{s.loggingIn ? "Création…" : "Créer la famille"}</button>
+        <button className="btn btn--primary btn--big" disabled={s.loggingIn || !SIX(f.secret) || f.secret !== f.again} data-testid="setup-submit">{s.loggingIn ? "Création…" : "Créer ma famille"}</button>
       </form>
       <button className="linkbtn" onClick={onBack}>← Retour à la connexion</button>
+    </main>
+  );
+}
+
+/** « Code famille oublié ? » / « Mot de passe oublié ? » : the answer is the same whether or not the address is known. */
+function Forgot({ kind, onBack }: { kind: "forgot-code" | "forgot-password"; onBack(): void }) {
+  const [email, setEmail] = useState("");
+  const [familyCode, setFamilyCode] = useState("");
+  const [state, setState] = useState<"idle" | "busy" | "sent" | "error">("idle");
+  const [error, setError] = useState("");
+  const isCode = kind === "forgot-code";
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setState("busy");
+    try {
+      if (isCode) await api.forgotFamilyCode(email.trim());
+      else await api.forgotPassword(email.trim(), familyCode.trim() || undefined);
+      setState("sent");
+    } catch (err) {
+      setError(err instanceof NetworkError ? "Pas de connexion." : err instanceof ApiError && err.status === 429 ? "Trop de demandes. Patientez un instant." : "Adresse invalide.");
+      setState("error");
+    }
+  };
+  return (
+    <main className="auth">
+      <Logo title={isCode ? "Code famille oublié" : "Mot de passe oublié"} text={isCode ? "Le code est envoyé à l'adresse de récupération de la famille." : "Un lien temporaire vous permet de choisir un nouveau mot de passe."} />
+      {state === "sent" ? (
+        <section className="panel" data-testid="forgot-sent">
+          <p><b>Si cette adresse est enregistrée et vérifiée, un e-mail vient d'être envoyé.</b></p>
+          <p className="muted">{isCode ? "Il contient votre code famille." : "Le lien est valable 1 heure et ne sert qu'une fois. Votre ancien mot de passe n'est jamais envoyé."} Pensez à regarder les courriers indésirables.</p>
+        </section>
+      ) : (
+        <form onSubmit={submit}>
+          <label>Adresse e-mail de récupération<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" data-testid="forgot-email" /></label>
+          {!isCode && <label>Code famille (facultatif)<input value={familyCode} onChange={(e) => setFamilyCode(e.target.value.toUpperCase())} autoCapitalize="characters" autoComplete="off" data-testid="forgot-family" /></label>}
+          {state === "error" && <p className="error" role="alert" data-testid="forgot-error">{error}</p>}
+          <button className="btn btn--primary btn--big" disabled={state === "busy" || !email.includes("@")} data-testid="forgot-submit">{state === "busy" ? "Envoi…" : isCode ? "Recevoir mon code famille" : "Recevoir le lien"}</button>
+        </form>
+      )}
+      <button className="linkbtn" data-testid="forgot-back" onClick={onBack}>← Retour à la connexion</button>
+    </main>
+  );
+}
+
+/** Opened by the link in an e-mail (…/?verify=… or …/?reset=…). Works signed in or out. */
+export function LinkScreen({ kind, token, onDone }: { kind: "verify" | "reset"; token: string; onDone(): void }) {
+  const [state, setState] = useState<"busy" | "ok" | "bad" | "form" | "saved" | "offline">("busy");
+  const [secret, setSecret] = useState("");
+  const [again, setAgain] = useState("");
+  const [error, setError] = useState("");
+  const ran = useRef(false);
+  useEffect(() => {
+    if (ran.current) return; // a link is single-use: React's double effect (same instance, same ref) must not spend it twice
+    ran.current = true;
+    (kind === "verify" ? api.verifyEmail(token).then(() => "ok" as const) : api.checkResetToken(token).then((r) => (r.valid ? ("form" as const) : ("bad" as const))))
+      .then(setState)
+      .catch((e) => setState(e instanceof NetworkError ? "offline" : "bad"));
+  }, [kind, token]);
+  const mismatch = again.length > 0 && secret !== again;
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    try {
+      await api.resetPassword(token, secret, again);
+      setState("saved");
+    } catch (err) {
+      setError(err instanceof NetworkError ? "Pas de connexion." : err instanceof ApiError && err.code === "weak_secret" ? "Mot de passe trop simple (évitez 123456, 111111…)." : err instanceof ApiError && err.code === "invalid_link" ? "Ce lien n'est plus valable : demandez-en un nouveau." : "Mot de passe refusé (6 caractères, identiques).");
+    }
+  };
+  return (
+    <main className="auth" data-testid={`link-${kind}`}>
+      <Logo title={kind === "verify" ? "Adresse de récupération" : "Nouveau mot de passe"} text="SmartCourse" />
+      {state === "busy" && <p className="muted" role="status">Vérification du lien…</p>}
+      {state === "offline" && <p className="error" role="alert">Pas de connexion. Rouvrez le lien une fois en ligne.</p>}
+      {state === "bad" && <section className="panel" data-testid="link-bad"><p><b>Ce lien n'est plus valable.</b></p><p className="muted">{kind === "verify" ? "Demandez un nouvel e-mail depuis Réglages → Adresse de récupération." : "Il a expiré ou a déjà servi. Depuis la connexion, choisissez « Mot de passe oublié ? »."}</p></section>}
+      {state === "ok" && <section className="panel" data-testid="link-ok"><p><b>Adresse confirmée.</b></p><p className="muted">Elle peut désormais servir à retrouver le code famille ou à changer un mot de passe oublié.</p></section>}
+      {state === "form" && (
+        <form onSubmit={save}>
+          <label>Nouveau mot de passe — 6 caractères<input type="password" maxLength={6} value={secret} onChange={(e) => setSecret(e.target.value.replace(/\s/g, "").slice(0, 6))} autoComplete="new-password" required data-testid="reset-new" /></label>
+          <label>Confirmer le mot de passe<input type="password" maxLength={6} value={again} onChange={(e) => setAgain(e.target.value.replace(/\s/g, "").slice(0, 6))} autoComplete="new-password" required data-testid="reset-confirm" /></label>
+          {mismatch && <p className="error">Les deux mots de passe ne sont pas identiques.</p>}
+          {error && <p className="error" role="alert" data-testid="reset-error">{error}</p>}
+          <button className="btn btn--primary btn--big" disabled={!SIX(secret) || secret !== again} data-testid="reset-submit">Enregistrer</button>
+        </form>
+      )}
+      {state === "saved" && <section className="panel" data-testid="reset-saved"><p><b>Mot de passe modifié.</b></p><p className="muted">Toutes les sessions de ce profil ont été fermées : connectez-vous avec le nouveau mot de passe.</p></section>}
+      <button className="btn btn--primary btn--big" data-testid="link-continue" onClick={onDone}>{state === "saved" || state === "ok" ? "Continuer" : "Retour"}</button>
     </main>
   );
 }

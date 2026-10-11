@@ -35,11 +35,16 @@ export function dummyHash(): Promise<string> {
 export const newToken = (): string => randomBytes(32).toString("base64url");
 export const hashToken = (token: string): string => createHash("sha256").update(token).digest("hex");
 
+/** Mot de passe : exactement 6 caractères visibles (chiffres, lettres, symboles) ; les codes à 6 chiffres actuels en font partie. */
+export const SECRET_PATTERN = /^[^\s\p{C}]{6}$/u;
+export const isValidSecret = (s: string): boolean => SECRET_PATTERN.test(s);
+
 export function isWeakSecret(s: string): boolean {
-  if (/^(\d)\1{5}$/.test(s)) return true;
+  if (/^(.)\1{5}$/u.test(s)) return true; // même caractère six fois
+  if (!/^\d{6}$/.test(s)) return false;
   const d = [...s].map(Number);
   const step = (d[1] ?? 0) - (d[0] ?? 0);
-  return Math.abs(step) === 1 && d.every((v, i) => i === 0 || v - (d[i - 1] ?? 0) === step);
+  return Math.abs(step) === 1 && d.every((v, i) => i === 0 || v - (d[i - 1] ?? 0) === step); // 123456, 654321…
 }
 
 export function generateSecret(): string {

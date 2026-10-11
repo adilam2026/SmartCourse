@@ -13,7 +13,7 @@ describe("socle", () => {
     const app = await buildApp({ db: await testDb(), store: testStore() });
     const res = await app.inject({ method: "GET", url: "/health" });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ status: "ok", schema: "014_catalog_complete.sql", commit: null }); // dernière migration appliquée
+    expect(res.json()).toEqual({ status: "ok", schema: "015_recovery.sql", mail: "off", commit: null }); // dernière migration appliquée
   });
 
   it("les migrations sont idempotentes", async () => {
