@@ -3,7 +3,7 @@ import { withTx, type Db } from "./db.js";
 import { revokeProfileSessions } from "./auth.js";
 import { HttpError } from "./errors.js";
 import type { SseHub } from "./hub.js";
-import { appBaseUrl, templates, type Mailer, type OutgoingMail } from "./mail.js";
+import { appBaseUrl, explainMailFailure, templates, type DiagnosticCheck, type Mailer, type OutgoingMail } from "./mail.js";
 import { checkChosenSecret } from "./profiles.js";
 import { hashSecret, hashToken, newToken } from "./security.js";
 
@@ -25,6 +25,9 @@ export interface MailStatusView {
   status: "queued" | "accepted" | "delivered" | "bounced" | "failed" | "unknown" | "not_configured";
   at: string;
   detail: string | null;
+  /** Titre et conseil en français quand l'envoi n'a pas abouti. */
+  title: string;
+  hint: string;
 }
 
 export class RecoveryService {
@@ -104,7 +107,7 @@ export class RecoveryService {
       email: p?.recovery_email ?? null,
       verified: !!p?.recovery_email_verified_at,
       setupPending: !!p?.setup_pending,
-      lastMail: last ? { kind: last.kind, status: last.status, at: new Date(last.updated_at).toISOString(), detail: last.detail } : null,
+      lastMail: last ? { kind: last.kind, status: last.status, at: new Date(last.updated_at).toISOString(), detail: last.detail, ...explainMailFailure(last.status, last.detail) } : null,
     };
   }
 
@@ -137,6 +140,14 @@ export class RecoveryService {
     const token = await this.issueToken("verify_email", profileId, p.recovery_email);
     // The administrator is waiting for the answer here: the result of the hand-over is recorded before replying.
     await this.deliver("verify_email", profileId, templates.verifyEmail(p.recovery_email, `${this.baseUrl}/#/verify/${encodeURIComponent(token)}`), token);
+  }
+
+  /** Key / account / sender checks (no message is sent). Primary administrator only. */
+  async diagnose(profileId: string): Promise<DiagnosticCheck[]> {
+    const p = (await this.db.query("SELECT is_primary FROM profiles WHERE id = $1", [profileId])).rows[0];
+    if (!p?.is_primary) throw new HttpError(403, "forbidden", "Seul l'administrateur principal peut diagnostiquer l'envoi");
+    if (!this.mailer.enabled || !this.mailer.diagnose) return [{ name: "Configuration", ok: false, detail: "BREVO_API_KEY ou BREVO_FROM_EMAIL absent (ou invalide) dans les variables du service" }];
+    return this.mailer.diagnose();
   }
 
   /** Real check of the sending chain: a short message to the VERIFIED address. The result recorded is the service's answer (accepted ≠ received). */

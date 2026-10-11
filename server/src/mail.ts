@@ -24,9 +24,48 @@ export interface SendResult {
   unknown?: boolean;
 }
 
+export interface DiagnosticCheck {
+  name: string;
+  ok: boolean | null; // null = information / avertissement
+  detail: string;
+}
+
 export interface Mailer {
   readonly enabled: boolean;
   send(mail: OutgoingMail): Promise<SendResult>;
+  /** Contrôles sans envoi de message : clé, compte, expéditeur. Jamais de secret dans le résultat. */
+  diagnose?(): Promise<DiagnosticCheck[]>;
+}
+
+/** What Brevo said, made safe to store and show: no key, no address, no long token-like string, short. */
+export function safeProviderMessage(msg: unknown, apiKey?: string): string {
+  let t = typeof msg === "string" ? msg : "";
+  if (apiKey) t = t.split(apiKey).join("[clé]");
+  t = t.replace(/[^\s@]+@[^\s@]+\.[^\s@]+/g, "[adresse]").replace(/[A-Za-z0-9_-]{28,}/g, "[…]");
+  return t.replace(/\s+/g, " ").trim().slice(0, 180);
+}
+
+/** French title + what to do, from the stored detail of a failed send (HTTP status, Brevo code, Brevo message). */
+export function explainMailFailure(status: string, detail: string | null): { title: string; hint: string } {
+  const d = detail ?? "";
+  const http = Number(d.match(/HTTP (\d{3})/)?.[1] ?? 0);
+  const m = d.toLowerCase();
+  if (status === "not_configured") return { title: "Envoi d'e-mails non configuré", hint: "Ajoutez BREVO_API_KEY et BREVO_FROM_EMAIL dans les variables du service SmartCourse sur Railway, puis redéployez." };
+  if (status === "unknown") return { title: "Envoi incertain", hint: "Brevo n'a pas répondu à temps : le message est peut-être parti. Patientez quelques minutes avant de réessayer." };
+  if (status === "bounced") return { title: "E-mail rejeté par la boîte du destinataire", hint: "Vérifiez l'adresse saisie (faute de frappe ?) ou changez-la." };
+  if (status !== "failed") return { title: "", hint: "" };
+  if (m.includes("injoignable")) return { title: "E-mail non envoyé", hint: "Le service d'envoi Brevo est injoignable depuis le serveur. Réessayez dans un instant." };
+  if (m.includes("https")) return { title: "E-mail non envoyé", hint: "Configuration refusée : l'adresse du service d'envoi doit être en HTTPS." };
+  if (http === 401 || m.includes("unauthorized") || m.includes("key not found")) {
+    if (/\bip\b/.test(m)) return { title: "E-mail non envoyé : Brevo bloque l'adresse du serveur", hint: "Dans Brevo → Sécurité → Adresses IP autorisées, désactivez la restriction (Railway n'a pas d'adresse IP fixe), puis réessayez." };
+    return { title: "E-mail non envoyé : clé API refusée par Brevo", hint: "Vérifiez BREVO_API_KEY dans les variables Railway du service SmartCourse : clé API v3 complète et active, sans guillemets ni espace. Le bouton « Diagnostiquer l'envoi » le confirme." };
+  }
+  if (http === 403 || m.includes("permission_denied") || m.includes("not yet activated") || m.includes("not activated")) return { title: "E-mail non envoyé : compte Brevo non autorisé à envoyer", hint: "Le compte Brevo doit être activé pour l'envoi d'e-mails transactionnels (parfois après validation par Brevo). Contrôlez le compte dans Brevo." };
+  if (http === 400 && (m.includes("sender") || m.includes("expéditeur"))) return { title: "E-mail non envoyé : expéditeur non autorisé", hint: "BREVO_FROM_EMAIL doit être un expéditeur validé dans Brevo → Expéditeurs, domaines et IP. Les adresses gmail.com, yahoo.fr… sont refusées : utilisez une adresse de votre propre domaine, authentifié." };
+  if (http === 400) return { title: "E-mail non envoyé : demande refusée par Brevo", hint: "Brevo a refusé la demande (voir le détail ci-dessous). Le plus fréquent : expéditeur non validé. « Diagnostiquer l'envoi » vérifie la clé et l'expéditeur." };
+  if (http === 402 || http === 429 || m.includes("quota") || m.includes("limit")) return { title: "E-mail non envoyé : limite ou crédits Brevo atteints", hint: "Le quota d'envoi du compte Brevo est atteint ou le crédit épuisé. Réessayez plus tard ou contrôlez le plan Brevo." };
+  if (http >= 500) return { title: "E-mail non envoyé : panne chez Brevo", hint: "Le service Brevo a renvoyé une erreur : réessayez dans quelques minutes." };
+  return { title: "E-mail non envoyé", hint: "Le service d'envoi a refusé ou n'a pas confirmé le message. « Diagnostiquer l'envoi » contrôle la clé et l'expéditeur." };
 }
 
 export class DisabledMailer implements Mailer {
@@ -96,10 +135,54 @@ export class BrevoMailer implements Mailer {
     }
     if (status < 200 || status >= 300) {
       const code = typeof j?.code === "string" && /^[a-z_]{3,40}$/.test(j.code) ? ` ${j.code}` : "";
-      return { accepted: false, detail: `refus du service d'envoi (HTTP ${status}${code})` };
+      const why = safeProviderMessage((j as { message?: unknown } | null)?.message, this.o.apiKey);
+      return { accepted: false, detail: `refus du service d'envoi (HTTP ${status}${code})${why ? ` : ${why}` : ""}` };
     }
     if (typeof j?.messageId !== "string" || !j.messageId) return { accepted: false, detail: `réponse sans identifiant de message (HTTP ${status}) : acceptation non démontrée` };
     return { accepted: true, messageId: j.messageId };
+  }
+
+  /** GET calls only: nothing is sent. Answers « is the key valid, is the account able to send, is the sender authorised ? ». */
+  async diagnose(): Promise<DiagnosticCheck[]> {
+    const base = new URL(this.o.endpoint ?? "https://api.brevo.com/v3/smtp/email");
+    const f = this.o.fetchImpl ?? fetch;
+    const get = async (path: string): Promise<{ status: number; body: any } | { error: string }> => {
+      try {
+        const res = await f(new URL(path, base).toString(), { headers: { "api-key": this.o.apiKey, accept: "application/json" }, redirect: "error", signal: AbortSignal.timeout(this.o.timeoutMs ?? 10_000) });
+        return { status: res.status, body: await res.json().catch(() => null) };
+      } catch {
+        return { error: "service d'envoi injoignable depuis le serveur" };
+      }
+    };
+    const out: DiagnosticCheck[] = [];
+    const mask = (e: string) => `${e.slice(0, 1)}***@${e.split("@")[1] ?? ""}`;
+    const from = this.o.senderEmail.toLowerCase();
+    const acc = await get("/v3/account");
+    if ("error" in acc) return [{ name: "Service Brevo", ok: false, detail: acc.error }];
+    if (acc.status !== 200) {
+      const why = safeProviderMessage(acc.body?.message, this.o.apiKey);
+      out.push({ name: "Clé API (BREVO_API_KEY)", ok: false, detail: `refusée par Brevo (HTTP ${acc.status}${acc.body?.code ? ` ${acc.body.code}` : ""})${why ? ` : ${why}` : ""}` });
+    } else {
+      out.push({ name: "Clé API (BREVO_API_KEY)", ok: true, detail: "acceptée par Brevo" });
+      const plans: { type?: string; credits?: number }[] = Array.isArray(acc.body?.plan) ? acc.body.plan : [];
+      const mailPlan = plans.find((p) => /free|payAsYouGo|subscription|sms/i.test(String(p.type)) && typeof p.credits === "number");
+      if (mailPlan && (mailPlan.credits ?? 1) <= 0) out.push({ name: "Crédits d'envoi", ok: false, detail: "aucun crédit d'envoi restant sur le compte" });
+      else if (mailPlan) out.push({ name: "Crédits d'envoi", ok: true, detail: `${mailPlan.credits} restant(s)` });
+      if (acc.body?.relay && acc.body.relay.enabled === false) out.push({ name: "Envoi transactionnel (SMTP)", ok: false, detail: "non activé sur le compte Brevo : contactez Brevo pour l'activer" });
+    }
+    const sen = await get("/v3/senders");
+    if ("error" in sen) out.push({ name: "Expéditeur (BREVO_FROM_EMAIL)", ok: false, detail: sen.error });
+    else if (sen.status !== 200) out.push({ name: "Expéditeur (BREVO_FROM_EMAIL)", ok: null, detail: `liste des expéditeurs non lisible (HTTP ${sen.status}) : ${safeProviderMessage(sen.body?.message, this.o.apiKey) || "droits insuffisants de la clé"}` });
+    else {
+      const list: { email?: string; active?: boolean }[] = Array.isArray(sen.body?.senders) ? sen.body.senders : [];
+      const mine = list.find((x) => String(x.email).toLowerCase() === from);
+      if (mine?.active) out.push({ name: "Expéditeur (BREVO_FROM_EMAIL)", ok: true, detail: `${mask(from)} est un expéditeur validé` });
+      else if (mine) out.push({ name: "Expéditeur (BREVO_FROM_EMAIL)", ok: false, detail: `${mask(from)} existe dans Brevo mais n'est pas encore validé (cliquez sur le lien de validation envoyé par Brevo)` });
+      else out.push({ name: "Expéditeur (BREVO_FROM_EMAIL)", ok: false, detail: `${mask(from)} n'est pas un expéditeur de ce compte Brevo. Expéditeurs validés : ${list.filter((x) => x.active).map((x) => mask(String(x.email))).join(", ") || "aucun"}` });
+    }
+    const domain = from.split("@")[1] ?? "";
+    if (/^(gmail|googlemail|yahoo|ymail|hotmail|outlook|live|icloud|aol)\./i.test(domain)) out.push({ name: "Domaine de l'expéditeur", ok: null, detail: `${domain} est un service grand public : Brevo n'envoie pas depuis ces adresses (politique anti-usurpation). Utilisez une adresse de votre propre domaine, authentifié dans Brevo.` });
+    return out;
   }
 }
 

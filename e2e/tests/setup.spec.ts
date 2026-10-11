@@ -51,7 +51,7 @@ test("installation : échec d'envoi → on réessaie ou on change l'adresse sans
   await c.connect();
   await c.query("INSERT INTO install_tokens (token_hash) VALUES ($1)", [createHash("sha256").update(token).digest("hex")]);
   await c.end();
-  await fetch(`${MOCK}/__fail?on=1`, { method: "POST" });
+  await fetch(`${MOCK}/__fail?on=1&status=400&code=invalid_parameter&msg=${encodeURIComponent("valid sender email required")}`, { method: "POST" });
   try {
     await page.goto("/");
     await page.getByTestId("go-setup").click();
@@ -65,10 +65,16 @@ test("installation : échec d'envoi → on réessaie ou on change l'adresse sans
     await page.getByTestId("setup-email").fill(typo);
     await page.getByTestId("setup-submit").click();
     await expect(page.getByTestId("setup-verify")).toBeVisible(); // la famille existe, en attente
-    await expect(page.getByTestId("verify-status")).toContainText("n'a pas pu être envoyé");
+    await expect(page.getByRole("heading", { name: "E-mail non envoyé" })).toBeVisible(); // jamais « ouvrez le lien reçu » après un refus
+    await expect(page.getByTestId("verify-status")).toContainText("HTTP 400"); // statut et message de Brevo, sans secret
+    await expect(page.getByTestId("verify-status")).toContainText("expéditeur");
+    await expect(page.getByTestId("verify-resend")).toHaveText("Réessayer l'envoi");
     await page.screenshot({ path: "../docs/captures/acces/installation-echec-envoi-390.png" });
+    await page.getByTestId("mail-diagnose").click();
+    await expect(page.getByTestId("mail-checks")).toContainText("Clé API (BREVO_API_KEY)");
+    await expect(page.getByTestId("mail-checks")).toContainText("acceptée par Brevo");
     await page.getByTestId("verify-resend").click();
-    await expect(page.getByTestId("verify-status")).toContainText("n'a pas pu être envoyé"); // toujours en panne : on peut réessayer, encore et encore
+    await expect(page.getByTestId("mail-title")).toBeVisible(); // toujours en panne : on peut réessayer, encore et encore
     await fetch(`${MOCK}/__fail?on=0`, { method: "POST" });
     const fixed = `adil${randomBytes(5).toString("hex")}@example.org`;
     await page.getByTestId("verify-change").click();

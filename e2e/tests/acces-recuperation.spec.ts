@@ -109,15 +109,15 @@ test("adresse de récupération : réglages, changement d'adresse, lien reçu qu
   await expect(page.getByTestId("recovery-unconfigured")).toHaveCount(0); // l'envoi est configuré
   // e-mail de test : réponse réelle du service, « accepté » n'est pas « reçu »
   await page.getByTestId("recovery-test").click();
-  await expect(page.getByTestId("recovery-lastmail")).toContainText("accepté par le service d'envoi");
-  await expect(page.getByTestId("recovery-lastmail")).toContainText("réception dans la boîte non confirmée");
+  await expect(page.getByTestId("mail-ok")).toContainText("accepté par le service d'envoi");
+  await expect(page.getByTestId("mail-ok")).toContainText("réception dans la boîte n'est pas confirmée");
   expect((await mailsTo(f.email)).some((m) => m.subject.includes("test"))).toBe(true);
   // nouvelle adresse : à vérifier tant que le lien n'est pas ouvert
   const next = `adil${randomBytes(5).toString("hex")}@example.org`;
   await page.getByTestId("recovery-input").fill(next);
   await page.getByTestId("recovery-save").click();
   await expect(page.getByTestId("recovery-state")).toContainText("À vérifier");
-  await expect(page.getByTestId("recovery-lastmail")).toContainText("accepté");
+  await expect(page.getByTestId("mail-ok")).toContainText("accepté");
   await page.screenshot({ path: `${OUT}/recuperation-390.png`, fullPage: true });
   const token = await linkTokenFor(next, "verify");
   await page.goto(`/#/verify/${token}`);
@@ -177,4 +177,46 @@ test("récupération : code famille et mot de passe oubliés par e-mail réel (c
   await expect(page.getByTestId("tab-settings")).toBeVisible();
   await page.goto(`/#/reset/${token}`);
   await expect(page.getByTestId("link-bad")).toBeVisible(); // usage unique
+});
+
+test("e-mail refusé : « E-mail non envoyé » avec la cause, jamais « ouvrez le lien reçu » ; réessayer ; diagnostic de la clé et de l'expéditeur", async ({ page, playwright, baseURL }) => {
+  const f = await newFamily(playwright, baseURL!);
+  const causes: [string, string, string, string][] = [
+    ["401", "unauthorized", "Key not found", "clé API refusée par Brevo"],
+    ["401", "unauthorized", "We have detected you are using an unrecognised IP address 1.2.3.4", "bloque l'adresse du serveur"],
+    ["403", "permission_denied", "Your account is not yet activated", "compte Brevo non autorisé"],
+  ];
+  await uiLogin(page, f, "adil", "482913");
+  await page.getByTestId("tab-settings").click();
+  await page.getByTestId("seg-recovery").click();
+  const next = `adil${randomBytes(5).toString("hex")}@example.org`;
+  try {
+    for (const [status, code, msg, title] of causes) {
+      await fetch(`http://127.0.0.1:3199/__fail?on=1&status=${status}&code=${code}&msg=${encodeURIComponent(msg)}`, { method: "POST" });
+      await page.getByTestId("recovery-input").fill(next);
+      await page.getByTestId("recovery-save").click();
+      await expect(page.getByTestId("recovery-state")).toContainText("E-mail non envoyé");
+      await expect(page.getByTestId("recovery-state")).not.toContainText("ouvrez le lien");
+      await expect(page.getByTestId("mail-title")).toContainText(title);
+      await expect(page.getByTestId("mail-detail")).toContainText(`HTTP ${status} ${code}`);
+      await expect(page.getByTestId("recovery-resend")).toHaveText("Réessayer l'envoi");
+    }
+    await page.screenshot({ path: `${OUT}/email-refuse-390.png`, fullPage: true });
+    // diagnostic : expéditeur absent des expéditeurs validés
+    await fetch("http://127.0.0.1:3199/__senders?list=autre%40example.org", { method: "POST" });
+    await page.getByTestId("mail-diagnose").click();
+    await expect(page.getByTestId("mail-checks")).toContainText("n'est pas un expéditeur de ce compte Brevo");
+    await page.screenshot({ path: `${OUT}/diagnostic-envoi-390.png`, fullPage: true });
+    // la cause est corrigée : réessayer fonctionne, sans recréer quoi que ce soit
+    await fetch("http://127.0.0.1:3199/__fail?on=0", { method: "POST" });
+    await fetch("http://127.0.0.1:3199/__senders?list=noreply%40smartcourse.test", { method: "POST" });
+    await page.getByTestId("recovery-resend").click();
+    await expect(page.getByTestId("mail-ok")).toContainText("accepté par le service d'envoi");
+    await expect(page.getByTestId("recovery-state")).toContainText("À vérifier : ouvrez le lien reçu");
+    await page.getByTestId("mail-diagnose").click();
+    await expect(page.getByTestId("mail-checks")).toContainText("est un expéditeur validé");
+  } finally {
+    await fetch("http://127.0.0.1:3199/__fail?on=0", { method: "POST" });
+    await fetch("http://127.0.0.1:3199/__senders?list=noreply%40smartcourse.test", { method: "POST" });
+  }
 });

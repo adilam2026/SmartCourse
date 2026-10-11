@@ -41,3 +41,17 @@ Chaque envoi est journalisé (`email_log`, adresse masquée) avec son état, aff
 | non configuré | aucune clé : rien n'est parti. |
 
 Pour activer « remis / rejeté » : dans Brevo → Transactional → Settings → Webhooks, adresse `https://<domaine>/api/email/brevo-webhook/<BREVO_WEBHOOK_SECRET>`, événements *delivered, hard bounce, soft bounce, blocked, spam, invalid*. La réception réelle dans la boîte mail se vérifie **à la main** (courriers indésirables compris) et dans Brevo → Transactional → Logs.
+
+## Diagnostiquer un e-mail « non envoyé »
+L'écran affiche désormais, quand l'envoi n'a pas abouti, **« E-mail non envoyé »** avec : la cause probable, la marche à suivre, et le détail réel renvoyé par Brevo (statut HTTP, code, message — nettoyé : ni clé, ni adresse). « Réessayer l'envoi » relance le message sans rien recréer.
+
+| Réponse de Brevo | Cause probable | Correction |
+|---|---|---|
+| HTTP 401 `unauthorized` « Key not found » | clé absente, tronquée, avec guillemets/espaces, ou révoquée | corriger `BREVO_API_KEY` (clé API **v3** complète) dans les variables du service SmartCourse |
+| HTTP 401 « unrecognised IP address » | Brevo → Sécurité → *Adresses IP autorisées* actif | désactiver la restriction (Railway n'a pas d'IP fixe) |
+| HTTP 403 `permission_denied` / « not yet activated » | compte Brevo non activé pour l'envoi transactionnel | faire activer le compte chez Brevo |
+| HTTP 400 `invalid_parameter` (« sender… ») | `BREVO_FROM_EMAIL` pas un expéditeur validé, ou adresse gmail/yahoo… | valider l'expéditeur dans Brevo → Expéditeurs, domaines et IP ; utiliser une adresse de son propre domaine |
+| HTTP 402 / 429 | quota ou crédits épuisés | attendre / contrôler le plan |
+| 5xx / injoignable | panne ou réseau | réessayer |
+
+**« Diagnostiquer l'envoi »** (Réglages → Adresse de récupération, et écran d'installation) contrôle **sans envoyer de message** : clé acceptée ou non, crédits, envoi transactionnel activé, `BREVO_FROM_EMAIL` présent et validé parmi les expéditeurs du compte, domaine grand public. Il n'affiche jamais la clé.

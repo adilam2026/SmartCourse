@@ -195,6 +195,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     return recovery.state(req.auth!.profileId);
   });
 
+  app.post("/api/recovery-email/diagnose", { preHandler: guard("family.manage", { allowPending: true }), config: { rateLimit: deps.recoveryRateLimit ?? { max: 20, timeWindow: "1 hour" } } }, async (req) => ({ checks: await recovery.diagnose(req.auth!.profileId) }));
   app.post("/api/recovery-email/test", { preHandler: guard("family.manage"), config: { rateLimit: deps.recoveryRateLimit ?? { max: 10, timeWindow: "1 hour" } } }, async (req) => {
     await recovery.sendTest(req.auth!.profileId);
     return recovery.state(req.auth!.profileId);

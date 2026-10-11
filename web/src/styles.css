@@ -419,3 +419,14 @@ h3 { font-size: 1.05rem; font-weight: 800; }
 .panel.danger { border-color: #b3261e; }
 .btn--danger { background: #b3261e; color: #fff; border-color: #b3261e; }
 .btn--danger:disabled { background: var(--slate-soft, #eceff1); color: var(--muted); border-color: var(--line); }
+
+/* ---------- état d'un e-mail ---------- */
+.mailproblem { display: grid; gap: 0.35rem; padding: 0.7rem 0.8rem; border-radius: 12px; border: 1.5px solid var(--red, #b3261e); background: color-mix(in srgb, var(--red, #b3261e) 8%, var(--surface)); }
+.mailproblem b { color: var(--red, #b3261e); }
+.mailproblem p { margin: 0; }
+.mailproblem small { overflow-wrap: anywhere; }
+.diagnose { display: grid; gap: 0.5rem; }
+.checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+.checks li { padding: 0.5rem 0.7rem; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); overflow-wrap: anywhere; }
+.checks li.good { border-color: var(--green-line, var(--line)); }
+.checks li.bad { border-color: var(--red, #b3261e); }

@@ -6,6 +6,7 @@ import { fmtDateTime } from "../format";
 import { CATEGORY_EMOJI } from "../categories";
 import { Dialog } from "../components/Dialog";
 import { Icon, type IconName } from "../components/Icon";
+import { Diagnose, isMailProblem, MailStatus } from "../components/MailStatus";
 import { NotificationSettings, usePushControl } from "../components/NotificationSettings";
 import { PageHead } from "../components/PageHead";
 import { useBackLayer } from "../useBackLayer";
@@ -290,16 +291,6 @@ function ResetFamily({ engine }: { engine: Engine }) {
   );
 }
 
-const MAIL_STATE: Record<string, string> = {
-  queued: "en cours d'envoi",
-  accepted: "accepté par le service d'envoi (Brevo) — réception dans la boîte non confirmée",
-  delivered: "remis au serveur de la boîte mail (à vérifier dans vos courriers, y compris indésirables)",
-  bounced: "rejeté par la boîte du destinataire — vérifiez l'adresse",
-  failed: "refusé par le service d'envoi",
-  unknown: "pas de réponse du service d'envoi à temps : le message est peut-être parti",
-  not_configured: "envoi d'e-mails non configuré sur le serveur",
-};
-
 /** Adresse de récupération : enregistrée par l'administrateur principal, utilisable seulement après vérification par e-mail. */
 function Recovery() {
   const [st, setSt] = useState<RecoveryState | null>(null);
@@ -320,23 +311,25 @@ function Recovery() {
     }
   };
   if (!st) return <p className="empty">{error ?? "Chargement…"}</p>;
-  const badge = st.email ? (st.verified ? "Adresse vérifiée" : "À vérifier : ouvrez le lien reçu par e-mail") : "Aucune adresse enregistrée";
+  const problem = isMailProblem(st.lastMail);
+  const badge = st.email ? (st.verified ? "Adresse vérifiée" : problem ? "E-mail non envoyé" : "À vérifier : ouvrez le lien reçu par e-mail") : "Aucune adresse enregistrée";
   return (
     <div className="panel recovery" data-testid="recovery">
       <p><span className={`statebadge ${st.verified ? "" : "statebadge--bad"}`} data-testid="recovery-state"><Icon name={st.verified ? "check" : "info"} size={16} /> {badge}</span></p>
       {st.email && <p data-testid="recovery-email">{st.email}</p>}
       {!st.configured && <p className="muted" data-testid="recovery-unconfigured">L'envoi d'e-mails n'est pas encore configuré sur le serveur : l'adresse peut être enregistrée mais aucun message ne partira.</p>}
-      {st.lastMail && <p className="muted" data-testid="recovery-lastmail">Dernier e-mail ({st.lastMail.kind === "test" ? "test" : "vérification"}) : {MAIL_STATE[st.lastMail.status]} ({fmtDateTime(st.lastMail.at)}).</p>}
+      <MailStatus mail={st.lastMail} />
       {st.canEdit ? (
         <form className="form" onSubmit={(e) => { e.preventDefault(); void run(() => api.setRecoveryEmail(email.trim())); }}>
           <label className="field">Adresse e-mail de récupération<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" maxLength={254} required data-testid="recovery-input" /></label>
           <button className="btn btn--primary btn--big" disabled={busy || !email.includes("@")} data-testid="recovery-save">{st.email ? "Enregistrer et envoyer le lien de vérification" : "Enregistrer et vérifier"}</button>
-          {st.email && !st.verified && <button type="button" className="btn" disabled={busy} data-testid="recovery-resend" onClick={() => void run(() => api.resendRecovery())}>Renvoyer le lien</button>}
+          {st.email && !st.verified && <button type="button" className="btn" disabled={busy} data-testid="recovery-resend" onClick={() => void run(() => api.resendRecovery())}>{problem ? "Réessayer l'envoi" : "Renvoyer le lien"}</button>}
           {st.verified && <button type="button" className="btn" disabled={busy || !st.configured} data-testid="recovery-test" onClick={() => void run(() => api.testRecovery())}>Envoyer un e-mail de test</button>}
         </form>
       ) : (
         <p className="muted">Seul l'administrateur principal gère l'adresse de récupération de la famille.</p>
       )}
+      {st.canEdit && <Diagnose />}
       <p className="muted">Elle sert à recevoir le code famille et un lien temporaire pour choisir un nouveau mot de passe. L'ancien mot de passe n'est jamais envoyé.</p>
       {error && <p className="error" role="alert" data-testid="recovery-error">{error}</p>}
     </div>

@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
 import { generateInstallToken } from "../src/auth.js";
 import type { Db } from "../src/db.js";
-import { BrevoMailer, DisabledMailer, mailerFromEnv, type Mailer, type OutgoingMail, type SendResult } from "../src/mail.js";
+import { BrevoMailer, DisabledMailer, explainMailFailure, mailerFromEnv, safeProviderMessage, type Mailer, type OutgoingMail, type SendResult } from "../src/mail.js";
 import { RecoveryService } from "../src/recovery.js";
 import { closeTestDb, resetData, testDb, testStore } from "./helpers.js";
 
@@ -291,5 +291,73 @@ describe("module d'envoi Brevo", () => {
     const st = (await a.inject({ method: "GET", url: "/api/recovery-email", cookies: cookieOf(res) })).json();
     expect(st).toMatchObject({ configured: false, verified: false, lastMail: { status: "not_configured" } });
     await a.close();
+  });
+});
+
+describe("refus du service d'envoi : le statut HTTP et le message de Brevo sont conservés (sans secret) et expliqués", () => {
+  const mk = (f: any) => new BrevoMailer({ apiKey: "xkeysib-0123456789abcdef0123456789abcdef-secret", senderEmail: "n@x.org", senderName: "S", fetchImpl: f });
+  const mail = { to: "a@b.c", subject: "s", text: "t", html: "t" };
+
+  it("détail = statut + code + message de Brevo nettoyés (ni clé, ni adresse)", async () => {
+    const r = await mk(async () => new Response(JSON.stringify({ code: "unauthorized", message: "Key not found xkeysib-0123456789abcdef0123456789abcdef-secret pour moi@example.org" }), { status: 401 })).send(mail);
+    expect(r.accepted).toBe(false);
+    expect(r.detail).toContain("HTTP 401 unauthorized");
+    expect(r.detail).toContain("Key not found");
+    expect(r.detail).not.toContain("xkeysib");
+    expect(r.detail).not.toContain("moi@example.org");
+    expect(safeProviderMessage("a".repeat(40) + " ok")).toBe("[…] ok");
+  });
+
+  it("chaque cause fréquente reçoit un titre et un conseil précis", () => {
+    const e = (detail: string, status = "failed") => explainMailFailure(status, detail);
+    expect(e("refus du service d'envoi (HTTP 401 unauthorized) : Key not found").title).toContain("clé API refusée");
+    expect(e("refus du service d'envoi (HTTP 401 unauthorized) : We have detected you are using an unrecognised IP address 1.2.3.4").title).toContain("bloque l'adresse du serveur");
+    expect(e("refus du service d'envoi (HTTP 403 permission_denied) : Your account is not yet activated").title).toContain("compte Brevo non autorisé");
+    expect(e("refus du service d'envoi (HTTP 400 invalid_parameter) : valid sender email required").title).toContain("expéditeur non autorisé");
+    expect(e("refus du service d'envoi (HTTP 400 invalid_parameter) : autre").title).toContain("demande refusée");
+    expect(e("refus du service d'envoi (HTTP 429 too_many_requests)").title).toContain("limite");
+    expect(e("refus du service d'envoi (HTTP 503)").title).toContain("panne chez Brevo");
+    expect(e("service d'envoi injoignable depuis le serveur").hint).toContain("injoignable");
+    expect(e("", "unknown").title).toContain("incertain");
+    expect(e("", "not_configured").hint).toContain("BREVO_API_KEY");
+    expect(e("", "accepted")).toEqual({ title: "", hint: "" });
+  });
+
+  it("l'état renvoyé à l'écran contient ce diagnostic ; un refus n'est jamais présenté comme un lien à ouvrir", async () => {
+    const failing = new RecordingMailer();
+    failing.next = { accepted: false, detail: "refus du service d'envoi (HTTP 401 unauthorized) : Key not found" };
+    const svc = new RecoveryService(db, failing, BASE);
+    const a = await buildApp({ db, store: testStore(), recovery: svc, requireRecoveryEmail: true, loginRateLimit: { max: 1000, timeWindow: "1 minute" } });
+    const res = await a.inject({ method: "POST", url: "/api/setup/family", payload: { installToken: await generateInstallToken(db), familyName: "Refus", admin: { displayName: "A", login: "adil", secret: "482913", secretConfirm: "482913", recoveryEmail: email() } } });
+    expect(res.statusCode).toBe(201);
+    expect(res.json().recovery.lastMail).toMatchObject({ status: "failed", title: expect.stringContaining("clé API refusée"), hint: expect.stringContaining("BREVO_API_KEY"), detail: expect.stringContaining("HTTP 401") });
+    await a.close();
+  });
+
+  it("diagnostic sans envoi : clé, expéditeur, domaine grand public, restriction d'adresse IP ; réservé au principal", async () => {
+    const reply = (routes: Record<string, [number, unknown]>) => (async (url: string) => { const r = routes[new URL(url).pathname] ?? [404, {}]; return new Response(JSON.stringify(r[1]), { status: r[0] }); }) as any;
+    const diag = (routes: Record<string, [number, unknown]>, from = "n@x.org") => new BrevoMailer({ apiKey: "cle", senderEmail: from, senderName: "S", fetchImpl: reply(routes) }).diagnose();
+    const good = await diag({ "/v3/account": [200, { plan: [{ type: "free", credits: 300 }], relay: { enabled: true } }], "/v3/senders": [200, { senders: [{ email: "n@x.org", active: true }] }] });
+    expect(good.every((c) => c.ok !== false)).toBe(true);
+    const ip = await diag({ "/v3/account": [401, { code: "unauthorized", message: "We have detected you are using an unrecognised IP address 9.9.9.9" }] });
+    expect(ip[0]).toMatchObject({ name: expect.stringContaining("Clé API"), ok: false, detail: expect.stringContaining("unrecognised IP") });
+    const wrongSender = await diag({ "/v3/account": [200, {}], "/v3/senders": [200, { senders: [{ email: "autre@x.org", active: true }] }] });
+    expect(wrongSender.find((c) => c.name.startsWith("Expéditeur"))).toMatchObject({ ok: false, detail: expect.stringContaining("n'est pas un expéditeur") });
+    const notValidated = await diag({ "/v3/account": [200, {}], "/v3/senders": [200, { senders: [{ email: "n@x.org", active: false }] }] });
+    expect(notValidated.find((c) => c.name.startsWith("Expéditeur"))!.detail).toContain("pas encore validé");
+    const gmail = await diag({ "/v3/account": [200, {}], "/v3/senders": [200, { senders: [{ email: "moi@gmail.com", active: true }] }] }, "moi@gmail.com");
+    expect(gmail.find((c) => c.name.startsWith("Domaine"))).toMatchObject({ ok: null, detail: expect.stringContaining("grand public") });
+    const noMail = await diag({ "/v3/account": [200, { plan: [{ type: "free", credits: 0 }], relay: { enabled: false } }], "/v3/senders": [200, { senders: [] }] });
+    expect(noMail.filter((c) => c.ok === false).map((c) => c.name)).toEqual(expect.arrayContaining(["Crédits d'envoi", "Envoi transactionnel (SMTP)"]));
+    // jamais la clé dans le résultat
+    expect(JSON.stringify(ip)).not.toContain('"cle"');
+    // droits : principal seulement, y compris pendant l'installation
+    const pending = await family(email());
+    expect((await app.inject({ method: "POST", url: "/api/recovery-email/diagnose", cookies: pending.admin })).statusCode).toBe(200); // possible pendant l'installation
+    const f = await verifiedFamily();
+    await post("/api/profiles", { displayName: "Sara", login: "sara", role: "parent", secret: "573918", secretConfirm: "573918" }, f.admin);
+    const sara = cookieOf(await login(f.code, "sara", "573918"));
+    expect((await app.inject({ method: "POST", url: "/api/recovery-email/diagnose", cookies: sara })).statusCode).toBe(403);
+    expect((await app.inject({ method: "POST", url: "/api/recovery-email/diagnose" })).statusCode).toBe(401);
   });
 });

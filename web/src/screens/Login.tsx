@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError, NetworkError, type RecoveryState } from "../api";
+import { Diagnose, isMailProblem, MailStatus } from "../components/MailStatus";
 import type { Engine, State } from "../sync/engine";
 
 type Mode = "login" | "setup" | "forgot-code" | "forgot-password";
@@ -138,16 +139,6 @@ function Forgot({ kind, onBack }: { kind: "forgot-code" | "forgot-password"; onB
   );
 }
 
-const MAIL_TEXT: Record<string, string> = {
-  queued: "Envoi en cours…",
-  accepted: "Le message a été accepté par le service d'envoi. Il peut mettre quelques minutes à arriver : regardez aussi les courriers indésirables.",
-  delivered: "Le message a été remis à votre boîte mail : ouvrez-le et appuyez sur le lien.",
-  bounced: "Le message a été rejeté par votre boîte mail : vérifiez l'adresse ou changez-la ci-dessous.",
-  failed: "Le message n'a pas pu être envoyé. Rien n'est perdu : réessayez, ou changez l'adresse.",
-  unknown: "Le service d'envoi n'a pas répondu à temps : le message est peut-être parti. Patientez un peu ou renvoyez-le.",
-  not_configured: "L'envoi d'e-mails n'est pas configuré sur le serveur : l'installation ne peut pas se terminer pour l'instant.",
-};
-
 /** Family created, address not verified yet: the only thing possible is to finish (verify, resend, change the address) — never a dead end. */
 export function SetupVerify({ engine }: { engine: Engine }) {
   const [st, setSt] = useState<RecoveryState | null>(null);
@@ -155,6 +146,7 @@ export function SetupVerify({ engine }: { engine: Engine }) {
   const [changing, setChanging] = useState(false);
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
+  const problem = isMailProblem(st?.lastMail);
   const load = async () => {
     try {
       const r = await api.recoveryState();
@@ -185,13 +177,17 @@ export function SetupVerify({ engine }: { engine: Engine }) {
   };
   return (
     <main className="auth" data-testid="setup-verify">
-      <Logo title="Vérifiez votre e-mail" text="Dernière étape de l'installation" />
+      <Logo title={problem ? "E-mail non envoyé" : "Vérifiez votre e-mail"} text="Dernière étape de l'installation" />
       <section className="panel">
-        <p>Un lien de confirmation a été envoyé à <b data-testid="verify-address">{st?.email ?? "…"}</b>. Ouvrez-le (sur ce téléphone ou un autre) : l'installation se termine toute seule.</p>
-        {st?.lastMail && <p className="muted" data-testid="verify-status">{MAIL_TEXT[st.lastMail.status]}</p>}
-        {st && !st.configured && <p className="error" role="alert" data-testid="verify-unconfigured">{MAIL_TEXT.not_configured}</p>}
+        {problem ? (
+          <p>Votre famille est créée, mais le lien de confirmation n'a <b>pas</b> pu être envoyé à <b data-testid="verify-address">{st?.email ?? "…"}</b>. Rien n'est perdu : corrigez la cause ci-dessous puis réessayez, ou changez l'adresse.</p>
+        ) : (
+          <p>Un lien de confirmation a été envoyé à <b data-testid="verify-address">{st?.email ?? "…"}</b>. Ouvrez-le (sur ce téléphone ou un autre) : l'installation se termine toute seule.</p>
+        )}
+        <div data-testid="verify-status"><MailStatus mail={st?.lastMail ?? null} /></div>
         {error && <p className="error" role="alert" data-testid="verify-error">{error}</p>}
-        <button className="btn btn--primary btn--big" disabled={busy || !st?.email} data-testid="verify-resend" onClick={() => void act(() => api.resendRecovery())}>Renvoyer le lien</button>
+        <button className="btn btn--primary btn--big" disabled={busy || !st?.email} data-testid="verify-resend" onClick={() => void act(() => api.resendRecovery())}>{problem ? "Réessayer l'envoi" : "Renvoyer le lien"}</button>
+        <Diagnose />
         {!changing ? (
           <button className="btn" data-testid="verify-change" onClick={() => { setEmail(st?.email ?? ""); setChanging(true); }}>Changer d'adresse</button>
         ) : (
