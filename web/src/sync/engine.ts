@@ -175,6 +175,16 @@ export class Engine {
     this.set({ phase: "loggedOut", me: null, catalog: null, list: undefined, toggles: {}, batches: [], draftListId: null, orphan: null, notices: [], lastLogin: null, welcomeCode: null, prefillInstallToken: installToken, installFrom: "reset", installRefused: false });
   }
 
+  /** The person deleted their own account: nothing of it stays on this phone and the login screen opens. */
+  async afterAccountDeleted(): Promise<void> {
+    clearTimeout(this.retryTimer);
+    this.retryPending = false;
+    this.closeEvents();
+    await Promise.race([this.releasePush?.().catch(() => {}), new Promise((r) => setTimeout(r, 3000))]);
+    await this.wipeLocal();
+    this.set({ phase: "loggedOut", me: null, catalog: null, list: undefined, toggles: {}, batches: [], draftListId: null, orphan: null, notices: [], lastLogin: null, welcomeCode: null });
+  }
+
   /** An installation link (/#/install/…) was opened: the authorisation is kept here, never typed or shown. */
   acceptInstallLink(token: string): void {
     try {

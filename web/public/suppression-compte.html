@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Courses — Supprimer mon compte</title>
+<style>
+  :root { color-scheme: light dark; --bg: #faf6ef; --ink: #1f2a24; --muted: #5a665f; --link: #17613f; --line: #cfc6b4; --card: #fff; --danger: #a12727; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #14201a; --ink: #eef3ef; --muted: #aab7ae; --link: #7fd1a6; --line: #3b4a41; --card: #1b2a22; --danger: #ff9b9b; } }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 1rem/1.55 system-ui, sans-serif; }
+  main { max-width: 34rem; margin: 0 auto; padding: 1rem 16px 3rem; }
+  h1 { font-size: 1.5rem; } a { color: var(--link); } .muted { color: var(--muted); }
+  form { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 1rem; display: grid; gap: 0.8rem; }
+  label { display: grid; gap: 0.25rem; font-weight: 700; }
+  input[type=text], input[type=password] { font: inherit; padding: 0.7rem; border: 1.5px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--ink); min-height: 44px; box-sizing: border-box; width: 100%; }
+  label.check { display: flex; gap: 0.6rem; align-items: flex-start; font-weight: 500; }
+  button { font: inherit; font-weight: 700; min-height: 48px; border-radius: 14px; border: 0; background: var(--danger); color: #fff; padding: 0 1rem; cursor: pointer; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  button.link { background: none; color: var(--link); text-decoration: underline; min-height: 44px; justify-self: start; padding: 0; font-weight: 500; }
+  .msg { padding: 0.7rem 0.9rem; border-radius: 12px; border: 1px solid var(--line); background: var(--card); }
+  .err { color: var(--danger); } [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Supprimer mon compte Courses</h1>
+  <p>Cette page permet à chaque personne de demander la suppression de <b>son propre profil</b>, sans supprimer sa famille ni les autres profils. Aucune connexion préalable n'est nécessaire : saisissez les mêmes informations que pour vous connecter.</p>
+  <p class="muted">Ce qui est supprimé : votre nom affiché, votre identifiant, votre code secret, vos accès et vos abonnements aux notifications. Dans l'historique des achats de la famille, votre nom devient « Ancien profil ». La suppression est <b>définitive</b>.</p>
+
+  <form id="f" autocomplete="off" novalidate>
+    <label>Code famille <input id="code" type="text" autocapitalize="characters" autocomplete="off" required></label>
+    <label>Identifiant <input id="login" type="text" autocapitalize="none" autocorrect="off" autocomplete="off" required></label>
+    <label>Mot de passe (code secret)
+      <input id="secret" type="password" inputmode="numeric" maxlength="6" autocomplete="off" required>
+    </label>
+    <button type="button" class="link" id="kb">Mon mot de passe contient des lettres ou des symboles</button>
+    <label class="check"><input id="sure" type="checkbox"> <span>Je comprends que la suppression de mon compte est définitive.</span></label>
+    <p id="err" class="err" role="alert" hidden></p>
+    <button id="go" type="submit" disabled>Supprimer mon compte</button>
+  </form>
+  <p id="done" class="msg" role="status" hidden><b>Votre compte a été supprimé.</b> Vos accès sont fermés. La famille et les autres profils n'ont pas changé.</p>
+
+  <h2>Cas particuliers</h2>
+  <ul>
+    <li><b>Profil principal</b> (celui qui a créé la famille) : il ne se supprime qu'avec toute la famille, dans l'application (<i>Réglages → Réinitialiser la famille</i>).</li>
+    <li><b>Dernier administrateur</b> : la famille doit garder au moins un administrateur actif.</li>
+    <li><b>Vous ne pouvez plus vous connecter</b> (code oublié, profil désactivé) : demandez à un administrateur de votre famille de supprimer votre profil, ou écrivez à <!--CONTACT-->.</li>
+  </ul>
+  <p><a href="/confidentialite.html">Politique de confidentialité</a> · <a href="/">Retour à l'application</a></p>
+</main>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var code = $("code"), login = $("login"), secret = $("secret"), sure = $("sure"), go = $("go"), err = $("err");
+  var full = false;
+  function ready() { go.disabled = !(code.value.trim() && login.value.trim() && secret.value.length === 6 && sure.checked); }
+  [code, login, secret, sure].forEach(function (e) { e.addEventListener("input", ready); e.addEventListener("change", ready); });
+  $("kb").addEventListener("click", function () {
+    full = !full;
+    secret.setAttribute("inputmode", full ? "text" : "numeric");
+    $("kb").textContent = full ? "Revenir au clavier numérique" : "Mon mot de passe contient des lettres ou des symboles";
+    secret.blur(); secret.focus();
+  });
+  var MESSAGES = {
+    401: "Identifiants incorrects ou accès temporairement bloqué. Vérifiez la saisie ou réessayez plus tard.",
+    409: "Ce compte ne peut pas être supprimé ainsi : le profil principal se supprime avec toute la famille, et la famille doit garder un administrateur actif.",
+    429: "Trop de tentatives. Patientez quelques minutes avant de réessayer.",
+    400: "Vérifiez les champs saisis, puis réessayez."
+  };
+  $("f").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    err.hidden = true; go.disabled = true;
+    fetch("/api/account/delete", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ familyCode: code.value.trim().toUpperCase(), login: login.value.trim().toLowerCase(), secret: secret.value }) })
+      .then(function (r) {
+        if (r.ok) { $("f").hidden = true; $("done").hidden = false; secret.value = ""; return; }
+        err.textContent = MESSAGES[r.status] || "Un problème est survenu. Réessayez dans quelques instants."; err.hidden = false; ready();
+      })
+      .catch(function () { err.textContent = "Pas de connexion. Réessayez quand le réseau est revenu."; err.hidden = false; ready(); });
+  });
+})();
+</script>
+</body>
+</html>

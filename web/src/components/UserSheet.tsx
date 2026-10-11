@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, type Credit } from "../api";
 import { useBackLayer } from "../useBackLayer";
+import { DeleteAccount } from "./DeleteAccount";
 import { NotificationSettings } from "./NotificationSettings";
 import { VersionInfo } from "./VersionInfo";
 import type { Engine, State } from "../sync/engine";
@@ -11,6 +12,7 @@ export function UserSheet({ engine, s, onClose }: { engine: Engine; s: State; on
   const [credits, setCredits] = useState<Credit[] | null>(null);
   const [generated, setGenerated] = useState<{ count: number; source: string } | null>(null);
   const [showCredits, setShowCredits] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const pending = Object.keys(s.toggles).length + s.batches.length;
   useBackLayer(true, onClose);
   useEffect(() => {
@@ -41,6 +43,10 @@ export function UserSheet({ engine, s, onClose }: { engine: Engine; s: State; on
           </ul>
         )}
         <button className="btn btn--danger" data-testid="logout" onClick={() => { void engine.logout(); onClose(); }}>Se déconnecter</button>
+        {s.me?.primary
+          ? <p className="muted" data-testid="delete-account-primary"><small>Pour supprimer ce compte, supprimez toute la famille : Réglages → Réinitialiser la famille.</small></p>
+          : <button className="btn btn--ghost" data-testid="delete-account" onClick={() => setDeleting(true)}>Supprimer mon compte</button>}
+        {deleting && <DeleteAccount engine={engine} onClose={() => setDeleting(false)} />}
         <section className="sheetsection sheetsection--secondary" aria-label="À propos">
           <h3>À propos</h3>
           <VersionInfo engine={engine} />

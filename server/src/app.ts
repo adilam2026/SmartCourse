@@ -1,6 +1,7 @@
 import cookie from "@fastify/cookie";
 import fastifyStatic from "@fastify/static";
 import path from "node:path";
+import { readFile } from "node:fs/promises";
 import rateLimit from "@fastify/rate-limit";
 import Fastify, { type FastifyInstance, type FastifyReply } from "fastify";
 import { ZodError, z } from "zod";
@@ -17,7 +18,7 @@ import type { Db } from "./db.js";
 import { HttpError } from "./errors.js";
 import { SseHub } from "./hub.js";
 import { can, type Action } from "./permissions.js";
-import { createProfile, listProfiles, resetSecret, updateProfile } from "./profiles.js";
+import { createProfile, deleteOwnAccount, deleteProfile, listProfiles, resetSecret, updateProfile } from "./profiles.js";
 import { mailerFromEnv } from "./mail.js";
 import { countFamilyData, identifyFamily, purgeFamily } from "./family-purge.js";
 import { RecoveryService, secretMatches } from "./recovery.js";
@@ -27,6 +28,8 @@ export interface AppDeps {
   db: Db;
   hub?: SseHub;
   store: PhotoStore;
+  /** Contact address printed on the public privacy / deletion pages (CONTACT_EMAIL). Absent: the pages say so instead of inventing one. */
+  contactEmail?: string;
   /** Built PWA (web/dist). When set, the server also serves the app and falls back to index.html. */
   webDir?: string;
   /** Digital Asset Links (Android app ↔ this site), served at /.well-known/assetlinks.json: lets the Android app open the site without an address bar. Public data (certificate fingerprints). */
@@ -181,6 +184,35 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     return { profile: await updateProfile(db, hub, req.auth!, id, body) };
   });
 
+  // Suppression d'un profil (jamais celui d'un administrateur : il faut d'abord lui retirer ce rôle) ; la famille reste intacte.
+  app.delete("/api/profiles/:id", { preHandler: guard("family.manage") }, async (req) => {
+    const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    await deleteProfile(db, hub, req.auth!, id);
+    return { ok: true };
+  });
+
+  // « Supprimer mon compte » : toute personne connectée (personnel compris) supprime son propre profil en retapant son mot de passe.
+  app.post("/api/me/delete", { preHandler: guard(), config: { rateLimit: limit } }, async (req, reply) => {
+    const a = req.auth!;
+    const body = z.object({ secret: z.string().regex(SECRET_PATTERN) }).parse(req.body ?? {});
+    await confirmPassword(db, a.profileId, body.secret);
+    await deleteOwnAccount(db, hub, a.familyId, a.profileId, "self");
+    reply.clearCookie(COOKIE, { path: "/" });
+    return { ok: true };
+  });
+
+  // Page publique de demande de suppression (sans connexion préalable) : mêmes vérifications et mêmes verrouillages que la connexion.
+  app.post("/api/account/delete", { config: { rateLimit: limit } }, async (req) => {
+    const body = loginSchema.parse(req.body);
+    const r = await login(db, body);
+    try {
+      await deleteOwnAccount(db, hub, r.auth.familyId, r.auth.profileId, "self_public");
+    } finally {
+      await revokeSession(db, r.auth.sessionId); // la session créée pour la vérification ne sert qu'à elle
+    }
+    return { ok: true };
+  });
+
   // « Modifier le mot de passe » : deux champs, jamais de génération ni d'affichage ; les sessions du profil sont révoquées.
   app.post("/api/profiles/:id/reset-secret", { preHandler: guard("family.manage") }, async (req) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
@@ -323,9 +355,23 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
   if (deps.webDir) {
     const root = path.resolve(deps.webDir);
+    // Pages publiques (sans connexion) : confidentialité et suppression. Toujours relues (jamais mises en cache par le service worker ni par un intermédiaire) ;
+    // l'adresse de contact vient de la configuration, jamais du code.
+    const contact = deps.contactEmail
+      ? `<a href="mailto:${deps.contactEmail}">${deps.contactEmail}</a>`
+      : "l'administrateur principal de votre famille (le contact public de l'application n'est pas encore renseigné)";
+    for (const name of ["confidentialite", "suppression-compte"]) {
+      const serve = async (_req: unknown, reply: FastifyReply) => {
+        const html = (await readFile(path.join(root, `${name}.html`), "utf8")).replaceAll("<!--CONTACT-->", contact);
+        return reply.header("Cache-Control", "no-store").type("text/html; charset=utf-8").send(html);
+      };
+      app.get(`/${name}`, serve);
+      app.get(`/${name}.html`, serve);
+    }
     await app.register(fastifyStatic, {
       root,
       wildcard: false,
+      globIgnore: ["confidentialite.html", "suppression-compte.html"], // servies par les routes ci-dessus (adresse de contact injectée)
       setHeaders: (res, file) => {
         // Hashed bundles never change; the shell, service worker and manifest must always be revalidated.
         const immutable = /[\\/]assets[\\/]/.test(file) || /[\\/]icons[\\/]/.test(file);

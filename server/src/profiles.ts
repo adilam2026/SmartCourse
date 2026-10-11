@@ -26,7 +26,7 @@ const toView = (r: any): ProfileView => ({
 });
 
 export async function listProfiles(db: Db, familyId: string): Promise<ProfileView[]> {
-  const r = await db.query("SELECT * FROM profiles WHERE family_id = $1 ORDER BY created_at, login", [familyId]);
+  const r = await db.query("SELECT * FROM profiles WHERE family_id = $1 AND deleted_at IS NULL ORDER BY created_at, login", [familyId]);
   return r.rows.map(toView);
 }
 
@@ -132,6 +132,42 @@ export async function updateProfile(db: Db, hub: SseHub, actor: AuthContext, id:
   });
   if (deactivated) hub.disconnectProfile(id); // after commit: open SSE streams are cut at once
   return view;
+}
+
+/** Anonymises a profile in place: nothing personal stays (name, identifier, code, sessions, notification subscriptions). History keeps « Ancien profil ». */
+async function erase(c: pg.PoolClient, familyId: string, t: Record<string, any>, by: string | null, how: "self" | "self_public" | "admin"): Promise<void> {
+  if (t.deleted_at) throw new HttpError(404, "not_found", "Profil introuvable");
+  if (t.is_primary) throw new HttpError(409, "primary_cannot_delete", "Le profil principal ne peut être supprimé qu'avec toute la famille (Réglages → Réinitialiser la famille)");
+  if (t.role === "admin" && t.active && (await otherActiveAdmins(c, familyId, t.id)) === 0) throw new HttpError(409, "last_admin", "Impossible : c'est le dernier administrateur actif");
+  await c.query(
+    "UPDATE profiles SET display_name = 'Ancien profil', login = $2, secret_hash = '!', active = false, failed_attempts = 0, locked_until = NULL, deleted_at = now() WHERE id = $1",
+    [t.id, `supprime-${String(t.id).replace(/-/g, "").slice(0, 20)}`],
+  );
+  await revokeProfileSessions(c, t.id);
+  await c.query("DELETE FROM push_subscriptions WHERE profile_id = $1", [t.id]);
+  await audit(c, familyId, by, "profile.deleted", t.id, { how });
+}
+
+/** Un administrateur supprime le profil d'une autre personne (parent ou personnel). Un administrateur doit d'abord perdre ce rôle : la protection des administrateurs reste entière. */
+export async function deleteProfile(db: Db, hub: SseHub, actor: AuthContext, id: string): Promise<void> {
+  if (id === actor.profileId) throw new HttpError(400, "use_own_deletion", "Pour supprimer votre propre compte, utilisez « Supprimer mon compte »");
+  await withTx(db, async (c) => {
+    await lockFamily(c, actor.familyId);
+    const t = await loadTarget(c, actor.familyId, id);
+    if (t.role === "admin") throw new HttpError(409, "admin_cannot_delete", "Retirez d'abord le rôle administrateur de ce profil");
+    await erase(c, actor.familyId, t, actor.profileId, "admin");
+  });
+  hub.disconnectProfile(id);
+}
+
+/** La personne supprime son propre compte (mot de passe retapé), sans toucher à la famille. */
+export async function deleteOwnAccount(db: Db, hub: SseHub, familyId: string, profileId: string, how: "self" | "self_public"): Promise<void> {
+  await withTx(db, async (c) => {
+    await lockFamily(c, familyId);
+    const t = await loadTarget(c, familyId, profileId);
+    await erase(c, familyId, t, profileId, how);
+  });
+  hub.disconnectProfile(profileId);
 }
 
 /** « Modifier le mot de passe » : l'ancien n'est jamais affiché ni renvoyé ; toutes les sessions du profil sont révoquées. */

@@ -11,7 +11,7 @@ on:
         default: "https://smartcourse-production-c7ce.up.railway.app"
       schema_attendu:
         description: "Dernière migration attendue"
-        default: "016_install_and_purge.sql"
+        default: "017_profile_deletion.sql"
 permissions:
   contents: read
 jobs:

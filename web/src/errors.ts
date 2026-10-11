@@ -31,6 +31,8 @@ const BY_CODE: Record<string, string> = {
   reset_not_ready: "Vérifiez d'abord votre adresse e-mail de récupération.",
   active_exists: "Une liste est déjà en cours.",
   op_in_progress: "Une opération est déjà en cours. Réessayez dans un instant.",
+  primary_cannot_delete: "Le profil principal ne peut être supprimé qu'avec toute la famille (Réglages → Réinitialiser la famille).",
+  admin_cannot_delete: "Retirez d'abord le rôle administrateur de ce profil.",
   forbidden: "Cette action est réservée à un administrateur.",
 };
 

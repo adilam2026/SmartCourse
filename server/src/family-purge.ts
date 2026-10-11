@@ -46,7 +46,7 @@ export async function identifyFamily(db: Db, familyId: string): Promise<FamilyId
 }
 
 async function identity(db: Db, f: any): Promise<FamilyIdentity> {
-  const p = (await db.query("SELECT display_name, login, role, is_primary, active FROM profiles WHERE family_id = $1 ORDER BY created_at, login", [f.id])).rows;
+  const p = (await db.query("SELECT display_name, login, role, is_primary, active FROM profiles WHERE family_id = $1 AND deleted_at IS NULL ORDER BY created_at, login", [f.id])).rows;
   return {
     id: f.id,
     code: f.code,
@@ -61,7 +61,7 @@ export async function countFamilyData(db: Db, familyId: string): Promise<PurgeCo
   const one = async (sql: string) => Number((await db.query(sql, [familyId])).rows[0].n);
   const inFam = "profile_id IN (SELECT id FROM profiles WHERE family_id = $1)";
   return {
-    profiles: await one("SELECT count(*) AS n FROM profiles WHERE family_id = $1"),
+    profiles: await one("SELECT count(*) AS n FROM profiles WHERE family_id = $1 AND deleted_at IS NULL"),
     sessions: await one(`SELECT count(*) AS n FROM sessions WHERE ${inFam}`),
     pushSubscriptions: await one("SELECT count(*) AS n FROM push_subscriptions WHERE family_id = $1"),
     recoveryAddresses: await one("SELECT count(*) AS n FROM profiles WHERE family_id = $1 AND recovery_email IS NOT NULL"),

@@ -42,9 +42,11 @@ export default defineConfig({
       },
       workbox: {
         cleanupOutdatedCaches: true,
+        // Pages publiques (confidentialité, suppression) : jamais dans le cache du service worker, toujours lues sur le serveur.
+        globIgnores: ["**/confidentialite.html", "**/suppression-compte.html"],
         importScripts: ["push-sw.js"], // notifications téléphone (push, toucher)
         navigateFallback: "/index.html",
-        navigateFallbackDenylist: [/^\/api\//, /^\/push-sw\.js$/, /^\/\.well-known\//, /^\/version\.json$/, /^\/confidentialite\.html$/],
+        navigateFallbackDenylist: [/^\/api\//, /^\/push-sw\.js$/, /^\/\.well-known\//, /^\/version\.json$/, /^\/confidentialite(\.html)?$/, /^\/suppression-compte(\.html)?$/],
         // Photos are immutable (content-addressed): cache-first, kept for offline use.
         runtimeCaching: [
           {

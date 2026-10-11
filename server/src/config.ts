@@ -51,6 +51,8 @@ const schema = z.object({
   BACKUP_DIR: z.string().default("./data/backups"),
   PHOTO_MANIFEST: z.string().default("./catalog-photos/manifest.json"),
   INSTALL_TOKEN: z.string().min(16).optional(),
+  /** Public contact address shown on the privacy and account-deletion pages (Railway variable; never invented). */
+  CONTACT_EMAIL: z.string().email().max(254).optional(),
   PORT: z.coerce.number().int().default(3000),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 });

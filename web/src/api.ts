@@ -82,6 +82,8 @@ export const api = {
   createProfile: (b: { displayName: string; login: string; role: Role; secret: string; secretConfirm: string }) =>
     request<{ profile: Profile }>("POST", "/api/profiles", b),
   updateProfile: (id: string, b: { displayName?: string; role?: Role; active?: boolean }) => request<{ profile: Profile }>("PATCH", `/api/profiles/${id}`, b),
+  deleteProfile: (id: string) => request<{ ok: true }>("DELETE", `/api/profiles/${id}`),
+  deleteOwnAccount: (secret: string) => request<{ ok: true }>("POST", "/api/me/delete", { secret }),
   resetSecret: (id: string, secret: string, secretConfirm: string) => request<{ ok: true }>("POST", `/api/profiles/${id}/reset-secret`, { secret, secretConfirm }),
   recoveryState: () => request<RecoveryState>("GET", "/api/recovery-email"),
   setRecoveryEmail: (email: string) => request<RecoveryState>("PUT", "/api/recovery-email", { email }),

@@ -664,7 +664,7 @@ describe("migration 009 sur des données existantes", () => {
       const l2 = (await old.query("INSERT INTO lists (family_id, created_by) VALUES ($1,$2) RETURNING id", [fam, prof])).rows[0].id as string;
       await old.query("INSERT INTO list_items (list_id, family_id, product_id, added_by, status) VALUES ($1,$2,$3,$4,'removed')", [l2, fam, lait, prof]);
 
-      expect(await migrate(old)).toEqual(["009_quantities.sql", "010_validation_times.sql", "011_units_more.sql", "012_push_notifications.sql", "013_catalog_keys.sql", "014_catalog_complete.sql", "015_recovery.sql", "016_install_and_purge.sql"]);
+      expect(await migrate(old)).toEqual(["009_quantities.sql", "010_validation_times.sql", "011_units_more.sql", "012_push_notifications.sql", "013_catalog_keys.sql", "014_catalog_complete.sql", "015_recovery.sql", "016_install_and_purge.sql", "017_profile_deletion.sql"]);
       // catalogue complet : rien n'est perdu ni activé, les unités des familles ne bougent pas, les articles liés gardent leur nom et leur identifiant
       const after = (await old.query("SELECT id, name, unit FROM products WHERE family_id = $1", [fam])).rows;
       expect(after).toHaveLength(80 + hExt.rows.length);

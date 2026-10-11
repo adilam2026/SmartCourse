@@ -15,7 +15,21 @@ L'APK déjà diffusé est signé par **votre clé** (empreinte `33:93:E6:53:…:
 | Choix | Conséquence |
 |---|---|
 | **A. Google crée sa clé de signature** (défaut de Play App Signing) ; votre clé devient la *clé de téléversement* | Le Play Store installe une application signée par **Google** : elle ne peut **pas** mettre à jour l'APK installé à la main (signatures différentes) → il faut **désinstaller puis réinstaller** (les données de la famille sont sur le serveur ; seuls les envois en attente hors connexion sont perdus). Ajouter l'empreinte Google dans `server/assetlinks.json` **à côté** de la première. |
-| **B. Importer votre clé existante comme clé de signature Play** (*Exporter et importer une clé depuis un keystore Java*, outil PEPK de Google) | Les applications Play portent **la même signature** que l'APK actuel : mise à jour par-dessus, `assetlinks.json` inchangé. **Recommandé** si des téléphones ont déjà l'APK. Se fait sur **votre ordinateur** (le keystore et ses mots de passe n'en sortent pas) : Play Console → Intégrité de l'application → Signature d'application → choisir l'import, télécharger `pepk.jar` et la clé de chiffrement Google, puis `java -jar pepk.jar --keystore=<votre .jks> --alias=<alias> --output=cle-chiffree.zip --include-cert --rsa-awoc --signing-key-encryption-key=<clé Google>`. |
+| **B. Importer votre clé existante comme clé de signature Play** (*Exporter et importer une clé depuis un keystore Java*) | Les applications Play portent **la même signature** que l'APK actuel : mise à jour par-dessus, `assetlinks.json` inchangé. **Recommandé** si des téléphones ont déjà l'APK. Procédure ci-dessous. |
+
+### Procédure précise pour conserver la clé existante avec Play App Signing (choix B)
+À faire sur **votre ordinateur** : le fichier `.jks` et ses mots de passe n'en sortent pas, et ne sont jamais envoyés à Claude ni mis dans le dépôt. Java (JDK 11+) est nécessaire.
+1. Play Console → **Créer l'application** (nom « Courses — Liste familiale », langue française, application, gratuite).
+2. **Tester et publier → Test interne → Créer une version** (ne pas publier en production). À l'étape « Signature d'application Play », choisir **Options de clé → Exporter et importer une clé depuis un keystore Java** (le choix est proposé *avant* le premier envoi de fichier).
+3. Télécharger depuis cette page l'outil **`pepk.jar`** et la **clé de chiffrement publique** (`encryption_public_key.pem`).
+4. Dans un terminal, depuis le dossier qui contient le keystore :
+   `java -jar pepk.jar --keystore=VOTRE_CLE.jks --alias=VOTRE_ALIAS --output=cle-chiffree.zip --include-cert --rsa-aes-wrap --encryption-key-path=encryption_public_key.pem`
+   (l'alias est la valeur du secret `ANDROID_KEY_ALIAS` ; le mot de passe est demandé au clavier).
+5. Envoyer **`cle-chiffree.zip`** sur la page de Play Console (le fichier est chiffré pour Google).
+6. Clé de **téléversement** : choisir « utiliser la même clé » (simple ; l'AAB produit par le workflow est signé avec cette clé) ou en créer une distincte plus tard (nécessite de changer les 4 secrets du dépôt).
+7. Envoyer **`SmartCourse.aab`**. Play le re-signe avec votre clé : l'application installée depuis Play a la **même signature** que l'APK actuel (elle se met à jour par-dessus).
+8. Contrôler : Play Console → **Intégrité de l'application → Signature d'application** : l'empreinte SHA-256 du « certificat de signature d'application » doit être exactement `33:93:E6:53:89:D6:C9:0B:70:05:B8:AC:62:7A:D1:F3:5C:B7:18:A8:6F:E5:B3:D3:F1:D6:BF:C8:5C:AB:42:79`. Relancer le workflow **Application Android** avec `play_cert_sha256` = cette empreinte : il échoue si elle manque dans `server/assetlinks.json` (dépôt ou production).
+9. Garder la clé en **deux exemplaires hors ligne**. Perdre la clé de téléversement se récupère via Google ; perdre la clé de signature importée ne se récupère pas.
 
 Décision à prendre **avant** le premier envoi : elle ne se change pas ensuite. Si aucun téléphone n'a l'APK de façon durable, A est plus simple.
 
@@ -26,20 +40,24 @@ Workflow **Application Android** → artefact `SmartCourse-android-production-N`
 - Catégorie : Maison et décoration… ou **Productivité** ; application gratuite ; sans publicités ; public cible : **adultes et familles** (pas une application pour enfants).
 - Description courte (80 car.) : *La liste de courses partagée de la famille, même sans connexion.*
 - Description : liste partagée en temps réel entre le personnel et les parents, achats et historique, catalogue de produits avec photos, notifications aux parents, fonctionne hors connexion.
-- Politique de confidentialité : `https://smartcourse-production-c7ce.up.railway.app/confidentialite.html` (elle contient aussi la procédure de suppression des données).
-- Suppression de compte / de données (formulaire « Sécurité des données ») : in-app *Réglages → Réinitialiser la famille* ; adresse web : même page, section « Supprimer vos données ».
-- E-mail de contact du développeur : **votre adresse** (la console l'exige ; elle n'est pas dans le dépôt).
+- Politique de confidentialité : `https://smartcourse-production-c7ce.up.railway.app/confidentialite.html` (publique, sans connexion, jamais en cache).
+- **URL de suppression de compte** (champ Play « Supprimer le compte ») : `https://smartcourse-production-c7ce.up.railway.app/suppression-compte.html` — chaque personne supprime **son seul profil** (code famille, identifiant, mot de passe), sans supprimer la famille. Dans l'application : profil → « Supprimer mon compte » ; un administrateur peut supprimer le profil d'un parent ou du personnel ; le profil principal ne se supprime qu'avec toute la famille (*Réglages → Réinitialiser la famille*).
+- **Adresse de contact** : variable Railway `CONTACT_EMAIL` (adresse publique affichée sur les deux pages). **Non renseignée tant que vous ne l'avez pas confirmée** : les pages l'indiquent au lieu d'en inventer une, et la fiche Play ne doit pas être soumise avant. Le contact du développeur que Play exige est une saisie de la console.
 
-## Sécurité des données (réponses proposées)
-| Donnée | Collectée | Partagée | Obligatoire | Usage |
+## Sécurité des données — correspondance avec le code et les services réels
+Vérifié dans le code (juin à octobre 2026) : aucune bibliothèque d'analyse, de publicité ni de journalisation de plantages ; aucune ressource externe chargée par l'application (ni polices, ni scripts) ; seuls services tiers : **Railway** (serveur, base, photos), **Brevo** (envoi d'e-mails), **service de notifications du système** (Firebase Cloud Messaging via Chrome). WhatsApp n'est qu'une adresse `wa.me` ouverte par un geste de l'administrateur (aucun envoi par l'application).
+
+| Catégorie Play | Collectée | Partagée | Où dans le code | Remarque |
 |---|---|---|---|---|
-| Adresse e-mail (récupération) | Oui | Oui — prestataire d'envoi d'e-mails (traitement pour notre compte) | Oui (administrateur principal) | Fonctionnement de l'application, gestion de compte |
-| Nom (nom affiché), identifiants utilisateur | Oui | Non | Oui | Fonctionnement, compte |
-| Photos (articles ajoutés par la famille) | Oui | Non | Non | Fonctionnement |
-| Autres contenus (listes, achats, historique) | Oui | Non | Oui | Fonctionnement |
-| Identifiants d'appareil / jeton de notification | Oui | Oui — service de notifications du système (traitement) | Non | Notifications |
+| Adresse e-mail | Oui (administrateur principal) | Oui, au prestataire d'e-mails qui agit pour nous | `profiles.recovery_email`, `recovery.ts`, `mail.ts` | Le prestataire reçoit l'adresse et le message ; un journal ne garde qu'une empreinte et une version masquée |
+| Nom | Oui (nom affiché) | Non | `profiles.display_name` | Anonymisé à la suppression du profil |
+| Identifiants utilisateur | Oui (identifiant, code famille) | Non | `profiles.login`, `families.code` | Le code secret n'est jamais conservé en clair (scrypt) |
+| Photos | Oui, facultatif (photos d'articles) | Non | `photo_assets`, stockage Railway | Supprimées avec la famille |
+| Autre contenu / activité dans l'application | Oui (listes, achats, historique) | Non | `lists`, `purchases`, `list_events` | Non utilisé pour la publicité ni l'analyse |
+| Identifiants d'appareil ou autres | Oui | Oui, au service de notifications du système | `push_subscriptions` (adresse d'abonnement, *user agent*) ; adresse IP dans les journaux et la limitation des essais | Facultatif : seulement si les notifications sont activées ; IP : journaux techniques temporaires |
+| Localisation, contacts, fichiers, micro, caméra en continu, santé, finances | **Non** | — | — | La caméra et la galerie passent par le sélecteur de fichiers de Chrome |
 
-Chiffrement en transit : **oui** (HTTPS). Suppression demandée par l'utilisateur : **oui** (voir ci-dessus). Pas de publicité, pas de revente, pas d'analyse comportementale.
+Réponses : données chiffrées en transit (HTTPS) : **oui** ; suppression demandée par l'utilisateur : **oui** (page publique ci-dessus) ; pas de publicité ; pas de vente ni de partage à des fins commerciales ; finalités : fonctionnement de l'application, gestion de compte, sécurité (limitation des essais de connexion), notifications.
 
 ## Autres déclarations
 - Autorisations : seulement `POST_NOTIFICATIONS` (Android 13+, demandée au toucher de « Activer les notifications »). Caméra et galerie passent par le sélecteur de fichiers de Chrome : aucune autorisation.

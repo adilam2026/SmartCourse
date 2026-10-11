@@ -174,6 +174,7 @@ function Profiles({ me, familyCode }: { me: string; familyCode: string }) {
 
 /** « Modifier le profil » : rôle, désactivation. Un administrateur n'est jamais désactivé (le bouton n'existe pas, le serveur refuse aussi). */
 function EditProfile({ profile, onClose, run }: { profile: Profile; onClose(): void; run(fn: () => Promise<unknown>): Promise<void> }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
   return (
     <Dialog title={`Modifier le profil de ${profile.displayName}`} onClose={onClose}>
       <div className="form">
@@ -184,6 +185,14 @@ function EditProfile({ profile, onClose, run }: { profile: Profile; onClose(): v
         </label>
         {profile.role !== "admin" && (
           <button className="btn" data-testid={`toggle-${profile.login}`} onClick={() => void run(() => api.updateProfile(profile.id, { active: !profile.active }))}>{profile.active ? "Désactiver ce profil" : "Réactiver ce profil"}</button>
+        )}
+        {profile.role !== "admin" && !confirmDelete && <button className="btn btn--ghost" data-testid={`delete-${profile.login}`} onClick={() => setConfirmDelete(true)}>Supprimer ce profil…</button>}
+        {confirmDelete && (
+          <div className="panel danger" data-testid="delete-confirm">
+            <p>Supprimer définitivement le profil de <b>{profile.displayName}</b> ? Son nom, son identifiant et son code sont effacés et ses accès fermés. Son nom devient « Ancien profil » dans l'historique des achats.</p>
+            <button className="btn btn--danger" data-testid={`delete-confirm-${profile.login}`} onClick={() => void run(() => api.deleteProfile(profile.id))}>Oui, supprimer ce profil</button>
+            <button className="btn btn--ghost" onClick={() => setConfirmDelete(false)}>Non, garder</button>
+          </div>
         )}
         <button className="btn btn--ghost" onClick={onClose}>Fermer</button>
       </div>
