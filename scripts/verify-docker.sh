@@ -2,7 +2,7 @@
 # Vérifie l'image Docker de bout en bout, EN LOCAL (ou dans un CI) : aucun déploiement, aucun accès à Railway.
 #   - construction de l'image (clients PostgreSQL 16/17/18 inclus)
 #   - démarrage sur un PostgreSQL jetable, utilisateur non privilégié
-#   - import des 80 visuels au premier démarrage, puis idempotence (redémarrage + import manuel)
+#   - import des 243 visuels au premier démarrage, puis idempotence (redémarrage + import manuel)
 #   - aucun JPEG résiduel, aucune image supprimée à tort, images servies par l'API
 # Prérequis : docker. Durée : quelques minutes (la première construction compile les clients PostgreSQL).
 # Usage : scripts/verify-docker.sh [--keep]     (--keep laisse les conteneurs pour inspection)
@@ -31,11 +31,11 @@ docker_build "$TAG"
 ok "image construite"
 
 echo "== 2. Contenu de l'image"
-[ "$(docker run --rm "$TAG" sh -c 'ls catalog-photos/files/*.webp | wc -l')" = 80 ] || fail "il devrait y avoir exactement 80 images WebP"
+[ "$(docker run --rm "$TAG" sh -c 'ls catalog-photos/files/*.webp | wc -l')" = 243 ] || fail "il devrait y avoir exactement 243 images WebP"
 [ "$(docker run --rm "$TAG" sh -c 'ls catalog-photos/files | grep -vc "\.webp$" || true')" = 0 ] || fail "fichier non WebP dans catalog-photos/files (ancienne image ?)"
 [ "$(docker run --rm "$TAG" id -un)" = node ] || fail "l'application ne tourne pas en utilisateur non privilégié"
 docker run --rm "$TAG" sh -c 'ls /usr/lib/postgresql/16/bin/pg_dump /usr/lib/postgresql/17/bin/pg_dump /usr/lib/postgresql/18/bin/pg_dump' >/dev/null || fail "clients pg_dump 16/17/18 absents de l'image"
-ok "80 WebP, aucun autre fichier, utilisateur node, clients pg_dump 16, 17, 18 présents"
+ok "243 WebP, aucun autre fichier, utilisateur node, clients pg_dump 16, 17, 18 présents"
 
 echo "== 3. Premier démarrage (base vide)"
 docker network create "$NET" >/dev/null
@@ -46,11 +46,13 @@ start_app
 wait_health || fail "l'application ne répond pas sur /health"
 ok "/health répond"
 sleep 3
-last_import | grep -q "Images du catalogue : 80 remplacée(s) ou ajoutée(s), 0 déjà à jour." || fail "import initial attendu : 80 remplacées/ajoutées"
+last_import | grep -q "Images du catalogue : 243 remplacée(s) ou ajoutée(s), 0 déjà à jour." || fail "import initial attendu : 243 remplacées/ajoutées"
 [ "$(sql "SELECT count(*) FROM initial_catalog WHERE photo_asset_id IS NOT NULL")" = 80 ] || fail "80 références du catalogue devraient avoir une image"
-[ "$(sql "SELECT count(*) FROM photo_assets WHERE generated AND license = 'GENERATED' AND source_name LIKE 'Image générée%' AND author IS NULL AND source_url IS NULL")" = 80 ] || fail "provenance « Image générée avec ChatGPT » attendue sur 80 images"
-[ "$(docker exec "$APP" sh -c 'ls /app/server/data/photos/photos/*.webp | wc -l')" = 80 ] || fail "80 fichiers attendus dans le stockage"
-ok "80 images importées, provenance générée, 80 fichiers stockés"
+[ "$(sql "SELECT count(*) FROM extended_catalog WHERE photo_asset_id IS NOT NULL AND merged_into IS NULL")" = 163 ] || fail "163 entrées du catalogue complémentaire devraient avoir une image"
+[ "$(sql "SELECT count(*) FROM extended_catalog WHERE photo_asset_id IS NULL AND merged_into IS NULL")" = 0 ] || fail "aucune entrée visible du catalogue complémentaire sans image"
+[ "$(sql "SELECT count(*) FROM photo_assets WHERE generated AND license = 'GENERATED' AND source_name LIKE 'Image générée%' AND author IS NULL AND source_url IS NULL")" = 243 ] || fail "provenance « Image générée avec ChatGPT » attendue sur 243 images"
+[ "$(docker exec "$APP" sh -c 'ls /app/server/data/photos/photos/*.webp | wc -l')" = 243 ] || fail "243 fichiers attendus dans le stockage"
+ok "243 images importées, provenance générée, 243 fichiers stockés"
 # Migration 008 (révision du catalogue) : enregistrée, colonne et déclencheur présents, révision incrémentée par la création des produits
 [ "$(sql "SELECT count(*) FROM schema_migrations WHERE name LIKE '008%'")" = 1 ] || fail "migration 008 non enregistrée"
 [ "$(sql "SELECT count(*) FROM information_schema.columns WHERE table_name = 'families' AND column_name = 'catalog_rev'")" = 1 ] || fail "colonne families.catalog_rev absente"
@@ -62,18 +64,18 @@ echo "== 4. Idempotence : redémarrage"
 docker restart "$APP" >/dev/null
 wait_health || fail "l'application ne redémarre pas"
 sleep 3
-last_import | grep -q "Images du catalogue : 0 remplacée(s) ou ajoutée(s), 80 déjà à jour." || fail "après redémarrage : 0 remplacée / 80 déjà à jour attendu"
-[ "$(sql "SELECT count(*) FROM photo_assets")" = 80 ] || fail "le redémarrage ne doit pas créer d'image"
+last_import | grep -q "Images du catalogue : 0 remplacée(s) ou ajoutée(s), 243 déjà à jour." || fail "après redémarrage : 0 remplacée / 243 déjà à jour attendu"
+[ "$(sql "SELECT count(*) FROM photo_assets")" = 243 ] || fail "le redémarrage ne doit pas créer d'image"
 [ "$(sql "SELECT md5(string_agg(photo_asset_id::text, ',' ORDER BY key)) FROM initial_catalog")" = "$IDS_BEFORE" ] || fail "les références d'image ont changé au redémarrage"
 ok "redémarrage : rien n'a changé"
 
 echo "== 5. Idempotence : import et purge manuels"
 OUT=$(docker exec "$APP" node dist/photos-cli.js import catalog-photos/manifest.json)
-echo "$OUT" | grep -q "0 remplacée(s) ou ajoutée(s), 80 déjà à jour." || fail "import manuel non idempotent : $OUT"
+echo "$OUT" | grep -q "0 remplacée(s) ou ajoutée(s), 243 déjà à jour." || fail "import manuel non idempotent : $OUT"
 OUT=$(docker exec "$APP" node dist/photos-cli.js purge --dry-run --min-age-minutes 0)
 echo "$OUT" | grep -q "0 enregistrement(s) d'image et 0 fichier(s)" || fail "la purge ne devrait rien trouver : $OUT"
-[ "$(sql "SELECT count(*) FROM photo_assets")" = 80 ] || fail "nombre d'images modifié"
-ok "import manuel : 80 déjà à jour ; purge : rien à supprimer"
+[ "$(sql "SELECT count(*) FROM photo_assets")" = 243 ] || fail "nombre d'images modifié"
+ok "import manuel : 243 déjà à jour ; purge : rien à supprimer"
 
 echo "== 6. Une image personnalisée survit à un redémarrage"
 TOKEN=$(docker exec "$APP" node -e 'console.log(require("crypto").randomBytes(24).toString("base64url"))')
