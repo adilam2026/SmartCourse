@@ -29,8 +29,26 @@ function readLink(): { kind: "verify" | "reset"; token: string } | null {
   return null;
 }
 
+/** /#/install/<autorisation> : lien d'installation. L'autorisation est gardée par l'application, jamais saisie ni affichée. */
+function takeInstallLink(engine: Engine): void {
+  try {
+    const m = window.location.hash.match(/^#\/install\/([A-Za-z0-9_%.-]{16,200})$/);
+    if (!m) return;
+    engine.acceptInstallLink(decodeURIComponent(m[1]!));
+    window.history.replaceState(null, "", "/");
+  } catch {
+    /* no address bar */
+  }
+}
+
 function Screens({ engine }: { engine: Engine }) {
   const s = useEngine(engine);
+  useEffect(() => {
+    takeInstallLink(engine);
+    const on = () => takeInstallLink(engine);
+    window.addEventListener("hashchange", on);
+    return () => window.removeEventListener("hashchange", on);
+  }, [engine]);
   const [link, setLink] = useState(readLink);
   useEffect(() => {
     const on = () => {

@@ -8,7 +8,7 @@
 - **Compatibilité** : les mots de passe existants (lettres, symboles) continuent de fonctionner et ne sont jamais modifiés automatiquement. Sur la connexion et la confirmation du mot de passe actuel, le lien « Clavier complet » bascule vers le clavier complet.
 - Tests : serveur + e2e en émulation Android (Pixel 7) et iPhone (iPhone 14) ; les vrais claviers ne sont pas vérifiables en automatique (attributs `inputmode`, `type`, `autocomplete` contrôlés).
 - **« Modifier le code secret »** (remplace « Nouveau code ») : deux champs ; l'ancien n'est jamais affiché ni renvoyé ; toutes les sessions du profil sont révoquées et ses flux temps réel coupés.
-- **Connexion** : deux parcours séparés — *Se connecter* (code famille, identifiant, mot de passe) et *Première installation → Créer ma famille* (jeton d'installation, famille, premier administrateur, e-mail de récupération recommandé).
+- **Connexion** : deux parcours séparés — *Se connecter* (code famille, identifiant, mot de passe) et *Première installation → Créer ma famille* (famille, premier administrateur, e-mail de récupération obligatoire ; l'autorisation d'installation arrive par le lien `/#/install/…`, jamais saisie).
 
 ## Récupération par e-mail
 - L'**administrateur principal** enregistre une adresse (à la création de la famille ou dans Réglages → Adresse de récupération). Elle n'est utilisable qu'**après vérification** par un lien reçu à cette adresse (valable 48 h, usage unique ; changer d'adresse annule la vérification et les anciens liens).

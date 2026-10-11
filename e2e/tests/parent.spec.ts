@@ -143,12 +143,11 @@ test.describe("administration", () => {
     await uiLogin(page, f, "adil", "482913");
     await page.getByTestId("tab-settings").click();
     await expect(page.getByTestId("family-code")).toHaveText(f.code);
-    // sauvegardes : un état simple, les détails techniques sont à un toucher
+    // sauvegarde : une phrase simple, aucun détail technique
     await page.getByTestId("seg-backups").click();
-    await expect(page.getByTestId("backup-state")).toContainText("non configurée"); // pas de clé de sauvegarde dans cet environnement de test
-    await expect(page.getByTestId("backup-details")).toHaveCount(0);
-    await page.getByTestId("backup-details-toggle").click();
-    await expect(page.getByTestId("backup-details")).toContainText("NON configurée");
+    await expect(page.getByTestId("backup-state")).toContainText("doit être vérifiée"); // pas de clé de sauvegarde dans cet environnement de test
+    await expect(page.getByTestId("backup-card")).toContainText("Contactez la personne qui gère l'application");
+    await expect(page.getByTestId("backup-details-toggle")).toHaveCount(0);
     await page.getByTestId("settings-back").click();
     await page.getByTestId("seg-profiles").click();
     await page.getByTestId("add-profile").click();

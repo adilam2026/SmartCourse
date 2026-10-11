@@ -36,7 +36,7 @@ Vérifié ici (9 octobre 2026) :
 ## 3. Première installation
 
 1. Après le déploiement, ouvrez l'adresse publique du service (Settings → Networking → Generate Domain).
-2. Écran de connexion → « Première installation » → saisissez le `INSTALL_TOKEN`, le nom de la famille et votre profil administrateur. Le jeton est consommé de façon atomique : il ne sert qu'une fois.
+2. Ouvrez sur le téléphone le **lien d'installation** `https://<domaine>/#/install/<INSTALL_TOKEN>` (l'autorisation n'est jamais saisie ni affichée ; l'application la garde et efface l'adresse), puis renseignez le nom de la famille et votre profil administrateur. L'autorisation est consommée de façon atomique : elle ne sert qu'une fois. Sans lien, ou avec un lien déjà utilisé, l'écran explique simplement qu'il faut demander un nouveau lien (`admin-cli token` en affiche un).
 3. **Supprimez ensuite la variable `INSTALL_TOKEN`.**
 4. Dans Réglages, créez le profil de Lamiaa (administrateur) : avec deux administrateurs, l'un peut réinitialiser le code de l'autre.
 5. Créez les profils du personnel. Chaque code à six chiffres est affiché une seule fois.

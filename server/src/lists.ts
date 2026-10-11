@@ -354,7 +354,7 @@ export async function createList(db: Db, hub: SseHub, a: AuthContext): Promise<{
   } catch (e: any) {
     if (e.code === "23505") {
       const cur = await db.query("SELECT id FROM lists WHERE family_id = $1 AND status = 'active'", [a.familyId]);
-      throw new HttpError(409, "active_exists", `Une liste est déjà en cours (${cur.rows[0]?.id ?? "?"})`);
+      throw new HttpError(409, "active_exists", "Une liste est déjà en cours");
     }
     throw e;
   }

@@ -8,6 +8,10 @@ type Mode = "login" | "setup" | "forgot-code" | "forgot-password";
 
 export function LoginScreen(props: { engine: Engine; s: State }) {
   const [mode, setMode] = useState<Mode>(props.s.prefillInstallToken ? "setup" : "login");
+  const hasToken = !!props.s.prefillInstallToken;
+  useEffect(() => {
+    if (hasToken) setMode("setup"); // a link or a deleted family opens the installation by itself
+  }, [hasToken]);
   const back = () => setMode("login");
   if (mode === "setup") return <Setup {...props} onBack={back} />;
   if (mode === "forgot-code" || mode === "forgot-password") return <Forgot kind={mode} onBack={back} />;
@@ -75,15 +79,26 @@ function Login({ engine, s, onMode }: { engine: Engine; s: State; onMode(m: Mode
 }
 
 function Setup({ engine, s, onBack }: { engine: Engine; s: State; onBack(): void }) {
-  const [f, setF] = useState({ installToken: s.prefillInstallToken ?? "", familyName: "", displayName: "", login: "", secret: "", again: "", email: "" });
+  const [f, setF] = useState({ familyName: "", displayName: "", login: "", secret: "", again: "", email: "" });
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
   const mismatch = f.again.length > 0 && f.secret !== f.again;
+  if (!s.prefillInstallToken) {
+    return (
+      <main className="auth">
+        <Logo title="Première installation" text="Créer ma famille" />
+        <section className="panel" data-testid="setup-blocked">
+          <p><b>{s.installRefused ? "Ce lien d'installation n'est plus valable." : "Un lien d'installation est nécessaire."}</b></p>
+          <p className="muted">{s.installRefused ? "Il a déjà servi ou il a expiré. Demandez un nouveau lien à la personne qui gère l'application, puis ouvrez-le sur ce téléphone." : "Pour créer une famille, ouvrez le lien d'installation que vous a transmis la personne qui gère l'application."}</p>
+        </section>
+        <button className="linkbtn" data-testid="setup-back" onClick={onBack}>← Retour à la connexion</button>
+      </main>
+    );
+  }
   return (
     <main className="auth">
-      <Logo title="Première installation" text="Créer ma famille : paramétrage de la famille et du premier administrateur" />
-      {s.prefillInstallToken && <p className="notice" role="status" data-testid="reset-banner">La famille précédente a été supprimée définitivement. Le jeton d'installation ci-dessous est neuf et ne sert qu'une fois.</p>}
-      <form onSubmit={async (e) => { e.preventDefault(); await engine.setup({ installToken: f.installToken, familyName: f.familyName, displayName: f.displayName, login: f.login, secret: f.secret, secretConfirm: f.again, recoveryEmail: f.email }); }}>
-        <label>Jeton d'installation<input value={f.installToken} onChange={set("installToken")} autoComplete="off" required data-testid="setup-token" /></label>
+      <Logo title="Première installation" text="Créer ma famille" />
+      {s.installFrom === "reset" && <p className="notice" role="status" data-testid="reset-banner">Votre famille a été supprimée. Vous pouvez maintenant créer une nouvelle famille.</p>}
+      <form onSubmit={async (e) => { e.preventDefault(); await engine.setup({ familyName: f.familyName, displayName: f.displayName, login: f.login, secret: f.secret, secretConfirm: f.again, recoveryEmail: f.email }); }}>
         <label>Nom de la famille<input value={f.familyName} onChange={set("familyName")} required maxLength={60} data-testid="setup-family" /></label>
         <label>Votre nom affiché<input value={f.displayName} onChange={set("displayName")} required maxLength={40} data-testid="setup-name" /></label>
         <label>Votre identifiant<input value={f.login} onChange={set("login")} required autoCapitalize="none" pattern="[a-zA-Z0-9._-]{2,30}" data-testid="setup-login" /></label>
@@ -91,7 +106,7 @@ function Setup({ engine, s, onBack }: { engine: Engine; s: State; onBack(): void
         <label>Confirmer le code secret<SecretInput kind="new" value={f.again} onChange={(v) => setF({ ...f, again: v })} testid="setup-again" /></label>
         {mismatch && <p className="error">Les deux codes secrets ne sont pas identiques.</p>}
         <label>E-mail de récupération (obligatoire)<input value={f.email} onChange={set("email")} type="email" autoComplete="email" maxLength={254} required data-testid="setup-email" /></label>
-        <p className="muted">Pour retrouver le code famille ou changer un mot de passe oublié. Un lien de confirmation y est envoyé : l'installation se termine quand vous l'avez ouvert.</p>
+        <p className="muted">Un lien de confirmation y est envoyé. Il permet aussi de retrouver le code famille ou de changer un mot de passe oublié.</p>
         {s.loginError && <p className="error" role="alert" data-testid="setup-error">{s.loginError}</p>}
         <button className="btn btn--primary btn--big" disabled={s.loggingIn || !isNewSecret(f.secret) || f.secret !== f.again || !f.email.includes("@")} data-testid="setup-submit">{s.loggingIn ? "Création…" : "Créer ma famille"}</button>
       </form>

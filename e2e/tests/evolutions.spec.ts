@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
-import { card, createList, newFamily, uiLogin, type Family } from "./helpers";
+import { card, createList, expectNoInfra, newFamily, uiLogin, type Family } from "./helpers";
 
 const ops = (f: Family, who: "staff" | "lamiaa" | "adil", listId: string, list: object[], batch?: { id: string; at: string }) =>
   f[who].post(`/api/lists/${listId}/ops`, { data: { ops: list, ...(batch ? { batch } : {}) } });
@@ -427,16 +427,17 @@ test.describe("version chargée", () => {
       await page.context().clearCookies();
       await uiLogin(page, f, login, secret);
       await page.getByTestId("avatar").click();
-      await expect(page.getByTestId("version-running")).toContainText(server.id); // le bundle chargé est celui que le serveur publie
-      await expect(page.getByTestId("version-status")).toHaveText("À jour");
+      await expect(page.getByTestId("version-running")).toHaveCount(0); // ni identifiant de build, ni commit à l'écran
+      await expect(page.getByTestId("version-status")).toHaveText("Application à jour");
       await page.getByRole("button", { name: "Fermer" }).click();
     }
     await page.context().clearCookies();
     await uiLogin(page, f, "adil", "482913");
     await page.getByTestId("tab-settings").click();
     await page.getByTestId("seg-about").click();
-    await expect(page.getByTestId("version-running")).toContainText(server.id);
-    await expect(page.getByTestId("version-server")).toContainText(server.id);
+    await expect(page.getByTestId("version-status")).toHaveText("Application à jour");
+    await expect(page.getByTestId("version-server")).toHaveCount(0);
+    await expectNoInfra(page);
     await page.screenshot({ path: "shots/settings-version.png" });
   });
 });

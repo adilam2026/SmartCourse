@@ -1,7 +1,7 @@
 import { randomBytes, scryptSync } from "node:crypto";
 import pg from "pg";
 import { devices, expect, test, type Page } from "@playwright/test";
-import { newFamily, uiLogin } from "./helpers";
+import { newFamily, openInstall, uiLogin } from "./helpers";
 
 /*
  * Code secret à 6 chiffres choisi à la main : clavier numérique, saisie masquée, exactement 6 chiffres, zéros initiaux conservés,
@@ -62,8 +62,7 @@ for (const [name, device] of PROFILES) {
     });
 
     test("première installation : « Code secret — 6 chiffres » / « Confirmer le code secret », chiffres seulement, 6 maximum, zéros conservés, masqué", async ({ page }) => {
-      await page.goto("/");
-      await page.getByTestId("go-setup").click();
+      await openInstall(page);
       await expect(page.getByText("Code secret — 6 chiffres")).toBeVisible();
       await expect(page.getByText("Confirmer le code secret")).toBeVisible();
       for (const id of ["setup-secret", "setup-again"]) expect(await attrs(page, id)).toMatchObject({ type: "password", inputmode: "numeric", maxlength: 6, autocomplete: "off", pattern: "[0-9]*" }); // « off » : jamais de mot de passe suggéré ou généré

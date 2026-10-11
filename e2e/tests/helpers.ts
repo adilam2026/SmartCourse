@@ -90,8 +90,26 @@ export async function staffAdds(f: Family, listId: string, names: string[]) {
 
 export const MAIL_FAILED = "L’e-mail n’a pas pu être envoyé. Veuillez réessayer dans quelques instants.";
 /** Aucune information d'infrastructure à l'écran : fournisseur d'envoi, hébergeur, adresse IP, HTTPS, statut HTTP, configuration. */
-export const INFRA = /brevo|railway|https?|\bip\b|\bHTTP\b|BREVO_|unauthorized|clé API|expéditeur|configur|serveur d'envoi|API v3|diagnostic|détails techniques/i;
+export const INFRA = /brevo|railway|https?|\bip\b|\bHTTP\b|BREVO_|unauthorized|clé API|expéditeur|configur|serveur|\bAPI\b|\bSQL\b|migration|commit|jeton|diagnostic|détails techniques|Africa\/|fuseau/i;
 export async function expectNoInfra(page: Page) {
   const text = await page.locator("main, .app, body").first().innerText();
   expect(text).not.toMatch(INFRA);
+}
+
+/** Autorisation d'installation neuve (usage unique) posée en base, comme le ferait l'exploitant ; renvoie le lien à ouvrir. */
+export async function installLink(): Promise<{ token: string; path: string }> {
+  const token = randomBytes(24).toString("base64url");
+  const c = new pg.Client({ connectionString: DB });
+  await c.connect();
+  await c.query("INSERT INTO install_tokens (token_hash) VALUES ($1)", [createHash("sha256").update(token).digest("hex")]);
+  await c.end();
+  return { token, path: `/#/install/${token}` };
+}
+/** Ouvre l'application par un lien d'installation : le formulaire de création s'affiche, sans aucun champ d'autorisation. */
+export async function openInstall(page: Page): Promise<string> {
+  const { token, path } = await installLink();
+  await page.goto("/");
+  await page.goto(path);
+  await expect(page.getByTestId("setup-submit")).toBeVisible();
+  return token;
 }

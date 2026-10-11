@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError, NetworkError, type RecoveryState } from "../api";
+import { userMessage } from "../errors";
 import { Icon } from "./Icon";
 import { MAIL_FAILED } from "../mailText";
 
-const errText = (e: unknown): string =>
-  e instanceof NetworkError ? "Pas de connexion."
-  : e instanceof ApiError ? (e.code === "too_soon" || e.code === "too_many_mails" ? e.message : e.code === "email_not_verified" ? "L'adresse doit d'abord être vérifiée." : MAIL_FAILED)
-  : "Erreur.";
+const errText = (e: unknown): string => (e instanceof ApiError && (e.code === "too_soon" || e.code === "too_many_mails" || e.code === "email_not_verified") ? userMessage(e) : e instanceof NetworkError ? userMessage(e) : MAIL_FAILED);
 
 /**
  * « Adresse de récupération », en trois états lisibles : à vérifier, vérifiée, envoi échoué.

@@ -1,7 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { checkClock, fmtOffset, type ClockCheck } from "../clock";
-import { fmtDateTime } from "../format";
-import { RUNNING, checkForUpdate, getUpdateState, subscribeUpdate, updateNow, type BuildInfo, type UpdaterDeps } from "../updater";
+import { checkClock, type ClockCheck } from "../clock";
+import { checkForUpdate, getUpdateState, subscribeUpdate, updateNow, type UpdaterDeps } from "../updater";
 import { backStack } from "../back";
 import type { Engine } from "../sync/engine";
 
@@ -11,34 +10,21 @@ export const makeUpdaterDeps = (engine: Engine): UpdaterDeps => ({
   reload: () => location.reload(),
 });
 
-const label = (b: BuildInfo | null) => (b ? `${b.commit ?? "locale"} · ${b.builtAt ? fmtDateTime(b.builtAt) : "date inconnue"}` : "inconnue");
-
-/** « Version de l'application » : what is really loaded on this phone, what the server has now, and a manual update button. */
+/** « À propos » : whether the application is up to date, and a manual update button. Build identifiers stay internal. */
 export function VersionInfo({ engine }: { engine: Engine }) {
   const u = useSyncExternalStore(subscribeUpdate, getUpdateState);
-  // Looking at this block checks the server (it never reloads by itself here: a sheet is open, so the page counts as busy).
+  // Looking at this block checks for a newer version (it never reloads by itself here: a sheet is open, so the page counts as busy).
   useEffect(() => void checkForUpdate(makeUpdaterDeps(engine)).catch(() => {}), [engine]);
   const [clock, setClock] = useState<ClockCheck | null>(null);
   useEffect(() => void checkClock().then(setClock), []);
   const text =
-    u.phase === "current" ? "À jour" : u.phase === "available" ? "Une version plus récente est disponible" : u.phase === "updating" ? "Mise à jour en cours…" : "Pas encore vérifié";
+    u.phase === "current" ? "Application à jour" : u.phase === "available" ? "Une nouvelle version est disponible" : u.phase === "updating" ? "Mise à jour en cours…" : "Mise à jour non vérifiée";
   return (
-    <section className="versioninfo" data-testid="version-info" aria-label="Version de l'application">
-      <p><strong>Version de l'application</strong></p>
-      <p className="muted" data-testid="version-running">Chargée sur ce téléphone : <b>{label(RUNNING)}</b> <small>({RUNNING.id})</small></p>
-      <p className="muted" data-testid="version-server">Publiée par le serveur : <b>{label(u.server)}</b>{u.server ? <small> ({u.server.id})</small> : null}</p>
-      {clock && (
-        <div data-testid="clock-info">
-          <p className="muted" data-testid="clock-zone">Heures affichées : <b>{clock.shownZone}</b> ({fmtOffset(clock.shownOffset)}). Fuseau de ce téléphone : <b>{clock.phoneZone}</b> ({fmtOffset(clock.phoneOffset)}).</p>
-          {clock.phoneOffset !== clock.shownOffset && (
-            <p className="banner banner--notice" data-testid="clock-zone-diff">Le fuseau du téléphone diffère de celui de l'application : les heures affichées peuvent différer de l'heure de votre téléphone de {Math.abs(clock.phoneOffset - clock.shownOffset) / 60} h.</p>
-          )}
-          {clock.skewSec !== null && Math.abs(clock.skewSec) > 90 && (
-            <p className="banner banner--notice" data-testid="clock-skew">L'horloge de ce téléphone est {clock.skewSec > 0 ? "en avance" : "en retard"} d'environ {Math.round(Math.abs(clock.skewSec) / 60)} min par rapport au serveur : réglez la date et l'heure automatiques.</p>
-          )}
-        </div>
-      )}
+    <section className="versioninfo" data-testid="version-info" aria-label="Mises à jour">
       <p className={u.phase === "available" ? "banner banner--pending" : "muted"} data-testid="version-status">{text}</p>
+      {clock && clock.skewSec !== null && Math.abs(clock.skewSec) > 90 && (
+        <p className="banner banner--notice" data-testid="clock-skew">L'horloge de ce téléphone est {clock.skewSec > 0 ? "en avance" : "en retard"} d'environ {Math.round(Math.abs(clock.skewSec) / 60)} min : réglez la date et l'heure automatiques.</p>
+      )}
       <button className="btn btn--small" data-testid="update-check" onClick={() => void (u.phase === "available" ? updateNow(makeUpdaterDeps(engine)) : checkForUpdate(makeUpdaterDeps(engine), { force: true }))}>
         {u.phase === "available" ? "Mettre à jour maintenant" : "Vérifier les mises à jour"}
       </button>

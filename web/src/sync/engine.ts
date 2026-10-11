@@ -35,6 +35,10 @@ export interface State {
   welcomeCode: string | null;
   /** Single-use installation token shown after a family reset, to prefill the first-installation form. */
   prefillInstallToken: string | null;
+  /** Why the installation is open: the family was just deleted here, or an installation link was opened. */
+  installFrom: "reset" | "link" | null;
+  /** The installation authorisation was refused (used up or no longer valid). */
+  installRefused: boolean;
   /** How this person likes the catalogue shown (kept per profile on this phone). */
   catalogView: CatalogView;
 }
@@ -62,12 +66,13 @@ export interface EngineDeps {
 }
 
 const TOKEN_KEY = "smartcourse.installToken";
+const FROM_KEY = "smartcourse.installFrom";
 const RETRY_MS = [3_000, 8_000, 20_000, 45_000];
 
 export class Engine {
   private s: State = {
     phase: "boot", me: null, conn: "online", catalog: null, list: undefined, toggles: {}, draftListId: null, batches: [],
-    sending: false, justSynced: false, notices: [], orphan: null, loginError: null, loggingIn: false, lastLogin: null, live: false, welcomeCode: null, prefillInstallToken: null, catalogView: "all",
+    sending: false, justSynced: false, notices: [], orphan: null, loginError: null, loggingIn: false, lastLogin: null, live: false, welcomeCode: null, prefillInstallToken: null, installFrom: null, installRefused: false, catalogView: "all",
   };
   private listeners = new Set<() => void>();
   private api: typeof realApi;
@@ -116,12 +121,14 @@ export class Engine {
   async start(): Promise<void> {
     const last = (await this.db.meta.get("lastLogin"))?.value as State["lastLogin"] | undefined;
     let token: string | null = null;
+    let from: State["installFrom"] = null;
     try {
       token = localStorage.getItem(TOKEN_KEY);
+      if (token) from = localStorage.getItem(FROM_KEY) === "reset" ? "reset" : "link";
     } catch {
       /* ignore */
     }
-    this.set({ lastLogin: last ?? null, prefillInstallToken: token });
+    this.set({ lastLogin: last ?? null, prefillInstallToken: token, installFrom: from });
     try {
       const { me } = await this.api.me();
       await this.enter(me);
@@ -160,11 +167,32 @@ export class Engine {
     await Promise.race([this.releasePush?.().catch(() => {}), new Promise((r) => setTimeout(r, 3000))]);
     await this.wipeLocal();
     try {
-      localStorage.setItem(TOKEN_KEY, installToken); // shown once: it must survive a closed tab until the installation uses it
+      localStorage.setItem(TOKEN_KEY, installToken); // kept for the installation: it must survive a closed tab until it is used
+      localStorage.setItem(FROM_KEY, "reset");
     } catch {
       /* private mode: memory only */
     }
-    this.set({ phase: "loggedOut", me: null, catalog: null, list: undefined, toggles: {}, batches: [], draftListId: null, orphan: null, notices: [], lastLogin: null, welcomeCode: null, prefillInstallToken: installToken });
+    this.set({ phase: "loggedOut", me: null, catalog: null, list: undefined, toggles: {}, batches: [], draftListId: null, orphan: null, notices: [], lastLogin: null, welcomeCode: null, prefillInstallToken: installToken, installFrom: "reset", installRefused: false });
+  }
+
+  /** An installation link (/#/install/…) was opened: the authorisation is kept here, never typed or shown. */
+  acceptInstallLink(token: string): void {
+    try {
+      localStorage.setItem(TOKEN_KEY, token);
+      localStorage.setItem(FROM_KEY, "link");
+    } catch {
+      /* private mode: memory only */
+    }
+    this.set({ prefillInstallToken: token, installFrom: "link", installRefused: false, loginError: null });
+  }
+
+  private forgetInstallToken(): void {
+    try {
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(FROM_KEY);
+    } catch {
+      /* ignore */
+    }
   }
 
   /** Everything this phone remembers about any family. */
@@ -213,32 +241,32 @@ export class Engine {
   }
 
   /** First installation: consumes the one-shot install token, creates the family and its first administrator. */
-  async setup(input: { installToken: string; familyName: string; displayName: string; login: string; secret: string; secretConfirm: string; recoveryEmail: string }): Promise<string | null> {
+  async setup(input: { familyName: string; displayName: string; login: string; secret: string; secretConfirm: string; recoveryEmail: string }): Promise<string | null> {
     this.set({ loggingIn: true, loginError: null });
     try {
       const r = await this.api.setupFamily({
-        installToken: input.installToken.trim(),
+        installToken: (this.s.prefillInstallToken ?? "").trim(),
         familyName: input.familyName,
         admin: { displayName: input.displayName, login: input.login.trim().toLowerCase(), secret: input.secret, secretConfirm: input.secretConfirm, recoveryEmail: input.recoveryEmail.trim() },
       });
       const lastLogin = { familyCode: r.familyCode, login: input.login.trim().toLowerCase() };
       await this.db.meta.put({ key: "lastLogin", value: lastLogin });
-      try {
-        localStorage.removeItem(TOKEN_KEY); // used: it cannot be used again anyway
-      } catch {
-        /* ignore */
-      }
-      this.set({ lastLogin, welcomeCode: r.familyCode, prefillInstallToken: null });
+      this.forgetInstallToken(); // used: it cannot be used again anyway
+      this.set({ lastLogin, welcomeCode: r.familyCode, prefillInstallToken: null, installFrom: null, installRefused: false });
       const { me } = await this.api.me();
       await this.enter(me);
       return r.familyCode;
     } catch (e) {
+      if (e instanceof ApiError && e.code === "invalid_install_token") {
+        this.forgetInstallToken();
+        this.set({ prefillInstallToken: null, installFrom: null, installRefused: true, loginError: null });
+        return null;
+      }
       this.set({
         loginError:
           e instanceof NetworkError ? "Pas de connexion. Réessayez."
-          : e instanceof ApiError && e.code === "mail_unavailable" ? "L’e-mail n’a pas pu être envoyé. Veuillez réessayer dans quelques instants. Rien n’a été créé : votre jeton reste valable."
+          : e instanceof ApiError && e.code === "mail_unavailable" ? "L’e-mail n’a pas pu être envoyé. Veuillez réessayer dans quelques instants. Rien n’a été créé : vous pouvez réessayer."
           : e instanceof ApiError && e.code === "email_required" ? "Une adresse e-mail de récupération est obligatoire."
-          : e instanceof ApiError && e.status === 403 ? "Jeton d'installation invalide ou déjà utilisé."
           : e instanceof ApiError && e.code === "weak_secret" ? "Code secret trop simple (évitez 123456, 111111…)."
           : e instanceof ApiError && e.status === 400 ? "Vérifiez les champs (identifiant : lettres minuscules, chiffres, . _ -)."
           : "Installation impossible.",
@@ -572,7 +600,7 @@ export class Engine {
         if (e instanceof ApiError && e.status >= 500) return this.scheduleRetry();
         // 400/403/404: the server will never accept this batch — drop it rather than retry forever.
         this.set({ batches: this.s.batches.filter((b) => b.id !== batch.id), toggles: normalizeToggles(this.s.list, this.s.batches.filter((b) => b.id !== batch.id), this.s.toggles) });
-        this.notice("Un envoi a été refusé par le serveur.");
+        this.notice("Un envoi n'a pas pu être enregistré. Vérifiez la liste.");
         await this.persistOutbox();
         continue;
       }
@@ -619,7 +647,7 @@ export class Engine {
         };
         // A new request in another unit exists: adding kilos to pieces would be meaningless, so nothing is merged or changed.
         const clash = r.reason === "duplicate_open" && r.detail?.quantity !== undefined && r.detail.unit ? `Correction impossible pour l'instant : une nouvelle demande de ce produit existe déjà dans une autre unité (${fmtQty(r.detail.quantity, r.detail.unit)}). Retirez-la ou achetez-la d'abord ; l'achat reste inchangé.` : null;
-        this.notice(clash ?? msg[r.reason ?? ""] ?? "Action refusée.");
+        this.notice(clash ?? msg[r.reason ?? ""] ?? "Cette action n'a pas pu être enregistrée.");
         if (r.reason === "list_closed") void this.refresh();
       } else if (okText) {
         const t = okText(r);
@@ -632,7 +660,7 @@ export class Engine {
         this.notice("Pas de connexion : cette action n'a pas été enregistrée. Réessayez quand le réseau est revenu.");
         this.scheduleRetry();
       } else if (e instanceof ApiError && e.status === 401) this.set({ phase: "loggedOut" });
-      else this.notice("Action refusée par le serveur.");
+      else this.notice("Cette action n'a pas pu être enregistrée. Réessayez.");
       return null;
     }
   }

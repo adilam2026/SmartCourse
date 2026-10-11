@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError, NetworkError } from "../api";
+import { userMessage } from "../errors";
 import { CATEGORY_EMOJI } from "../categories";
 import { prepareImage } from "../image";
 import type { Product, Unit } from "../types";
@@ -14,10 +15,7 @@ interface Props {
   onSaved(): void;
 }
 
-const errText = (e: unknown): string =>
-  e instanceof NetworkError ? "Pas de connexion : l'enregistrement du catalogue demande le serveur."
-  : e instanceof ApiError ? (e.code === "product_exists" ? "Un article de ce nom existe déjà." : e.code === "invalid_image" || e.code === "image_too_large" ? e.message : e.message)
-  : "Erreur.";
+const errText = (e: unknown): string => (e instanceof NetworkError ? "Pas de connexion : l'enregistrement d'un article demande le réseau. Réessayez quand il est revenu." : userMessage(e));
 
 /** « Ajouter un article » / « Modifier un article » (administrateur). L'image est vue avant l'enregistrement. */
 export function ProductForm({ product, categories, onClose, onSaved }: Props) {

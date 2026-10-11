@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import pg from "pg";
 import { expect, test } from "@playwright/test";
-import { expectNoInfra, linkTokenFor, MAIL_FAILED, mailsTo, newFamily, uiLogin, type Family } from "./helpers";
+import { expectNoInfra, linkTokenFor, openInstall, MAIL_FAILED, mailsTo, newFamily, uiLogin, type Family } from "./helpers";
 
 /*
  * Accès : connexion à deux parcours, mots de passe choisis à la main, protection de l'administration, récupération par e-mail.
@@ -41,7 +41,7 @@ for (const w of [360, 390, 412]) {
     await expect(setup.getByTestId("go-setup")).toHaveText("Créer ma famille");
     expect(await noOverflow(page)).toBe(true);
     await page.screenshot({ path: `${OUT}/connexion-${w}.png`, fullPage: true });
-    await setup.getByTestId("go-setup").click();
+    await openInstall(page);
     await expect(page.getByText("Code secret — 6 chiffres")).toBeVisible();
     await expect(page.getByText("Confirmer le code secret")).toBeVisible();
     expect(await noOverflow(page)).toBe(true);

@@ -17,7 +17,7 @@ Les données locales sont indexées par famille. À la réinitialisation, le té
 ## Parcours exact pour recréer la famille
 1. Réglages → **Adresse de récupération** : adresse vérifiée ? Appuyer sur **Envoyer un e-mail de test**, vérifier la réception dans la boîte (courriers indésirables compris).
 2. Réglages → **Réinitialiser la famille** : contrôler le nom, le code et le décompte ; saisir le mot de passe, retaper le code, cocher la case ; **Supprimer définitivement la famille**.
-3. L'application revient à **Première installation** avec un **jeton neuf** prérempli (usage unique ; il survit à la fermeture de l'application jusqu'à son utilisation). Noter aussi ce jeton.
+3. L'application revient à **Première installation** avec le message « Votre famille a été supprimée. Vous pouvez maintenant créer une nouvelle famille. » L'autorisation de recréer (usage unique) est gardée par l'application, sans saisie ni copie ; elle survit à la fermeture de l'application. Sur un autre téléphone, ouvrir le lien d'installation fourni par `admin-cli`.
 4. Renseigner : nom de la famille, nom affiché, identifiant, **mot de passe (6 caractères) ×2**, **e-mail de récupération (obligatoire)** → **Créer ma famille**.
 5. Écran « Vérifiez votre e-mail » : ouvrir le lien reçu (sur ce téléphone ou un autre) ; l'écran se termine seul → code famille affiché → **Continuer**.
 6. Chaque personne se reconnecte avec le nouveau code famille ; les profils se recréent dans Réglages → Famille et profils (mot de passe choisi à la main).

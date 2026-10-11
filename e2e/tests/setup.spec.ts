@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 import pg from "pg";
 import { expectNoInfra, linkTokenFor, MAIL_FAILED, MOCK } from "./helpers";
 
-test("première installation : jeton à usage unique → famille créée → connecté en administrateur", async ({ page, playwright, baseURL }) => {
+test("première installation : lien d'installation à usage unique → famille créée → connecté en administrateur", async ({ page, playwright, baseURL }) => {
   const token = randomBytes(24).toString("base64url");
   const c = new pg.Client({ connectionString: "postgres://smart:smart@localhost:5432/smartcourse_e2e" });
   await c.connect();
@@ -11,8 +11,10 @@ test("première installation : jeton à usage unique → famille créée → con
   await c.end();
 
   await page.goto("/");
-  await page.getByTestId("go-setup").click();
-  await page.getByTestId("setup-token").fill(token);
+  await page.goto(`/#/install/${token}`); // le lien transmet l'autorisation : aucun champ à remplir
+  await expect(page.getByTestId("setup-token")).toHaveCount(0);
+  await expect(page.getByTestId("setup-family")).toBeVisible();
+  expect(page.url()).not.toContain(token); // l'autorisation ne reste pas dans la barre d'adresse
   await page.getByTestId("setup-family").fill("Famille Test");
   await page.getByTestId("setup-name").fill("Adil");
   await page.getByTestId("setup-login").fill("adil");
@@ -55,8 +57,7 @@ test("installation : échec d'envoi → on réessaie ou on change l'adresse sans
   await fetch(`${MOCK}/__fail?on=1&status=400&code=invalid_parameter&msg=${encodeURIComponent("valid sender email required")}`, { method: "POST" });
   try {
     await page.goto("/");
-    await page.getByTestId("go-setup").click();
-    await page.getByTestId("setup-token").fill(token);
+    await page.goto(`/#/install/${token}`);
     await page.getByTestId("setup-family").fill("Famille Retry");
     await page.getByTestId("setup-name").fill("Adil");
     await page.getByTestId("setup-login").fill("adil");

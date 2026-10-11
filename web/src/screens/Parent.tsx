@@ -129,7 +129,7 @@ function Current({ engine, s, onEdit }: { engine: Engine; s: State; onEdit(): vo
       <PageHead engine={engine} s={s} title="Les courses du jour" subtitle={fmtToday()} />
       <Banners engine={engine} s={s} />
       {s.me && <NotificationInvite profileId={s.me.id} />}
-      {s.conn === "offline" && <p className="banner banner--offline limit" data-testid="offline-limit">Hors connexion : les achats et corrections ne peuvent pas être enregistrés tant que le serveur est injoignable.</p>}
+      {s.conn === "offline" && <p className="banner banner--offline limit" data-testid="offline-limit">Hors connexion : les achats et corrections ne peuvent pas être enregistrés tant que la connexion est coupée.</p>}
       <section className="progresscard" aria-label="Progression" data-testid="progress">
         <div className="progresscard__line">
           <strong data-testid="progress-text">{total === 0 ? "Aucun produit pour le moment" : `${bought.length} produit${bought.length > 1 ? "s" : ""} sur ${total} acheté${bought.length > 1 ? "s" : ""}`}</strong>

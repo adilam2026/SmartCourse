@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError, NetworkError, type CatalogAllItem } from "../api";
+import { userMessage } from "../errors";
 import { CATEGORY_EMOJI } from "../categories";
 import { Icon } from "../components/Icon";
 import { unitLabel } from "../units";
@@ -37,7 +38,7 @@ export function CatalogBrowser({ categories, onChanged }: { categories: { key: s
       setTotal(r.total);
       setError(null);
     } catch (e) {
-      if (my === gen.current) setError(e instanceof NetworkError ? "Pas de connexion." : e instanceof ApiError ? e.message : "Erreur.");
+      if (my === gen.current) setError(userMessage(e));
     } finally {
       if (my === gen.current) setBusy(false);
     }
@@ -57,7 +58,7 @@ export function CatalogBrowser({ categories, onChanged }: { categories: { key: s
       setNotice(r.reactivated ? `« ${it.name} » est de nouveau disponible.` : r.created ? `« ${it.name} » ajouté au catalogue de la famille.` : `« ${it.name} » était déjà disponible.`);
       await onChanged();
     } catch (e) {
-      setError(e instanceof NetworkError ? "Pas de connexion." : e instanceof ApiError ? e.message : "Erreur.");
+      setError(userMessage(e));
     }
   };
 

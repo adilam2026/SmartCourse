@@ -59,9 +59,10 @@ test("réinitialiser ma famille : suppression de cette famille seulement, accès
   await page.getByTestId("reset-password").fill("482913");
   await page.getByTestId("reset-submit").click();
   // la famille est supprimée : l'application revient seule à l'installation, jeton neuf prérempli
-  await expect(page.getByTestId("reset-banner")).toContainText("supprimée définitivement");
-  const token = (await page.getByTestId("setup-token").inputValue()).trim();
-  expect(token.length).toBeGreaterThan(20);
+  await expect(page.getByTestId("reset-banner")).toHaveText("Votre famille a été supprimée. Vous pouvez maintenant créer une nouvelle famille.");
+  await expect(page.getByTestId("setup-token")).toHaveCount(0); // aucun champ ni mention de jeton
+  const token = await page.evaluate(() => localStorage.getItem("smartcourse.installToken") ?? "");
+  expect(token.length).toBeGreaterThan(20); // l'autorisation est gardée par l'application, jamais montrée
   await page.screenshot({ path: `${OUT}/reinitialiser-termine-390.png`, fullPage: true });
 
   // côté base : A a disparu, B et le catalogue partagé sont identiques
@@ -76,7 +77,7 @@ test("réinitialiser ma famille : suppression de cette famille seulement, accès
 
   // retour à l'installation : jeton neuf prérempli, données locales du premier téléphone effacées
   await page.reload(); // le jeton survit à une fermeture de l'application
-  await expect(page.getByTestId("setup-token")).toHaveValue(token); // l'installation s'ouvre directement avec le jeton
+  await expect(page.getByTestId("setup-family")).toBeVisible(); // l'installation s'ouvre directement, sans saisie
   const local = await idb(page);
   expect(Object.values(local).flat()).toEqual([]);
 

@@ -20,10 +20,10 @@ export function ValidationHistory({ list, onClose }: { list: ListView; onClose()
           <section key={g.validation.id} className="vgroup" data-testid="validation-group">
             <h3>{fmtWhen(g.validation.at)} · {g.validation.by.displayName} <span className="muted">· {g.events.length} changement{g.events.length > 1 ? "s" : ""}</span></h3>
             {isLate(g.validation.at, g.validation.receivedAt) && (
-              <p className="muted" data-testid="validation-late">Envoyé plus tard : validé sur le téléphone à {fmtWhen(g.validation.at)}, reçu par le serveur à {fmtWhen(g.validation.receivedAt)}.</p>
+              <p className="muted" data-testid="validation-late">Envoyé plus tard : validé sur le téléphone à {fmtWhen(g.validation.at)}, enregistré à {fmtWhen(g.validation.receivedAt)}.</p>
             )}
             {g.validation.clientAt && Math.abs(new Date(g.validation.clientAt).getTime() - new Date(g.validation.at).getTime()) > 1000 && (
-              <p className="muted" data-testid="validation-clock">L'heure annoncée par le téléphone ({fmtWhen(g.validation.clientAt)}) était incohérente : l'heure du serveur est affichée.</p>
+              <p className="muted" data-testid="validation-clock">L'heure annoncée par le téléphone ({fmtWhen(g.validation.clientAt)}) était incohérente : l'heure d'enregistrement est affichée.</p>
             )}
             <ul>
               {g.events.map((e) => (

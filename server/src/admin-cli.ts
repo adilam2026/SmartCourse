@@ -17,7 +17,7 @@ try {
     const code = await operatorResetSecret(db, args[0]!.toUpperCase(), args[1]!.toLowerCase());
     console.log(`Nouveau code pour ${args[1]} : ${code}\n(sessions révoquées, opération journalisée)`);
   } else if (cmd === "token") {
-    console.log(`Jeton d'installation (à usage unique) : ${await generateInstallToken(db)}`);
+    console.log(`Lien d'installation (usage unique) : <adresse de l'application>/#/install/${await generateInstallToken(db)}`);
   } else if (cmd === "purge-family" && args[0]) {
     // Suppression DÉFINITIVE d'une seule famille. Sans --execute : identification et décompte seulement.
     const code = args[0].toUpperCase();
@@ -36,7 +36,7 @@ try {
       if (ci < 0 || args[ci + 1]?.toUpperCase() !== fam.code) throw new Error(`Confirmation manquante : ajoutez --confirm ${fam.code}`);
       const r = await purgeFamily(db, createPhotoStore(loadConfig()), fam.id, fam.code);
       console.log(`\nFamille supprimée. Fichiers photo retirés : ${r.photoFilesRemoved}. Autres familles intactes : ${r.otherFamiliesUntouched}.`);
-      console.log(`Nouveau jeton d'installation (usage unique, à noter maintenant) : ${r.installToken}`);
+      console.log(`Lien d'installation pour une nouvelle famille (usage unique) : <adresse de l'application>/#/install/${r.installToken}`);
       const store = createBackupStorage(loadConfig());
       if (store) {
         const { listBackups } = await import("./backup.js");

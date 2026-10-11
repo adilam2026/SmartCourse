@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { expect, test, type Page } from "@playwright/test";
-import { card, createList, newFamily, uiLogin, type Family } from "./helpers";
+import { card, createList, newFamily, openInstall, uiLogin, type Family } from "./helpers";
 
 /*
  * Refonte visuelle : liste des parents, catalogue, statistiques (écrans de référence) puis historique, réglages, profil, connexion.
@@ -189,7 +189,7 @@ for (const w of WIDTHS) {
       await expect(page.getByTestId("notif-settings")).toBeVisible();
       await expect(page.getByTestId("logout")).toBeVisible();
       await expect(page.getByRole("button", { name: "Crédits photos" })).toBeVisible();
-      await expect(page.getByRole("region", { name: "À propos et version" })).toBeVisible();
+      await expect(page.getByRole("region", { name: "À propos" })).toBeVisible();
       await page.screenshot({ path: `${OUT}/${w}-profil.png` });
       await ctx.close();
     });
@@ -356,8 +356,7 @@ for (const w of WIDTHS) {
       await expect(page.locator(".auth__logo img")).toBeVisible();
       await audit(page, "connexion");
       await page.screenshot({ path: `${OUT}/${w}-connexion.png` });
-      await page.getByTestId("go-setup").click();
-      await expect(page.getByTestId("setup-submit")).toBeVisible();
+      await openInstall(page);
       await audit(page, "installation");
       await page.screenshot({ path: `${OUT}/${w}-installation.png`, fullPage: true });
       await ctx.close();

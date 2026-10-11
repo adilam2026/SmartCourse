@@ -2,6 +2,7 @@ import { unitLabel } from "../units";
 import { VersionInfo } from "../components/VersionInfo";
 import { useEffect, useState } from "react";
 import { api, ApiError, NetworkError, type AuditProduct, type BackupStatus, type Profile, type ResetPreview } from "../api";
+import { userMessage } from "../errors";
 import { fmtDateTime } from "../format";
 import { CATEGORY_EMOJI } from "../categories";
 import { Dialog } from "../components/Dialog";
@@ -22,24 +23,17 @@ const flatten = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLower
 
 const ROLE_LABEL: Record<Role, string> = { admin: "Administrateur", parent: "Parent", staff: "Personnel" };
 
-const errText = (e: unknown): string =>
-  e instanceof NetworkError ? "Pas de connexion."
-  : e instanceof ApiError ? (e.code === "last_admin" ? "Impossible : c'est le dernier administrateur actif." : e.code === "admin_cannot_deactivate" ? "Un administrateur ne peut pas être désactivé." : e.code === "primary_admin_protected" ? "Le rôle de l'administrateur principal ne peut pas être modifié." : e.code === "login_taken" ? "Cet identifiant existe déjà." : e.code === "weak_secret" ? "Code secret trop simple (évitez 123456, 111111…)." : e.code === "secret_mismatch" ? "Les deux codes secrets ne sont pas identiques." : e.code === "invalid_secret" ? "Le code secret doit comporter exactement 6 chiffres." : e.message)
-  : "Erreur.";
+const errText = userMessage;
 
 type Section = "profiles" | "recovery" | "reset" | "catalog" | "notifications" | "backups" | "about";
 
-/** Backup state in one word (the technical detail is one touch away). */
+/** Backup state in one sentence: what matters to the family. How it works stays on the operator side (server logs). */
 function backupSummary(st: BackupStatus | null): { ok: boolean; text: string } {
   if (!st) return { ok: true, text: "Vérification…" };
   const old = (iso: string | null, days: number) => !iso || Date.now() - new Date(iso).getTime() > days * 86_400_000;
   const failedSince = st.lastVerifyFailedAt && (!st.lastVerifiedOkAt || st.lastVerifyFailedAt > st.lastVerifiedOkAt);
-  const toolsBad = st.tools && !st.tools.ok;
-  if (!st.configured) return { ok: false, text: "Sauvegarde non configurée" };
-  if (failedSince) return { ok: false, text: "Dernière vérification en échec" };
-  if (toolsBad) return { ok: false, text: "Outils de sauvegarde à vérifier" };
-  if (old(st.lastVerifiedOkAt, 3)) return { ok: false, text: "Sauvegarde à vérifier" };
-  return { ok: true, text: "Sauvegardes à jour" };
+  if (!st.configured || failedSince || (st.tools && !st.tools.ok) || old(st.lastVerifiedOkAt, 3)) return { ok: false, text: "À vérifier" };
+  return { ok: true, text: "Données sauvegardées" };
 }
 
 export function Settings({ engine, s }: { engine: Engine; s: State }) {
@@ -57,9 +51,9 @@ export function Settings({ engine, s }: { engine: Engine; s: State }) {
       { key: "recovery", icon: "lock", title: "Adresse de récupération", text: "Code famille et mot de passe oubliés", testid: "seg-recovery" },
       { key: "catalog", icon: "grid", title: "Catalogue", text: "Produits, photos et unités", testid: "seg-catalog" },
       { key: "notifications", icon: "bell", title: "Notifications", text: pushText, testid: "seg-notifications" },
-      { key: "backups", icon: "shield", title: "Sauvegardes", text: bs.text, testid: "seg-backups" },
+      { key: "backups", icon: "shield", title: "Sauvegarde", text: bs.text, testid: "seg-backups" },
       ...(s.me?.primary ? [{ key: "reset" as Section, icon: "shield" as IconName, title: "Réinitialiser la famille", text: "Suppression définitive, pour recommencer", testid: "seg-reset" }] : []),
-      { key: "about", icon: "info", title: "À propos et version", text: "Version installée, mises à jour", testid: "seg-about" },
+      { key: "about", icon: "info", title: "À propos", text: "Mises à jour de l'application", testid: "seg-about" },
     ];
     return (
       <>
@@ -76,7 +70,7 @@ export function Settings({ engine, s }: { engine: Engine; s: State }) {
       </>
     );
   }
-  const titles: Record<Section, string> = { profiles: "Famille et profils", recovery: "Adresse de récupération", reset: "Réinitialiser la famille", catalog: "Catalogue", notifications: "Notifications", backups: "Sauvegardes", about: "À propos et version" };
+  const titles: Record<Section, string> = { profiles: "Famille et profils", recovery: "Adresse de récupération", reset: "Réinitialiser la famille", catalog: "Catalogue", notifications: "Notifications", backups: "Sauvegarde", about: "À propos" };
   return (
     <>
       <PageHead engine={engine} s={s} title={titles[section]} onBack={() => setSection(null)} backLabel="Réglages" backTestId="settings-back" subtitle={section === "profiles" && s.me?.family ? <>Code de la famille : <b data-testid="family-code">{s.me.family.code}</b></> : undefined} />
@@ -92,28 +86,13 @@ export function Settings({ engine, s }: { engine: Engine; s: State }) {
 }
 
 function BackupCard({ st }: { st: BackupStatus | null }) {
-  const [details, setDetails] = useState(false);
   if (!st) return <p className="empty">Vérification…</p>;
   const sum = backupSummary(st);
-  const failedSince = st.lastVerifyFailedAt && (!st.lastVerifiedOkAt || st.lastVerifyFailedAt > st.lastVerifiedOkAt);
-  const toolsBad = st.tools && !st.tools.ok;
   return (
     <div className="panel backupcard" data-testid="backup-card">
-      <p><span className={`statebadge ${sum.ok ? "" : "statebadge--bad"}`} data-testid="backup-state"><Icon name={sum.ok ? "check" : "info"} size={16} /> {sum.text}</span></p>
+      <p><span className={`statebadge ${sum.ok ? "" : "statebadge--bad"}`} data-testid="backup-state"><Icon name={sum.ok ? "check" : "info"} size={16} /> {sum.ok ? "Vos données sont sauvegardées automatiquement" : "La sauvegarde automatique doit être vérifiée"}</span></p>
       <p className="muted">{st.lastBackupAt ? `Dernière sauvegarde : ${fmtDateTime(st.lastBackupAt)}` : "Aucune sauvegarde pour le moment."}</p>
-      <button className="disclose" data-testid="backup-details-toggle" aria-expanded={details} onClick={() => setDetails((v) => !v)}>{details ? "Masquer les détails techniques" : "Détails techniques"}</button>
-      {details && (
-        <div data-testid="backup-details" className="muted">
-          <strong>Sauvegarde {st.configured ? "automatique" : "NON configurée (aucun bucket sûr ou clé absente)"}</strong>
-          {st.configured && <><br />Stockage : {st.storage === "s3" ? "bucket (chiffré)" : "dossier local"} · {st.schedule}</>}
-          <br />
-          Dernière sauvegarde : {st.lastBackupAt ? fmtDateTime(st.lastBackupAt) : "aucune"}
-          <br />
-          Dernière restauration vérifiée : {st.lastVerifiedOkAt ? fmtDateTime(st.lastVerifiedOkAt) : "jamais"}
-          {failedSince ? " — ÉCHEC de la dernière vérification" : ""}
-          {toolsBad && <><br /><strong>Outils : </strong>{st.tools!.message}</>}
-        </div>
-      )}
+      {!sum.ok && <p className="muted">Contactez la personne qui gère l'application.</p>}
     </div>
   );
 }
@@ -276,7 +255,7 @@ function ResetFamily({ engine }: { engine: Engine }) {
           // The family is gone: the app leaves at once (its own session is closed) and the new single-use token is kept on the installation form.
           await engine.afterFamilyReset(r.installToken);
         } catch (err) {
-          setError(err instanceof ApiError && err.code === "wrong_password" ? "Mot de passe incorrect." : err instanceof ApiError && err.code === "code_mismatch" ? "Le code famille saisi ne correspond pas." : errText(err));
+          setError(errText(err));
           setBusy(false);
         }
       }}>

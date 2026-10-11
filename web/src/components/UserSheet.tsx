@@ -41,8 +41,8 @@ export function UserSheet({ engine, s, onClose }: { engine: Engine; s: State; on
           </ul>
         )}
         <button className="btn btn--danger" data-testid="logout" onClick={() => { void engine.logout(); onClose(); }}>Se déconnecter</button>
-        <section className="sheetsection sheetsection--secondary" aria-label="À propos et version">
-          <h3>À propos et version</h3>
+        <section className="sheetsection sheetsection--secondary" aria-label="À propos">
+          <h3>À propos</h3>
           <VersionInfo engine={engine} />
         </section>
         <button className="btn btn--ghost" onClick={onClose}>Fermer</button>

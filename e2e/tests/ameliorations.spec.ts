@@ -468,7 +468,7 @@ test.describe("5 et 6 · statistiques lisibles et fiche d'achats par produit", (
 });
 
 test.describe("fuseau Africa/Casablanca : l'heure affichée ne dépend pas du fuseau du téléphone", () => {
-  test("même heure affichée avec quatre fuseaux de téléphone ; le diagnostic signale un fuseau différent", async ({ browser, playwright, baseURL }) => {
+  test("même heure affichée avec quatre fuseaux de téléphone ; aucune information de fuseau n'est montrée", async ({ browser, playwright, baseURL }) => {
     const f = await newFamily(playwright, baseURL!);
     const listId = await createList(f);
     const pressed = new Date(Date.now() - 5 * 60_000);
@@ -482,11 +482,7 @@ test.describe("fuseau Africa/Casablanca : l'heure affichée ne dépend pas du fu
       const added = await page.getByTestId(`added-${pid(f, "Lait")}`).textContent();
       shown[tz] = added!.match(/\d{2}:\d{2}/)![0];
       await page.getByTestId("avatar").click();
-      await expect(page.getByTestId("clock-zone")).toContainText("Africa/Casablanca");
-      await expect(page.getByTestId("clock-zone")).toContainText(tz);
-      if (tz === "Africa/Casablanca") await expect(page.getByTestId("clock-zone-diff")).toHaveCount(0);
-      else await expect(page.getByTestId("clock-zone-diff")).toBeVisible();
-      if (tz === "Europe/Paris") await page.screenshot({ path: `${CAP}/amelioration-fuseau-diagnostic.png` });
+      await expect(page.getByTestId("clock-zone")).toHaveCount(0); // aucune information de fuseau à l'écran
       await ctx.close();
     }
     for (const tz of Object.keys(shown)) expect(shown[tz]).toBe(expected);

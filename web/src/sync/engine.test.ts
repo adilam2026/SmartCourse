@@ -123,7 +123,13 @@ describe("effacement des données locales d'une ancienne famille", () => {
     await e.toggle("lait");
     await e.afterFamilyReset("TOKEN-NEUF-0123456789");
     expect(await db.cache.count() + (await db.outbox.count()) + (await db.drafts.count()) + (await db.orphans.count()) + (await db.meta.count())).toBe(0);
-    expect(e.getState()).toMatchObject({ phase: "loggedOut", me: null, lastLogin: null, prefillInstallToken: "TOKEN-NEUF-0123456789" });
+    expect(e.getState()).toMatchObject({ phase: "loggedOut", me: null, lastLogin: null, prefillInstallToken: "TOKEN-NEUF-0123456789", installFrom: "reset" });
+  });
+
+  it("un lien d'installation fournit l'autorisation sans saisie ", async () => {
+    const e = await boot();
+    e.acceptInstallLink("LIEN-INSTALL-0123456789");
+    expect(e.getState()).toMatchObject({ prefillInstallToken: "LIEN-INSTALL-0123456789", installFrom: "link", installRefused: false });
   });
 });
 
