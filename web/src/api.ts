@@ -227,6 +227,8 @@ export interface RecoveryState {
   verified: boolean;
   /** Première installation inachevée : l'adresse doit être vérifiée pour terminer. */
   setupPending: boolean;
+  /** Secondes avant de pouvoir demander un nouveau lien de vérification. */
+  resendInSeconds: number;
   /** « accepted » = pris en charge par le service d'envoi, pas une preuve de réception ; « delivered » = remis au serveur du destinataire. */
   lastMail: { kind: string; status: "queued" | "accepted" | "delivered" | "bounced" | "failed" | "unknown" | "not_configured"; at: string; detail: string | null; /** Titre et conseil quand l'envoi n'a pas abouti. */ title: string; hint: string } | null;
 }

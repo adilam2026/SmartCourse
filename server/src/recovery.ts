@@ -11,6 +11,8 @@ const VERIFY_HOURS = 48;
 const RESET_MINUTES = 60;
 /** Per profile / per address, to stop a person (or a bot) from flooding a mailbox. */
 const MAX_MAILS_PER_HOUR = 3;
+/** Minimum wait between two verification links requested by hand. */
+const RESEND_COOLDOWN_SEC = 30;
 
 export const normalizeEmail = (s: string): string => s.trim().toLowerCase();
 const emailHash = (e: string) => createHash("sha256").update(normalizeEmail(e)).digest("hex");
@@ -35,6 +37,7 @@ export class RecoveryService {
     private readonly db: Db,
     private readonly mailer: Mailer,
     private readonly baseUrl: string = appBaseUrl(),
+    private readonly opts: { resendCooldownSec?: number } = {},
   ) {
     this.baseUrl = baseUrl.replace(/\/+$/, "");
   }
@@ -96,7 +99,7 @@ export class RecoveryService {
 
   // ---- adresse de récupération (administrateur principal) -------------------------------------------------------
 
-  async state(profileId: string): Promise<{ canEdit: boolean; configured: boolean; email: string | null; verified: boolean; setupPending: boolean; lastMail: MailStatusView | null }> {
+  async state(profileId: string): Promise<{ canEdit: boolean; configured: boolean; email: string | null; verified: boolean; setupPending: boolean; lastMail: MailStatusView | null; resendInSeconds: number }> {
     const p = (await this.db.query("SELECT p.is_primary, p.recovery_email, p.recovery_email_verified_at, f.setup_completed_at IS NULL AS setup_pending FROM profiles p JOIN families f ON f.id = p.family_id WHERE p.id = $1", [profileId])).rows[0];
     const last = (
       await this.db.query("SELECT kind, status, detail, updated_at FROM email_log WHERE profile_id = $1 AND kind IN ('verify_email', 'test') ORDER BY created_at DESC LIMIT 1", [profileId])
@@ -107,8 +110,18 @@ export class RecoveryService {
       email: p?.recovery_email ?? null,
       verified: !!p?.recovery_email_verified_at,
       setupPending: !!p?.setup_pending,
+      resendInSeconds: await this.resendWait(profileId),
       lastMail: last ? { kind: last.kind, status: last.status, at: new Date(last.updated_at).toISOString(), detail: last.detail, ...explainMailFailure(last.status, last.detail) } : null,
     };
+  }
+
+  /** Seconds before a new verification link may be requested (a message that left, or may have left, less than the cooldown ago). */
+  private async resendWait(profileId: string): Promise<number> {
+    const cool = this.opts.resendCooldownSec ?? RESEND_COOLDOWN_SEC;
+    if (cool <= 0) return 0;
+    const r = (await this.db.query("SELECT ceil(extract(epoch from (created_at + make_interval(secs => $2) - now())))::int AS s, status IN ('failed', 'not_configured') AS failed FROM email_log WHERE profile_id = $1 AND kind = 'verify_email' ORDER BY created_at DESC LIMIT 1", [profileId, cool])).rows[0];
+    if (!r || r.failed) return 0; // the latest attempt did not leave: no reason to wait
+    return Math.max(0, Number(r.s ?? 0));
   }
 
   /** Registers (or changes) the address and sends the verification link. The address is unusable for recovery until verified. */
@@ -130,6 +143,7 @@ export class RecoveryService {
     if (!p?.is_primary) throw new HttpError(403, "forbidden", "Seul l'administrateur principal peut gérer l'adresse de récupération");
     if (!p.recovery_email) throw new HttpError(400, "no_email", "Aucune adresse enregistrée");
     if (p.recovery_email_verified_at) return;
+    if ((await this.resendWait(profileId)) > 0) throw new HttpError(429, "too_soon", "Un lien vient d'être envoyé : patientez un instant avant de le renvoyer");
     await this.sendVerification(profileId);
   }
 

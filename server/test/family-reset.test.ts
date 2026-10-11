@@ -32,7 +32,7 @@ beforeAll(async () => {
   db = await testDb();
   await resetData(db);
   mailer = new RecordingMailer();
-  recovery = new RecoveryService(db, mailer, BASE);
+  recovery = new RecoveryService(db, mailer, BASE, { resendCooldownSec: 0 });
   app = await buildApp({ db, store, recovery, requireRecoveryEmail: true, loginRateLimit: rate, recoveryRateLimit: rate });
   await app.ready();
 });
@@ -57,7 +57,7 @@ describe("première installation : adresse de récupération obligatoire et vér
     expect([noMail.statusCode, noMail.json().error]).toEqual([400, "email_required"]);
     const bad = await app.inject({ method: "POST", url: "/api/setup/family", payload: await setupBody({ recoveryEmail: "pas-une-adresse" }, token) });
     expect(bad.statusCode).toBe(400);
-    const off = await buildApp({ db, store, recovery: new RecoveryService(db, new DisabledMailer(), BASE), requireRecoveryEmail: true, loginRateLimit: rate });
+    const off = await buildApp({ db, store, recovery: new RecoveryService(db, new DisabledMailer(), BASE, { resendCooldownSec: 0 }), requireRecoveryEmail: true, loginRateLimit: rate });
     const refused = await off.inject({ method: "POST", url: "/api/setup/family", payload: await setupBody({}, token) });
     expect([refused.statusCode, refused.json().error]).toEqual([503, "mail_not_configured"]);
     await off.close();

@@ -41,7 +41,7 @@ export interface Mailer {
 export function safeProviderMessage(msg: unknown, apiKey?: string): string {
   let t = typeof msg === "string" ? msg : "";
   if (apiKey) t = t.split(apiKey).join("[clé]");
-  t = t.replace(/[^\s@]+@[^\s@]+\.[^\s@]+/g, "[adresse]").replace(/[A-Za-z0-9_-]{28,}/g, "[…]");
+  t = t.replace(/https?:\/\/\S+/g, "[lien]").replace(/[^\s@]+@[^\s@]+\.[^\s@]+/g, "[adresse]").replace(/[A-Za-z0-9_-]{28,}/g, "[…]");
   return t.replace(/\s+/g, " ").trim().slice(0, 180);
 }
 
@@ -54,18 +54,18 @@ export function explainMailFailure(status: string, detail: string | null): { tit
   if (status === "unknown") return { title: "Envoi incertain", hint: "Brevo n'a pas répondu à temps : le message est peut-être parti. Patientez quelques minutes avant de réessayer." };
   if (status === "bounced") return { title: "E-mail rejeté par la boîte du destinataire", hint: "Vérifiez l'adresse saisie (faute de frappe ?) ou changez-la." };
   if (status !== "failed") return { title: "", hint: "" };
-  if (m.includes("injoignable")) return { title: "E-mail non envoyé", hint: "Le service d'envoi Brevo est injoignable depuis le serveur. Réessayez dans un instant." };
-  if (m.includes("https")) return { title: "E-mail non envoyé", hint: "Configuration refusée : l'adresse du service d'envoi doit être en HTTPS." };
-  if (http === 401 || m.includes("unauthorized") || m.includes("key not found")) {
-    if (/\bip\b/.test(m)) return { title: "E-mail non envoyé : Brevo bloque l'adresse du serveur", hint: "Dans Brevo → Sécurité → Adresses IP autorisées, désactivez la restriction (Railway n'a pas d'adresse IP fixe), puis réessayez." };
-    return { title: "E-mail non envoyé : clé API refusée par Brevo", hint: "Vérifiez BREVO_API_KEY dans les variables Railway du service SmartCourse : clé API v3 complète et active, sans guillemets ni espace. Le bouton « Diagnostiquer l'envoi » le confirme." };
-  }
-  if (http === 403 || m.includes("permission_denied") || m.includes("not yet activated") || m.includes("not activated")) return { title: "E-mail non envoyé : compte Brevo non autorisé à envoyer", hint: "Le compte Brevo doit être activé pour l'envoi d'e-mails transactionnels (parfois après validation par Brevo). Contrôlez le compte dans Brevo." };
-  if (http === 400 && (m.includes("sender") || m.includes("expéditeur"))) return { title: "E-mail non envoyé : expéditeur non autorisé", hint: "BREVO_FROM_EMAIL doit être un expéditeur validé dans Brevo → Expéditeurs, domaines et IP. Les adresses gmail.com, yahoo.fr… sont refusées : utilisez une adresse de votre propre domaine, authentifié." };
-  if (http === 400) return { title: "E-mail non envoyé : demande refusée par Brevo", hint: "Brevo a refusé la demande (voir le détail ci-dessous). Le plus fréquent : expéditeur non validé. « Diagnostiquer l'envoi » vérifie la clé et l'expéditeur." };
-  if (http === 402 || http === 429 || m.includes("quota") || m.includes("limit")) return { title: "E-mail non envoyé : limite ou crédits Brevo atteints", hint: "Le quota d'envoi du compte Brevo est atteint ou le crédit épuisé. Réessayez plus tard ou contrôlez le plan Brevo." };
-  if (http >= 500) return { title: "E-mail non envoyé : panne chez Brevo", hint: "Le service Brevo a renvoyé une erreur : réessayez dans quelques minutes." };
-  return { title: "E-mail non envoyé", hint: "Le service d'envoi a refusé ou n'a pas confirmé le message. « Diagnostiquer l'envoi » contrôle la clé et l'expéditeur." };
+  // 1. L'adresse IP du serveur n'est pas autorisée chez Brevo (le message de Brevo contient un lien https : ce n'est PAS une erreur HTTPS).
+  if (/unrecogni[sz]ed ip|authori[sz]ed_?ips?|ip address/.test(m) || (http === 401 && /\bip\b/.test(m)))
+    return { title: "IP du serveur non autorisée dans Brevo", hint: "Brevo bloque le serveur de SmartCourse. Dans Brevo → Sécurité → Adresses IP autorisées, désactivez la restriction (Railway n'a pas d'IP fixe), puis appuyez sur Réessayer." };
+  if (m.includes("injoignable")) return { title: "Brevo est injoignable", hint: "Le serveur n'arrive pas à joindre Brevo. Appuyez sur Réessayer dans un instant." };
+  if (m.includes("configuration refusée")) return { title: "Configuration d'envoi refusée", hint: "L'adresse du service d'envoi doit commencer par https." };
+  if (http === 401 || m.includes("unauthorized") || m.includes("key not found")) return { title: "Clé API refusée par Brevo", hint: "Vérifiez BREVO_API_KEY dans les variables Railway : clé API v3 complète et active, sans guillemets ni espace. « Diagnostiquer l'envoi » (détails techniques) le confirme." };
+  if (http === 403 || m.includes("permission_denied") || m.includes("not yet activated") || m.includes("not activated")) return { title: "Compte Brevo non autorisé à envoyer", hint: "Le compte Brevo doit être activé pour l'envoi d'e-mails transactionnels (parfois après validation par Brevo)." };
+  if (http === 400 && (m.includes("sender") || m.includes("expéditeur"))) return { title: "Expéditeur non autorisé par Brevo", hint: "BREVO_FROM_EMAIL doit être un expéditeur validé dans Brevo → Expéditeurs, domaines et IP. Une adresse gmail ou yahoo est refusée : utilisez une adresse de votre propre domaine." };
+  if (http === 400) return { title: "Demande refusée par Brevo", hint: "Le plus fréquent : expéditeur non validé. « Diagnostiquer l'envoi » (détails techniques) vérifie la clé et l'expéditeur." };
+  if (http === 402 || http === 429 || m.includes("quota")) return { title: "Limite ou crédits Brevo atteints", hint: "Le quota d'envoi du compte Brevo est atteint. Réessayez plus tard ou contrôlez le plan Brevo." };
+  if (http >= 500) return { title: "Panne chez Brevo", hint: "Brevo a renvoyé une erreur : appuyez sur Réessayer dans quelques minutes." };
+  return { title: "Le service d'envoi a refusé le message", hint: "« Diagnostiquer l'envoi » (détails techniques) contrôle la clé et l'expéditeur." };
 }
 
 export class DisabledMailer implements Mailer {

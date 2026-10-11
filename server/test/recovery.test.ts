@@ -29,7 +29,7 @@ beforeAll(async () => {
   db = await testDb();
   await resetData(db);
   mailer = new RecordingMailer();
-  recovery = new RecoveryService(db, mailer, BASE);
+  recovery = new RecoveryService(db, mailer, BASE, { resendCooldownSec: 0 });
   app = await buildApp({ db, store: testStore(), recovery, brevoWebhookSecret: "hook-secret-1234567890", loginRateLimit: { max: 1000, timeWindow: "1 minute" }, recoveryRateLimit: { max: 1000, timeWindow: "1 minute" } });
   await app.ready();
 });
@@ -283,7 +283,7 @@ describe("module d'envoi Brevo", () => {
     expect(mailerFromEnv({} as any).enabled).toBe(false);
     expect(mailerFromEnv({ BREVO_API_KEY: "k", BREVO_FROM_EMAIL: "n@x.org" } as any).enabled).toBe(true);
     expect(mailerFromEnv({ BREVO_API_KEY: "k", BREVO_FROM_EMAIL: "pas-une-adresse" } as any).enabled).toBe(false); // expéditeur invalide : désactivé
-    const off = new RecoveryService(db, new DisabledMailer(), BASE);
+    const off = new RecoveryService(db, new DisabledMailer(), BASE, { resendCooldownSec: 0 });
     const a = await buildApp({ db, store: testStore(), recovery: off, loginRateLimit: { max: 1000, timeWindow: "1 minute" } });
     expect((await a.inject({ method: "GET", url: "/health" })).json().mail).toBe("off");
     const res = await a.inject({ method: "POST", url: "/api/setup/family", payload: { installToken: await generateInstallToken(db), familyName: "Off", admin: { displayName: "A", login: "adil", secret: "482913", recoveryEmail: email() } } });
@@ -310,14 +310,20 @@ describe("refus du service d'envoi : le statut HTTP et le message de Brevo sont 
 
   it("chaque cause fréquente reçoit un titre et un conseil précis", () => {
     const e = (detail: string, status = "failed") => explainMailFailure(status, detail);
-    expect(e("refus du service d'envoi (HTTP 401 unauthorized) : Key not found").title).toContain("clé API refusée");
-    expect(e("refus du service d'envoi (HTTP 401 unauthorized) : We have detected you are using an unrecognised IP address 1.2.3.4").title).toContain("bloque l'adresse du serveur");
-    expect(e("refus du service d'envoi (HTTP 403 permission_denied) : Your account is not yet activated").title).toContain("compte Brevo non autorisé");
-    expect(e("refus du service d'envoi (HTTP 400 invalid_parameter) : valid sender email required").title).toContain("expéditeur non autorisé");
-    expect(e("refus du service d'envoi (HTTP 400 invalid_parameter) : autre").title).toContain("demande refusée");
-    expect(e("refus du service d'envoi (HTTP 429 too_many_requests)").title).toContain("limite");
-    expect(e("refus du service d'envoi (HTTP 503)").title).toContain("panne chez Brevo");
-    expect(e("service d'envoi injoignable depuis le serveur").hint).toContain("injoignable");
+    expect(e("refus du service d'envoi (HTTP 401 unauthorized) : Key not found").title).toContain("Clé API refusée");
+    expect(e("refus du service d'envoi (HTTP 401 unauthorized) : We have detected you are using an unrecognised IP address 1.2.3.4").title).toContain("IP du serveur non autorisée dans Brevo");
+    // Le vrai message de Brevo contient un lien https : ce n'est pas une erreur HTTPS (elle ne doit jamais être présentée comme telle)
+    const real = explainMailFailure("failed", "refus du service d'envoi (HTTP 401 unauthorized) : We have detected you are using an unrecognised IP address 1.2.3.4. If you performed this action make sure to add the new IP address here: [lien]");
+    expect(real.title).toBe("IP du serveur non autorisée dans Brevo");
+    expect(real.hint).not.toMatch(/https/i.test(real.hint) ? /^$/ : /HTTPS/);
+    expect(explainMailFailure("failed", "refus du service d'envoi (HTTP 401 unauthorized) : We have detected an unrecognised IP address https://app.brevo.com/security/authorised_ips").title).not.toContain("HTTPS");
+    expect(safeProviderMessage("voir https://app.brevo.com/security/authorised_ips svp")).toBe("voir [lien] svp");
+    expect(e("refus du service d'envoi (HTTP 403 permission_denied) : Your account is not yet activated").title).toContain("Compte Brevo non autorisé");
+    expect(e("refus du service d'envoi (HTTP 400 invalid_parameter) : valid sender email required").title).toContain("Expéditeur non autorisé");
+    expect(e("refus du service d'envoi (HTTP 400 invalid_parameter) : autre").title).toContain("Demande refusée");
+    expect(e("refus du service d'envoi (HTTP 429 too_many_requests)").title).toContain("Limite");
+    expect(e("refus du service d'envoi (HTTP 503)").title).toContain("Panne chez Brevo");
+    expect(e("service d'envoi injoignable depuis le serveur").title).toContain("injoignable");
     expect(e("", "unknown").title).toContain("incertain");
     expect(e("", "not_configured").hint).toContain("BREVO_API_KEY");
     expect(e("", "accepted")).toEqual({ title: "", hint: "" });
@@ -326,11 +332,11 @@ describe("refus du service d'envoi : le statut HTTP et le message de Brevo sont 
   it("l'état renvoyé à l'écran contient ce diagnostic ; un refus n'est jamais présenté comme un lien à ouvrir", async () => {
     const failing = new RecordingMailer();
     failing.next = { accepted: false, detail: "refus du service d'envoi (HTTP 401 unauthorized) : Key not found" };
-    const svc = new RecoveryService(db, failing, BASE);
+    const svc = new RecoveryService(db, failing, BASE, { resendCooldownSec: 0 });
     const a = await buildApp({ db, store: testStore(), recovery: svc, requireRecoveryEmail: true, loginRateLimit: { max: 1000, timeWindow: "1 minute" } });
     const res = await a.inject({ method: "POST", url: "/api/setup/family", payload: { installToken: await generateInstallToken(db), familyName: "Refus", admin: { displayName: "A", login: "adil", secret: "482913", secretConfirm: "482913", recoveryEmail: email() } } });
     expect(res.statusCode).toBe(201);
-    expect(res.json().recovery.lastMail).toMatchObject({ status: "failed", title: expect.stringContaining("clé API refusée"), hint: expect.stringContaining("BREVO_API_KEY"), detail: expect.stringContaining("HTTP 401") });
+    expect(res.json().recovery.lastMail).toMatchObject({ status: "failed", title: expect.stringContaining("Clé API refusée"), hint: expect.stringContaining("BREVO_API_KEY"), detail: expect.stringContaining("HTTP 401") });
     await a.close();
   });
 
@@ -359,5 +365,30 @@ describe("refus du service d'envoi : le statut HTTP et le message de Brevo sont 
     const sara = cookieOf(await login(f.code, "sara", "573918"));
     expect((await app.inject({ method: "POST", url: "/api/recovery-email/diagnose", cookies: sara })).statusCode).toBe(403);
     expect((await app.inject({ method: "POST", url: "/api/recovery-email/diagnose" })).statusCode).toBe(401);
+  });
+});
+
+describe("renvoi du lien de vérification : délai", () => {
+  it("un deuxième lien demandé aussitôt est refusé (429) et l'état indique le temps restant ; un échec d'envoi n'impose aucun délai", async () => {
+    const m = new RecordingMailer();
+    const svc = new RecoveryService(db, m, BASE, { resendCooldownSec: 30 });
+    const a = await buildApp({ db, store: testStore(), recovery: svc, requireRecoveryEmail: true, loginRateLimit: { max: 1000, timeWindow: "1 minute" } });
+    const res = await a.inject({ method: "POST", url: "/api/setup/family", payload: { installToken: await generateInstallToken(db), familyName: "Delai", admin: { displayName: "A", login: "adil", secret: "482913", secretConfirm: "482913", recoveryEmail: email() } } });
+    const admin = cookieOf(res);
+    const st = res.json().recovery;
+    expect(st.resendInSeconds).toBeGreaterThan(20);
+    const again = await a.inject({ method: "POST", url: "/api/recovery-email/resend", cookies: admin });
+    expect([again.statusCode, again.json().error]).toEqual([429, "too_soon"]);
+    expect(m.sent).toHaveLength(1);
+    await db.query("UPDATE email_log SET created_at = now() - interval '31 seconds' WHERE profile_id = $1", [res.json().me.id]);
+    expect((await a.inject({ method: "POST", url: "/api/recovery-email/resend", cookies: admin })).statusCode).toBe(200);
+    // après un échec : aucun délai
+    m.next = { accepted: false, detail: "refus du service d'envoi (HTTP 400 invalid_parameter)" };
+    await db.query("UPDATE email_log SET created_at = now() - interval '31 seconds' WHERE profile_id = $1", [res.json().me.id]);
+    await a.inject({ method: "POST", url: "/api/recovery-email/resend", cookies: admin });
+    m.next = null;
+    expect((await a.inject({ method: "GET", url: "/api/recovery-email", cookies: admin })).json()).toMatchObject({ resendInSeconds: 0, lastMail: { status: "failed" } });
+    expect((await a.inject({ method: "POST", url: "/api/recovery-email/resend", cookies: admin })).statusCode).toBe(200);
+    await a.close();
   });
 });

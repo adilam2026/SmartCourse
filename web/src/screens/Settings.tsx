@@ -1,12 +1,12 @@
 import { unitLabel } from "../units";
 import { VersionInfo } from "../components/VersionInfo";
 import { useEffect, useState } from "react";
-import { api, ApiError, NetworkError, type AuditProduct, type BackupStatus, type Profile, type RecoveryState, type ResetPreview } from "../api";
+import { api, ApiError, NetworkError, type AuditProduct, type BackupStatus, type Profile, type ResetPreview } from "../api";
 import { fmtDateTime } from "../format";
 import { CATEGORY_EMOJI } from "../categories";
 import { Dialog } from "../components/Dialog";
 import { Icon, type IconName } from "../components/Icon";
-import { Diagnose, isMailProblem, MailStatus } from "../components/MailStatus";
+import { RecoveryPanel } from "../components/RecoveryPanel";
 import { NotificationSettings, usePushControl } from "../components/NotificationSettings";
 import { PageHead } from "../components/PageHead";
 import { useBackLayer } from "../useBackLayer";
@@ -80,7 +80,7 @@ export function Settings({ engine, s }: { engine: Engine; s: State }) {
     <>
       <PageHead engine={engine} s={s} title={titles[section]} onBack={() => setSection(null)} backLabel="Réglages" backTestId="settings-back" subtitle={section === "profiles" && s.me?.family ? <>Code de la famille : <b data-testid="family-code">{s.me.family.code}</b></> : undefined} />
       {section === "profiles" && <Profiles me={s.me!.id} />}
-      {section === "recovery" && <Recovery />}
+      {section === "recovery" && <RecoveryPanel />}
       {section === "reset" && <ResetFamily engine={engine} />}
       {section === "catalog" && <CatalogAdmin engine={engine} />}
       {section === "notifications" && <div className="menu"><NotificationSettings /></div>}
@@ -291,50 +291,6 @@ function ResetFamily({ engine }: { engine: Engine }) {
   );
 }
 
-/** Adresse de récupération : enregistrée par l'administrateur principal, utilisable seulement après vérification par e-mail. */
-function Recovery() {
-  const [st, setSt] = useState<RecoveryState | null>(null);
-  const [email, setEmail] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const load = () => api.recoveryState().then((r) => { setSt(r); setEmail((cur) => cur || r.email || ""); }).catch((e) => setError(errText(e)));
-  useEffect(() => void load(), []);
-  const run = async (fn: () => Promise<RecoveryState>) => {
-    setBusy(true);
-    setError(null);
-    try {
-      setSt(await fn());
-    } catch (e) {
-      setError(e instanceof ApiError && e.code === "too_many_mails" ? e.message : errText(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-  if (!st) return <p className="empty">{error ?? "Chargement…"}</p>;
-  const problem = isMailProblem(st.lastMail);
-  const badge = st.email ? (st.verified ? "Adresse vérifiée" : problem ? "E-mail non envoyé" : "À vérifier : ouvrez le lien reçu par e-mail") : "Aucune adresse enregistrée";
-  return (
-    <div className="panel recovery" data-testid="recovery">
-      <p><span className={`statebadge ${st.verified ? "" : "statebadge--bad"}`} data-testid="recovery-state"><Icon name={st.verified ? "check" : "info"} size={16} /> {badge}</span></p>
-      {st.email && <p data-testid="recovery-email">{st.email}</p>}
-      {!st.configured && <p className="muted" data-testid="recovery-unconfigured">L'envoi d'e-mails n'est pas encore configuré sur le serveur : l'adresse peut être enregistrée mais aucun message ne partira.</p>}
-      <MailStatus mail={st.lastMail} />
-      {st.canEdit ? (
-        <form className="form" onSubmit={(e) => { e.preventDefault(); void run(() => api.setRecoveryEmail(email.trim())); }}>
-          <label className="field">Adresse e-mail de récupération<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" maxLength={254} required data-testid="recovery-input" /></label>
-          <button className="btn btn--primary btn--big" disabled={busy || !email.includes("@")} data-testid="recovery-save">{st.email ? "Enregistrer et envoyer le lien de vérification" : "Enregistrer et vérifier"}</button>
-          {st.email && !st.verified && <button type="button" className="btn" disabled={busy} data-testid="recovery-resend" onClick={() => void run(() => api.resendRecovery())}>{problem ? "Réessayer l'envoi" : "Renvoyer le lien"}</button>}
-          {st.verified && <button type="button" className="btn" disabled={busy || !st.configured} data-testid="recovery-test" onClick={() => void run(() => api.testRecovery())}>Envoyer un e-mail de test</button>}
-        </form>
-      ) : (
-        <p className="muted">Seul l'administrateur principal gère l'adresse de récupération de la famille.</p>
-      )}
-      {st.canEdit && <Diagnose />}
-      <p className="muted">Elle sert à recevoir le code famille et un lien temporaire pour choisir un nouveau mot de passe. L'ancien mot de passe n'est jamais envoyé.</p>
-      {error && <p className="error" role="alert" data-testid="recovery-error">{error}</p>}
-    </div>
-  );
-}
 
 function CatalogAdmin({ engine }: { engine: Engine }) {
   const [view, setView] = useState<"mine" | "all">("mine");
