@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import pg from "pg";
 import { expect, test } from "@playwright/test";
-import { linkTokenFor, mailsTo, newFamily, uiLogin, type Family } from "./helpers";
+import { expectNoInfra, linkTokenFor, MAIL_FAILED, mailsTo, newFamily, uiLogin, type Family } from "./helpers";
 
 /*
  * Accès : connexion à deux parcours, mots de passe choisis à la main, protection de l'administration, récupération par e-mail.
@@ -113,7 +113,8 @@ test("adresse vérifiée : coche verte, aucun ancien message ; modifier l'adress
   await expect(page.getByTestId("recovery-state").locator(".okmark")).toBeVisible(); // coche verte
   await expect(page.getByTestId("recovery-email")).toHaveText(f.email);
   // masqués : anciens messages, erreurs, boutons de vérification
-  for (const id of ["mail-problem", "verify-instruction", "recovery-error", "recovery-resend", "recovery-unconfigured"]) await expect(page.getByTestId(id)).toHaveCount(0);
+  for (const id of ["mail-problem", "verify-instruction", "recovery-error", "recovery-resend", "recovery-tech", "mail-diagnose"]) await expect(page.getByTestId(id)).toHaveCount(0);
+  await expectNoInfra(page);
   await expect(page.getByTestId("recovery-sentence")).toHaveText("Cette adresse permet de récupérer votre code famille et de réinitialiser votre mot de passe.");
   await expect(page.getByTestId("recovery-edit")).toHaveText("Modifier l'adresse");
   await expect(page.getByTestId("recovery-test")).toHaveText("Envoyer un e-mail de test");
@@ -122,11 +123,7 @@ test("adresse vérifiée : coche verte, aucun ancien message ; modifier l'adress
   await page.getByTestId("recovery-test").click();
   await expect(page.getByTestId("test-ok")).toContainText("E-mail de test envoyé");
   expect((await mailsTo(f.email)).some((m) => m.subject.includes("test"))).toBe(true);
-  // détails techniques : repliés, réservés à l'administrateur principal
-  await expect(page.getByTestId("tech-last")).toBeHidden();
-  await page.getByTestId("recovery-tech").locator("summary").click();
-  await expect(page.getByTestId("tech-last")).toContainText("accepté par Brevo");
-  await expect(page.getByTestId("mail-diagnose")).toBeVisible();
+  await expectNoInfra(page); // ni « Détails techniques », ni « Diagnostiquer l'envoi », ni fournisseur
 });
 
 test("adresse à vérifier : un seul bouton principal avec délai, « Modifier l'adresse » en secondaire ; l'état se met à jour tout seul quand le lien est ouvert ailleurs", async ({ page, playwright, baseURL, browser }) => {
@@ -148,6 +145,7 @@ test("adresse à vérifier : un seul bouton principal avec délai, « Modifier l
   await expect(page.getByTestId("recovery-resend")).toContainText("Renvoyer le lien de vérification (dans");
   await expect(page.getByTestId("recovery-edit")).toHaveText("Modifier l'adresse");
   await expect(page.getByTestId("mail-problem")).toHaveCount(0);
+  await expectNoInfra(page);
   await page.screenshot({ path: `${OUT}/recuperation-a-verifier-390.png`, fullPage: true });
   // le serveur refuse aussi un renvoi trop rapproché
   expect((await f.adil.post("/api/recovery-email/resend")).status()).toBe(429);
@@ -211,20 +209,22 @@ test("récupération : code famille et mot de passe oubliés par e-mail réel (c
   await expect(page.getByTestId("link-bad")).toBeVisible(); // usage unique
 });
 
-test("envoi échoué : « E-mail non envoyé », la vraie cause en langage simple, un seul bouton « Réessayer », jamais « ouvrez le lien » ; détails techniques repliés", async ({ page, playwright, baseURL }) => {
+test("envoi échoué : une seule phrase, un seul bouton « Réessayer », aucune information d'infrastructure ; un envoi réussi efface l'erreur", async ({ page, playwright, baseURL }) => {
   const f = await newFamily(playwright, baseURL!);
+  // Quelle que soit la cause réelle chez le service d'envoi, l'écran dit la même chose (la cause reste dans les journaux du serveur).
   const brevoIp = "We have detected you are using an unrecognised IP address 1.2.3.4. If you performed this action make sure to add the new IP address here: https://app.brevo.com/security/authorised_ips";
-  const causes: [string, string, string, string][] = [
-    ["401", "unauthorized", brevoIp, "IP du serveur non autorisée dans Brevo"], // jamais « HTTPS »
-    ["401", "unauthorized", "Key not found", "Clé API refusée par Brevo"],
-    ["403", "permission_denied", "Your account is not yet activated", "Compte Brevo non autorisé à envoyer"],
-    ["400", "invalid_parameter", "valid sender email required", "Expéditeur non autorisé par Brevo"],
+  const causes: [string, string, string][] = [
+    ["401", "unauthorized", brevoIp],
+    ["401", "unauthorized", "Key not found"],
+    ["403", "permission_denied", "Your account is not yet activated"],
+    ["400", "invalid_parameter", "valid sender email required"],
+    ["503", "service_unavailable", "down"],
   ];
   await gotoRecovery(page, f);
   const next = newAddress();
   try {
     await page.getByTestId("recovery-edit").click();
-    for (const [i, [status, code, msg, title]] of causes.entries()) {
+    for (const [i, [status, code, msg]] of causes.entries()) {
       await fetch(`http://127.0.0.1:3199/__fail?on=1&status=${status}&code=${code}&msg=${encodeURIComponent(msg)}`, { method: "POST" });
       if (i === 0) {
         await page.getByTestId("recovery-input").fill(next);
@@ -232,31 +232,43 @@ test("envoi échoué : « E-mail non envoyé », la vraie cause en langage simpl
       } else {
         await page.getByTestId("recovery-resend").click();
       }
-      await expect(page.getByTestId("mail-title")).toHaveText("E-mail non envoyé");
-      await expect(page.getByTestId("mail-cause")).toContainText(title);
-      await expect(page.getByTestId("mail-cause")).not.toContainText(/https/i);
+      await expect(page.getByTestId("mail-problem")).toHaveText(MAIL_FAILED);
+      await expectNoInfra(page);
       await expect(page.getByTestId("recovery-state")).toHaveText("Adresse à vérifier");
       await expect(page.getByTestId("recovery-resend")).toHaveText("Réessayer"); // un seul bouton principal
       await expect(page.locator(".recovery .btn--primary")).toHaveCount(1);
       await expect(page.getByTestId("verify-instruction")).toHaveCount(0); // jamais « ouvrez le lien » après un échec
+      for (const gone of ["recovery-tech", "mail-diagnose", "tech-detail"]) await expect(page.getByTestId(gone)).toHaveCount(0);
     }
     await page.screenshot({ path: `${OUT}/recuperation-echec-390.png`, fullPage: true });
-    // détails techniques repliés : statut HTTP, dates, diagnostic
-    await expect(page.getByTestId("tech-detail")).toBeHidden();
-    await page.getByTestId("recovery-tech").locator("summary").click();
-    await expect(page.getByTestId("tech-detail")).toContainText("HTTP 400 invalid_parameter");
-    await fetch("http://127.0.0.1:3199/__senders?list=autre%40example.org", { method: "POST" });
-    await page.getByTestId("mail-diagnose").click();
-    await expect(page.getByTestId("mail-checks")).toContainText("n'est pas un expéditeur de ce compte Brevo");
-    await page.screenshot({ path: `${OUT}/recuperation-echec-details-390.png`, fullPage: true });
-    // cause corrigée : « Réessayer » fonctionne, sans rien recréer
+    // la cause est corrigée : « Réessayer » réussit, l'ancienne erreur disparaît aussitôt
     await fetch("http://127.0.0.1:3199/__fail?on=0", { method: "POST" });
-    await fetch("http://127.0.0.1:3199/__senders?list=noreply%40smartcourse.test", { method: "POST" });
     await page.getByTestId("recovery-resend").click();
     await expect(page.getByTestId("verify-instruction")).toHaveText("Ouvrez le lien envoyé par e-mail pour vérifier votre adresse.");
     await expect(page.getByTestId("mail-problem")).toHaveCount(0);
+    await expect(page.getByTestId("recovery-error")).toHaveCount(0);
+    await expectNoInfra(page);
   } finally {
     await fetch("http://127.0.0.1:3199/__fail?on=0", { method: "POST" });
-    await fetch("http://127.0.0.1:3199/__senders?list=noreply%40smartcourse.test", { method: "POST" });
+  }
+});
+
+test("e-mail de test : jamais « envoyé » si le service l'a refusé ; la phrase unique + « Réessayer » ; le succès efface l'erreur", async ({ page, playwright, baseURL }) => {
+  const f = await newFamily(playwright, baseURL!);
+  await gotoRecovery(page, f);
+  try {
+    await fetch("http://127.0.0.1:3199/__fail?on=1&status=401&code=unauthorized&msg=Key%20not%20found", { method: "POST" });
+    await page.getByTestId("recovery-test").click();
+    await expect(page.getByTestId("test-problem")).toHaveText(MAIL_FAILED);
+    await expect(page.getByTestId("test-ok")).toHaveCount(0);
+    await expect(page.getByTestId("recovery-test")).toHaveText("Réessayer");
+    await expectNoInfra(page);
+    await fetch("http://127.0.0.1:3199/__fail?on=0", { method: "POST" });
+    await page.getByTestId("recovery-test").click();
+    await expect(page.getByTestId("test-ok")).toBeVisible();
+    await expect(page.getByTestId("test-problem")).toHaveCount(0);
+    expect((await mailsTo(f.email)).some((m) => m.subject.includes("test"))).toBe(true);
+  } finally {
+    await fetch("http://127.0.0.1:3199/__fail?on=0", { method: "POST" });
   }
 });

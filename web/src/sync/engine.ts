@@ -236,7 +236,7 @@ export class Engine {
       this.set({
         loginError:
           e instanceof NetworkError ? "Pas de connexion. Réessayez."
-          : e instanceof ApiError && e.code === "mail_not_configured" ? "L'envoi d'e-mails n'est pas configuré sur le serveur : l'installation ne peut pas être vérifiée. Rien n'a été créé, le jeton reste valable."
+          : e instanceof ApiError && e.code === "mail_unavailable" ? "L’e-mail n’a pas pu être envoyé. Veuillez réessayer dans quelques instants. Rien n’a été créé : votre jeton reste valable."
           : e instanceof ApiError && e.code === "email_required" ? "Une adresse e-mail de récupération est obligatoire."
           : e instanceof ApiError && e.status === 403 ? "Jeton d'installation invalide ou déjà utilisé."
           : e instanceof ApiError && e.code === "weak_secret" ? "Mot de passe trop simple (évitez 123456, 111111…)."

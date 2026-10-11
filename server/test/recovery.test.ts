@@ -74,7 +74,7 @@ describe("adresse de récupération de l'administrateur principal", () => {
     expect(m.text).toContain(`${BASE}/#/verify/`); // fragment : le jeton ne passe jamais dans les journaux du serveur
     expect(m.html).toContain(`${BASE}/#/verify/`);
     let st = (await app.inject({ method: "GET", url: "/api/recovery-email", cookies: f.admin })).json();
-    expect(st).toMatchObject({ canEdit: true, email: addr, verified: false, lastMail: { kind: "verify_email", status: "accepted" } });
+    expect(st).toMatchObject({ canEdit: true, email: addr, verified: false, lastMail: { kind: "verify_email", status: "sent" } });
     // non vérifiée : ni code famille ni lien de mot de passe
     await post("/api/auth/forgot-family-code", { email: addr });
     await post("/api/auth/forgot-password", { email: addr });
@@ -113,21 +113,22 @@ describe("adresse de récupération de l'administrateur principal", () => {
     mailer.sent.length = 0;
     const f = await family(email());
     const state = async () => (await app.inject({ method: "GET", url: "/api/recovery-email", cookies: f.admin })).json().lastMail.status;
-    expect(await state()).toBe("accepted");
+    expect(await state()).toBe("sent");
     const id = mailer.n; // dernier identifiant de message
     expect((await post(`/api/email/brevo-webhook/mauvais-secret`, { event: "delivered", "message-id": `<msg-${id}@smtp-relay.test>` })).statusCode).toBe(404);
-    expect(await state()).toBe("accepted");
+    expect(await state()).toBe("sent");
     expect((await post(`/api/email/brevo-webhook/hook-secret-1234567890`, { event: "delivered", "message-id": `<msg-${id}@smtp-relay.test>` })).statusCode).toBe(200);
-    expect(await state()).toBe("delivered");
+    expect(await state()).toBe("sent"); // remis : toujours « envoyé » à l'écran
     await post(`/api/email/brevo-webhook/hook-secret-1234567890`, { event: "hard_bounce", "message-id": `<msg-${id}@smtp-relay.test>` });
-    expect(await state()).toBe("bounced");
+    expect(await state()).toBe("failed"); // rejeté par la boîte : « non envoyé »
     await post(`/api/email/brevo-webhook/hook-secret-1234567890`, { event: "delivered", "message-id": `<msg-${id}@smtp-relay.test>` });
-    expect(await state()).toBe("bounced"); // un rejet n'est pas masqué
+    expect(await state()).toBe("failed"); // un rejet n'est pas masqué
     mailer.next = { accepted: false, detail: "refus du service d'envoi (HTTP 401)" };
     await app.inject({ method: "POST", url: "/api/recovery-email/resend", cookies: f.admin });
     mailer.next = null;
     const st = (await app.inject({ method: "GET", url: "/api/recovery-email", cookies: f.admin })).json();
-    expect(st.lastMail).toMatchObject({ status: "failed", detail: "refus du service d'envoi (HTTP 401)" });
+    expect(st.lastMail).toMatchObject({ status: "failed" });
+    expect(JSON.stringify(st)).not.toContain("401");
   });
 });
 
@@ -289,7 +290,8 @@ describe("module d'envoi Brevo", () => {
     const res = await a.inject({ method: "POST", url: "/api/setup/family", payload: { installToken: await generateInstallToken(db), familyName: "Off", admin: { displayName: "A", login: "adil", secret: "482913", recoveryEmail: email() } } });
     expect(res.statusCode).toBe(201); // la création de la famille ne dépend pas de l'envoi
     const st = (await a.inject({ method: "GET", url: "/api/recovery-email", cookies: cookieOf(res) })).json();
-    expect(st).toMatchObject({ configured: false, verified: false, lastMail: { status: "not_configured" } });
+    expect(st).toMatchObject({ verified: false, lastMail: { status: "failed" } });
+    expect(JSON.stringify(st)).not.toMatch(/configur|brevo|BREVO/i);
     await a.close();
   });
 });
@@ -329,42 +331,36 @@ describe("refus du service d'envoi : le statut HTTP et le message de Brevo sont 
     expect(e("", "accepted")).toEqual({ title: "", hint: "" });
   });
 
-  it("l'état renvoyé à l'écran contient ce diagnostic ; un refus n'est jamais présenté comme un lien à ouvrir", async () => {
+  it("l'écran ne reçoit AUCUNE information d'infrastructure ; la vraie cause est dans les journaux du serveur (sans secret)", async () => {
+    const logs: { level: string; obj: any }[] = [];
     const failing = new RecordingMailer();
-    failing.next = { accepted: false, detail: "refus du service d'envoi (HTTP 401 unauthorized) : Key not found" };
+    failing.next = { accepted: false, detail: "refus du service d'envoi (HTTP 401 unauthorized) : We have detected you are using an unrecognised IP address 1.2.3.4. If you performed this action make sure to add the new IP address here: [lien]" };
     const svc = new RecoveryService(db, failing, BASE, { resendCooldownSec: 0 });
+    svc.setLogger({ info: (obj) => logs.push({ level: "info", obj }), warn: (obj) => logs.push({ level: "warn", obj }) });
     const a = await buildApp({ db, store: testStore(), recovery: svc, requireRecoveryEmail: true, loginRateLimit: { max: 1000, timeWindow: "1 minute" } });
-    const res = await a.inject({ method: "POST", url: "/api/setup/family", payload: { installToken: await generateInstallToken(db), familyName: "Refus", admin: { displayName: "A", login: "adil", secret: "482913", secretConfirm: "482913", recoveryEmail: email() } } });
+    const addr = email();
+    const res = await a.inject({ method: "POST", url: "/api/setup/family", payload: { installToken: await generateInstallToken(db), familyName: "Refus", admin: { displayName: "A", login: "adil", secret: "482913", secretConfirm: "482913", recoveryEmail: addr } } });
     expect(res.statusCode).toBe(201);
-    expect(res.json().recovery.lastMail).toMatchObject({ status: "failed", title: expect.stringContaining("Clé API refusée"), hint: expect.stringContaining("BREVO_API_KEY"), detail: expect.stringContaining("HTTP 401") });
+    const admin = cookieOf(res);
+    // ce que voit l'écran : un état « non envoyé », et rien d'autre
+    const shown = JSON.stringify([res.json(), (await a.inject({ method: "GET", url: "/api/recovery-email", cookies: admin })).json()]);
+    expect(res.json().recovery.lastMail).toEqual({ kind: "verify_email", status: "failed", at: expect.any(String) });
+    expect(shown).not.toMatch(/brevo|railway|https?:|\bip\b|unauthorized|HTTP \d|BREVO_|hint|detail|title|configured/i);
+    // ce que garde le serveur pour le diagnostic : la vraie cause, sans clé, sans adresse
+    const failedLog = logs.find((l) => l.obj.event === "mail.failed")!;
+    expect(failedLog.level).toBe("warn");
+    expect(failedLog.obj).toMatchObject({ kind: "verify_email", status: "failed", cause: "IP du serveur non autorisée dans Brevo", detail: expect.stringContaining("HTTP 401") });
+    expect(JSON.stringify(logs)).not.toContain(addr);
+    // un envoi réussi efface aussitôt l'ancienne erreur
+    failing.next = null;
+    const ok = await a.inject({ method: "POST", url: "/api/recovery-email/resend", cookies: admin });
+    expect(ok.json().lastMail).toMatchObject({ status: "sent" });
+    expect(logs.some((l) => l.obj.event === "mail.sent")).toBe(true);
+    // refusé par le service : jamais annoncé comme envoyé
+    failing.next = { accepted: false, detail: "refus du service d'envoi (HTTP 400 invalid_parameter) : sender" };
+    expect((await a.inject({ method: "POST", url: "/api/recovery-email/resend", cookies: admin })).statusCode).toBe(200);
+    expect((await a.inject({ method: "GET", url: "/api/recovery-email", cookies: admin })).json().lastMail.status).toBe("failed");
     await a.close();
-  });
-
-  it("diagnostic sans envoi : clé, expéditeur, domaine grand public, restriction d'adresse IP ; réservé au principal", async () => {
-    const reply = (routes: Record<string, [number, unknown]>) => (async (url: string) => { const r = routes[new URL(url).pathname] ?? [404, {}]; return new Response(JSON.stringify(r[1]), { status: r[0] }); }) as any;
-    const diag = (routes: Record<string, [number, unknown]>, from = "n@x.org") => new BrevoMailer({ apiKey: "cle", senderEmail: from, senderName: "S", fetchImpl: reply(routes) }).diagnose();
-    const good = await diag({ "/v3/account": [200, { plan: [{ type: "free", credits: 300 }], relay: { enabled: true } }], "/v3/senders": [200, { senders: [{ email: "n@x.org", active: true }] }] });
-    expect(good.every((c) => c.ok !== false)).toBe(true);
-    const ip = await diag({ "/v3/account": [401, { code: "unauthorized", message: "We have detected you are using an unrecognised IP address 9.9.9.9" }] });
-    expect(ip[0]).toMatchObject({ name: expect.stringContaining("Clé API"), ok: false, detail: expect.stringContaining("unrecognised IP") });
-    const wrongSender = await diag({ "/v3/account": [200, {}], "/v3/senders": [200, { senders: [{ email: "autre@x.org", active: true }] }] });
-    expect(wrongSender.find((c) => c.name.startsWith("Expéditeur"))).toMatchObject({ ok: false, detail: expect.stringContaining("n'est pas un expéditeur") });
-    const notValidated = await diag({ "/v3/account": [200, {}], "/v3/senders": [200, { senders: [{ email: "n@x.org", active: false }] }] });
-    expect(notValidated.find((c) => c.name.startsWith("Expéditeur"))!.detail).toContain("pas encore validé");
-    const gmail = await diag({ "/v3/account": [200, {}], "/v3/senders": [200, { senders: [{ email: "moi@gmail.com", active: true }] }] }, "moi@gmail.com");
-    expect(gmail.find((c) => c.name.startsWith("Domaine"))).toMatchObject({ ok: null, detail: expect.stringContaining("grand public") });
-    const noMail = await diag({ "/v3/account": [200, { plan: [{ type: "free", credits: 0 }], relay: { enabled: false } }], "/v3/senders": [200, { senders: [] }] });
-    expect(noMail.filter((c) => c.ok === false).map((c) => c.name)).toEqual(expect.arrayContaining(["Crédits d'envoi", "Envoi transactionnel (SMTP)"]));
-    // jamais la clé dans le résultat
-    expect(JSON.stringify(ip)).not.toContain('"cle"');
-    // droits : principal seulement, y compris pendant l'installation
-    const pending = await family(email());
-    expect((await app.inject({ method: "POST", url: "/api/recovery-email/diagnose", cookies: pending.admin })).statusCode).toBe(200); // possible pendant l'installation
-    const f = await verifiedFamily();
-    await post("/api/profiles", { displayName: "Sara", login: "sara", role: "parent", secret: "573918", secretConfirm: "573918" }, f.admin);
-    const sara = cookieOf(await login(f.code, "sara", "573918"));
-    expect((await app.inject({ method: "POST", url: "/api/recovery-email/diagnose", cookies: sara })).statusCode).toBe(403);
-    expect((await app.inject({ method: "POST", url: "/api/recovery-email/diagnose" })).statusCode).toBe(401);
   });
 });
 

@@ -75,6 +75,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const push = deps.push ?? new PushService(db);
   const recovery = deps.recovery ?? new RecoveryService(db, mailerFromEnv());
   const app = Fastify({ logger: process.env.NODE_ENV !== "test", trustProxy: true });
+  recovery.useLogger(app.log); // la vraie cause des échecs d'envoi va dans les journaux du serveur, jamais à l'écran
+  app.log.info({ event: "mail.config", mail: recovery.enabled ? "on" : "off" }, "envoi d'e-mails");
 
   // Plugins must be fully loaded before routes are declared, or per-route rateLimit config is silently ignored.
   await app.register(cookie);
@@ -106,7 +108,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     try {
       // The latest applied migration tells which version of the schema this server runs (checked after a deployment).
       const m = await db.query("SELECT name FROM schema_migrations ORDER BY name DESC LIMIT 1");
-      return { status: "ok", schema: (m.rows[0]?.name as string | undefined) ?? null, mail: recovery.enabled ? "brevo" : "off", commit: process.env.RAILWAY_GIT_COMMIT_SHA ?? process.env.GIT_COMMIT ?? null };
+      return { status: "ok", schema: (m.rows[0]?.name as string | undefined) ?? null, mail: recovery.enabled ? "on" : "off", commit: process.env.RAILWAY_GIT_COMMIT_SHA ?? process.env.GIT_COMMIT ?? null };
     } catch {
       return reply.code(503).send({ status: "db_unavailable" });
     }
@@ -120,7 +122,10 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     if (requireEmail) {
       // Avant toute création (et sans consommer le jeton) : une installation ne doit jamais laisser un compte inutilisable.
       if (!recoveryEmail) throw new HttpError(400, "email_required", "Une adresse e-mail de récupération est obligatoire");
-      if (!recovery.enabled) throw new HttpError(503, "mail_not_configured", "L'envoi d'e-mails n'est pas configuré sur le serveur : l'installation ne peut pas être vérifiée");
+      if (!recovery.enabled) {
+        app.log.error({ event: "mail.not_configured" }, "installation refusée : envoi d'e-mails non configuré (BREVO_API_KEY / BREVO_FROM_EMAIL)");
+        throw new HttpError(503, "mail_unavailable", "L'e-mail n'a pas pu être envoyé. Veuillez réessayer dans quelques instants.");
+      }
     }
     const r = await setupFamily(db, { ...input, admin: { ...admin, ...(recoveryEmail ? { recoveryEmail } : {}) } });
     setSessionCookie(reply, r.token);
@@ -195,7 +200,6 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     return recovery.state(req.auth!.profileId);
   });
 
-  app.post("/api/recovery-email/diagnose", { preHandler: guard("family.manage", { allowPending: true }), config: { rateLimit: deps.recoveryRateLimit ?? { max: 20, timeWindow: "1 hour" } } }, async (req) => ({ checks: await recovery.diagnose(req.auth!.profileId) }));
   app.post("/api/recovery-email/test", { preHandler: guard("family.manage"), config: { rateLimit: deps.recoveryRateLimit ?? { max: 10, timeWindow: "1 hour" } } }, async (req) => {
     await recovery.sendTest(req.auth!.profileId);
     return recovery.state(req.auth!.profileId);
@@ -210,7 +214,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       family: { name: fam.name, code: fam.code, createdAt: fam.createdAt, profiles: fam.profiles },
       counts: await countFamilyData(db, req.auth!.familyId),
       // La preuve que l'envoi d'e-mails fonctionne réellement : une adresse vérifiée est une adresse qui a REÇU un e-mail.
-      ready: { mailConfigured: recovery.enabled, recoveryEmailVerified: !!me.recovery_email_verified_at },
+      ready: { recoveryEmailVerified: !!me.recovery_email_verified_at && recovery.enabled },
     };
   });
   app.post("/api/family/reset", { preHandler: guard("family.manage"), config: { rateLimit: deps.recoveryRateLimit ?? { max: 5, timeWindow: "1 hour" } } }, async (req, reply) => {
@@ -218,7 +222,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     const a = req.auth!;
     const me = (await db.query("SELECT is_primary, recovery_email_verified_at FROM profiles WHERE id = $1", [a.profileId])).rows[0];
     if (!me.is_primary) throw new HttpError(403, "forbidden", "Seul l'administrateur principal peut réinitialiser la famille");
-    if (!recovery.enabled || !me.recovery_email_verified_at) throw new HttpError(409, "reset_not_ready", "Vérifiez d'abord que l'envoi d'e-mails fonctionne : l'adresse de récupération doit être configurée et vérifiée");
+    if (!recovery.enabled || !me.recovery_email_verified_at) throw new HttpError(409, "reset_not_ready", "Vérifiez d'abord votre adresse e-mail de récupération.");
     await confirmPassword(db, a.profileId, b.password);
     const report = await purgeFamily(db, deps.store, a.familyId, b.confirmCode);
     for (const id of report.profileIds) hub.disconnectProfile(id);

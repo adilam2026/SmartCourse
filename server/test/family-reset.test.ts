@@ -59,7 +59,7 @@ describe("première installation : adresse de récupération obligatoire et vér
     expect(bad.statusCode).toBe(400);
     const off = await buildApp({ db, store, recovery: new RecoveryService(db, new DisabledMailer(), BASE, { resendCooldownSec: 0 }), requireRecoveryEmail: true, loginRateLimit: rate });
     const refused = await off.inject({ method: "POST", url: "/api/setup/family", payload: await setupBody({}, token) });
-    expect([refused.statusCode, refused.json().error]).toEqual([503, "mail_not_configured"]);
+    expect([refused.statusCode, refused.json().error]).toEqual([503, "mail_unavailable"]);
     await off.close();
     expect((await db.query("SELECT consumed_at FROM install_tokens WHERE token_hash = encode(sha256($1::bytea), 'hex')", [token])).rows[0].consumed_at).toBeNull();
     // le jeton est toujours utilisable
@@ -71,7 +71,7 @@ describe("première installation : adresse de récupération obligatoire et vér
     const res = await app.inject({ method: "POST", url: "/api/setup/family", payload: await setupBody() });
     expect(res.statusCode).toBe(201);
     expect(res.json().me.setupPending).toBe(true);
-    expect(res.json().recovery).toMatchObject({ verified: false, setupPending: true, lastMail: { status: "accepted" } });
+    expect(res.json().recovery).toMatchObject({ verified: false, setupPending: true, lastMail: { status: "sent" } });
     const admin = cookieOf(res);
     expect(mailer.sent).toHaveLength(1);
     for (const [method, url] of [["GET", "/api/catalog"], ["GET", "/api/lists/active"], ["GET", "/api/profiles"], ["POST", "/api/lists"], ["GET", "/api/catalog/all"], ["GET", "/api/events"]] as const) {
@@ -104,7 +104,7 @@ describe("première installation : adresse de récupération obligatoire et vér
     for (let i = 0; i < 5; i++) expect((await app.inject({ method: "POST", url: "/api/recovery-email/resend", cookies: admin })).json().lastMail.status).toBe("failed");
     mailer.next = null;
     const ok = await app.inject({ method: "POST", url: "/api/recovery-email/resend", cookies: admin });
-    expect(ok.json().lastMail.status).toBe("accepted");
+    expect(ok.json().lastMail.status).toBe("sent");
     expect((await db.query("SELECT count(*)::int AS n FROM families WHERE code = $1", [code])).rows[0].n).toBe(1);
     // adresse mal saisie : on la change, un nouveau lien part, l'ancien ne marche plus
     const old = tokenIn(mailer.sent.at(-1)!);
@@ -200,7 +200,7 @@ describe("réinitialisation définitive d'une famille", () => {
 
     // prévisualisation : identification précise
     const prev = await app.inject({ method: "GET", url: "/api/family/reset-preview", cookies: A.admin });
-    expect(prev.json()).toMatchObject({ family: { code: A.code }, ready: { mailConfigured: true, recoveryEmailVerified: true } });
+    expect(prev.json()).toMatchObject({ family: { code: A.code }, ready: { recoveryEmailVerified: true } });
     expect(prev.json().counts.listItems).toBe(before.A.list_items);
 
     // refus : mauvais code, mauvais mot de passe, parent, personnel, administrateur non principal
@@ -263,7 +263,7 @@ describe("réinitialisation définitive d'une famille", () => {
     // e-mail de test : réponse réelle du service, accepté ≠ reçu
     await app.inject({ method: "POST", url: "/api/auth/verify-email", payload: { token: tokenIn(mailer.sent.at(-1)!) } });
     const t = await app.inject({ method: "POST", url: "/api/recovery-email/test", cookies: admin });
-    expect(t.json().lastMail).toMatchObject({ kind: "test", status: "accepted" });
+    expect(t.json().lastMail).toMatchObject({ kind: "test", status: "sent" });
     expect(mailer.sent.at(-1)!.subject).toContain("test");
   });
 

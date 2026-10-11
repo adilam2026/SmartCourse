@@ -255,7 +255,7 @@ function ResetFamily({ engine }: { engine: Engine }) {
   const [error, setError] = useState<string | null>(null);
   useEffect(() => void api.resetPreview().then(setPv).catch((e) => setError(errText(e))), []);
   if (!pv) return <p className="empty">{error ?? "Chargement…"}</p>;
-  const ready = pv.ready.mailConfigured && pv.ready.recoveryEmailVerified;
+  const ready = pv.ready.recoveryEmailVerified;
   const c = pv.counts;
   return (
     <div className="panel danger" data-testid="reset-panel">
@@ -265,9 +265,10 @@ function ResetFamily({ engine }: { engine: Engine }) {
       <p className="muted">Conservés : le catalogue partagé (243 produits et leurs photos) et toutes les autres familles. Les sauvegardes déjà faites contiennent encore cette famille jusqu'à leur expiration.</p>
       {!ready && (
         <p className="error" role="alert" data-testid="reset-notready">
-          {!pv.ready.mailConfigured ? "L'envoi d'e-mails n'est pas configuré sur le serveur." : "L'adresse de récupération n'est pas vérifiée."} Vérifiez d'abord que l'envoi d'e-mails fonctionne (Réglages → Adresse de récupération → e-mail de test) : la nouvelle installation en dépend.
+          La suppression n'est possible qu'une fois votre adresse e-mail de récupération vérifiée (Réglages → Adresse de récupération).
         </p>
       )}
+
       <form className="form" onSubmit={async (e) => {
         e.preventDefault();
         setBusy(true);

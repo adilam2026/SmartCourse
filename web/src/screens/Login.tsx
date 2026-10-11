@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError, NetworkError, type RecoveryState } from "../api";
-import { Diagnose, isMailProblem, MailStatus } from "../components/MailStatus";
+import { MAIL_FAILED } from "../mailText";
 import type { Engine, State } from "../sync/engine";
 
 type Mode = "login" | "setup" | "forgot-code" | "forgot-password";
@@ -146,7 +146,7 @@ export function SetupVerify({ engine }: { engine: Engine }) {
   const [changing, setChanging] = useState(false);
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
-  const problem = isMailProblem(st?.lastMail);
+  const problem = st?.lastMail?.status === "failed";
   const load = async () => {
     try {
       const r = await api.recoveryState();
@@ -170,24 +170,25 @@ export function SetupVerify({ engine }: { engine: Engine }) {
       setSt(await fn());
       setChanging(false);
     } catch (e) {
-      setError(e instanceof NetworkError ? "Pas de connexion." : e instanceof ApiError && e.code === "too_many_mails" ? e.message : "Opération impossible : réessayez.");
+      setError(e instanceof NetworkError ? "Pas de connexion." : e instanceof ApiError && (e.code === "too_many_mails" || e.code === "too_soon") ? e.message : MAIL_FAILED);
     } finally {
       setBusy(false);
     }
   };
   return (
     <main className="auth" data-testid="setup-verify">
-      <Logo title={problem ? "E-mail non envoyé" : "Vérifiez votre e-mail"} text="Dernière étape de l'installation" />
+      <Logo title="Vérifiez votre e-mail" text="Dernière étape de l'installation" />
       <section className="panel">
         {problem ? (
-          <p>Votre famille est créée, mais le lien de confirmation n'a <b>pas</b> pu être envoyé à <b data-testid="verify-address">{st?.email ?? "…"}</b>. Rien n'est perdu : corrigez la cause ci-dessous puis réessayez, ou changez l'adresse.</p>
+          <p className="mailproblem" role="alert" data-testid="verify-status">{MAIL_FAILED}</p>
         ) : (
-          <p>Un lien de confirmation a été envoyé à <b data-testid="verify-address">{st?.email ?? "…"}</b>. Ouvrez-le (sur ce téléphone ou un autre) : l'installation se termine toute seule.</p>
+          <>
+            <p>Un lien de confirmation a été envoyé à <b data-testid="verify-address">{st?.email ?? "…"}</b>. Ouvrez-le (sur ce téléphone ou un autre) : l'installation se termine toute seule.</p>
+            <p className="muted" data-testid="verify-status">{busy ? "Envoi en cours…" : "Pensez à regarder aussi les courriers indésirables."}</p>
+          </>
         )}
-        <div data-testid="verify-status"><MailStatus mail={st?.lastMail ?? null} /></div>
         {error && <p className="error" role="alert" data-testid="verify-error">{error}</p>}
-        <button className="btn btn--primary btn--big" disabled={busy || !st?.email} data-testid="verify-resend" onClick={() => void act(() => api.resendRecovery())}>{problem ? "Réessayer l'envoi" : "Renvoyer le lien"}</button>
-        <Diagnose />
+        <button className="btn btn--primary btn--big" disabled={busy || !st?.email} data-testid="verify-resend" onClick={() => void act(() => api.resendRecovery())}>{busy ? "Envoi en cours…" : problem ? "Réessayer" : "Renvoyer le lien"}</button>
         {!changing ? (
           <button className="btn" data-testid="verify-change" onClick={() => { setEmail(st?.email ?? ""); setChanging(true); }}>Changer d'adresse</button>
         ) : (

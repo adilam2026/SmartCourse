@@ -42,16 +42,19 @@ Chaque envoi est journalisé (`email_log`, adresse masquée) avec son état, aff
 
 Pour activer « remis / rejeté » : dans Brevo → Transactional → Settings → Webhooks, adresse `https://<domaine>/api/email/brevo-webhook/<BREVO_WEBHOOK_SECRET>`, événements *delivered, hard bounce, soft bounce, blocked, spam, invalid*. La réception réelle dans la boîte mail se vérifie **à la main** (courriers indésirables compris) et dans Brevo → Transactional → Logs.
 
-## Diagnostiquer un e-mail « non envoyé »
-L'écran affiche désormais, quand l'envoi n'a pas abouti, **« E-mail non envoyé »** avec : la cause probable, la marche à suivre, et le détail réel renvoyé par Brevo (statut HTTP, code, message — nettoyé : ni clé, ni adresse). « Réessayer l'envoi » relance le message sans rien recréer.
+## E-mail non envoyé : ce que voit l'utilisateur, ce que garde le serveur
+**À l'écran** (réglages, première installation, e-mail de test) : uniquement « L'e-mail n'a pas pu être envoyé. Veuillez réessayer dans quelques instants. » avec un seul bouton « Réessayer ». Jamais le nom du service d'envoi, de l'hébergeur, d'une adresse IP, de HTTPS, d'un statut HTTP ni une consigne de configuration. Un envoi réussi efface aussitôt l'erreur ; un envoi refusé n'est jamais annoncé comme envoyé. L'API ne renvoie pas non plus ces informations (`/health` indique seulement `"mail":"on"|"off"`).
 
-| Réponse de Brevo | Cause probable | Correction |
-|---|---|---|
-| HTTP 401 `unauthorized` « Key not found » | clé absente, tronquée, avec guillemets/espaces, ou révoquée | corriger `BREVO_API_KEY` (clé API **v3** complète) dans les variables du service SmartCourse |
-| HTTP 401 « unrecognised IP address » | Brevo → Sécurité → *Adresses IP autorisées* actif | désactiver la restriction (Railway n'a pas d'IP fixe) |
-| HTTP 403 `permission_denied` / « not yet activated » | compte Brevo non activé pour l'envoi transactionnel | faire activer le compte chez Brevo |
-| HTTP 400 `invalid_parameter` (« sender… ») | `BREVO_FROM_EMAIL` pas un expéditeur validé, ou adresse gmail/yahoo… | valider l'expéditeur dans Brevo → Expéditeurs, domaines et IP ; utiliser une adresse de son propre domaine |
-| HTTP 402 / 429 | quota ou crédits épuisés | attendre / contrôler le plan |
-| 5xx / injoignable | panne ou réseau | réessayer |
+**Dans les journaux du serveur** (Railway → Logs) : une ligne `mail.failed` avec `kind`, `status`, `cause` (en clair), `todo` (marche à suivre) et `detail` (statut et code du service, message nettoyé : ni clé, ni adresse, ni contenu), et `mail.sent` avec l'identifiant du message quand le service accepte. Au démarrage : `mail.config` (`on`/`off`). Cause fréquente : `cause: "IP du serveur non autorisée dans Brevo"` → dans Brevo, désactiver le blocage des adresses IP inconnues pour les clés API (réglage de sécurité du compte). **Aucune adresse IP n'est ajoutée automatiquement et aucune plage n'est autorisée** : le serveur Railway change d'IP, la désactivation du blocage évite toute intervention à chaque changement.
 
-**« Diagnostiquer l'envoi »** (Réglages → Adresse de récupération, et écran d'installation) contrôle **sans envoyer de message** : clé acceptée ou non, crédits, envoi transactionnel activé, `BREVO_FROM_EMAIL` présent et validé parmi les expéditeurs du compte, domaine grand public. Il n'affiche jamais la clé.
+| `cause` dans les journaux | Correction |
+|---|---|
+| IP du serveur non autorisée | désactiver le blocage des IP inconnues pour les clés API (Brevo → Sécurité) |
+| Clé API refusée | corriger `BREVO_API_KEY` (clé v3 complète, sans guillemets ni espace) |
+| Compte non autorisé à envoyer | faire activer l'envoi transactionnel du compte |
+| Expéditeur non autorisé | valider `BREVO_FROM_EMAIL` dans Brevo (adresse de son propre domaine) |
+| Limite ou crédits atteints / panne | attendre, ou contrôler le plan |
+
+## Tests simulés et test réel
+- **Simulés** (automatiques, à chaque livraison) : le vrai client d'envoi parle à un faux service local qui reçoit les messages. On y vérifie : envoi, « réception » dans la boîte factice, ouverture du lien, passage à « Adresse vérifiée », et tous les cas de refus. Ils ne prouvent rien sur Brevo lui-même.
+- **Réel** (à faire par vous, après la désactivation du blocage d'IP) : Réglages → Adresse de récupération → « Réessayer » ou « Renvoyer le lien », ouvrir le lien reçu dans la boîte mail réelle, constater « Adresse vérifiée », puis « Envoyer un e-mail de test » et constater sa réception. Tant que ce test réel n'est pas fait, la réception réelle n'est pas démontrée.

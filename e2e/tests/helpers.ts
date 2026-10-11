@@ -87,3 +87,11 @@ export async function staffAdds(f: Family, listId: string, names: string[]) {
   expect(r.status()).toBe(200);
   return (await r.json()).list;
 }
+
+export const MAIL_FAILED = "L’e-mail n’a pas pu être envoyé. Veuillez réessayer dans quelques instants.";
+/** Aucune information d'infrastructure à l'écran : fournisseur d'envoi, hébergeur, adresse IP, HTTPS, statut HTTP, configuration. */
+export const INFRA = /brevo|railway|https?|\bip\b|\bHTTP\b|BREVO_|unauthorized|clé API|expéditeur|configur|serveur d'envoi|API v3|diagnostic|détails techniques/i;
+export async function expectNoInfra(page: Page) {
+  const text = await page.locator("main, .app, body").first().innerText();
+  expect(text).not.toMatch(INFRA);
+}

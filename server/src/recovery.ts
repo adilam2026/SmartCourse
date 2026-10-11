@@ -3,7 +3,7 @@ import { withTx, type Db } from "./db.js";
 import { revokeProfileSessions } from "./auth.js";
 import { HttpError } from "./errors.js";
 import type { SseHub } from "./hub.js";
-import { appBaseUrl, explainMailFailure, templates, type DiagnosticCheck, type Mailer, type OutgoingMail } from "./mail.js";
+import { appBaseUrl, explainMailFailure, templates, type Mailer, type OutgoingMail } from "./mail.js";
 import { checkChosenSecret } from "./profiles.js";
 import { hashSecret, hashToken, newToken } from "./security.js";
 
@@ -21,15 +21,17 @@ export function maskEmail(e: string): string {
   return `${u.slice(0, 1)}***@${d}`;
 }
 
+/** What the screens may know about the last message: nothing about the sending service, only « on its way / sent / not sent ». */
 export interface MailStatusView {
   kind: string;
-  /** « accepted » = pris en charge par le service d'envoi, rien de plus ; « delivered » = remis au serveur du destinataire (signalé par le service). */
-  status: "queued" | "accepted" | "delivered" | "bounced" | "failed" | "unknown" | "not_configured";
+  status: "sending" | "sent" | "failed";
   at: string;
-  detail: string | null;
-  /** Titre et conseil en français quand l'envoi n'a pas abouti. */
-  title: string;
-  hint: string;
+}
+
+/** Minimal logger shape (Fastify's `app.log` fits). */
+export interface MailLog {
+  info(obj: object, msg?: string): void;
+  warn(obj: object, msg?: string): void;
 }
 
 export class RecoveryService {
@@ -40,6 +42,16 @@ export class RecoveryService {
     private readonly opts: { resendCooldownSec?: number } = {},
   ) {
     this.baseUrl = baseUrl.replace(/\/+$/, "");
+  }
+
+  private log: MailLog | null = null;
+  /** The REAL cause of every failure goes here (server logs), with no key, no address, no content. */
+  setLogger(log: MailLog): void {
+    this.log = log;
+  }
+  /** Default logger (the application's own), unless one was set explicitly. */
+  useLogger(log: MailLog): void {
+    this.log ??= log;
   }
 
   get enabled(): boolean {
@@ -66,6 +78,11 @@ export class RecoveryService {
     ).rows[0].id as string;
     const r = await this.mailer.send(mail);
     const status = r.accepted ? "accepted" : r.notConfigured ? "not_configured" : r.unknown ? "unknown" : "failed";
+    if (r.accepted) this.log?.info({ event: "mail.sent", kind, messageId: r.messageId ? r.messageId.replace(/[<>]/g, "") : null }, "e-mail pris en charge par le service d'envoi");
+    else {
+      const why = explainMailFailure(status, r.detail ?? null);
+      this.log?.warn({ event: "mail.failed", kind, status, cause: why.title, todo: why.hint, detail: r.detail ?? null }, "e-mail non envoyé");
+    }
     // Échec certain (refus, réseau, non configuré) : le lien qui n'a pas pu partir est invalidé. Issue inconnue (délai dépassé) : il est conservé.
     if (token && (status === "failed" || status === "not_configured")) await this.db.query("UPDATE auth_tokens SET used_at = now() WHERE token_hash = $1 AND used_at IS NULL", [hashToken(token)]);
     await this.db.query("UPDATE email_log SET status = $2, provider_message_id = $3, detail = $4, updated_at = now() WHERE id = $1", [
@@ -99,19 +116,18 @@ export class RecoveryService {
 
   // ---- adresse de récupération (administrateur principal) -------------------------------------------------------
 
-  async state(profileId: string): Promise<{ canEdit: boolean; configured: boolean; email: string | null; verified: boolean; setupPending: boolean; lastMail: MailStatusView | null; resendInSeconds: number }> {
+  async state(profileId: string): Promise<{ canEdit: boolean; email: string | null; verified: boolean; setupPending: boolean; lastMail: MailStatusView | null; resendInSeconds: number }> {
     const p = (await this.db.query("SELECT p.is_primary, p.recovery_email, p.recovery_email_verified_at, f.setup_completed_at IS NULL AS setup_pending FROM profiles p JOIN families f ON f.id = p.family_id WHERE p.id = $1", [profileId])).rows[0];
     const last = (
       await this.db.query("SELECT kind, status, detail, updated_at FROM email_log WHERE profile_id = $1 AND kind IN ('verify_email', 'test') ORDER BY created_at DESC LIMIT 1", [profileId])
     ).rows[0];
     return {
       canEdit: !!p?.is_primary,
-      configured: this.mailer.enabled,
       email: p?.recovery_email ?? null,
       verified: !!p?.recovery_email_verified_at,
       setupPending: !!p?.setup_pending,
       resendInSeconds: await this.resendWait(profileId),
-      lastMail: last ? { kind: last.kind, status: last.status, at: new Date(last.updated_at).toISOString(), detail: last.detail, ...explainMailFailure(last.status, last.detail) } : null,
+      lastMail: last ? { kind: last.kind, status: last.status === "queued" ? "sending" : last.status === "accepted" || last.status === "delivered" ? "sent" : "failed", at: new Date(last.updated_at).toISOString() } : null,
     };
   }
 
@@ -154,14 +170,6 @@ export class RecoveryService {
     const token = await this.issueToken("verify_email", profileId, p.recovery_email);
     // The administrator is waiting for the answer here: the result of the hand-over is recorded before replying.
     await this.deliver("verify_email", profileId, templates.verifyEmail(p.recovery_email, `${this.baseUrl}/#/verify/${encodeURIComponent(token)}`), token);
-  }
-
-  /** Key / account / sender checks (no message is sent). Primary administrator only. */
-  async diagnose(profileId: string): Promise<DiagnosticCheck[]> {
-    const p = (await this.db.query("SELECT is_primary FROM profiles WHERE id = $1", [profileId])).rows[0];
-    if (!p?.is_primary) throw new HttpError(403, "forbidden", "Seul l'administrateur principal peut diagnostiquer l'envoi");
-    if (!this.mailer.enabled || !this.mailer.diagnose) return [{ name: "Configuration", ok: false, detail: "BREVO_API_KEY ou BREVO_FROM_EMAIL absent (ou invalide) dans les variables du service" }];
-    return this.mailer.diagnose();
   }
 
   /** Real check of the sending chain: a short message to the VERIFIED address. The result recorded is the service's answer (accepted ≠ received). */

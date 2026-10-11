@@ -86,7 +86,6 @@ export const api = {
   recoveryState: () => request<RecoveryState>("GET", "/api/recovery-email"),
   setRecoveryEmail: (email: string) => request<RecoveryState>("PUT", "/api/recovery-email", { email }),
   resendRecovery: () => request<RecoveryState>("POST", "/api/recovery-email/resend", {}),
-  diagnoseMail: () => request<{ checks: DiagnosticCheck[] }>("POST", "/api/recovery-email/diagnose", {}),
   testRecovery: () => request<RecoveryState>("POST", "/api/recovery-email/test", {}),
   resetPreview: () => request<ResetPreview>("GET", "/api/family/reset-preview"),
   resetFamily: (password: string, confirmCode: string) => request<{ ok: true; installToken: string; deleted: Record<string, number>; otherFamiliesUntouched: number; photoFilesRemoved: number }>("POST", "/api/family/reset", { password, confirmCode }),
@@ -221,16 +220,14 @@ export interface Profile {
 
 export interface RecoveryState {
   canEdit: boolean;
-  /** Le service d'envoi d'e-mails est-il configuré sur le serveur ? */
-  configured: boolean;
   email: string | null;
   verified: boolean;
   /** Première installation inachevée : l'adresse doit être vérifiée pour terminer. */
   setupPending: boolean;
   /** Secondes avant de pouvoir demander un nouveau lien de vérification. */
   resendInSeconds: number;
-  /** « accepted » = pris en charge par le service d'envoi, pas une preuve de réception ; « delivered » = remis au serveur du destinataire. */
-  lastMail: { kind: string; status: "queued" | "accepted" | "delivered" | "bounced" | "failed" | "unknown" | "not_configured"; at: string; detail: string | null; /** Titre et conseil quand l'envoi n'a pas abouti. */ title: string; hint: string } | null;
+  /** Dernier message : en cours, envoyé, ou non envoyé. Rien d'autre n'est révélé à l'écran. */
+  lastMail: { kind: string; status: "sending" | "sent" | "failed"; at: string } | null;
 }
 
 export interface AuditProduct {
@@ -293,12 +290,6 @@ export interface Credit {
 export interface ResetPreview {
   family: { name: string; code: string; createdAt: string; profiles: { displayName: string; login: string; role: string; primary: boolean; active: boolean }[] };
   counts: Record<string, number>;
-  ready: { mailConfigured: boolean; recoveryEmailVerified: boolean };
+  ready: { recoveryEmailVerified: boolean };
 }
 
-export interface DiagnosticCheck {
-  name: string;
-  /** null = information / avertissement */
-  ok: boolean | null;
-  detail: string;
-}

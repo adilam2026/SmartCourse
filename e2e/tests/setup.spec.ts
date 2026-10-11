@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import pg from "pg";
-import { linkTokenFor, MOCK } from "./helpers";
+import { expectNoInfra, linkTokenFor, MAIL_FAILED, MOCK } from "./helpers";
 
 test("première installation : jeton à usage unique → famille créée → connecté en administrateur", async ({ page, playwright, baseURL }) => {
   const token = randomBytes(24).toString("base64url");
@@ -26,7 +26,8 @@ test("première installation : jeton à usage unique → famille créée → con
   // installation inachevée : écran d'attente, rien d'autre n'est accessible
   await expect(page.getByTestId("setup-verify")).toBeVisible();
   await expect(page.getByTestId("verify-address")).toHaveText(email);
-  await expect(page.getByTestId("verify-status")).toContainText("accepté");
+  await expect(page.getByTestId("verify-status")).toContainText("courriers indésirables");
+  await expectNoInfra(page);
   await expect(page.getByTestId("tab-settings")).toHaveCount(0);
   // le lien est ouvert AILLEURS (autre appareil) : l'écran d'attente se termine tout seul
   const other = await page.context().browser()!.newContext();
@@ -65,23 +66,23 @@ test("installation : échec d'envoi → on réessaie ou on change l'adresse sans
     await page.getByTestId("setup-email").fill(typo);
     await page.getByTestId("setup-submit").click();
     await expect(page.getByTestId("setup-verify")).toBeVisible(); // la famille existe, en attente
-    await expect(page.getByRole("heading", { name: "E-mail non envoyé" })).toBeVisible(); // jamais « ouvrez le lien reçu » après un refus
-    await expect(page.getByTestId("verify-status")).toContainText("HTTP 400"); // statut et message de Brevo, sans secret
-    await expect(page.getByTestId("verify-status")).toContainText("expéditeur");
-    await expect(page.getByTestId("verify-resend")).toHaveText("Réessayer l'envoi");
+    // un refus de Brevo (ici « expéditeur ») : l'écran ne dit que la phrase unique, avec un seul bouton « Réessayer »
+    await expect(page.getByTestId("verify-status")).toHaveText(MAIL_FAILED);
+    await expectNoInfra(page);
+    await expect(page.getByTestId("verify-resend")).toHaveText("Réessayer");
+    await expect(page.getByTestId("verify-address")).toHaveCount(0); // jamais « un lien a été envoyé » après un échec
     await page.screenshot({ path: "../docs/captures/acces/installation-echec-envoi-390.png" });
-    await page.getByTestId("mail-diagnose").click();
-    await expect(page.getByTestId("mail-checks")).toContainText("Clé API (BREVO_API_KEY)");
-    await expect(page.getByTestId("mail-checks")).toContainText("acceptée par Brevo");
     await page.getByTestId("verify-resend").click();
-    await expect(page.getByTestId("mail-title")).toBeVisible(); // toujours en panne : on peut réessayer, encore et encore
+    await expect(page.getByTestId("verify-status")).toHaveText(MAIL_FAILED); // toujours en panne : on peut réessayer, encore et encore
+    await expectNoInfra(page);
     await fetch(`${MOCK}/__fail?on=0`, { method: "POST" });
     const fixed = `adil${randomBytes(5).toString("hex")}@example.org`;
     await page.getByTestId("verify-change").click();
     await page.getByTestId("verify-new-email").fill(fixed);
     await page.getByTestId("verify-new-save").click();
-    await expect(page.getByTestId("verify-address")).toHaveText(fixed);
-    await expect(page.getByTestId("verify-status")).toContainText("accepté");
+    await expect(page.getByTestId("verify-address")).toHaveText(fixed); // l'ancienne erreur a disparu dès l'envoi réussi
+    await expect(page.getByTestId("verify-status")).not.toHaveText(MAIL_FAILED);
+    await expectNoInfra(page);
     const other = await page.context().browser()!.newContext();
     const p2 = await other.newPage();
     await p2.goto(`${baseURL}/#/verify/${await linkTokenFor(fixed, "verify")}`);

@@ -1,27 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError, NetworkError, type RecoveryState } from "../api";
-import { fmtDateTime } from "../format";
-import { Diagnose, isMailProblem } from "./MailStatus";
 import { Icon } from "./Icon";
-
-const STATUS_LABEL: Record<string, string> = {
-  queued: "en cours d'envoi",
-  accepted: "accepté par Brevo (réception non confirmée)",
-  delivered: "remis à la boîte mail",
-  bounced: "rejeté par la boîte du destinataire",
-  failed: "refusé",
-  unknown: "sans réponse de Brevo à temps",
-  not_configured: "envoi non configuré",
-};
+import { MAIL_FAILED } from "../mailText";
 
 const errText = (e: unknown): string =>
   e instanceof NetworkError ? "Pas de connexion."
-  : e instanceof ApiError ? (e.code === "too_soon" || e.code === "too_many_mails" ? e.message : e.code === "email_not_verified" ? "L'adresse doit d'abord être vérifiée." : "Opération impossible : réessayez.")
+  : e instanceof ApiError ? (e.code === "too_soon" || e.code === "too_many_mails" ? e.message : e.code === "email_not_verified" ? "L'adresse doit d'abord être vérifiée." : MAIL_FAILED)
   : "Erreur.";
 
 /**
  * « Adresse de récupération », en trois états lisibles : à vérifier, vérifiée, envoi échoué.
- * Une seule phrase d'explication ; tout ce qui est technique (Brevo, statut HTTP, dates, diagnostic) est replié.
+ * Une seule phrase d'explication. En cas d'échec : une seule phrase et un seul bouton « Réessayer » — rien sur l'infrastructure.
  */
 export function RecoveryPanel() {
   const [st, setSt] = useState<RecoveryState | null>(null);
@@ -30,7 +19,8 @@ export function RecoveryPanel() {
   const [busy, setBusy] = useState<"send" | "test" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [wait, setWait] = useState(0);
-  const [testResult, setTestResult] = useState<RecoveryState["lastMail"]>(null);
+  const [testFailed, setTestFailed] = useState(false);
+  const [testSent, setTestSent] = useState(false);
   const inFlight = useRef(false); // un second appui avant le rendu suivant n'envoie rien
 
   const apply = (r: RecoveryState) => {
@@ -57,14 +47,20 @@ export function RecoveryPanel() {
     if (inFlight.current) return;
     inFlight.current = true;
     setBusy(kind);
-    setError(null);
+    setError(null); // l'ancienne erreur disparaît dès qu'on réessaie
+    if (kind === "test") { setTestFailed(false); setTestSent(false); }
     try {
       const r = await fn();
       apply(r);
-      if (kind === "test") setTestResult(r.lastMail);
+      if (kind === "test") {
+        const failed = r.lastMail?.status === "failed";
+        setTestFailed(failed);
+        setTestSent(!failed); // jamais « envoyé » si le service a refusé
+      }
       if (kind === "send") setEditing(false);
     } catch (e) {
       setError(errText(e));
+      if (kind === "test") setTestFailed(true);
       if (e instanceof ApiError && e.code === "too_soon") void load();
     } finally {
       inFlight.current = false;
@@ -82,10 +78,8 @@ export function RecoveryPanel() {
     );
 
   const mail = st.lastMail?.kind === "verify_email" ? st.lastMail : null;
-  const failed = !st.verified && isMailProblem(mail);
-  const sending = busy === "send" || mail?.status === "queued";
+  const failed = !st.verified && mail?.status === "failed";
   const form = editing || !st.email;
-  const sentence = "Cette adresse permet de récupérer votre code famille et de réinitialiser votre mot de passe.";
 
   return (
     <div className="panel recovery" data-testid="recovery">
@@ -94,29 +88,18 @@ export function RecoveryPanel() {
         <p><span className="statebadge statebadge--bad" data-testid="recovery-state">Aucune adresse</span></p>
       ) : st.verified ? (
         <p className="verified" data-testid="recovery-state"><span className="okmark" aria-hidden="true"><Icon name="check" size={20} /></span> <b>Adresse vérifiée</b></p>
-      ) : failed ? (
-        <p><span className="statebadge statebadge--bad" data-testid="recovery-state">Adresse à vérifier</span></p>
       ) : (
         <p><span className="statebadge statebadge--bad" data-testid="recovery-state">Adresse à vérifier</span></p>
       )}
       {st.email && <p className="addr" data-testid="recovery-email">{st.email}</p>}
 
       {/* ---- message : un seul, selon l'état ---- */}
-      {!st.verified && st.email && !form && failed && (
-        <div className="mailproblem" role="alert" data-testid="mail-problem">
-          <b data-testid="mail-title">E-mail non envoyé</b>
-          <p data-testid="mail-cause">{mail!.title}{mail!.hint ? ` — ${mail!.hint}` : ""}</p>
-        </div>
+      {failed && !form && <p className="mailproblem" role="alert" data-testid="mail-problem">{MAIL_FAILED}</p>}
+      {!st.verified && st.email && !failed && !form && (
+        <p data-testid="verify-instruction">{busy === "send" || mail?.status === "sending" ? "Envoi en cours…" : "Ouvrez le lien envoyé par e-mail pour vérifier votre adresse."}</p>
       )}
-      {!st.verified && st.email && !failed && mail && (mail.status === "accepted" || mail.status === "delivered" || sending) && !form && (
-        <p data-testid="verify-instruction">{sending && busy === "send" ? "Envoi en cours…" : "Ouvrez le lien envoyé par e-mail pour vérifier votre adresse."}</p>
-      )}
-      {!st.verified && st.email && !failed && mail?.status === "unknown" && !form && <p data-testid="verify-instruction">Brevo n'a pas confirmé l'envoi : patientez un peu avant de renvoyer le lien.</p>}
-      {st.verified && testResult && (isMailProblem(testResult) ? (
-        <div className="mailproblem" role="alert" data-testid="test-problem"><b>E-mail de test non envoyé</b><p>{testResult.title}{testResult.hint ? ` — ${testResult.hint}` : ""}</p></div>
-      ) : (
-        <p data-testid="test-ok">E-mail de test envoyé : vérifiez votre boîte mail (courriers indésirables compris).</p>
-      ))}
+      {st.verified && testSent && <p data-testid="test-ok">E-mail de test envoyé : vérifiez votre boîte mail (courriers indésirables compris).</p>}
+      {st.verified && testFailed && <p className="mailproblem" role="alert" data-testid="test-problem">{MAIL_FAILED}</p>}
       {error && <p className="error" role="alert" data-testid="recovery-error">{error}</p>}
 
       {/* ---- actions ---- */}
@@ -128,8 +111,8 @@ export function RecoveryPanel() {
         </form>
       ) : st.verified ? (
         <div className="actions2">
-          <button className="btn" disabled={busy !== null} data-testid="recovery-edit" onClick={() => { setEmail(st.email ?? ""); setEditing(true); setTestResult(null); }}>Modifier l'adresse</button>
-          <button className="btn" disabled={busy !== null || !st.configured} aria-busy={busy === "test"} data-testid="recovery-test" onClick={() => void run("test", () => api.testRecovery())}>{busy === "test" ? "Envoi en cours…" : "Envoyer un e-mail de test"}</button>
+          <button className="btn" disabled={busy !== null} data-testid="recovery-edit" onClick={() => { setEmail(st.email ?? ""); setEditing(true); setTestSent(false); setTestFailed(false); }}>Modifier l'adresse</button>
+          <button className="btn" disabled={busy !== null} aria-busy={busy === "test"} data-testid="recovery-test" onClick={() => void run("test", () => api.testRecovery())}>{busy === "test" ? "Envoi en cours…" : testFailed ? "Réessayer" : "Envoyer un e-mail de test"}</button>
         </div>
       ) : (
         <div className="actions2">
@@ -144,20 +127,7 @@ export function RecoveryPanel() {
         </div>
       )}
 
-      <p className="muted" data-testid="recovery-sentence">{sentence}</p>
-
-      {/* ---- technique, replié ---- */}
-      <details className="tech" data-testid="recovery-tech">
-        <summary>Détails techniques</summary>
-        {!st.configured && <p data-testid="recovery-unconfigured">L'envoi d'e-mails n'est pas configuré sur le serveur (BREVO_API_KEY, BREVO_FROM_EMAIL).</p>}
-        {st.lastMail ? (
-          <p data-testid="tech-last">
-            Dernier envoi ({st.lastMail.kind === "test" ? "test" : "vérification"}) : {STATUS_LABEL[st.lastMail.status] ?? st.lastMail.status}, le {fmtDateTime(st.lastMail.at)}.
-            {st.lastMail.detail && <><br /><span data-testid="tech-detail">{st.lastMail.detail}</span></>}
-          </p>
-        ) : <p>Aucun envoi enregistré.</p>}
-        <Diagnose />
-      </details>
+      <p className="muted" data-testid="recovery-sentence">Cette adresse permet de récupérer votre code famille et de réinitialiser votre mot de passe.</p>
     </div>
   );
 }
