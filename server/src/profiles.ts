@@ -109,6 +109,8 @@ export async function updateProfile(db: Db, hub: SseHub, actor: AuthContext, id:
     ]);
     const deactivated = t.active && !active;
     if (deactivated) await revokeProfileSessions(c, id);
+    // A profile that is deactivated or becomes staff no longer receives notifications on any phone.
+    if (deactivated || role === "staff") await c.query("DELETE FROM push_subscriptions WHERE profile_id = $1", [id]);
     if (input.role && input.role !== t.role) await audit(c, actor.familyId, actor.profileId, "profile.role_changed", id, { from: t.role, to: role });
     if (t.active !== active) await audit(c, actor.familyId, actor.profileId, active ? "profile.reactivated" : "profile.deactivated", id);
     return { view: toView(r.rows[0]), deactivated };

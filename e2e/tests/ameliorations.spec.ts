@@ -421,7 +421,7 @@ test.describe("5 et 6 · statistiques lisibles et fiche d'achats par produit", (
     await ctx2.close();
   });
 
-  test("fiche produit : historique incomplet (quantités inconnues), achat corrigé identifié sans double comptage", async ({ browser, playwright, baseURL }) => {
+  test("fiche produit : historique incomplet (quantités inconnues), achat corrigé absent de l'historique sans double comptage", async ({ browser, playwright, baseURL }) => {
     const f = await newFamily(playwright, baseURL!);
     const listId = await createList(f);
     const now = new Date();
@@ -440,10 +440,11 @@ test.describe("5 et 6 · statistiques lisibles et fiche d'achats par produit", (
     await page.getByTestId("stat-Tomates").click();
     await expect(page.getByTestId("pstats-count")).toContainText("2 achats");
     await expect(page.getByTestId("pstats-history")).toContainText("Quantité non enregistrée");
-    await expect(page.getByTestId("pstats-history")).toContainText("achat corrigé, non compté");
-    await expect(page.getByTestId("pstats-history")).toContainText("Corrigé par Lamiaa");
-    await expect(page.getByTestId("pstats-history")).toContainText("erreur");
-    expect(await page.getByTestId("pstats-purchase").count()).toBe(3); // 3 lignes visibles, 2 comptées
+    // l'achat annulé par « Corriger » n'apparaît pas : ni ligne barrée, ni mention de correction
+    await expect(page.getByTestId("pstats-history")).not.toContainText("corrigé");
+    await expect(page.getByTestId("pstats-history")).not.toContainText("erreur");
+    await expect(page.getByTestId("pstats-history")).not.toContainText("Lamiaa");
+    expect(await page.getByTestId("pstats-purchase").count()).toBe(2); // exactement les 2 achats comptés
     await expect(page.getByTestId("chart-kg")).toBeVisible();
     await expect(page.getByTestId("chart-kg").locator("text.chart__val")).toHaveText(["3"]); // l'achat corrigé (3 kg) n'est pas ajouté au rachat (3 kg) : 3, pas 6
     await ctx.close();

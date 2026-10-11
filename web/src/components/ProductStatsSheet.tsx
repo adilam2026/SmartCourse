@@ -8,8 +8,8 @@ import { Dialog } from "./Dialog";
 import { Thumb } from "./Thumb";
 
 /**
- * Purchase history of one product: period totals per unit, every purchase (newest first, with who and when), corrected
- * purchases shown but never counted, and a small monthly chart per unit. Purchases are not consumption.
+ * Purchase history of one product: period totals per unit, every valid purchase (newest first, with who and when) and a small
+ * monthly chart per unit. Purchases cancelled by « Corriger » are not shown here (the server does not send them). Purchases are not consumption.
  */
 export function ProductStatsSheet({ row, period, month, onOpenList, onClose }: { row: StatsRow; period: StatsPeriod; month: string; onOpenList?(listId: string, status: string): void; onClose(): void }) {
   const [data, setData] = useState<ProductStats | null>(null);
@@ -60,13 +60,9 @@ export function ProductStatsSheet({ row, period, month, onOpenList, onClose }: {
           ) : (
             <ul className="timeline pstats__list" data-testid="pstats-history">
               {data.purchases.map((p) => (
-                <li key={p.id} className={p.corrected ? "pstats__corrected" : ""} data-testid="pstats-purchase">
-                  <span>
-                    <b>{p.quantity !== null && p.unit ? fmtQty(p.quantity, p.unit) : "Quantité non enregistrée"}</b>
-                    {p.corrected && <em> · achat corrigé, non compté</em>}
-                  </span>
+                <li key={p.id} data-testid="pstats-purchase">
+                  <span><b>{p.quantity !== null && p.unit ? fmtQty(p.quantity, p.unit) : "Quantité non enregistrée"}</b></span>
                   <small>{fmtWhen(p.at)} · acheté par {p.by.displayName}</small>
-                  {p.corrected && <small>Corrigé par {p.corrected.by} · {fmtWhen(p.corrected.at)}{p.corrected.reason ? ` — « ${p.corrected.reason} »` : ""}</small>}
                   {onOpenList && (
                     <button className="linkbtn linkbtn--inline" data-testid="pstats-open-list" onClick={() => onOpenList(p.list.id, p.list.status)}>
                       {p.list.status === "active" ? "Voir la liste en cours" : `Voir la liste du ${fmtDayMonth(p.list.closedAt ?? p.list.createdAt)}`}

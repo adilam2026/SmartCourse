@@ -71,6 +71,13 @@ jobs:
           grep -E "^package:|application-label:|launchable-activity|uses-permission|sdkVersion|targetSdkVersion" /tmp/badging.txt
           grep -q "name='app.smartcourse.courses'" /tmp/badging.txt
           grep -q "application-label:'Courses'" /tmp/badging.txt
+          # Notifications : permission Android 13+ et service de délégation des notifications Chrome → application
+          "$BT/aapt2" dump xmltree --file AndroidManifest.xml "$APK" > /tmp/manifest.txt
+          grep -q "android.permission.POST_NOTIFICATIONS" /tmp/manifest.txt
+          grep -q "com.google.androidbrowserhelper.trusted.DelegationService" /tmp/manifest.txt
+          grep -q "android.support.customtabs.trusted.TRUSTED_WEB_ACTIVITY_SERVICE" /tmp/manifest.txt
+          grep -q "NotificationPermissionRequestActivity" /tmp/manifest.txt
+          echo "notifications : permission, DelegationService et demande d'autorisation présents dans le manifeste"
           ! grep -q "uses-permission: name='android.permission.\(CAMERA\|READ_EXTERNAL_STORAGE\|WRITE_EXTERNAL_STORAGE\|RECORD_AUDIO\|ACCESS_FINE_LOCATION\)" /tmp/badging.txt
           grep -E "^application-icon-" /tmp/badging.txt | head -5; grep -q "^application-icon-" /tmp/badging.txt
           # L'AAB doit être signé et valide pour Google Play
@@ -135,6 +142,7 @@ jobs:
           script: |
             adb install dist/SmartCourse.apk
             adb shell pm list packages | grep app.smartcourse.courses
+            adb shell dumpsys package app.smartcourse.courses | grep -E "POST_NOTIFICATIONS|DelegationService" | head -5
             adb shell cmd package resolve-activity --brief -c android.intent.category.LAUNCHER app.smartcourse.courses
             adb shell monkey -p app.smartcourse.courses -c android.intent.category.LAUNCHER 1
             sleep 20

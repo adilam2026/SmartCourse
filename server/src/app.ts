@@ -10,6 +10,8 @@ import { catalogRoutes } from "./catalog-routes.js";
 import { COOKIE, makeGuard } from "./guard.js";
 import { listRoutes } from "./list-routes.js";
 import { statsRoutes } from "./stats-routes.js";
+import { PushService } from "./push.js";
+import { pushRoutes } from "./push-routes.js";
 import type { PhotoStore } from "./photos.js";
 import type { Db } from "./db.js";
 import { HttpError } from "./errors.js";
@@ -33,6 +35,8 @@ export interface AppDeps {
   loginRateLimit?: { max: number; timeWindow: string };
   /** How often an open SSE stream re-checks its session (catches out-of-band revocation). */
   sseRevalidateMs?: number;
+  /** Notifications service (tests give it a sender that records instead of calling a push service). */
+  push?: PushService;
 }
 
 
@@ -55,6 +59,7 @@ const setupSchema = z.object({
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const { db } = deps;
   const hub = deps.hub ?? new SseHub();
+  const push = deps.push ?? new PushService(db);
   const app = Fastify({ logger: process.env.NODE_ENV !== "test", trustProxy: true });
 
   // Plugins must be fully loaded before routes are declared, or per-route rateLimit config is silently ignored.
@@ -151,8 +156,9 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.get("/api/admin/backup-status", { preHandler: guard("family.manage") }, async () => backupStatus(db, deps.backupStorage ?? null, deps.backupMode ?? "internal"));
 
   catalogRoutes(app, { db, store: deps.store, guard, hub });
-  listRoutes(app, { db, hub, guard });
+  listRoutes(app, { db, hub, guard, push });
   statsRoutes(app, { db, guard });
+  pushRoutes(app, { db, guard, push });
 
   // --- flux SSE ---
   app.get("/api/events", { preHandler: guard() }, async (req, reply) => {

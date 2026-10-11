@@ -2,6 +2,7 @@ import type pg from "pg";
 import { withTx, type Db } from "./db.js";
 import type { AuthContext } from "./auth.js";
 import { HttpError } from "./errors.js";
+import type { PushService } from "./push.js";
 import type { SseHub } from "./hub.js";
 
 /*
@@ -281,7 +282,7 @@ async function execCorrect(e: EventCtx, op: Extract<OpIn, { type: "correct" }>):
 }
 
 /** Applies one idempotent operation. Replaying the same (profile, opId) returns the original result. */
-async function runOp(db: Db, a: AuthContext, listId: string, op: OpIn, batch?: BatchIn): Promise<{ result: OpResult; itemId?: string; changed: boolean }> {
+async function runOp(db: Db, a: AuthContext, listId: string, op: OpIn, batch?: BatchIn): Promise<{ result: OpResult; itemId?: string; changed: boolean; validationId?: string }> {
   return withTx(db, async (c) => {
     const claimed = await c.query(
       "INSERT INTO op_log (profile_id, op_id, type, list_id) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING RETURNING op_id",
@@ -297,11 +298,13 @@ async function runOp(db: Db, a: AuthContext, listId: string, op: OpIn, batch?: B
     if (!list) throw new HttpError(404, "not_found", "Liste introuvable");
 
     let ex: Executed;
+    let validationId: string | undefined;
     if (list.status === "archived") ex = rejected("list_closed");
     else if (op.type === "purchase") ex = await execPurchase(c, a, listId, op);
     else {
       // Every other operation writes events: they belong to the validation (one press on "Valider") that carried them.
       const v = await ensureValidation(c, a, listId, batch, op.opId, new Date());
+      validationId = v.id;
       const e: EventCtx = { c, a, listId, validationId: v.id, at: v.at };
       if (op.type === "add") ex = await execAdd(e, op);
       else if (op.type === "remove") ex = await execRemove(e, op);
@@ -312,20 +315,24 @@ async function runOp(db: Db, a: AuthContext, listId: string, op: OpIn, batch?: B
 
     const result: OpResult = { opId: op.opId, ...ex.result };
     await c.query("UPDATE op_log SET result = $3 WHERE profile_id = $1 AND op_id = $2", [a.profileId, op.opId, JSON.stringify(result)]);
-    return { result, itemId: ex.itemId, changed: ex.result.status === "applied" };
+    return { result, itemId: ex.itemId, changed: ex.result.status === "applied", validationId };
   });
 }
 
-export async function applyOps(db: Db, hub: SseHub, a: AuthContext, listId: string, ops: OpIn[], batch?: BatchIn) {
+export async function applyOps(db: Db, hub: SseHub, a: AuthContext, listId: string, ops: OpIn[], batch?: BatchIn, push?: PushService) {
   const results: OpResult[] = [];
   const changedItems: string[] = [];
+  const changedValidations = new Set<string>();
   for (const op of ops) {
     const r = await runOp(db, a, listId, op, batch);
     results.push(a.role === "staff" ? stripDetail(r.result) : r.result);
     if (r.changed && r.itemId) changedItems.push(r.itemId);
+    if (r.changed && r.validationId) changedValidations.add(r.validationId); // replayed operations (r.changed false) never notify again
   }
   // After commit: tell the other members something changed (they refetch the list state).
   if (changedItems.length) hub.broadcast(a.familyId, "list.updated", { listId, itemIds: changedItems });
+  // One summary notification per validation that really changed something, sent in the background once the batch is saved.
+  if (push) for (const vid of changedValidations) push.enqueue(() => push.notifyValidation(a, vid));
   return { results, list: await getListView(db, a, listId) };
 }
 

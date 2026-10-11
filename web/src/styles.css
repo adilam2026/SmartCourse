@@ -276,8 +276,6 @@ h1, h2 { margin: 0; }
 .pstats__units { margin: 4px 0; padding-left: 18px; }
 .pstats__h { margin: 14px 0 6px; font-size: 1rem; }
 .pstats__list li { border-left-color: var(--green); }
-.pstats__corrected { border-left-color: var(--line) !important; opacity: 0.75; }
-.pstats__corrected b { text-decoration: line-through; }
 .chart { margin: 6px 0 10px; padding: 6px 8px; border: 2px solid var(--line); border-radius: 14px; background: var(--surface); }
 .chart figcaption { font-weight: 700; font-size: 0.9rem; }
 .chart svg { width: 100%; height: auto; display: block; }

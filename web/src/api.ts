@@ -61,6 +61,10 @@ export const api = {
   setupFamily: (b: { installToken: string; familyName: string; admin: { displayName: string; login: string; secret: string } }) =>
     request<{ familyCode: string; me: Me }>("POST", "/api/setup/family", b),
   logout: () => request<{ ok: true }>("POST", "/api/auth/logout"),
+  pushConfig: () => request<{ publicKey: string }>("GET", "/api/push/config"),
+  pushSubscribe: (b: { endpoint: string; keys: { p256dh: string; auth: string }; userAgent?: string }) => request<{ ok: true }>("POST", "/api/push/subscriptions", b),
+  pushUnsubscribe: (endpoint: string) => request<{ removed: number }>("DELETE", "/api/push/subscriptions", { endpoint }),
+  pushCheck: (endpoint: string) => request<{ registered: boolean }>("POST", "/api/push/subscriptions/check", { endpoint }),
   me: () => request<{ me: Me }>("GET", "/api/me"),
   catalog: () => request<Catalog>("GET", "/api/catalog"),
   activeList: () => request<{ list: ListView | null; catalogRev?: number }>("GET", "/api/lists/active"),
@@ -160,7 +164,6 @@ export interface ProductPurchase {
   quantity: number | null;
   unit: Unit | null;
   by: { id: string; displayName: string };
-  corrected: { at: string; by: string; reason: string | null } | null;
   list: { id: string; status: string; createdAt: string; closedAt: string | null };
 }
 export interface ProductStats {

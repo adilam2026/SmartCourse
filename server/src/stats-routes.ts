@@ -213,7 +213,11 @@ export function statsRoutes(app: FastifyInstance, { db, guard }: { db: Db; guard
     };
   });
 
-  /** Purchase history of ONE product over the selected period, plus six months of quantities (units kept apart). */
+  /**
+   * Purchase history of ONE product over the selected period, plus six months of quantities (units kept apart).
+   * Only confirmed, still-valid purchases: purchases cancelled by « Corriger » are never listed here (they stay in the database and in
+   * the list journal for traceability), so the list, the totals, the frequencies and the chart always describe the same purchases.
+   */
   app.get("/api/stats/products/:id", { preHandler: guard("stats.read") }, async (req) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
     const q = periodSchema.parse(req.query);
@@ -228,13 +232,12 @@ export function statsRoutes(app: FastifyInstance, { db, guard }: { db: Db; guard
     const photo = (p.photo_asset_id ?? p.catalog_photo ?? null) as string | null;
     const list = (
       await db.query(
-        `SELECT pu.id, pu.purchased_at, pu.quantity, pu.unit, pu.voided_at, pu.void_reason, b.id AS buyer_id, b.display_name AS buyer, vb.display_name AS voided_by_name,
+        `SELECT pu.id, pu.purchased_at, pu.quantity, pu.unit, b.id AS buyer_id, b.display_name AS buyer,
                 l.id AS list_id, l.status AS list_status, l.created_at AS list_created, l.closed_at AS list_closed
            FROM purchases pu
            JOIN profiles b ON b.id = pu.purchased_by
-           LEFT JOIN profiles vb ON vb.id = pu.voided_by
            JOIN lists l ON l.id = pu.list_id
-          WHERE pu.family_id = $1 AND pu.product_id = $2 AND pu.purchased_at >= $3 AND pu.purchased_at < $4
+          WHERE pu.family_id = $1 AND pu.product_id = $2 AND pu.voided_at IS NULL AND pu.purchased_at >= $3 AND pu.purchased_at < $4
           ORDER BY pu.purchased_at DESC, pu.id
           LIMIT 300`,
         [fam, id, win.current.from, win.current.to],
@@ -246,14 +249,11 @@ export function statsRoutes(app: FastifyInstance, { db, guard }: { db: Db; guard
       quantity: r.quantity === null ? null : Number(r.quantity),
       unit: (r.unit ?? null) as string | null,
       by: { id: r.buyer_id as string, displayName: r.buyer as string },
-      // A corrected purchase stays visible in the history but is in no total.
-      corrected: r.voided_at ? { at: (r.voided_at as Date).toISOString(), by: r.voided_by_name as string, reason: (r.void_reason ?? null) as string | null } : null,
       list: { id: r.list_id as string, status: r.list_status as string, createdAt: (r.list_created as Date).toISOString(), closedAt: r.list_closed ? (r.list_closed as Date).toISOString() : null },
     }));
     // Totals per unit, confirmed purchases only.
     const totals = new Map<string, Cell>();
     for (const r of purchases) {
-      if (r.corrected) continue;
       const k = r.unit ?? "";
       const c = totals.get(k) ?? { unit: r.unit, purchases: 0, quantity: null, unknownQuantity: 0 };
       c.purchases += 1;

@@ -4,6 +4,10 @@
     <!-- Application Android « Trusted Web Activity » : la PWA SmartCourse (serveur Railway) s'ouvre en plein écran, sans barre d'adresse,
          dans Chrome. Caméra, galerie, clavier, connexion persistante, mode hors connexion et bouton Retour sont ceux de la PWA.
          Aucune permission déclarée : la caméra passe par le sélecteur de fichiers de Chrome (aucune autorisation à accorder). -->
+    <!-- Notifications : Android 13+ demande l'autorisation « Notifications » ; elle est demandée au toucher de « Activer les notifications »
+         dans l'application (délégation des notifications Chrome → application Android, voir DelegationService ci-dessous). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
@@ -53,5 +57,22 @@
                 <data android:scheme="https" android:host="${appHost}" />
             </intent-filter>
         </activity>
+
+        <!-- Délégation des notifications : Chrome reçoit la notification push de la page (Web Push) et la fait afficher PAR cette application
+             (nom « Courses », icône de l'application, autorisation Android « Notifications » propre à l'application). Fonctionne application
+             ouverte, en arrière-plan ou fermée normalement. -->
+        <service
+            android:name="com.google.androidbrowserhelper.trusted.DelegationService"
+            android:enabled="true"
+            android:exported="true">
+            <meta-data
+                android:name="android.support.customtabs.trusted.SMALL_ICON"
+                android:resource="@drawable/ic_notification_icon" />
+            <intent-filter>
+                <action android:name="android.support.customtabs.trusted.TRUSTED_WEB_ACTIVITY_SERVICE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </service>
+        <activity android:name="com.google.androidbrowserhelper.trusted.NotificationPermissionRequestActivity" />
     </application>
 </manifest>

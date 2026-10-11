@@ -15,6 +15,9 @@
 | Hors connexion | Le service worker de la PWA (catalogue, photos, file d'envoi) |
 | Icône | Icône adaptative (panier vert avec coche), ronde, et monochrome (icônes thématiques Android 13+) |
 
+## Notifications
+L'application déclare la **délégation des notifications** (`DelegationService`, `NotificationPermissionRequestActivity`) et la permission `POST_NOTIFICATIONS` : voir [notifications.md](notifications.md). C'est la seule permission déclarée ; elle n'est demandée qu'au toucher de « Activer les notifications ».
+
 ## Plein écran : assetlinks.json
 Pour supprimer la barre d'adresse, Android vérifie que le site déclare l'application : `https://<adresse>/.well-known/assetlinks.json` doit contenir le paquet et l'**empreinte SHA-256 du certificat de signature**. Le fichier est `server/assetlinks.json` (public : une empreinte n'est pas un secret), servi par le serveur. **Il faut redéployer le serveur Railway avec le dernier commit** pour qu'il soit en ligne. Contrôle : ouvrir l'adresse `/.well-known/assetlinks.json` dans un navigateur.
 

@@ -1,6 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useBackLayer } from "../useBackLayer";
 import { Banners } from "../components/Banners";
+import { NotificationInvite } from "../components/NotificationSettings";
+import { clearOpenTarget, useOpenTarget } from "../openTarget";
+import { api } from "../api";
 import { Dialog } from "../components/Dialog";
 import { Thumb } from "../components/Thumb";
 import { UserSheet } from "../components/UserSheet";
@@ -24,6 +27,28 @@ export function ParentApp({ engine, s }: { engine: Engine; s: State }) {
   const [editing, setEditing] = useState(false);
   const [archiveId, setArchiveId] = useState<string | null>(null); // a closed list opened from a product's purchase history
   const isAdmin = s.me?.role === "admin";
+  // A tap on a notification: open that list (current list → « En cours », closed list → its history). Waits behind the login screen.
+  const target = useOpenTarget();
+  useEffect(() => {
+    if (!target || !s.me) return;
+    let live = true;
+    api
+      .listById(target)
+      .then((r) => {
+        if (!live) return;
+        setEditing(false);
+        if (r.list.status === "active") setTab("current");
+        else {
+          setArchiveId(r.list.id);
+          setTab("history");
+        }
+      })
+      .catch(() => void 0) // another family's list or an unknown one: nothing to open
+      .finally(() => live && clearOpenTarget());
+    return () => {
+      live = false;
+    };
+  }, [target, s.me]);
   const isEditing = editing && s.list?.status === "active";
   useBackLayer(isEditing, () => setEditing(false)); // Back leaves the edit screen
   useBackLayer(!isEditing && tab !== "current", () => setTab("current")); // then goes back to the first tab
@@ -99,6 +124,7 @@ function Current({ engine, s, onEdit }: { engine: Engine; s: State; onEdit(): vo
     <>
       {header}
       <Banners engine={engine} s={s} />
+      {s.me && <NotificationInvite profileId={s.me.id} />}
       {s.conn === "offline" && <p className="banner banner--offline limit" data-testid="offline-limit">Hors connexion : les achats et corrections ne peuvent pas être enregistrés tant que le serveur est injoignable.</p>}
       <div className="actions">
         <button className="btn" data-testid="edit-list" onClick={onEdit}>✏️ Modifier{pendingEdits ? ` (${pendingEdits})` : ""}</button>

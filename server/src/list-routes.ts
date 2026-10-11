@@ -4,6 +4,7 @@ import type { Db } from "./db.js";
 import { HttpError } from "./errors.js";
 import type { Guard } from "./guard.js";
 import type { SseHub } from "./hub.js";
+import type { PushService } from "./push.js";
 import { applyOps, closeList, createList, getActiveListView, getListView, listHistory, type OpIn } from "./lists.js";
 import { can, type Action } from "./permissions.js";
 
@@ -27,7 +28,7 @@ const REQUIRED: Record<OpIn["type"], Action> = {
   correct: "purchase.correct",
 };
 
-export function listRoutes(app: FastifyInstance, { db, hub, guard }: { db: Db; hub: SseHub; guard: Guard }): void {
+export function listRoutes(app: FastifyInstance, { db, hub, guard, push }: { db: Db; hub: SseHub; guard: Guard; push?: PushService }): void {
   // `catalogRev` lets a client that polls decide whether it must download the catalogue again (see migration 008).
   app.get("/api/lists/active", { preHandler: guard() }, async (req) => {
     const list = await getActiveListView(db, req.auth!);
@@ -55,7 +56,7 @@ export function listRoutes(app: FastifyInstance, { db, hub, guard }: { db: Db; h
     const { ops, batch } = z.object({ ops: z.array(opSchema).min(1).max(200), batch: z.object({ id: uuid, at: z.string().datetime({ offset: true }).optional() }).optional() }).parse(req.body);
     // Rights are checked server-side for every operation before any is applied.
     for (const op of ops) if (!can(req.auth!.role, REQUIRED[op.type])) throw new HttpError(403, "forbidden", "Action non autorisée");
-    return applyOps(db, hub, req.auth!, id, ops, batch);
+    return applyOps(db, hub, req.auth!, id, ops, batch, push);
   });
 
   app.post("/api/lists/:id/close", { preHandler: guard("list.close") }, async (req) => {

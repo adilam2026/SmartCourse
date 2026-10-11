@@ -5,6 +5,8 @@ import { App } from "./App";
 import { makeUpdaterDeps } from "./components/VersionInfo";
 import { startUpdater } from "./updater";
 import { createEngine } from "./sync/engine";
+import { releasePushDevice } from "./push";
+import { readOpenTargetFromLocation, setOpenTarget } from "./openTarget";
 import "./styles.css";
 
 /** Warm the photo cache in the background so the catalogue works fully offline. */
@@ -22,9 +24,12 @@ async function preloadPhotos(urls: string[]): Promise<void> {
   await Promise.all([worker(), worker(), worker(), worker()]);
 }
 
-const engine = createEngine({ preload: (urls) => void preloadPhotos(urls), eventSource: (url) => new EventSource(url) });
+const engine = createEngine({ releasePush: releasePushDevice, preload: (urls) => void preloadPhotos(urls), eventSource: (url) => new EventSource(url) });
 (window as unknown as { __engine: typeof engine }).__engine = engine;
 registerSW({ immediate: true });
+// Notification tapped: the address carries ?open=<list>, or the service worker tells the open application which list to show.
+readOpenTargetFromLocation();
+navigator.serviceWorker?.addEventListener("message", (e) => e.data?.type === "open-list" && setOpenTarget(e.data.listId));
 startUpdater(makeUpdaterDeps(engine)); // keeps a long-lived page in step with the server (see updater.ts)
 // The catalogue pictures were replaced: drop the previous picture cache so phones do not keep the old images.
 void window.caches?.delete("photos").catch(() => {});

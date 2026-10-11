@@ -41,8 +41,9 @@ export default defineConfig({
       },
       workbox: {
         cleanupOutdatedCaches: true,
+        importScripts: ["push-sw.js"], // notifications téléphone (push, toucher)
         navigateFallback: "/index.html",
-        navigateFallbackDenylist: [/^\/api\//, /^\/\.well-known\//, /^\/version\.json$/],
+        navigateFallbackDenylist: [/^\/api\//, /^\/push-sw\.js$/, /^\/\.well-known\//, /^\/version\.json$/],
         // Photos are immutable (content-addressed): cache-first, kept for offline use.
         runtimeCaching: [
           {

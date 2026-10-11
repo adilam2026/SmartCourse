@@ -547,7 +547,7 @@ describe("Statistiques d'achats", () => {
     expect(typeof all.rows[0].categoryLabel).toBe("string");
   });
 
-  it("fiche d'un produit : historique du plus récent au plus ancien, totaux par unité, achat corrigé visible mais jamais compté, six mois", async () => {
+  it("fiche d'un produit : historique du plus récent au plus ancien, totaux par unité, achat corrigé absent de la fiche (conservé en base), six mois", async () => {
     statsClock.now = () => new Date("2026-10-20T12:00:00Z");
     const f = await newFamily();
     await db.query("UPDATE lists SET created_at = '2026-08-15T00:00:00Z' WHERE family_id = $1", [f.familyId]);
@@ -560,9 +560,14 @@ describe("Statistiques d'achats", () => {
     await one(f.lamiaa, listId, op.correct(pid));
     const d = (await app.inject({ method: "GET", url: `/api/stats/products/${f.products["Lait"]}?month=2026-10`, cookies: f.adil })).json();
     expect(d.product).toMatchObject({ name: "Lait" });
-    expect(d.purchases.map((p: any) => [p.quantity, p.unit, !!p.corrected])).toEqual([[5, "piece", true], [2, "brique", false]]);
-    expect(d.purchases[0].corrected).toMatchObject({ by: "Lamiaa" });
-    expect(d.purchases[1].by.displayName).toBe("Adil");
+    // seuls les achats valides sont listés : l'achat corrigé (5) n'apparaît ni en ligne barrée ni autrement
+    expect(d.purchases.map((p: any) => [p.quantity, p.unit])).toEqual([[2, "brique"]]);
+    expect(d.purchases[0].by.displayName).toBe("Adil");
+    expect(JSON.stringify(d)).not.toMatch(/corrected|voided|Lamiaa/);
+    // …mais rien n'est supprimé : l'achat annulé est toujours en base avec qui l'a corrigé
+    const kept = (await db.query("SELECT quantity, voided_by IS NOT NULL AS voided FROM purchases WHERE id = $1", [pid])).rows[0];
+    expect(Number(kept.quantity)).toBe(5);
+    expect(kept.voided).toBe(true);
     expect(d.summary.units).toEqual([expect.objectContaining({ unit: "brique", purchases: 1, quantity: 2 })]); // 5 corrigé : exclu
     expect(d.summary.purchases).toBe(1);
     expect(d.summary.lastPurchaseAt).toBe("2026-10-03T10:00:00.000Z");
@@ -650,7 +655,7 @@ describe("migration 009 sur des données existantes", () => {
       const l2 = (await old.query("INSERT INTO lists (family_id, created_by) VALUES ($1,$2) RETURNING id", [fam, prof])).rows[0].id as string;
       await old.query("INSERT INTO list_items (list_id, family_id, product_id, added_by, status) VALUES ($1,$2,$3,$4,'removed')", [l2, fam, lait, prof]);
 
-      expect(await migrate(old)).toEqual(["009_quantities.sql", "010_validation_times.sql", "011_units_more.sql"]);
+      expect(await migrate(old)).toEqual(["009_quantities.sql", "010_validation_times.sql", "011_units_more.sql", "012_push_notifications.sql"]);
       expect((await old.query("SELECT client_at FROM validations")).rows.every((r) => r.client_at === null)).toBe(true); // anciennes validations : heure du téléphone inconnue
 
       expect((await old.query("SELECT count(*)::int AS n FROM profiles")).rows[0].n).toBe(1);

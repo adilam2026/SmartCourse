@@ -50,6 +50,8 @@ export interface EventSourceLike {
 }
 
 export interface EngineDeps {
+  /** Cancels this phone's notification subscription (signing out). */
+  releasePush?: () => Promise<void>;
   eventSource?: (url: string) => EventSourceLike;
   api?: typeof realApi;
   db: AppDb;
@@ -86,7 +88,9 @@ export class Engine {
     this.newId = deps.newId ?? (() => crypto.randomUUID());
     this.preloadFn = deps.preload ?? (() => {});
     this.makeEventSource = deps.eventSource;
+    this.releasePush = deps.releasePush;
   }
+  private releasePush?: () => Promise<void>;
 
   // ---- store plumbing ------------------------------------------------------------------------
   getState = (): State => this.s;
@@ -188,6 +192,8 @@ export class Engine {
   }
 
   async logout(): Promise<void> {
+    // First: this phone stops receiving this profile's notifications (waits at most 3 s, never blocks signing out).
+    await Promise.race([this.releasePush?.().catch(() => {}), new Promise((r) => setTimeout(r, 3000))]);
     try {
       await this.api.logout();
     } catch {
