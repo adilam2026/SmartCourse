@@ -85,6 +85,22 @@ for (const width of [360, 390]) {
         expect(b.height).toBeGreaterThanOrEqual(44);
       }
     }
+    // le début des noms est aligné sur chaque rangée ; le compteur reste sous le nom (les voisines ne sont pas étirées au milieu)
+    const rowsTops = await page.locator("[data-testid^=wrap-]").evaluateAll((els) => {
+      const by = new Map<number, number[]>();
+      for (const e of els) {
+        const r = e.getBoundingClientRect();
+        const nm = e.querySelector(".card__name")!.getBoundingClientRect();
+        const k = Math.round(r.top + window.scrollY);
+        by.set(k, [...(by.get(k) ?? []), Math.round(nm.top - r.top)]);
+      }
+      return [...by.values()].filter((v) => v.length > 1);
+    });
+    expect(rowsTops.length).toBeGreaterThan(10);
+    for (const tops of rowsTops) expect(Math.max(...tops) - Math.min(...tops)).toBeLessThanOrEqual(1);
+    const topsOfName = await page.getByTestId(`wrap-${f.products[LONG]}`).locator(".card__name").evaluate((e) => e.getBoundingClientRect().top - e.parentElement!.getBoundingClientRect().top);
+    expect(topsOfName).toBeGreaterThan(0);
+
     // deux colonnes sur mobile
     const cols = await page.locator("[data-testid^=wrap-]").evaluateAll((els) => new Set(els.slice(0, 8).map((e) => Math.round(e.getBoundingClientRect().left))).size);
     expect(cols).toBe(2);
@@ -94,6 +110,7 @@ for (const width of [360, 390]) {
     await page.evaluate(() => window.scrollBy(0, -120));
     await page.waitForTimeout(600);
     await page.screenshot({ path: `${CAP}/design-${width}-cartes-laitages.png` });
+    await page.screenshot({ path: `${CAP}/final-${width}-grille-alignement.png` });
     await card(page, f, LONG).scrollIntoViewIfNeeded();
     await page.evaluate(() => window.scrollBy(0, -200));
     await page.waitForTimeout(400);
@@ -102,6 +119,11 @@ for (const width of [360, 390]) {
     await page.evaluate(() => window.scrollBy(0, -200));
     await page.waitForTimeout(400);
     await page.screenshot({ path: `${CAP}/design-${width}-cartes-kg-decimal.png` });
+    await page.screenshot({ path: `${CAP}/final-${width}-grille-125-kg.png` });
+    const inp = page.getByTestId(`qty-input-${f.products["Tomates"]}`);
+    expect(await inp.inputValue()).toBe("1,25");
+    expect(await inp.evaluate((e: HTMLInputElement) => e.scrollWidth <= e.clientWidth)).toBe(true);
+    await page.getByTestId(`wrap-${f.products["Tomates"]}`).screenshot({ path: `${CAP}/final-${width}-carte-125-kg.png` });
 
     // par catégories
     await page.getByTestId("view-categories").click();
@@ -176,6 +198,13 @@ for (const width of [360, 390]) {
     await page.getByTestId("stats-sort").selectOption("frequency");
     await expect(page.getByTestId("stats-sort").locator("option:checked")).toHaveText("Fréquence d'achat");
     await expect(page.getByTestId(`freq-${LONG}`)).toBeVisible(); // nom long
+    // nom long entier, sur plusieurs lignes, sans « … »
+    const nm = page.getByTestId(`stat-${LONG}`).locator("b");
+    await expect(nm).toHaveText(LONG);
+    expect(await nm.evaluate((e) => ({ whole: e.scrollHeight <= e.clientHeight + 1, ellipsis: getComputedStyle(e).textOverflow, lines: Math.round(e.getBoundingClientRect().height / parseFloat(getComputedStyle(e).lineHeight)) }))).toMatchObject({ whole: true, ellipsis: "clip" });
+    expect(await nm.evaluate((e) => e.getBoundingClientRect().height / parseFloat(getComputedStyle(e).fontSize))).toBeGreaterThan(2); // au moins deux lignes
+    await page.getByTestId(`stat-${LONG}`).scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `${CAP}/final-${width}-statistiques-nom-long.png` });
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
     await page.screenshot({ path: `${CAP}/design-${width}-statistiques.png` });
 
