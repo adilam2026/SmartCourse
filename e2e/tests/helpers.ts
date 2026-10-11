@@ -5,7 +5,23 @@ import { expect } from "@playwright/test";
 
 const DB = "postgres://smart:smart@localhost:5432/smartcourse_e2e";
 
+export const MOCK = "http://127.0.0.1:3199";
+/** Messages « envoyés » au faux service Brevo pour une adresse. */
+export async function mailsTo(to: string): Promise<{ to: string; subject: string; text: string }[]> {
+  return (await fetch(`${MOCK}/__sent?to=${encodeURIComponent(to)}`)).json() as Promise<{ to: string; subject: string; text: string }[]>;
+}
+/** Jeton du dernier lien (verify/reset) reçu à cette adresse : le même parcours que le clic dans l'e-mail. */
+export async function linkTokenFor(to: string, kind: "verify" | "reset"): Promise<string> {
+  for (let i = 0; i < 40; i++) {
+    const m = (await mailsTo(to)).filter((x) => x.text.includes(`#/${kind}/`)).at(-1);
+    if (m) return decodeURIComponent(m.text.match(new RegExp(`#/${kind}/([^\\s]+)`))![1]!);
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  throw new Error(`aucun e-mail ${kind} pour ${to}`);
+}
+
 export interface Family {
+  email: string;
   code: string;
   adil: APIRequestContext;
   lamiaa: APIRequestContext;
@@ -23,8 +39,11 @@ export async function newFamily(playwright: { request: { newContext(o: object): 
   await client.end();
 
   const adil = await playwright.request.newContext({ baseURL });
-  const setup = await adil.post("/api/setup/family", { data: { installToken: token, familyName: "Test", admin: { displayName: "Adil", login: "adil", secret: "482913" } } });
+  const email = `adil${randomBytes(6).toString("hex")}@example.org`;
+  const setup = await adil.post("/api/setup/family", { data: { installToken: token, familyName: "Test", admin: { displayName: "Adil", login: "adil", secret: "482913", secretConfirm: "482913", recoveryEmail: email } } });
   expect(setup.status()).toBe(201);
+  // Installation en deux temps : la famille n'existe pour de bon qu'une fois le lien reçu par e-mail ouvert.
+  expect((await adil.post("/api/auth/verify-email", { data: { token: await linkTokenFor(email, "verify") } })).status()).toBe(200);
   const code = (await setup.json()).familyCode as string;
   const staffLogin = `marie${Math.floor(Math.random() * 1e6)}`;
   for (const [login, role, display] of [["lamiaa", "parent", "Lamiaa"], [staffLogin, "staff", "Marie"]] as const) {
@@ -38,7 +57,7 @@ export async function newFamily(playwright: { request: { newContext(o: object): 
   const cat = await (await adil.get("/api/catalog")).json();
   const products: Record<string, string> = {};
   for (const c of cat.categories) for (const p of c.products) products[p.name] = p.id;
-  return { code, adil, lamiaa, staff, products, staffLogin };
+  return { email, code, adil, lamiaa, staff, products, staffLogin };
 }
 
 export async function uiLogin(page: Page, f: Family, login = f.staffLogin, secret = "573918") {

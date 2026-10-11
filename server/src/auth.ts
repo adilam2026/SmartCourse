@@ -11,6 +11,8 @@ export interface AuthContext {
   role: Role;
   displayName: string;
   login: string;
+  /** Famille créée mais adresse de récupération pas encore vérifiée : tout est refusé sauf la finalisation de l'installation. */
+  setupPending?: boolean;
 }
 
 export const SESSION_DAYS = 90;
@@ -30,8 +32,8 @@ export async function authenticate(db: Db, token: string | undefined): Promise<A
   if (!token) return null;
   const r = await db.query(
     `SELECT s.id AS session_id, s.last_seen_at < now() - interval '1 minute' AS stale,
-            p.id AS profile_id, p.family_id, p.role, p.display_name, p.login
-       FROM sessions s JOIN profiles p ON p.id = s.profile_id
+            p.id AS profile_id, p.family_id, p.role, p.display_name, p.login, f.setup_completed_at IS NULL AS setup_pending
+       FROM sessions s JOIN profiles p ON p.id = s.profile_id JOIN families f ON f.id = p.family_id
       WHERE s.token_hash = $1 AND s.revoked_at IS NULL AND p.active
         AND s.last_seen_at > now() - make_interval(days => $2)`,
     [hashToken(token), SESSION_DAYS],
@@ -46,6 +48,7 @@ export async function authenticate(db: Db, token: string | undefined): Promise<A
     role: row.role,
     displayName: row.display_name,
     login: row.login,
+    setupPending: row.setup_pending,
   };
 }
 
@@ -70,7 +73,7 @@ export interface LoginInput {
 export async function login(db: Db, input: LoginInput): Promise<{ token: string; auth: AuthContext }> {
   const outcome = await withTx(db, async (c) => {
     const found = await c.query(
-      `SELECT p.*, p.locked_until > now() AS locked
+      `SELECT p.*, p.locked_until > now() AS locked, f.setup_completed_at IS NULL AS setup_pending
          FROM profiles p JOIN families f ON f.id = p.family_id
         WHERE f.code = $1 AND p.login = $2
           FOR UPDATE OF p`,
@@ -106,6 +109,7 @@ export async function login(db: Db, input: LoginInput): Promise<{ token: string;
         role: p.role as Role,
         displayName: p.display_name,
         login: p.login,
+        setupPending: p.setup_pending,
       },
     };
   });
@@ -113,10 +117,29 @@ export async function login(db: Db, input: LoginInput): Promise<{ token: string;
   return { token: outcome.token, auth: outcome.auth };
 }
 
+/** Re-enter the password before a destructive action: counts as a failed attempt (and locks) exactly like a login does. */
+export async function confirmPassword(db: Db, profileId: string, secret: string): Promise<void> {
+  const ok = await withTx(db, async (c) => {
+    const p = (await c.query("SELECT secret_hash, failed_attempts, locked_until > now() AS locked FROM profiles WHERE id = $1 FOR UPDATE", [profileId])).rows[0];
+    if (!p) return false;
+    const good = await verifySecret(secret, p.secret_hash);
+    if (p.locked) return false;
+    if (!good) {
+      const attempts = p.failed_attempts + 1;
+      const delay = attempts >= LOCK_AFTER ? Math.min(900, 30 * 2 ** (attempts - LOCK_AFTER)) : 0;
+      await c.query("UPDATE profiles SET failed_attempts = $2, locked_until = CASE WHEN $3 > 0 THEN now() + make_interval(secs => $3) ELSE locked_until END WHERE id = $1", [profileId, attempts, delay]);
+      return false;
+    }
+    await c.query("UPDATE profiles SET failed_attempts = 0, locked_until = NULL WHERE id = $1", [profileId]);
+    return true;
+  });
+  if (!ok) throw new HttpError(403, "wrong_password", "Mot de passe incorrect");
+}
+
 export interface SetupInput {
   installToken: string;
   familyName: string;
-  admin: { displayName: string; login: string; secret: string };
+  admin: { displayName: string; login: string; secret: string; /** Adresse de récupération (non vérifiée) : la famille reste « en attente » jusqu'à sa vérification. Sans adresse (outils d'exploitation), la famille est installée d'emblée. */ recoveryEmail?: string };
 }
 
 /**
@@ -139,10 +162,11 @@ export async function setupFamily(db: Db, input: SetupInput): Promise<{ token: s
     const fam = await c.query<{ id: string }>("INSERT INTO families (code, name) VALUES ($1, $2) RETURNING id", [code, input.familyName]);
     const familyId = fam.rows[0]!.id;
     await c.query("UPDATE install_tokens SET family_id = $2 WHERE id = $1", [consumed.rows[0].id, familyId]);
+    if (!input.admin.recoveryEmail) await c.query("UPDATE families SET setup_completed_at = now() WHERE id = $1", [familyId]);
     const prof = await c.query<{ id: string }>(
-      `INSERT INTO profiles (family_id, display_name, login, role, secret_hash, is_primary)
-       VALUES ($1, $2, $3, 'admin', $4, true) RETURNING id`,
-      [familyId, input.admin.displayName, input.admin.login, secretHash],
+      `INSERT INTO profiles (family_id, display_name, login, role, secret_hash, is_primary, recovery_email)
+       VALUES ($1, $2, $3, 'admin', $4, true, $5) RETURNING id`,
+      [familyId, input.admin.displayName, input.admin.login, secretHash, input.admin.recoveryEmail ? input.admin.recoveryEmail.trim().toLowerCase() : null],
     );
     const profileId = prof.rows[0]!.id;
     // Catalogue familial de départ : copie des 80 références génériques.
@@ -166,6 +190,7 @@ export async function setupFamily(db: Db, input: SetupInput): Promise<{ token: s
         role: "admin" as Role,
         displayName: input.admin.displayName,
         login: input.admin.login,
+        setupPending: !!input.admin.recoveryEmail,
       },
     };
   });

@@ -11,7 +11,7 @@ on:
         default: "https://smartcourse-production-c7ce.up.railway.app"
       schema_attendu:
         description: "Dernière migration attendue"
-        default: "015_recovery.sql"
+        default: "016_install_and_purge.sql"
 permissions:
   contents: read
 jobs:
@@ -39,7 +39,7 @@ jobs:
           JS=$(grep -o '/assets/index-[A-Za-z0-9_-]*\.js' /tmp/index.html | head -1)
           echo "bundle : $JS"
           curl -fsS -m 30 "$U$JS" -o /tmp/app.js
-          for m in "Historique des validations" "Par catégories" "Nouvelle demande" "envoyé plus tard" "autre unité" "Vérifier les mises à jour" "Version de l'application" "Liste à jour" "En attente de connexion" "modification" "Qu'est-ce qu'un achat" "3 derniers mois" "Choisir un mois" "Quantités achetées par mois" "Heures affichées" "Activer les notifications" "Désactiver sur cet appareil" "Les courses du jour" "Préparer les courses" "Vos achats" "Famille et profils" "Détails techniques" "Aucune modification à valider" "Les plus achetés" "Tous les produits" "Photo à venir" "Voir plus" "Photo du catalogue" "À vérifier" "Code famille oublié" "Mot de passe oublié" "Modifier le mot de passe" "Adresse de récupération" "Première installation"; do
+          for m in "Historique des validations" "Par catégories" "Nouvelle demande" "envoyé plus tard" "autre unité" "Vérifier les mises à jour" "Version de l'application" "Liste à jour" "En attente de connexion" "modification" "Qu'est-ce qu'un achat" "3 derniers mois" "Choisir un mois" "Quantités achetées par mois" "Heures affichées" "Activer les notifications" "Désactiver sur cet appareil" "Les courses du jour" "Préparer les courses" "Vos achats" "Famille et profils" "Détails techniques" "Aucune modification à valider" "Les plus achetés" "Tous les produits" "Photo à venir" "Voir plus" "Photo du catalogue" "À vérifier" "Code famille oublié" "Mot de passe oublié" "Modifier le mot de passe" "Adresse de récupération" "Première installation" "Vérifiez votre e-mail" "Réinitialiser la famille" "Envoyer un e-mail de test"; do
             grep -q "$m" /tmp/app.js && echo "présent : $m" || { echo "::error::absent du bundle servi : $m"; exit 1; }
           done
       - name: Notifications — service worker et clé publique
@@ -70,6 +70,6 @@ jobs:
           U="${{ inputs.app_url }}"
           curl -fsS -m 15 -o /dev/null -w "page d'accueil : HTTP %{http_code}\n" "$U/"
           curl -fsS -m 15 "$U/.well-known/assetlinks.json" | head -c 400; echo
-          for p in /api/lists/active /api/stats/purchases /api/catalog /api/catalog/all /api/recovery-email; do
+          for p in /api/lists/active /api/stats/purchases /api/catalog /api/catalog/all /api/recovery-email /api/family/reset-preview; do
             echo "$p -> $(curl -s -o /dev/null -w '%{http_code}' -m 15 "$U$p")"
           done

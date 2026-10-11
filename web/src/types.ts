@@ -9,6 +9,8 @@ export interface Me {
   family?: { code: string; name: string };
   /** Administrateur principal (seul à gérer l'adresse de récupération). */
   primary?: boolean;
+  /** Famille créée mais adresse de récupération pas encore vérifiée. */
+  setupPending?: boolean;
 }
 
 export type Unit = "piece" | "paquet" | "bouteille" | "brique" | "pot" | "boite" | "kg";

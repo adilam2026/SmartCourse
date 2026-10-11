@@ -89,6 +89,44 @@ beforeEach(async () => {
   ids = 0;
 });
 
+describe("effacement des données locales d'une ancienne famille", () => {
+  const seedOld = async () => {
+    await db.meta.put({ key: "lastMe", value: me("old-p", "old-f") });
+    await db.meta.put({ key: "lastLogin", value: { familyCode: "OLDCODE1", login: "adil" } });
+    await db.cache.put({ familyId: "old-f", profileId: "old-p", me: me("old-p", "old-f"), catalog, list: null, savedAt: 1 });
+    await db.drafts.put({ familyId: "old-f", profileId: "old-p", listId: "OL", toggles: { lait: true } as never });
+    await db.outbox.put({ id: "b-old", familyId: "old-f", profileId: "old-p", listId: "OL", ops: [], createdAt: 1 } as never);
+    await db.orphans.put({ id: "o-old", familyId: "old-f", profileId: "old-p", fromListId: "OL", productIds: ["x"], createdAt: 1 });
+  };
+
+  it("se connecter à une AUTRE famille efface d'abord brouillons, file d'envoi, cache et identité de l'ancienne ; rien n'est réinjecté", async () => {
+    await seedOld();
+    const e = await boot(); // le serveur répond « p1 / f1 »
+    expect(e.getState().phase).toBe("ready");
+    expect(await db.outbox.count()).toBe(0);
+    expect(await db.drafts.where("familyId").equals("old-f").count().catch(() => 0)).toBe(0);
+    expect((await db.cache.toArray()).every((r) => r.familyId === "f1")).toBe(true);
+    expect(await db.orphans.count()).toBe(0);
+    expect(srv.calls).toEqual([]); // l'ancien brouillon n'a jamais été envoyé à la nouvelle famille
+    expect(((await db.meta.get("lastMe"))?.value as Me).familyId).toBe("f1");
+  });
+
+  it("la même famille garde ses brouillons et sa file d'envoi", async () => {
+    const e1 = await boot();
+    await e1.toggle("lait");
+    const e2 = await boot();
+    expect(Object.keys(e2.getState().toggles)).toEqual(["lait"]);
+  });
+
+  it("après la suppression de la famille : tout est effacé, le formulaire d'installation reçoit le nouveau jeton", async () => {
+    const e = await boot();
+    await e.toggle("lait");
+    await e.afterFamilyReset("TOKEN-NEUF-0123456789");
+    expect(await db.cache.count() + (await db.outbox.count()) + (await db.drafts.count()) + (await db.orphans.count()) + (await db.meta.count())).toBe(0);
+    expect(e.getState()).toMatchObject({ phase: "loggedOut", me: null, lastLogin: null, prefillInstallToken: "TOKEN-NEUF-0123456789" });
+  });
+});
+
 describe("moteur de synchronisation", () => {
   it("critère 1 : le catalogue de la liste active est là dès l'ouverture", async () => {
     const e = await boot();

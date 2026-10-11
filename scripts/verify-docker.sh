@@ -21,8 +21,11 @@ sql() { docker exec "$PGC" psql -U smart -d smartcourse -tA -c "$1"; }
 # Dernière ligne d'import du journal (celle du démarrage le plus récent), pas la fin du journal.
 last_import() { docker logs "$APP" 2>&1 | grep "Images du catalogue" | tail -1; }
 wait_health() { for _ in $(seq 1 60); do docker exec "$APP" node -e 'fetch("http://127.0.0.1:3000/health").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))' && return 0; sleep 1; done; return 1; }
+# Faux service Brevo DANS le conteneur (même contrat que l'API réelle) : l'installation exige un e-mail vérifié.
+start_mock_mail() { docker cp scripts/mock-brevo.mjs "$APP":/tmp/mock-brevo.mjs && docker exec -d "$APP" node /tmp/mock-brevo.mjs; sleep 1; }
 start_app() {
   docker run -d --name "$APP" --network "$NET" -v "$VOL:/app/server/data" \
+    -e BREVO_API_KEY=cle-de-test -e BREVO_FROM_EMAIL=noreply@smartcourse.test -e BREVO_API_URL=http://127.0.0.1:3199/v3/smtp/email \
     -e DATABASE_URL=postgres://smart:smart@"$PGC":5432/smartcourse -e NODE_ENV=production "$TAG" >/dev/null
 }
 
@@ -81,13 +84,18 @@ echo "== 6. Une image personnalisée survit à un redémarrage"
 TOKEN=$(docker exec "$APP" node -e 'console.log(require("crypto").randomBytes(24).toString("base64url"))')
 HASH=$(printf %s "$TOKEN" | sha256sum | cut -d" " -f1)
 sql "INSERT INTO install_tokens (token_hash) VALUES ('$HASH')" >/dev/null
+start_mock_mail
 docker exec -e T="$TOKEN" "$APP" node -e '
 const sharp=require("sharp");
 (async()=>{
  const b="http://127.0.0.1:3000";
- const r=await fetch(b+"/api/setup/family",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({installToken:process.env.T,familyName:"Verif",admin:{displayName:"Adil",login:"adil",secret:"482913"}})});
+ const r=await fetch(b+"/api/setup/family",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({installToken:process.env.T,familyName:"Verif",admin:{displayName:"Adil",login:"adil",secret:"482913",secretConfirm:"482913",recoveryEmail:"verif@example.org"}})});
  if(r.status!==201) throw new Error("setup "+r.status);
  const cookie=r.headers.get("set-cookie").split(";")[0];
+ // installation en deux temps : le lien reçu (faux Brevo) est ouvert, la famille est alors installée
+ const sent=await (await fetch("http://127.0.0.1:3199/__sent?to=verif%40example.org")).json();
+ const tok=decodeURIComponent(sent.at(-1).text.match(/#\/verify\/([^\s]+)/)[1]);
+ const v=await fetch(b+"/api/auth/verify-email",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({token:tok})}); if(v.status!==200) throw new Error("verify "+v.status);
  const cat=await (await fetch(b+"/api/catalog",{headers:{cookie}})).json();
  const p=cat.categories.flatMap(c=>c.products).find(x=>x.name==="Tomates");
  if(!p||!p.photoUrl) throw new Error("Tomates sans image");

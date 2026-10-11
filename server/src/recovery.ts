@@ -51,7 +51,7 @@ export class RecoveryService {
   }
 
   /** Records the attempt, hands the message to the mailer and records what the service answered. */
-  private async deliver(kind: "verify_email" | "reset_password" | "family_code", profileId: string | null, mail: OutgoingMail, token?: string): Promise<void> {
+  private async deliver(kind: "verify_email" | "reset_password" | "family_code" | "test", profileId: string | null, mail: OutgoingMail, token?: string): Promise<void> {
     const log = (
       await this.db.query(
         "INSERT INTO email_log (kind, profile_id, recipient_hash, recipient_masked, status) VALUES ($1,$2,$3,$4,'queued') RETURNING id",
@@ -71,7 +71,7 @@ export class RecoveryService {
   }
 
   private async recentMails(kind: string, recipientHash: string): Promise<number> {
-    return (await this.db.query("SELECT count(*)::int AS n FROM email_log WHERE kind = $1 AND recipient_hash = $2 AND created_at > now() - interval '1 hour'", [kind, recipientHash])).rows[0].n;
+    return (await this.db.query("SELECT count(*)::int AS n FROM email_log WHERE kind = $1 AND recipient_hash = $2 AND status NOT IN ('failed', 'not_configured') AND created_at > now() - interval '1 hour'", [kind, recipientHash])).rows[0].n;
   }
 
   private async issueToken(purpose: "verify_email" | "reset_password", profileId: string, email: string): Promise<string> {
@@ -93,16 +93,17 @@ export class RecoveryService {
 
   // ---- adresse de récupération (administrateur principal) -------------------------------------------------------
 
-  async state(profileId: string): Promise<{ canEdit: boolean; configured: boolean; email: string | null; verified: boolean; lastMail: MailStatusView | null }> {
-    const p = (await this.db.query("SELECT is_primary, recovery_email, recovery_email_verified_at FROM profiles WHERE id = $1", [profileId])).rows[0];
+  async state(profileId: string): Promise<{ canEdit: boolean; configured: boolean; email: string | null; verified: boolean; setupPending: boolean; lastMail: MailStatusView | null }> {
+    const p = (await this.db.query("SELECT p.is_primary, p.recovery_email, p.recovery_email_verified_at, f.setup_completed_at IS NULL AS setup_pending FROM profiles p JOIN families f ON f.id = p.family_id WHERE p.id = $1", [profileId])).rows[0];
     const last = (
-      await this.db.query("SELECT kind, status, detail, updated_at FROM email_log WHERE profile_id = $1 AND kind = 'verify_email' ORDER BY created_at DESC LIMIT 1", [profileId])
+      await this.db.query("SELECT kind, status, detail, updated_at FROM email_log WHERE profile_id = $1 AND kind IN ('verify_email', 'test') ORDER BY created_at DESC LIMIT 1", [profileId])
     ).rows[0];
     return {
       canEdit: !!p?.is_primary,
       configured: this.mailer.enabled,
       email: p?.recovery_email ?? null,
       verified: !!p?.recovery_email_verified_at,
+      setupPending: !!p?.setup_pending,
       lastMail: last ? { kind: last.kind, status: last.status, at: new Date(last.updated_at).toISOString(), detail: last.detail } : null,
     };
   }
@@ -113,6 +114,11 @@ export class RecoveryService {
     const p = (await this.db.query("SELECT is_primary FROM profiles WHERE id = $1", [profileId])).rows[0];
     if (!p?.is_primary) throw new HttpError(403, "forbidden", "Seul l'administrateur principal peut gérer l'adresse de récupération");
     await this.db.query("UPDATE profiles SET recovery_email = $2, recovery_email_verified_at = NULL WHERE id = $1", [profileId, e]);
+    await this.sendVerification(profileId);
+  }
+
+  /** First installation: the address given at creation (already stored, unverified) receives its link. */
+  async sendInitialVerification(profileId: string): Promise<void> {
     await this.sendVerification(profileId);
   }
 
@@ -133,6 +139,15 @@ export class RecoveryService {
     await this.deliver("verify_email", profileId, templates.verifyEmail(p.recovery_email, `${this.baseUrl}/#/verify/${encodeURIComponent(token)}`), token);
   }
 
+  /** Real check of the sending chain: a short message to the VERIFIED address. The result recorded is the service's answer (accepted ≠ received). */
+  async sendTest(profileId: string): Promise<void> {
+    const p = (await this.db.query("SELECT is_primary, recovery_email, recovery_email_verified_at FROM profiles WHERE id = $1", [profileId])).rows[0];
+    if (!p?.is_primary) throw new HttpError(403, "forbidden", "Seul l'administrateur principal peut gérer l'adresse de récupération");
+    if (!p.recovery_email || !p.recovery_email_verified_at) throw new HttpError(400, "email_not_verified", "L'adresse doit d'abord être vérifiée");
+    if ((await this.recentMails("test", emailHash(p.recovery_email))) >= MAX_MAILS_PER_HOUR) throw new HttpError(429, "too_many_mails", "Trop d'e-mails envoyés à cette adresse : réessayez dans une heure");
+    await this.deliver("test", profileId, templates.test(p.recovery_email));
+  }
+
   /** Link clicked: the address becomes usable for recovery. The token proves control of the mailbox. */
   async verifyEmail(token: string): Promise<void> {
     await withTx(this.db, async (c) => {
@@ -147,6 +162,9 @@ export class RecoveryService {
       const r = await c.query("UPDATE profiles SET recovery_email_verified_at = now() WHERE id = $1 AND lower(recovery_email) = $2 RETURNING family_id", [t.profile_id, t.email]);
       if (!r.rows[0]) throw new HttpError(400, "invalid_link", "Ce lien n'est plus valable");
       await c.query("INSERT INTO audit_log (family_id, actor_profile_id, action, target_profile_id) VALUES ($1,$2,'profile.recovery_email_verified',$2)", [r.rows[0].family_id, t.profile_id]);
+      // Première installation : la famille n'est installée qu'une fois l'adresse du principal vérifiée.
+      const done = await c.query("UPDATE families SET setup_completed_at = now() WHERE id = $1 AND setup_completed_at IS NULL AND EXISTS (SELECT 1 FROM profiles WHERE id = $2 AND is_primary)", [r.rows[0].family_id, t.profile_id]);
+      if (done.rowCount) await c.query("INSERT INTO audit_log (family_id, actor_profile_id, action) VALUES ($1,$2,'family.setup_completed')", [r.rows[0].family_id, t.profile_id]);
     });
   }
 

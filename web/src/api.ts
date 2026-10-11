@@ -58,7 +58,7 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
 
 export const api = {
   login: (familyCode: string, login: string, secret: string) => request<{ me: Me }>("POST", "/api/auth/login", { familyCode, login, secret }),
-  setupFamily: (b: { installToken: string; familyName: string; admin: { displayName: string; login: string; secret: string; secretConfirm: string; recoveryEmail?: string } }) =>
+  setupFamily: (b: { installToken: string; familyName: string; admin: { displayName: string; login: string; secret: string; secretConfirm: string; recoveryEmail: string } }) =>
     request<{ familyCode: string; me: Me }>("POST", "/api/setup/family", b),
   logout: () => request<{ ok: true }>("POST", "/api/auth/logout"),
   pushConfig: () => request<{ publicKey: string }>("GET", "/api/push/config"),
@@ -86,6 +86,9 @@ export const api = {
   recoveryState: () => request<RecoveryState>("GET", "/api/recovery-email"),
   setRecoveryEmail: (email: string) => request<RecoveryState>("PUT", "/api/recovery-email", { email }),
   resendRecovery: () => request<RecoveryState>("POST", "/api/recovery-email/resend", {}),
+  testRecovery: () => request<RecoveryState>("POST", "/api/recovery-email/test", {}),
+  resetPreview: () => request<ResetPreview>("GET", "/api/family/reset-preview"),
+  resetFamily: (password: string, confirmCode: string) => request<{ ok: true; installToken: string; deleted: Record<string, number>; otherFamiliesUntouched: number; photoFilesRemoved: number }>("POST", "/api/family/reset", { password, confirmCode }),
   verifyEmail: (token: string) => request<{ ok: true }>("POST", "/api/auth/verify-email", { token }),
   forgotFamilyCode: (email: string) => request<{ ok: true; message: string }>("POST", "/api/auth/forgot-family-code", { email }),
   forgotPassword: (email: string, familyCode?: string) => request<{ ok: true; message: string }>("POST", "/api/auth/forgot-password", { email, familyCode }),
@@ -221,8 +224,10 @@ export interface RecoveryState {
   configured: boolean;
   email: string | null;
   verified: boolean;
+  /** Première installation inachevée : l'adresse doit être vérifiée pour terminer. */
+  setupPending: boolean;
   /** « accepted » = pris en charge par le service d'envoi, pas une preuve de réception ; « delivered » = remis au serveur du destinataire. */
-  lastMail: { kind: string; status: "queued" | "accepted" | "delivered" | "bounced" | "failed" | "not_configured"; at: string; detail: string | null } | null;
+  lastMail: { kind: string; status: "queued" | "accepted" | "delivered" | "bounced" | "failed" | "unknown" | "not_configured"; at: string; detail: string | null } | null;
 }
 
 export interface AuditProduct {
@@ -280,4 +285,10 @@ export interface Credit {
   author: string | null;
   attributionRequired: boolean;
   text: string | null;
+}
+
+export interface ResetPreview {
+  family: { name: string; code: string; createdAt: string; profiles: { displayName: string; login: string; role: string; primary: boolean; active: boolean }[] };
+  counts: Record<string, number>;
+  ready: { mailConfigured: boolean; recoveryEmailVerified: boolean };
 }

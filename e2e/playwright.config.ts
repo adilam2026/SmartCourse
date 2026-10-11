@@ -13,7 +13,9 @@ export default defineConfig({
     launchOptions: { executablePath: process.env.CHROMIUM_PATH ?? "/opt/pw-browsers/chromium-1194/chrome-linux/chrome", args: ["--no-sandbox"] },
     serviceWorkers: "allow",
   },
-  webServer: {
+  webServer: [
+    { command: "node mock-brevo.mjs", cwd: ".", url: "http://127.0.0.1:3199/__sent", reuseExistingServer: false, timeout: 15_000 },
+    {
     command: "node ../e2e/reset-db.mjs && node dist/index.js",
     cwd: "../server",
     url: `http://127.0.0.1:${PORT}/health`,
@@ -27,6 +29,12 @@ export default defineConfig({
       WEB_DIR: "../web/dist",
       SCRYPT_N: "1024",
       LOGIN_RATE_MAX: "5000",
+      // Même chemin qu'en production (client Brevo réel), vers un faux service local : installation avec e-mail vérifié.
+      BREVO_API_KEY: "cle-de-test",
+      BREVO_FROM_EMAIL: "noreply@smartcourse.test",
+      BREVO_API_URL: "http://127.0.0.1:3199/v3/smtp/email",
+      APP_URL: "http://127.0.0.1:3100",
     },
   },
+  ],
 });

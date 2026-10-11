@@ -22,9 +22,12 @@ for _ in $(seq 1 60); do docker exec "$PGC" pg_isready -U smart -d smartcourse >
 TOKEN=$(openssl rand -hex 16)
 # Port publié sur localhost seulement : le téléphone passe par le tunnel HTTPS.
 docker run -d --name "$APP" --network "$NET" -p 127.0.0.1:3000:3000 -v "$VOL:/app/server/data" \
-  -e DATABASE_URL=postgres://smart:smart@"$PGC":5432/smartcourse -e NODE_ENV=production -e INSTALL_TOKEN="$TOKEN" "$TAG" >/dev/null
+  -e DATABASE_URL=postgres://smart:smart@"$PGC":5432/smartcourse -e NODE_ENV=production -e INSTALL_TOKEN="$TOKEN" \
+  -e BREVO_API_KEY=cle-de-test -e BREVO_FROM_EMAIL=noreply@smartcourse.test -e BREVO_API_URL=http://127.0.0.1:3199/v3/smtp/email "$TAG" >/dev/null
 for _ in $(seq 1 60); do docker exec "$APP" node -e 'fetch("http://127.0.0.1:3000/health").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))' && break; sleep 1; done
 docker cp scripts/recette-seed.mjs "$APP":/tmp/recette-seed.mjs
+# Faux service Brevo dans le conteneur (recette seulement) : l'installation exige un e-mail vérifié.
+docker cp scripts/mock-brevo.mjs "$APP":/tmp/mock-brevo.mjs && docker exec -d "$APP" node /tmp/mock-brevo.mjs; sleep 1
 OUT=$(docker exec -e INSTALL_TOKEN="$TOKEN" "$APP" node /tmp/recette-seed.mjs)
 CODE=$(echo "$OUT" | sed -E 's/.*"familyCode":"([^"]+)".*/\1/')
 URL="http://localhost:3000 (cet ordinateur seulement ; pas de tunnel)"

@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import pg from "pg";
 import { expect, test } from "@playwright/test";
-import { newFamily, uiLogin, type Family } from "./helpers";
+import { linkTokenFor, mailsTo, newFamily, uiLogin, type Family } from "./helpers";
 
 /*
  * Accès : connexion à deux parcours, mots de passe choisis à la main, protection de l'administration, récupération par e-mail.
@@ -99,20 +99,27 @@ test("administration : pas de bouton Désactiver pour un administrateur, rôle d
   expect((await again.post("/api/auth/login", { data: { familyCode: f.code, login: "sara", secret: "Zz9#qq" } })).status()).toBe(200);
 });
 
-test("adresse de récupération : réglages, lien de vérification ouvrant SmartCourse, état honnête de l'envoi", async ({ page, playwright, baseURL }) => {
+test("adresse de récupération : réglages, changement d'adresse, lien reçu qui ouvre SmartCourse, e-mail de test, état honnête de l'envoi", async ({ page, playwright, baseURL }) => {
   const f = await newFamily(playwright, baseURL!);
   await uiLogin(page, f, "adil", "482913");
   await page.getByTestId("tab-settings").click();
   await page.getByTestId("seg-recovery").click();
-  await expect(page.getByTestId("recovery-state")).toContainText("Aucune adresse");
-  await expect(page.getByTestId("recovery-unconfigured")).toBeVisible(); // pas de service d'envoi dans cet environnement
-  await page.getByTestId("recovery-input").fill("adil@example.org");
+  await expect(page.getByTestId("recovery-state")).toContainText("vérifiée"); // vérifiée à l'installation
+  await expect(page.getByTestId("recovery-email")).toHaveText(f.email);
+  await expect(page.getByTestId("recovery-unconfigured")).toHaveCount(0); // l'envoi est configuré
+  // e-mail de test : réponse réelle du service, « accepté » n'est pas « reçu »
+  await page.getByTestId("recovery-test").click();
+  await expect(page.getByTestId("recovery-lastmail")).toContainText("accepté par le service d'envoi");
+  await expect(page.getByTestId("recovery-lastmail")).toContainText("réception dans la boîte non confirmée");
+  expect((await mailsTo(f.email)).some((m) => m.subject.includes("test"))).toBe(true);
+  // nouvelle adresse : à vérifier tant que le lien n'est pas ouvert
+  const next = `adil${randomBytes(5).toString("hex")}@example.org`;
+  await page.getByTestId("recovery-input").fill(next);
   await page.getByTestId("recovery-save").click();
   await expect(page.getByTestId("recovery-state")).toContainText("À vérifier");
-  await expect(page.getByTestId("recovery-lastmail")).toContainText("non configuré"); // jamais « envoyé » à tort
+  await expect(page.getByTestId("recovery-lastmail")).toContainText("accepté");
   await page.screenshot({ path: `${OUT}/recuperation-390.png`, fullPage: true });
-  // lien reçu par e-mail : ouvre SmartCourse
-  const token = await link(f, "verify_email", "adil@example.org", 60 * 24);
+  const token = await linkTokenFor(next, "verify");
   await page.goto(`/#/verify/${token}`);
   await expect(page.getByTestId("link-ok")).toContainText("Adresse confirmée");
   await page.screenshot({ path: `${OUT}/lien-verification-390.png` });
@@ -126,24 +133,35 @@ test("adresse de récupération : réglages, lien de vérification ouvrant Smart
   await expect(page.getByTestId("link-bad")).toBeVisible();
 });
 
-test("récupération : code famille et mot de passe oubliés (réponse neutre), nouveau mot de passe par lien à usage unique", async ({ page, playwright, baseURL }) => {
+test("récupération : code famille et mot de passe oubliés par e-mail réel (code reçu, lien à usage unique, ancien mot de passe jamais envoyé)", async ({ page, playwright, baseURL }) => {
   const f = await newFamily(playwright, baseURL!);
   await page.goto("/");
+  // adresse inconnue : même réponse, aucun e-mail
   await page.getByTestId("go-forgot-code").click();
   await page.getByTestId("forgot-email").fill("inconnu@example.org");
   await page.getByTestId("forgot-submit").click();
   await expect(page.getByTestId("forgot-sent")).toContainText("Si cette adresse est enregistrée et vérifiée");
+  expect(await mailsTo("inconnu@example.org")).toEqual([]);
   await page.getByTestId("forgot-back").click();
+  // code famille oublié : le vrai code arrive à l'adresse vérifiée
+  await page.getByTestId("go-forgot-code").click();
+  await page.getByTestId("forgot-email").fill(f.email);
+  await page.getByTestId("forgot-submit").click();
+  await expect(page.getByTestId("forgot-sent")).toBeVisible();
+  await expect.poll(async () => (await mailsTo(f.email)).some((m) => m.text.includes(f.code))).toBe(true);
+  expect((await mailsTo(f.email)).map((m) => m.text).join("\n")).not.toContain("482913"); // jamais un mot de passe
+  await page.getByTestId("forgot-back").click();
+  // mot de passe oublié
   await page.getByTestId("go-forgot-password").click();
-  await page.getByTestId("forgot-email").fill("inconnu@example.org");
+  await page.getByTestId("forgot-email").fill(f.email);
+  await page.getByTestId("forgot-family").fill(f.code);
   await page.getByTestId("forgot-submit").click();
   await expect(page.getByTestId("forgot-sent")).toContainText("Si cette adresse est enregistrée et vérifiée");
   await page.screenshot({ path: `${OUT}/mot-de-passe-oublie-390.png` });
-
   const session = await playwright.request.newContext({ baseURL });
   await session.post("/api/auth/login", { data: { familyCode: f.code, login: "adil", secret: "482913" } });
   expect((await session.get("/api/me")).status()).toBe(200);
-  const token = await link(f, "reset_password", "adil@example.org");
+  const token = await linkTokenFor(f.email, "reset");
   await page.goto(`/#/reset/${token}`);
   await expect(page.getByText("Nouveau mot de passe — 6 caractères")).toBeVisible();
   await page.getByTestId("reset-new").fill("Ab3$xy");
@@ -157,7 +175,6 @@ test("récupération : code famille et mot de passe oubliés (réponse neutre), 
   await page.getByTestId("link-continue").click();
   await uiLogin(page, f, "adil", "Ab3$xy");
   await expect(page.getByTestId("tab-settings")).toBeVisible();
-  // le lien ne sert qu'une fois
   await page.goto(`/#/reset/${token}`);
-  await expect(page.getByTestId("link-bad")).toBeVisible();
+  await expect(page.getByTestId("link-bad")).toBeVisible(); // usage unique
 });

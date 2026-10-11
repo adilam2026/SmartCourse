@@ -4,7 +4,7 @@ import path from "node:path";
 import rateLimit from "@fastify/rate-limit";
 import Fastify, { type FastifyInstance, type FastifyReply } from "fastify";
 import { ZodError, z } from "zod";
-import { authenticate, login, revokeSession, setupFamily, type AuthContext, SESSION_DAYS } from "./auth.js";
+import { authenticate, confirmPassword, login, revokeSession, setupFamily, type AuthContext, SESSION_DAYS } from "./auth.js";
 import { backupStatus } from "./backup.js";
 import { catalogRoutes } from "./catalog-routes.js";
 import { COOKIE, makeGuard } from "./guard.js";
@@ -19,6 +19,7 @@ import { SseHub } from "./hub.js";
 import { can, type Action } from "./permissions.js";
 import { createProfile, listProfiles, resetSecret, updateProfile } from "./profiles.js";
 import { mailerFromEnv } from "./mail.js";
+import { countFamilyData, identifyFamily, purgeFamily } from "./family-purge.js";
 import { RecoveryService, secretMatches } from "./recovery.js";
 import { SECRET_PATTERN } from "./security.js";
 
@@ -46,6 +47,8 @@ export interface AppDeps {
   brevoWebhookSecret?: string;
   /** Demandes de récupération sans session, par IP (par défaut 5 par heure, comme Petits Héros). */
   recoveryRateLimit?: { max: number; timeWindow: string };
+  /** Première installation : adresse de récupération obligatoire et vérifiée (toujours vrai en production ; les tests d'avant cette règle peuvent la lever avec SC_LEGACY_SETUP=1, ignoré hors NODE_ENV=test). */
+  requireRecoveryEmail?: boolean;
 }
 
 
@@ -109,15 +112,25 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     }
   });
 
+  const requireEmail = deps.requireRecoveryEmail ?? !(process.env.NODE_ENV === "test" && process.env.SC_LEGACY_SETUP === "1");
   app.post("/api/setup/family", { config: { rateLimit: limit } }, async (req, reply) => {
     const input = setupSchema.parse(req.body);
     if (input.admin.secretConfirm !== undefined && input.admin.secretConfirm !== input.admin.secret) throw new HttpError(400, "secret_mismatch", "Les deux mots de passe ne sont pas identiques");
     const { recoveryEmail, secretConfirm: _c, ...admin } = input.admin;
-    const r = await setupFamily(db, { ...input, admin });
-    // Adresse de récupération saisie à la création : enregistrée, puis vérifiée par le lien envoyé (la création ne dépend pas de l'envoi).
-    if (recoveryEmail) await recovery.setEmail(r.auth.profileId, recoveryEmail).catch(() => {});
+    if (requireEmail) {
+      // Avant toute création (et sans consommer le jeton) : une installation ne doit jamais laisser un compte inutilisable.
+      if (!recoveryEmail) throw new HttpError(400, "email_required", "Une adresse e-mail de récupération est obligatoire");
+      if (!recovery.enabled) throw new HttpError(503, "mail_not_configured", "L'envoi d'e-mails n'est pas configuré sur le serveur : l'installation ne peut pas être vérifiée");
+    }
+    const r = await setupFamily(db, { ...input, admin: { ...admin, ...(recoveryEmail ? { recoveryEmail } : {}) } });
     setSessionCookie(reply, r.token);
-    return reply.code(201).send({ familyCode: r.familyCode, me: publicMe(r.auth) });
+    // La famille existe, en attente de vérification. Un échec d'envoi n'annule rien : l'écran de vérification permet de réessayer.
+    let state: Awaited<ReturnType<RecoveryService["state"]>> | null = null;
+    if (recoveryEmail) {
+      await recovery.sendInitialVerification(r.auth.profileId).catch(() => {});
+      state = await recovery.state(r.auth.profileId);
+    }
+    return reply.code(201).send({ familyCode: r.familyCode, me: publicMe(r.auth), recovery: state });
   });
 
   app.post("/api/auth/login", { config: { rateLimit: limit } }, async (req, reply) => {
@@ -126,14 +139,14 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     return { me: publicMe(r.auth) };
   });
 
-  app.post("/api/auth/logout", { preHandler: guard() }, async (req, reply) => {
+  app.post("/api/auth/logout", { preHandler: guard(undefined, { allowPending: true }) }, async (req, reply) => {
     await revokeSession(db, req.auth!.sessionId);
     hub.disconnectSession(req.auth!.sessionId);
     reply.clearCookie(COOKIE, { path: "/" });
     return { ok: true };
   });
 
-  app.get("/api/me", { preHandler: guard() }, async (req) => {
+  app.get("/api/me", { preHandler: guard(undefined, { allowPending: true }) }, async (req) => {
     const a = req.auth!;
     const me: Record<string, unknown> = publicMe(a);
     if (can(a.role, "family.manage")) {
@@ -171,15 +184,45 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   });
 
   // --- adresse de récupération (administrateur principal) ---
-  app.get("/api/recovery-email", { preHandler: guard("family.manage") }, async (req) => recovery.state(req.auth!.profileId));
-  app.put("/api/recovery-email", { preHandler: guard("family.manage") }, async (req) => {
+  app.get("/api/recovery-email", { preHandler: guard("family.manage", { allowPending: true }) }, async (req) => recovery.state(req.auth!.profileId));
+  app.put("/api/recovery-email", { preHandler: guard("family.manage", { allowPending: true }) }, async (req) => {
     const { email } = z.object({ email: emailField }).parse(req.body);
     await recovery.setEmail(req.auth!.profileId, email);
     return recovery.state(req.auth!.profileId);
   });
-  app.post("/api/recovery-email/resend", { preHandler: guard("family.manage") }, async (req) => {
+  app.post("/api/recovery-email/resend", { preHandler: guard("family.manage", { allowPending: true }) }, async (req) => {
     await recovery.resendVerification(req.auth!.profileId);
     return recovery.state(req.auth!.profileId);
+  });
+
+  app.post("/api/recovery-email/test", { preHandler: guard("family.manage"), config: { rateLimit: deps.recoveryRateLimit ?? { max: 10, timeWindow: "1 hour" } } }, async (req) => {
+    await recovery.sendTest(req.auth!.profileId);
+    return recovery.state(req.auth!.profileId);
+  });
+
+  // --- réinitialisation de MA famille (administrateur principal) : suppression définitive, confirmée par mot de passe ET code famille ---
+  app.get("/api/family/reset-preview", { preHandler: guard("family.manage") }, async (req) => {
+    const me = (await db.query("SELECT is_primary, recovery_email_verified_at FROM profiles WHERE id = $1", [req.auth!.profileId])).rows[0];
+    if (!me.is_primary) throw new HttpError(403, "forbidden", "Seul l'administrateur principal peut réinitialiser la famille");
+    const fam = await identifyFamily(db, req.auth!.familyId);
+    return {
+      family: { name: fam.name, code: fam.code, createdAt: fam.createdAt, profiles: fam.profiles },
+      counts: await countFamilyData(db, req.auth!.familyId),
+      // La preuve que l'envoi d'e-mails fonctionne réellement : une adresse vérifiée est une adresse qui a REÇU un e-mail.
+      ready: { mailConfigured: recovery.enabled, recoveryEmailVerified: !!me.recovery_email_verified_at },
+    };
+  });
+  app.post("/api/family/reset", { preHandler: guard("family.manage"), config: { rateLimit: deps.recoveryRateLimit ?? { max: 5, timeWindow: "1 hour" } } }, async (req, reply) => {
+    const b = z.object({ password: z.string().min(1).max(40), confirmCode: z.string().trim().min(1).max(20) }).parse(req.body);
+    const a = req.auth!;
+    const me = (await db.query("SELECT is_primary, recovery_email_verified_at FROM profiles WHERE id = $1", [a.profileId])).rows[0];
+    if (!me.is_primary) throw new HttpError(403, "forbidden", "Seul l'administrateur principal peut réinitialiser la famille");
+    if (!recovery.enabled || !me.recovery_email_verified_at) throw new HttpError(409, "reset_not_ready", "Vérifiez d'abord que l'envoi d'e-mails fonctionne : l'adresse de récupération doit être configurée et vérifiée");
+    await confirmPassword(db, a.profileId, b.password);
+    const report = await purgeFamily(db, deps.store, a.familyId, b.confirmCode);
+    for (const id of report.profileIds) hub.disconnectProfile(id);
+    reply.clearCookie(COOKIE, { path: "/" });
+    return { ok: true, family: report.family, deleted: report.deleted, photoFilesRemoved: report.photoFilesRemoved, otherFamiliesUntouched: report.otherFamiliesUntouched, installToken: report.installToken };
   });
 
   // --- récupération sans session : réponses identiques que l'adresse soit connue ou non ---
@@ -295,4 +338,4 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   return app;
 }
 
-const publicMe = (a: AuthContext) => ({ id: a.profileId, familyId: a.familyId, displayName: a.displayName, login: a.login, role: a.role });
+const publicMe = (a: AuthContext) => ({ id: a.profileId, familyId: a.familyId, displayName: a.displayName, login: a.login, role: a.role, setupPending: !!a.setupPending });

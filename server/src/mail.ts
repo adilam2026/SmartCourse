@@ -144,6 +144,14 @@ export const templates = {
       html: layout("Nouveau mot de passe", `<p>Vous avez demandé à changer votre mot de passe. Choisissez-en un nouveau :</p>${button(link, "Choisir un nouveau mot de passe")}<p>Lien valable 1 heure, utilisable une seule fois. Votre ancien mot de passe n'est jamais envoyé.</p>`),
     };
   },
+  test(to: string): OutgoingMail {
+    return {
+      to,
+      subject: "SmartCourse — e-mail de test",
+      text: "Ceci est un e-mail de test de SmartCourse : si vous le lisez, l'envoi fonctionne jusqu'à votre boîte. Aucune action n'est nécessaire.",
+      html: layout("E-mail de test", "<p>Si vous lisez ce message, l'envoi d'e-mails de SmartCourse fonctionne jusqu'à votre boîte.</p><p>Aucune action n'est nécessaire.</p>"),
+    };
+  },
   familyCode(to: string, families: { name: string; code: string }[]): OutgoingMail {
     const lines = families.map((f) => `${f.name} : ${f.code}`).join("\n");
     return {

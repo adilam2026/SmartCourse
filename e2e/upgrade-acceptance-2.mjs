@@ -99,7 +99,7 @@ await phone.screenshot({ path: "shots/accept-0-ancienne-version.png" });
 // 2. déploiement de la nouvelle version (migrations sur la base existante)
 await redeploy(SERVER_NEW, WEB_A);
 const health = await (await fetch(`${BASE}/health`)).json();
-check("serveur redéployé : migration 015 appliquée (011 à 014 aussi) sur la base existante (009 et 010 déjà là)", health.schema === "015_recovery.sql", JSON.stringify(health));
+check("serveur redéployé : migration 016 appliquée (011 à 015 aussi) sur la base existante (009 et 010 déjà là)", health.schema === "016_install_and_purge.sql", JSON.stringify(health));
 
 // 3. page restée ouverte : la version actuelle sait se mettre à jour toute seule
 await phone.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));

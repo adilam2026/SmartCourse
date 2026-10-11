@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { api, ApiError, NetworkError } from "../api";
+import { api, ApiError, NetworkError, type RecoveryState } from "../api";
 import type { Engine, State } from "../sync/engine";
 
 type Mode = "login" | "setup" | "forgot-code" | "forgot-password";
 
 export function LoginScreen(props: { engine: Engine; s: State }) {
-  const [mode, setMode] = useState<Mode>("login");
+  const [mode, setMode] = useState<Mode>(props.s.prefillInstallToken ? "setup" : "login");
   const back = () => setMode("login");
   if (mode === "setup") return <Setup {...props} onBack={back} />;
   if (mode === "forgot-code" || mode === "forgot-password") return <Forgot kind={mode} onBack={back} />;
@@ -73,12 +73,13 @@ function Login({ engine, s, onMode }: { engine: Engine; s: State; onMode(m: Mode
 }
 
 function Setup({ engine, s, onBack }: { engine: Engine; s: State; onBack(): void }) {
-  const [f, setF] = useState({ installToken: "", familyName: "", displayName: "", login: "", secret: "", again: "", email: "" });
+  const [f, setF] = useState({ installToken: s.prefillInstallToken ?? "", familyName: "", displayName: "", login: "", secret: "", again: "", email: "" });
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: k === "secret" || k === "again" ? e.target.value.replace(/\s/g, "").slice(0, 6) : e.target.value });
   const mismatch = f.again.length > 0 && f.secret !== f.again;
   return (
     <main className="auth">
       <Logo title="Première installation" text="Créer ma famille : paramétrage de la famille et du premier administrateur" />
+      {s.prefillInstallToken && <p className="notice" role="status" data-testid="reset-banner">La famille précédente a été supprimée définitivement. Le jeton d'installation ci-dessous est neuf et ne sert qu'une fois.</p>}
       <form onSubmit={async (e) => { e.preventDefault(); await engine.setup({ installToken: f.installToken, familyName: f.familyName, displayName: f.displayName, login: f.login, secret: f.secret, secretConfirm: f.again, recoveryEmail: f.email }); }}>
         <label>Jeton d'installation<input value={f.installToken} onChange={set("installToken")} autoComplete="off" required data-testid="setup-token" /></label>
         <label>Nom de la famille<input value={f.familyName} onChange={set("familyName")} required maxLength={60} data-testid="setup-family" /></label>
@@ -87,10 +88,10 @@ function Setup({ engine, s, onBack }: { engine: Engine; s: State; onBack(): void
         <label>Mot de passe — 6 caractères<input value={f.secret} onChange={set("secret")} type="password" maxLength={6} autoComplete="new-password" required data-testid="setup-secret" /></label>
         <label>Confirmer le mot de passe<input value={f.again} onChange={set("again")} type="password" maxLength={6} autoComplete="new-password" required data-testid="setup-again" /></label>
         {mismatch && <p className="error">Les deux mots de passe ne sont pas identiques.</p>}
-        <label>E-mail de récupération (recommandé)<input value={f.email} onChange={set("email")} type="email" autoComplete="email" maxLength={254} data-testid="setup-email" /></label>
-        <p className="muted">Pour retrouver le code famille ou changer un mot de passe oublié. Un lien de confirmation y sera envoyé.</p>
+        <label>E-mail de récupération (obligatoire)<input value={f.email} onChange={set("email")} type="email" autoComplete="email" maxLength={254} required data-testid="setup-email" /></label>
+        <p className="muted">Pour retrouver le code famille ou changer un mot de passe oublié. Un lien de confirmation y est envoyé : l'installation se termine quand vous l'avez ouvert.</p>
         {s.loginError && <p className="error" role="alert" data-testid="setup-error">{s.loginError}</p>}
-        <button className="btn btn--primary btn--big" disabled={s.loggingIn || !SIX(f.secret) || f.secret !== f.again} data-testid="setup-submit">{s.loggingIn ? "Création…" : "Créer ma famille"}</button>
+        <button className="btn btn--primary btn--big" disabled={s.loggingIn || !SIX(f.secret) || f.secret !== f.again || !f.email.includes("@")} data-testid="setup-submit">{s.loggingIn ? "Création…" : "Créer ma famille"}</button>
       </form>
       <button className="linkbtn" onClick={onBack}>← Retour à la connexion</button>
     </main>
@@ -133,6 +134,74 @@ function Forgot({ kind, onBack }: { kind: "forgot-code" | "forgot-password"; onB
         </form>
       )}
       <button className="linkbtn" data-testid="forgot-back" onClick={onBack}>← Retour à la connexion</button>
+    </main>
+  );
+}
+
+const MAIL_TEXT: Record<string, string> = {
+  queued: "Envoi en cours…",
+  accepted: "Le message a été accepté par le service d'envoi. Il peut mettre quelques minutes à arriver : regardez aussi les courriers indésirables.",
+  delivered: "Le message a été remis à votre boîte mail : ouvrez-le et appuyez sur le lien.",
+  bounced: "Le message a été rejeté par votre boîte mail : vérifiez l'adresse ou changez-la ci-dessous.",
+  failed: "Le message n'a pas pu être envoyé. Rien n'est perdu : réessayez, ou changez l'adresse.",
+  unknown: "Le service d'envoi n'a pas répondu à temps : le message est peut-être parti. Patientez un peu ou renvoyez-le.",
+  not_configured: "L'envoi d'e-mails n'est pas configuré sur le serveur : l'installation ne peut pas se terminer pour l'instant.",
+};
+
+/** Family created, address not verified yet: the only thing possible is to finish (verify, resend, change the address) — never a dead end. */
+export function SetupVerify({ engine }: { engine: Engine }) {
+  const [st, setSt] = useState<RecoveryState | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [changing, setChanging] = useState(false);
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState("");
+  const load = async () => {
+    try {
+      const r = await api.recoveryState();
+      setSt(r);
+      if (r.verified) void engine.completeSetup(); // verified (here or on another device): the server now lets the installation finish
+    } catch {
+      /* offline: stay here */
+    }
+  };
+  useEffect(() => {
+    void load();
+    const t = setInterval(() => void load(), 4000);
+    const on = () => void load();
+    document.addEventListener("visibilitychange", on);
+    return () => { clearInterval(t); document.removeEventListener("visibilitychange", on); };
+  }, []);
+  const act = async (fn: () => Promise<RecoveryState>) => {
+    setBusy(true);
+    setError("");
+    try {
+      setSt(await fn());
+      setChanging(false);
+    } catch (e) {
+      setError(e instanceof NetworkError ? "Pas de connexion." : e instanceof ApiError && e.code === "too_many_mails" ? e.message : "Opération impossible : réessayez.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <main className="auth" data-testid="setup-verify">
+      <Logo title="Vérifiez votre e-mail" text="Dernière étape de l'installation" />
+      <section className="panel">
+        <p>Un lien de confirmation a été envoyé à <b data-testid="verify-address">{st?.email ?? "…"}</b>. Ouvrez-le (sur ce téléphone ou un autre) : l'installation se termine toute seule.</p>
+        {st?.lastMail && <p className="muted" data-testid="verify-status">{MAIL_TEXT[st.lastMail.status]}</p>}
+        {st && !st.configured && <p className="error" role="alert" data-testid="verify-unconfigured">{MAIL_TEXT.not_configured}</p>}
+        {error && <p className="error" role="alert" data-testid="verify-error">{error}</p>}
+        <button className="btn btn--primary btn--big" disabled={busy || !st?.email} data-testid="verify-resend" onClick={() => void act(() => api.resendRecovery())}>Renvoyer le lien</button>
+        {!changing ? (
+          <button className="btn" data-testid="verify-change" onClick={() => { setEmail(st?.email ?? ""); setChanging(true); }}>Changer d'adresse</button>
+        ) : (
+          <form className="form" onSubmit={(e) => { e.preventDefault(); void act(() => api.setRecoveryEmail(email.trim())); }}>
+            <label className="field">Nouvelle adresse<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" data-testid="verify-new-email" /></label>
+            <button className="btn btn--primary" disabled={busy || !email.includes("@")} data-testid="verify-new-save">Envoyer le lien à cette adresse</button>
+          </form>
+        )}
+      </section>
+      <button className="linkbtn" data-testid="verify-logout" onClick={() => void engine.logout()}>Me déconnecter (je reprendrai plus tard)</button>
     </main>
   );
 }

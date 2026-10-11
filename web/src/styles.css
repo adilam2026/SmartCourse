@@ -414,3 +414,8 @@ h3 { font-size: 1.05rem; font-weight: 800; }
 .authsec .panel { display: grid; gap: 0.8rem; }
 .authlinks { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.25rem 1rem; }
 .authlinks .linkbtn { margin: 0; }
+
+/* ---------- zone dangereuse ---------- */
+.panel.danger { border-color: #b3261e; }
+.btn--danger { background: #b3261e; color: #fff; border-color: #b3261e; }
+.btn--danger:disabled { background: var(--slate-soft, #eceff1); color: var(--muted); border-color: var(--line); }

@@ -1,4 +1,4 @@
-import { LinkScreen, LoginScreen, Welcome } from "./screens/Login";
+import { LinkScreen, LoginScreen, SetupVerify, Welcome } from "./screens/Login";
 import { UpdateBanner } from "./components/VersionInfo";
 import { ParentApp } from "./screens/Parent";
 import { StaffScreen } from "./screens/Staff";
@@ -58,6 +58,7 @@ function Screens({ engine }: { engine: Engine }) {
   if (link && s.phase !== "boot") return <LinkScreen key={link.token} kind={link.kind} token={link.token} onDone={leaveLink} />;
   if (s.phase === "boot") return <main className="nolist"><div className="nolist__body"><img className="nolist__logo" src="/icons/icon-192.png" alt="" width="96" height="96" /></div></main>;
   if (s.phase === "loggedOut" || !s.me) return <LoginScreen engine={engine} s={s} />;
+  if (s.me.setupPending) return <SetupVerify engine={engine} />;
   if (s.welcomeCode) return <Welcome code={s.welcomeCode} onDone={engine.dismissWelcome} />;
   if (s.me.role === "staff") return <StaffScreen engine={engine} s={s} />;
   return <ParentApp engine={engine} s={s} />;

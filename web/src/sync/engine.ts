@@ -33,6 +33,8 @@ export interface State {
   live: boolean;
   /** Family code to show once right after the first installation. */
   welcomeCode: string | null;
+  /** Single-use installation token shown after a family reset, to prefill the first-installation form. */
+  prefillInstallToken: string | null;
   /** How this person likes the catalogue shown (kept per profile on this phone). */
   catalogView: CatalogView;
 }
@@ -59,12 +61,13 @@ export interface EngineDeps {
   preload?: (urls: string[]) => void;
 }
 
+const TOKEN_KEY = "smartcourse.installToken";
 const RETRY_MS = [3_000, 8_000, 20_000, 45_000];
 
 export class Engine {
   private s: State = {
     phase: "boot", me: null, conn: "online", catalog: null, list: undefined, toggles: {}, draftListId: null, batches: [],
-    sending: false, justSynced: false, notices: [], orphan: null, loginError: null, loggingIn: false, lastLogin: null, live: false, welcomeCode: null, catalogView: "all",
+    sending: false, justSynced: false, notices: [], orphan: null, loginError: null, loggingIn: false, lastLogin: null, live: false, welcomeCode: null, prefillInstallToken: null, catalogView: "all",
   };
   private listeners = new Set<() => void>();
   private api: typeof realApi;
@@ -112,7 +115,13 @@ export class Engine {
   // ---- startup & session ---------------------------------------------------------------------
   async start(): Promise<void> {
     const last = (await this.db.meta.get("lastLogin"))?.value as State["lastLogin"] | undefined;
-    this.set({ lastLogin: last ?? null });
+    let token: string | null = null;
+    try {
+      token = localStorage.getItem(TOKEN_KEY);
+    } catch {
+      /* ignore */
+    }
+    this.set({ lastLogin: last ?? null, prefillInstallToken: token });
     try {
       const { me } = await this.api.me();
       await this.enter(me);
@@ -131,6 +140,57 @@ export class Engine {
   }
 
   dismissWelcome = () => this.set({ welcomeCode: null });
+
+  /** The address of a new family was verified (on this phone or another): leave the waiting screen and enter the application. */
+  async completeSetup(): Promise<boolean> {
+    const { me } = await this.api.me();
+    if (me.setupPending) return false;
+    await this.enter(me);
+    return true;
+  }
+
+  /**
+   * The family was deleted on the server (definitive reset): nothing of it stays on this phone — lists, drafts, outbox, catalogue,
+   * remembered identity, cached pictures — and the first-installation form opens with the new single-use token.
+   */
+  async afterFamilyReset(installToken: string): Promise<void> {
+    clearTimeout(this.retryTimer);
+    this.retryPending = false;
+    this.closeEvents();
+    await Promise.race([this.releasePush?.().catch(() => {}), new Promise((r) => setTimeout(r, 3000))]);
+    await this.wipeLocal();
+    try {
+      localStorage.setItem(TOKEN_KEY, installToken); // shown once: it must survive a closed tab until the installation uses it
+    } catch {
+      /* private mode: memory only */
+    }
+    this.set({ phase: "loggedOut", me: null, catalog: null, list: undefined, toggles: {}, batches: [], draftListId: null, orphan: null, notices: [], lastLogin: null, welcomeCode: null, prefillInstallToken: installToken });
+  }
+
+  /** Everything this phone remembers about any family. */
+  private async wipeLocal(): Promise<void> {
+    await Promise.all([this.db.cache.clear(), this.db.drafts.clear(), this.db.outbox.clear(), this.db.orphans.clear(), this.db.meta.clear()]);
+    try {
+      if (typeof caches !== "undefined") for (const k of await caches.keys()) if (!/precache/i.test(k)) await caches.delete(k);
+    } catch {
+      /* the cache API may be unavailable */
+    }
+  }
+
+  /**
+   * Signing in as a DIFFERENT family than the one remembered here (e.g. after a reset and a new installation): the old family's
+   * drafts, outbox and cache are erased first, so nothing of it can ever be sent into the new one.
+   */
+  private async wipeIfOtherFamily(me: Me): Promise<void> {
+    const mine = me.familyId;
+    const stale = async (table: { filter(fn: (r: { familyId: string }) => boolean): { count(): Promise<number> } }) => (await table.filter((r) => r.familyId !== mine).count()) > 0;
+    const known = (await this.db.meta.get("lastMe"))?.value as Me | undefined;
+    const other = (known && known.familyId !== mine) || (await stale(this.db.cache as never)) || (await stale(this.db.outbox as never)) || (await stale(this.db.drafts as never)) || (await stale(this.db.orphans as never));
+    if (!other) return;
+    const login = (await this.db.meta.get("lastLogin"))?.value;
+    await this.wipeLocal();
+    if (login && this.s.lastLogin) await this.db.meta.put({ key: "lastLogin", value: this.s.lastLogin });
+  }
 
   async login(familyCode: string, login: string, secret: string): Promise<void> {
     this.set({ loggingIn: true, loginError: null });
@@ -153,17 +213,22 @@ export class Engine {
   }
 
   /** First installation: consumes the one-shot install token, creates the family and its first administrator. */
-  async setup(input: { installToken: string; familyName: string; displayName: string; login: string; secret: string; secretConfirm: string; recoveryEmail?: string }): Promise<string | null> {
+  async setup(input: { installToken: string; familyName: string; displayName: string; login: string; secret: string; secretConfirm: string; recoveryEmail: string }): Promise<string | null> {
     this.set({ loggingIn: true, loginError: null });
     try {
       const r = await this.api.setupFamily({
         installToken: input.installToken.trim(),
         familyName: input.familyName,
-        admin: { displayName: input.displayName, login: input.login.trim().toLowerCase(), secret: input.secret, secretConfirm: input.secretConfirm, ...(input.recoveryEmail?.trim() ? { recoveryEmail: input.recoveryEmail.trim() } : {}) },
+        admin: { displayName: input.displayName, login: input.login.trim().toLowerCase(), secret: input.secret, secretConfirm: input.secretConfirm, recoveryEmail: input.recoveryEmail.trim() },
       });
       const lastLogin = { familyCode: r.familyCode, login: input.login.trim().toLowerCase() };
       await this.db.meta.put({ key: "lastLogin", value: lastLogin });
-      this.set({ lastLogin, welcomeCode: r.familyCode });
+      try {
+        localStorage.removeItem(TOKEN_KEY); // used: it cannot be used again anyway
+      } catch {
+        /* ignore */
+      }
+      this.set({ lastLogin, welcomeCode: r.familyCode, prefillInstallToken: null });
       const { me } = await this.api.me();
       await this.enter(me);
       return r.familyCode;
@@ -171,6 +236,8 @@ export class Engine {
       this.set({
         loginError:
           e instanceof NetworkError ? "Pas de connexion. Réessayez."
+          : e instanceof ApiError && e.code === "mail_not_configured" ? "L'envoi d'e-mails n'est pas configuré sur le serveur : l'installation ne peut pas être vérifiée. Rien n'a été créé, le jeton reste valable."
+          : e instanceof ApiError && e.code === "email_required" ? "Une adresse e-mail de récupération est obligatoire."
           : e instanceof ApiError && e.status === 403 ? "Jeton d'installation invalide ou déjà utilisé."
           : e instanceof ApiError && e.code === "weak_secret" ? "Mot de passe trop simple (évitez 123456, 111111…)."
           : e instanceof ApiError && e.status === 400 ? "Vérifiez les champs (identifiant : lettres minuscules, chiffres, . _ -)."
@@ -183,7 +250,13 @@ export class Engine {
   }
 
   private async enter(me: Me, online = true): Promise<void> {
+    if (online) await this.wipeIfOtherFamily(me);
     await this.db.meta.put({ key: "lastMe", value: me });
+    if (me.setupPending) {
+      // Installation inachevée : seul l'écran de vérification est possible (le serveur refuse tout le reste).
+      this.set({ me, phase: "ready" });
+      return;
+    }
     this.set({ me, phase: "ready" });
     await this.loadLocal(me);
     this.openEvents();

@@ -1,7 +1,7 @@
 import { unitLabel } from "../units";
 import { VersionInfo } from "../components/VersionInfo";
 import { useEffect, useState } from "react";
-import { api, ApiError, NetworkError, type AuditProduct, type BackupStatus, type Profile, type RecoveryState } from "../api";
+import { api, ApiError, NetworkError, type AuditProduct, type BackupStatus, type Profile, type RecoveryState, type ResetPreview } from "../api";
 import { fmtDateTime } from "../format";
 import { CATEGORY_EMOJI } from "../categories";
 import { Dialog } from "../components/Dialog";
@@ -25,7 +25,7 @@ const errText = (e: unknown): string =>
   : e instanceof ApiError ? (e.code === "last_admin" ? "Impossible : c'est le dernier administrateur actif." : e.code === "admin_cannot_deactivate" ? "Un administrateur ne peut pas être désactivé." : e.code === "primary_admin_protected" ? "Le rôle de l'administrateur principal ne peut pas être modifié." : e.code === "login_taken" ? "Cet identifiant existe déjà." : e.code === "weak_secret" ? "Mot de passe trop simple (évitez 123456, 111111…)." : e.code === "secret_mismatch" ? "Les deux mots de passe ne sont pas identiques." : e.code === "invalid_secret" ? "Le mot de passe doit comporter 6 caractères." : e.message)
   : "Erreur.";
 
-type Section = "profiles" | "recovery" | "catalog" | "notifications" | "backups" | "about";
+type Section = "profiles" | "recovery" | "reset" | "catalog" | "notifications" | "backups" | "about";
 
 /** Backup state in one word (the technical detail is one touch away). */
 function backupSummary(st: BackupStatus | null): { ok: boolean; text: string } {
@@ -56,6 +56,7 @@ export function Settings({ engine, s }: { engine: Engine; s: State }) {
       { key: "catalog", icon: "grid", title: "Catalogue", text: "Produits, photos et unités", testid: "seg-catalog" },
       { key: "notifications", icon: "bell", title: "Notifications", text: pushText, testid: "seg-notifications" },
       { key: "backups", icon: "shield", title: "Sauvegardes", text: bs.text, testid: "seg-backups" },
+      ...(s.me?.primary ? [{ key: "reset" as Section, icon: "shield" as IconName, title: "Réinitialiser la famille", text: "Suppression définitive, pour recommencer", testid: "seg-reset" }] : []),
       { key: "about", icon: "info", title: "À propos et version", text: "Version installée, mises à jour", testid: "seg-about" },
     ];
     return (
@@ -73,12 +74,13 @@ export function Settings({ engine, s }: { engine: Engine; s: State }) {
       </>
     );
   }
-  const titles: Record<Section, string> = { profiles: "Famille et profils", recovery: "Adresse de récupération", catalog: "Catalogue", notifications: "Notifications", backups: "Sauvegardes", about: "À propos et version" };
+  const titles: Record<Section, string> = { profiles: "Famille et profils", recovery: "Adresse de récupération", reset: "Réinitialiser la famille", catalog: "Catalogue", notifications: "Notifications", backups: "Sauvegardes", about: "À propos et version" };
   return (
     <>
       <PageHead engine={engine} s={s} title={titles[section]} onBack={() => setSection(null)} backLabel="Réglages" backTestId="settings-back" subtitle={section === "profiles" && s.me?.family ? <>Code de la famille : <b data-testid="family-code">{s.me.family.code}</b></> : undefined} />
       {section === "profiles" && <Profiles me={s.me!.id} />}
       {section === "recovery" && <Recovery />}
+      {section === "reset" && <ResetFamily engine={engine} />}
       {section === "catalog" && <CatalogAdmin engine={engine} />}
       {section === "notifications" && <div className="menu"><NotificationSettings /></div>}
       {section === "backups" && <BackupCard st={backup} />}
@@ -242,12 +244,59 @@ function AddProfile({ onClose, onCreated }: { onClose(): void; onCreated(name: s
   );
 }
 
+/** Zone dangereuse — suppression définitive de la famille (administrateur principal). Identification, décompte, mot de passe ET code à retaper. */
+function ResetFamily({ engine }: { engine: Engine }) {
+  const [pv, setPv] = useState<ResetPreview | null>(null);
+  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [sure, setSure] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => void api.resetPreview().then(setPv).catch((e) => setError(errText(e))), []);
+  if (!pv) return <p className="empty">{error ?? "Chargement…"}</p>;
+  const ready = pv.ready.mailConfigured && pv.ready.recoveryEmailVerified;
+  const c = pv.counts;
+  return (
+    <div className="panel danger" data-testid="reset-panel">
+      <p><b>Famille « {pv.family.name} »</b> — code <b data-testid="reset-code">{pv.family.code}</b></p>
+      <p className="muted">{pv.family.profiles.map((p) => `${p.displayName} (${ROLE_LABEL[p.role as Role]}${p.primary ? ", principal" : ""})`).join(" · ")}</p>
+      <p data-testid="reset-counts">Sera supprimé : {c.profiles} profil(s), {c.lists} liste(s) et leurs achats et historiques, {c.products} article(s) de la famille, {c.ownedPhotos} photo(s) propre(s), {c.pushSubscriptions} abonnement(s) aux notifications, l'adresse de récupération et les liens associés. Les accès de tous les profils sont fermés.</p>
+      <p className="muted">Conservés : le catalogue partagé (243 produits et leurs photos) et toutes les autres familles. Les sauvegardes déjà faites contiennent encore cette famille jusqu'à leur expiration.</p>
+      {!ready && (
+        <p className="error" role="alert" data-testid="reset-notready">
+          {!pv.ready.mailConfigured ? "L'envoi d'e-mails n'est pas configuré sur le serveur." : "L'adresse de récupération n'est pas vérifiée."} Vérifiez d'abord que l'envoi d'e-mails fonctionne (Réglages → Adresse de récupération → e-mail de test) : la nouvelle installation en dépend.
+        </p>
+      )}
+      <form className="form" onSubmit={async (e) => {
+        e.preventDefault();
+        setBusy(true);
+        setError(null);
+        try {
+          const r = await api.resetFamily(password, code);
+          // The family is gone: the app leaves at once (its own session is closed) and the new single-use token is kept on the installation form.
+          await engine.afterFamilyReset(r.installToken);
+        } catch (err) {
+          setError(err instanceof ApiError && err.code === "wrong_password" ? "Mot de passe incorrect." : err instanceof ApiError && err.code === "code_mismatch" ? "Le code famille saisi ne correspond pas." : errText(err));
+          setBusy(false);
+        }
+      }}>
+        <label className="field">Votre mot de passe<input type="password" maxLength={6} autoComplete="current-password" value={password} onChange={(e) => setPassword(clean(e.target.value))} required data-testid="reset-password" /></label>
+        <label className="field">Retapez le code famille ({pv.family.code})<input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} autoCapitalize="characters" autoComplete="off" required data-testid="reset-confirm-code" /></label>
+        <label className="check"><input type="checkbox" checked={sure} onChange={(e) => setSure(e.target.checked)} data-testid="reset-sure" /> Je comprends que c'est définitif et irréversible.</label>
+        {error && <p className="error" role="alert" data-testid="reset-error">{error}</p>}
+        <button className="btn btn--danger btn--big" disabled={busy || !ready || !sure || !six(password) || code.trim().toUpperCase() !== pv.family.code} data-testid="reset-submit">{busy ? "Suppression…" : "Supprimer définitivement la famille"}</button>
+      </form>
+    </div>
+  );
+}
+
 const MAIL_STATE: Record<string, string> = {
   queued: "en cours d'envoi",
   accepted: "accepté par le service d'envoi (Brevo) — réception dans la boîte non confirmée",
   delivered: "remis au serveur de la boîte mail (à vérifier dans vos courriers, y compris indésirables)",
   bounced: "rejeté par la boîte du destinataire — vérifiez l'adresse",
   failed: "refusé par le service d'envoi",
+  unknown: "pas de réponse du service d'envoi à temps : le message est peut-être parti",
   not_configured: "envoi d'e-mails non configuré sur le serveur",
 };
 
@@ -277,12 +326,13 @@ function Recovery() {
       <p><span className={`statebadge ${st.verified ? "" : "statebadge--bad"}`} data-testid="recovery-state"><Icon name={st.verified ? "check" : "info"} size={16} /> {badge}</span></p>
       {st.email && <p data-testid="recovery-email">{st.email}</p>}
       {!st.configured && <p className="muted" data-testid="recovery-unconfigured">L'envoi d'e-mails n'est pas encore configuré sur le serveur : l'adresse peut être enregistrée mais aucun message ne partira.</p>}
-      {st.lastMail && <p className="muted" data-testid="recovery-lastmail">Dernier e-mail de vérification : {MAIL_STATE[st.lastMail.status]} ({fmtDateTime(st.lastMail.at)}).</p>}
+      {st.lastMail && <p className="muted" data-testid="recovery-lastmail">Dernier e-mail ({st.lastMail.kind === "test" ? "test" : "vérification"}) : {MAIL_STATE[st.lastMail.status]} ({fmtDateTime(st.lastMail.at)}).</p>}
       {st.canEdit ? (
         <form className="form" onSubmit={(e) => { e.preventDefault(); void run(() => api.setRecoveryEmail(email.trim())); }}>
           <label className="field">Adresse e-mail de récupération<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" maxLength={254} required data-testid="recovery-input" /></label>
           <button className="btn btn--primary btn--big" disabled={busy || !email.includes("@")} data-testid="recovery-save">{st.email ? "Enregistrer et envoyer le lien de vérification" : "Enregistrer et vérifier"}</button>
           {st.email && !st.verified && <button type="button" className="btn" disabled={busy} data-testid="recovery-resend" onClick={() => void run(() => api.resendRecovery())}>Renvoyer le lien</button>}
+          {st.verified && <button type="button" className="btn" disabled={busy || !st.configured} data-testid="recovery-test" onClick={() => void run(() => api.testRecovery())}>Envoyer un e-mail de test</button>}
         </form>
       ) : (
         <p className="muted">Seul l'administrateur principal gère l'adresse de récupération de la famille.</p>
