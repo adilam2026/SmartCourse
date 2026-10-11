@@ -171,7 +171,7 @@ test.describe("administration du catalogue : ajouter et modifier un article", ()
     const staffCtx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
     const staff = await staffCtx.newPage();
     await uiLogin(staff, f);
-    const tom = staff.getByTestId(`card-${f.products["Tomates"]}`);
+    const tom = staff.getByTestId(`wrap-${f.products["Tomates"]}`);
     await expect(tom).toContainText("désactivé");
     await expect(staff.getByTestId(`card-${f.products["Carottes"]}`)).toHaveCount(0);
     const parentCtx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });

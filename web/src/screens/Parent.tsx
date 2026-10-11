@@ -22,6 +22,7 @@ type Tab = "current" | "history" | "stats" | "settings";
 export function ParentApp({ engine, s }: { engine: Engine; s: State }) {
   const [tab, setTab] = useState<Tab>("current");
   const [editing, setEditing] = useState(false);
+  const [archiveId, setArchiveId] = useState<string | null>(null); // a closed list opened from a product's purchase history
   const isAdmin = s.me?.role === "admin";
   const isEditing = editing && s.list?.status === "active";
   useBackLayer(isEditing, () => setEditing(false)); // Back leaves the edit screen
@@ -31,8 +32,8 @@ export function ParentApp({ engine, s }: { engine: Engine; s: State }) {
     <div className="parent">
       <div className="parent__body">
         {tab === "current" && <Current engine={engine} s={s} onEdit={() => setEditing(true)} />}
-        {tab === "history" && <History categories={s.catalog?.categories ?? []} />}
-        {tab === "stats" && <Stats />}
+        {tab === "history" && <History categories={s.catalog?.categories ?? []} openId={archiveId} onOpened={() => setArchiveId(null)} />}
+        {tab === "stats" && <Stats onOpenList={(id, status) => { if (status === "active") setTab("current"); else { setArchiveId(id); setTab("history"); } }} />}
         {tab === "settings" && isAdmin && <Settings engine={engine} s={s} />}
       </div>
       <nav className="tabbar" aria-label="Navigation">
@@ -117,9 +118,9 @@ function Current({ engine, s, onEdit }: { engine: Engine; s: State; onEdit(): vo
             <li key={i.id} className="row" data-testid={`row-${i.productId}`}>
               <Thumb photoUrl={i.photoUrl} category={i.category} />
               <button className="row__main" data-testid={`detail-${i.productId}`} aria-label={`Détail des modifications de ${i.name}`} onClick={() => setDetail(i.id)}>
-                <b>{i.name}<span className="qtychip" data-testid={`qty-${i.productId}`}>{fmtQty(i.quantity, i.unit)}</span></b>
-                {i.brand && <small>{i.brand}</small>}
-                {!i.productActive && <small>désactivé</small>}
+                <b>{i.name}</b>
+                <span className="rowqty" data-testid={`qty-${i.productId}`}>{fmtQty(i.quantity, i.unit)}</span>
+                {(i.brand || !i.productActive) && <small>{[i.brand, i.productActive ? null : "désactivé"].filter(Boolean).join(" · ")}</small>}
                 <RowMeta item={i} />
               </button>
               <button className="btn btn--primary" data-testid={`buy-${i.productId}`} disabled={busy === i.id} onClick={() => void buy(i.id)}>Acheté</button>
@@ -137,7 +138,8 @@ function Current({ engine, s, onEdit }: { engine: Engine; s: State; onEdit(): vo
             <li key={i.id} className="row row--bought" data-testid={`row-${i.productId}`}>
               <Thumb photoUrl={i.photoUrl} category={i.category} />
               <button className="row__main" data-testid={`detail-${i.productId}`} aria-label={`Détail de ${i.name}`} onClick={() => setDetail(i.id)}>
-                <b>{i.name}<span className="qtychip">{fmtQty(i.purchase?.quantity ?? i.quantity, i.purchase?.unit ?? i.unit)}</span></b>
+                <b>{i.name}</b>
+                <span className="rowqty" data-testid={`boughtqty-${i.productId}`}>{fmtQty(i.purchase?.quantity ?? i.quantity, i.purchase?.unit ?? i.unit)}</span>
                 <small data-testid={`by-${i.productId}`}>Acheté par {i.purchase?.by.displayName} · {i.purchase ? fmtWhen(i.purchase.at) : ""}</small>
               </button>
               <button className="btn btn--ghost" data-testid={`correct-${i.productId}`} onClick={() => setCorrecting(i)}>Corriger</button>

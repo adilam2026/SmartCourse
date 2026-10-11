@@ -1,9 +1,9 @@
 import type { Unit } from "./types";
 
-export const UNITS: Unit[] = ["piece", "paquet", "bouteille", "kg"];
-const SINGULAR: Record<Unit, string> = { piece: "pièce", paquet: "paquet", bouteille: "bouteille", kg: "kg" };
-const PLURAL: Record<Unit, string> = { piece: "pièces", paquet: "paquets", bouteille: "bouteilles", kg: "kg" };
-export const UNIT_CHOICE: Record<Unit, string> = { piece: "Pièce", paquet: "Paquet", bouteille: "Bouteille", kg: "Kilogramme (kg)" };
+export const UNITS: Unit[] = ["piece", "paquet", "bouteille", "brique", "pot", "boite", "kg"];
+const SINGULAR: Record<Unit, string> = { piece: "pièce", paquet: "paquet", bouteille: "bouteille", brique: "brique", pot: "pot", boite: "boîte", kg: "kg" };
+const PLURAL: Record<Unit, string> = { piece: "pièces", paquet: "paquets", bouteille: "bouteilles", brique: "briques", pot: "pots", boite: "boîtes", kg: "kg" };
+export const UNIT_CHOICE: Record<Unit, string> = { piece: "Pièce", paquet: "Paquet", bouteille: "Bouteille", brique: "Brique", pot: "Pot", boite: "Boîte", kg: "Kilogramme (kg)" };
 
 /** Counter step: whole units go by 1, kilograms by half a kilo (a typed value may have any decimals). */
 export const stepOf = (unit: Unit): number => (unit === "kg" ? 0.5 : 1);

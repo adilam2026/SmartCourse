@@ -36,7 +36,7 @@ test("relecture périodique légère : catalogue téléchargé seulement quand i
   const before = calls.catalog;
   const created = await f.adil.post("/api/products", { data: { name: "Article relecture", category: "pain" } });
   const id = (await created.json()).product.id as string;
-  const card = page.getByTestId(`card-${id}`);
+  const card = page.getByTestId(`wrap-${id}`);
   await expect(card).toBeAttached({ timeout: 30_000 });
   await expect(card).toContainText("Article relecture");
   expect(calls.catalog - before).toBe(1);

@@ -14,8 +14,8 @@ import type { SseHub } from "./hub.js";
  * list -> item -> purchase, so there is no deadlock cycle.
  */
 
-export type Unit = "piece" | "paquet" | "bouteille" | "kg";
-export const UNITS: readonly Unit[] = ["piece", "paquet", "bouteille", "kg"];
+export type Unit = "piece" | "paquet" | "bouteille" | "brique" | "pot" | "boite" | "kg";
+export const UNITS: readonly Unit[] = ["piece", "paquet", "bouteille", "brique", "pot", "boite", "kg"];
 
 export type OpIn =
   | { opId: string; type: "add"; productId: string; quantity?: number }

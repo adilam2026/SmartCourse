@@ -23,26 +23,27 @@ export function NoList({ engine, s }: { engine: Engine; s: State }) {
   );
 }
 
+export type SyncKind = "sending" | "todo" | "waiting" | "offline" | "ok";
 /**
- * One line, three distinct situations, never mixed up:
- *   - chosen but not sent yet  → "N à valider" (the counter below says "pas encore enregistrés")
- *   - validated, server has not confirmed → "⏳ En attente de synchronisation"
- *   - confirmed by the server → "✓ Enregistré sur le serveur" (only right after a confirmation, never while offline)
+ * ONE short indication in the header, in plain words, never two at once:
+ *   - choices not validated yet                    → « 3 modifications à valider » (the only thing shown in orange)
+ *   - validated, the server has not received them  → « En attente de connexion »
+ *   - nothing to send, phone offline               → « Hors connexion »
+ *   - nothing to send                              → « Liste à jour »
  */
-export function syncLine(s: State, unsent: number): string {
+export function syncState(s: State, unsent: number): { kind: SyncKind; text: string } {
   const queued = s.batches.reduce((n, b) => n + b.ops.length, 0);
-  if (s.sending) return "Envoi en cours…";
-  const parts: string[] = [];
-  if (unsent > 0) parts.push(`${unsent} à valider`);
-  if (queued > 0) parts.push("⏳ En attente"); // full wording in the banner right below
-  if (parts.length > 0) return parts.join(" · ");
-  if (s.conn === "offline") return "Dernière liste connue";
-  return s.justSynced ? "✓ Enregistré sur le serveur" : "";
+  if (s.sending) return { kind: "sending", text: "Envoi en cours…" };
+  if (unsent > 0) return { kind: "todo", text: `${unsent} modification${unsent > 1 ? "s" : ""} à valider` };
+  if (queued > 0) return { kind: "waiting", text: "En attente de connexion" };
+  if (s.conn === "offline") return { kind: "offline", text: "Hors connexion" };
+  return { kind: "ok", text: "Liste à jour" };
 }
 
 export function TopBar({ engine, s, validate, onBack, title = "Courses" }: { engine: Engine; s: State; validate: boolean; onBack?: () => void; title?: string }) {
   const [open, setOpen] = useState(false);
   const pending = Object.keys(s.toggles).length;
+  const sync = syncState(s, pending);
   const label = s.sending ? "Enregistrement…" : "Valider";
   const disabled = s.sending || pending === 0;
   return (
@@ -56,8 +57,8 @@ export function TopBar({ engine, s, validate, onBack, title = "Courses" }: { eng
       )}
       <div className="topbar__title">
         <strong>{title}</strong>
-        <span className="muted" data-testid="sync-state">
-          {syncLine(s, pending)}
+        <span className={`syncstate syncstate--${sync.kind}`} data-testid="sync-state" data-kind={sync.kind}>
+          {sync.text}
         </span>
       </div>
       {validate && (
@@ -136,9 +137,6 @@ export function StaffScreen({ engine, s, onBack }: { engine: Engine; s: State; o
     return line && projectedQty(list, batches, productId) === line.quantity ? "saved" : "unsaved";
   };
 
-  const all = sections.flatMap((c) => c.products.map((p) => stateOf(p.id)));
-  const confirmed = all.filter((x) => x === "saved" || x === "bought").length; // known to the server
-  const notYet = all.filter((x) => x === "unsaved" || x === "removing").length; // chosen here, not confirmed
   const tap = (id: string) => void engine.toggle(id);
   const setQty = (id: string, q: number) => void engine.setQuantity(id, q);
   const again = (id: string) => void engine.requestAgain(id);
@@ -203,10 +201,6 @@ export function StaffScreen({ engine, s, onBack }: { engine: Engine; s: State; o
             <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="🔎 Chercher un produit" aria-label="Chercher un produit dans toutes les catégories" data-testid="catalog-search" />
           </label>
         </div>
-        <p className="count" data-testid="count">
-          <span className="count__ok" data-testid="count-saved">✓ {confirmed} enregistré{confirmed > 1 ? "s" : ""} sur le serveur</span>
-          {notYet > 0 && <span className="count__todo" data-testid="count-unsaved">● {notYet} pas encore enregistré{notYet > 1 ? "s" : ""}</span>}
-        </p>
         {searching ? (
           found.length === 0 ? (
             <p className="empty" data-testid="search-empty">Aucun produit « {query.trim()} ».</p>
@@ -237,14 +231,16 @@ export function StaffScreen({ engine, s, onBack }: { engine: Engine; s: State; o
           <div className="catblocks" data-testid="category-blocks">
             {sections.map((c) => {
               const n = selectedIn(c);
-              const pics = c.products.filter((p) => p.photoUrl).slice(0, 4);
+              // Two representative photos: the selected products first, then the others.
+              const withPhoto = c.products.filter((p) => p.photoUrl);
+              const pics = [...withPhoto.filter((p) => { const st = stateOf(p.id); return st === "saved" || st === "unsaved"; }), ...withPhoto].filter((p, i, all) => all.indexOf(p) === i).slice(0, 2);
               return (
                 <button key={c.key} type="button" className={`catblock ${n > 0 ? "catblock--sel" : ""}`} data-testid={`catblock-${c.key}`} aria-label={`${c.label}, ${c.products.length} produit${c.products.length > 1 ? "s" : ""}${n > 0 ? `, ${n} sélectionné${n > 1 ? "s" : ""}` : ""}`} onClick={() => setOpenCat(c.key)}>
-                  {n > 0 && <span className="catblock__count" data-testid={`catcount-${c.key}`} aria-hidden="true">{n}</span>}
                   <span className="catblock__mosaic" aria-hidden="true">
                     {pics.length > 0 ? pics.map((p) => <img key={p.id} src={p.photoUrl!} alt="" loading="lazy" decoding="async" />) : <span>{CATEGORY_EMOJI[c.key] ?? "•"}</span>}
                   </span>
-                  <span className="catblock__title"><span className="catblock__emoji" aria-hidden="true">{CATEGORY_EMOJI[c.key]} </span>{c.label}</span>
+                  <span className="catblock__title">{c.label}</span>
+                  {n > 0 ? <span className="catblock__count" data-testid={`catcount-${c.key}`} aria-hidden="true">{n} sélectionné{n > 1 ? "s" : ""}</span> : <span className="catblock__none" aria-hidden="true">{c.products.length} produit{c.products.length > 1 ? "s" : ""}</span>}
                 </button>
               );
             })}

@@ -18,6 +18,12 @@ export class ApiError extends Error {
   }
 }
 
+function statsParams(q: StatsQuery): string {
+  const p = new URLSearchParams();
+  for (const [k, v] of Object.entries(q)) if (v) p.set(k, String(v));
+  return p.toString();
+}
+
 const TIMEOUT_MS = 12_000;
 
 async function request<T>(method: string, url: string, body?: unknown): Promise<T> {
@@ -60,7 +66,8 @@ export const api = {
   activeList: () => request<{ list: ListView | null; catalogRev?: number }>("GET", "/api/lists/active"),
   postOps: (listId: string, ops: Op[], batch?: { id: string; at?: string }) =>
     request<{ results: OpResult[]; list: ListView }>("POST", `/api/lists/${listId}/ops`, { ops, ...(batch ? { batch } : {}) }),
-  purchaseStats: (month?: string) => request<PurchaseStats>("GET", `/api/stats/purchases${month ? `?month=${month}` : ""}`),
+  purchaseStats: (q: StatsQuery = {}) => request<PurchaseStats>("GET", `/api/stats/purchases?${statsParams(q)}`),
+  productStats: (id: string, q: Pick<StatsQuery, "period" | "month"> = {}) => request<ProductStats>("GET", `/api/stats/products/${id}?${statsParams(q)}`),
   createList: () => request<{ list: ListView }>("POST", "/api/lists"),
   closeList: (listId: string) => request<{ status: string; remaining: number; purchased: number }>("POST", `/api/lists/${listId}/close`),
   history: () => request<{ lists: HistoryEntry[] }>("GET", "/api/lists"),
@@ -98,7 +105,11 @@ export interface ProductPatch {
   resetImage?: boolean;
 }
 
-export interface StatsCell {
+export type StatsPeriod = "month" | "last3";
+export type StatsSort = "frequency" | "last" | "name";
+/** One unit of one product: how many purchases, how much (null = never recorded) and how many purchases have no quantity. */
+export interface StatsUnitCell {
+  unit: Unit | null;
   purchases: number;
   quantity: number | null;
   unknownQuantity: number;
@@ -110,18 +121,56 @@ export interface StatsRow {
   active: boolean;
   category: string;
   categoryLabel: string;
-  unit: Unit | null;
-  current: StatsCell;
-  previous: StatsCell;
+  photoUrl: string | null;
+  purchases: number;
+  lastPurchaseAt: string | null;
+  units: StatsUnitCell[];
+  /** Same product over the equivalent earlier period; null when there is nothing reliable to compare with. */
+  compare: { purchases: number; units: StatsUnitCell[] } | null;
+}
+export interface StatsWindow {
+  from: string;
+  to: string;
+  fromDay: string; // YYYY-MM-DD, first day included (Africa/Casablanca)
+  toDay: string; // last day included
 }
 export interface PurchaseStats {
+  period: StatsPeriod;
   month: string;
-  previousMonth: string;
+  currentMonth: string;
   timeZone: string;
   months: string[];
+  window: StatsWindow & { partial: boolean };
+  comparison: StatsWindow & { available: boolean };
+  categories: { key: string; label: string }[];
   rows: StatsRow[];
-  totals: { purchases: number; previousPurchases: number };
+  totals: { purchases: number; products: number; comparePurchases: number | null };
   spending: null;
+}
+export interface StatsQuery {
+  period?: StatsPeriod;
+  month?: string;
+  category?: string;
+  q?: string;
+  sort?: StatsSort;
+}
+export interface ProductPurchase {
+  id: string;
+  at: string;
+  quantity: number | null;
+  unit: Unit | null;
+  by: { id: string; displayName: string };
+  corrected: { at: string; by: string; reason: string | null } | null;
+  list: { id: string; status: string; createdAt: string; closedAt: string | null };
+}
+export interface ProductStats {
+  product: { id: string; name: string; brand: string | null; active: boolean; category: string; categoryLabel: string; photoUrl: string | null };
+  period: StatsPeriod;
+  month: string;
+  window: StatsWindow & { partial: boolean };
+  summary: { purchases: number; units: StatsUnitCell[]; lastPurchaseAt: string | null };
+  purchases: ProductPurchase[];
+  months: { month: string; covered: boolean; units: StatsUnitCell[] }[];
 }
 
 export interface BackupStatus {

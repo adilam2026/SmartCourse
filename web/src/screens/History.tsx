@@ -9,10 +9,15 @@ import { ValidationHistory } from "../components/ValidationHistory";
 import { fmtQty } from "../units";
 import type { ListView } from "../types";
 
-export function History({ categories }: { categories: { key: string; label: string }[] }) {
+export function History({ categories, openId, onOpened }: { categories: { key: string; label: string }[]; openId?: string | null; onOpened?(): void }) {
   const [entries, setEntries] = useState<HistoryEntry[] | null>(null);
   const [open, setOpen] = useState<ListView | null>(null);
   const [error, setError] = useState(false);
+  // Opened from a product's purchase history: go straight to that closed list.
+  useEffect(() => {
+    if (!openId) return;
+    api.listById(openId).then((r) => setOpen(r.list)).catch(() => setError(true)).finally(() => onOpened?.());
+  }, [openId, onOpened]);
   useEffect(() => {
     api.history().then((r) => setEntries(r.lists)).catch(() => setError(true));
   }, []);
@@ -62,7 +67,7 @@ function Archive({ list, categories, onBack }: { list: ListView; categories: { k
         row={(i) => (
           <li key={i.id} className="row row--bought">
             <Thumb photoUrl={i.photoUrl} category={i.category} />
-            <span className="row__name">{i.name}<span className="qtychip">{fmtQty(i.purchase?.quantity ?? i.quantity, i.purchase?.unit ?? i.unit)}</span>{i.brand && <small>{i.brand}</small>}<small>Acheté par {i.purchase?.by.displayName} · {i.purchase ? fmtWhen(i.purchase.at) : ""}</small></span>
+            <span className="row__name">{i.name}<span className="rowqty">{fmtQty(i.purchase?.quantity ?? i.quantity, i.purchase?.unit ?? i.unit)}</span>{i.brand && <small>{i.brand}</small>}<small>Acheté par {i.purchase?.by.displayName} · {i.purchase ? fmtWhen(i.purchase.at) : ""}</small></span>
           </li>
         )}
       />
@@ -73,7 +78,7 @@ function Archive({ list, categories, onBack }: { list: ListView; categories: { k
         row={(i) => (
           <li key={i.id} className="row">
             <Thumb photoUrl={i.photoUrl} category={i.category} />
-            <span className="row__name">{i.name}<span className="qtychip">{fmtQty(i.quantity, i.unit)}</span>{i.brand && <small>{i.brand}</small>}<RowMeta item={i} /></span>
+            <span className="row__name">{i.name}<span className="rowqty">{fmtQty(i.quantity, i.unit)}</span>{i.brand && <small>{i.brand}</small>}<RowMeta item={i} /></span>
           </li>
         )}
       />

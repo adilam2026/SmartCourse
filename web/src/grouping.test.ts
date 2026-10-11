@@ -118,23 +118,45 @@ describe("dates en Africa/Casablanca", () => {
   });
 });
 
-import { purchasesDelta, quantityText } from "./stats";
+import { lastPurchaseText, purchasesLine, shiftMonth, unitsText } from "./stats";
+import { fmtDayRange, fmtDayRangeShort } from "./format";
+
+const cell = (unit: any, purchases: number, quantity: number | null, unknownQuantity = 0) => ({ unit, purchases, quantity, unknownQuantity });
 
 describe("statistiques : textes", () => {
-  it("comparaison de fréquence avec le mois précédent", () => {
-    expect(purchasesDelta(3, 1, "septembre 2026")).toBe("+2 par rapport à septembre 2026 (1)");
-    expect(purchasesDelta(1, 3, "septembre 2026")).toBe("−2 par rapport à septembre 2026 (3)");
-    expect(purchasesDelta(2, 2, "septembre 2026")).toBe("comme en septembre 2026 (2)");
-    expect(purchasesDelta(2, 0, "septembre 2026")).toMatch(/nouveau/);
-    expect(purchasesDelta(0, 4, "septembre 2026")).toMatch(/aucun achat ce mois-ci \(4/);
-    expect(purchasesDelta(0, 0, "x")).toBe("");
+  it("« 3 achats · 5 briques » : une seule unité par quantité, jamais d'addition entre unités", () => {
+    expect(purchasesLine(3, [cell("brique", 3, 5)])).toBe("3 achats · 5 briques");
+    expect(purchasesLine(1, [cell("brique", 1, 1)])).toBe("1 achat · 1 brique");
+    expect(purchasesLine(3, [cell("kg", 2, 3.5), cell("paquet", 1, 2)])).toBe("3 achats · 3,5 kg + 2 paquets");
+    expect(unitsText([cell("piece", 2, 3), cell("boite", 1, 1)])).toBe("3 pièces + 1 boîte");
   });
-  it("quantité : une seule unité par ligne ; les achats sans quantité sont signalés, pas inventés", () => {
-    expect(quantityText({ purchases: 2, quantity: 3.5, unknownQuantity: 0 }, "kg")).toBe("3,5 kg");
-    expect(quantityText({ purchases: 2, quantity: 6, unknownQuantity: 0 }, "paquet")).toBe("6 paquets");
-    expect(quantityText({ purchases: 1, quantity: null, unknownQuantity: 1 }, null)).toBe("quantité non enregistrée");
-    expect(quantityText({ purchases: 3, quantity: 2, unknownQuantity: 1 }, "kg")).toBe("2 kg + 1 achat sans quantité");
-    expect(quantityText({ purchases: 0, quantity: null, unknownQuantity: 0 }, "kg")).toBe("—");
+  it("les anciens achats sans quantité sont signalés, pas inventés", () => {
+    expect(unitsText([cell(null, 1, null, 1)])).toBe("quantité non enregistrée");
+    expect(unitsText([cell("kg", 3, 2, 1)])).toBe("2 kg + 1 achat sans quantité");
+    expect(unitsText([cell("kg", 3, 2, 2), cell(null, 2, null, 2)])).toBe("2 kg + 4 achats sans quantité");
+    expect(unitsText([])).toBe("—");
+  });
+  it("« Dernier achat : 10 octobre » (l'année n'est ajoutée que si ce n'est pas l'année en cours)", () => {
+    const now = new Date("2026-10-20T10:00:00Z");
+    expect(lastPurchaseText("2026-10-10T09:00:00Z", now)).toBe("Dernier achat : 10 octobre");
+    expect(lastPurchaseText("2025-12-31T09:00:00Z", now)).toBe("Dernier achat : 31 décembre 2025");
+    expect(lastPurchaseText(null)).toBe("");
+  });
+  it("dates comparées lisibles", () => {
+    expect(fmtDayRange("2026-10-01", "2026-10-11")).toBe("du 1 au 11 octobre 2026");
+    expect(fmtDayRange("2026-08-01", "2026-10-11")).toBe("du 1 août au 11 octobre 2026");
+    expect(fmtDayRangeShort("2026-09-01", "2026-09-11")).toBe("1 au 11 septembre");
+    expect(shiftMonth("2026-01", -1)).toBe("2025-12");
+    expect(shiftMonth("2026-12", 1)).toBe("2027-01");
+  });
+  it("singulier et pluriel des unités", () => {
+    expect(fmtQty(1, "boite")).toBe("1 boîte");
+    expect(fmtQty(2, "boite")).toBe("2 boîtes");
+    expect(fmtQty(2, "pot")).toBe("2 pots");
+    expect(fmtQty(1, "brique")).toBe("1 brique");
+    expect(fmtQty(6, "bouteille")).toBe("6 bouteilles");
+    expect(fmtQty(1.5, "kg")).toBe("1,5 kg");
+    expect(fmtQty(1, "piece")).toBe("1 pièce");
   });
 });
 

@@ -37,49 +37,54 @@ export const ProductCard = memo(function ProductCard({ productId, name, brand, p
   const [broken, setBroken] = useState(false);
   const showPhoto = photoUrl && !broken;
   const selected = state === "saved" || state === "unsaved";
+  const tap = () => onTap(productId);
   return (
     <div className={`cardwrap cardwrap--${state}`} data-testid={`wrap-${productId}`}>
-      <button
-        type="button"
-        className={`card card--${state}`}
-        aria-pressed={state !== "off" && state !== "removing"}
-        aria-label={`${name}${LABEL[state]}${again ? ", nouvelle demande" : ""}${qty !== undefined && selected ? `, ${fmtQty(qty, unit)}` : ""}`}
-        data-testid={`card-${productId}`}
-        data-state={state}
-        onClick={() => onTap(productId)}
-      >
-        <span className="card__photo">
-          {showPhoto ? (
-            <img src={photoUrl} alt="" loading="lazy" decoding="async" onError={() => setBroken(true)} />
-          ) : (
-            // No photo yet: a neutral tile with the name, never a stand-in picture.
-            <span className="card__noimg" aria-hidden="true">{emoji ?? name.slice(0, 1)}</span>
-          )}
-          {state === "bought" ? (
-            <span className="badge badge--bought" aria-hidden="true">🔒 Acheté{boughtQty ? ` · ${fmtQty(boughtQty.qty, boughtQty.unit)}` : ""}</span>
-          ) : state === "saved" ? (
-            <span className="badge badge--saved" aria-hidden="true">✓</span>
-          ) : state === "unsaved" ? (
-            <span className="badge badge--unsaved" aria-hidden="true">✓</span>
-          ) : state === "removing" ? (
-            <span className="badge badge--removing" aria-hidden="true">✕</span>
-          ) : (
-            <span className="badge badge--off" aria-hidden="true" />
-          )}
-        </span>
-        <span className="card__name">
-          {name}
-          {brand ? <small>{brand}</small> : null}
-          {inactive ? <small>désactivé</small> : null}
-          {again ? <small className="card__again">Nouvelle demande</small> : null}
-        </span>
-      </button>
-      {selected && qty !== undefined && onQty && <QtyCounter productId={productId} name={name} unit={unit} qty={qty} onChange={onQty} />}
-      {state === "bought" && onAgain && (
-        <button type="button" className="btn btn--small again" data-testid={`again-${productId}`} onClick={() => onAgain(productId)}>
-          Nouvelle demande
+      {/* The photo area also carries the counter (or « Nouvelle demande »), drawn over its lower edge: the card never grows. */}
+      <div className="card__media">
+        <button
+          type="button"
+          className={`card card--${state}`}
+          aria-pressed={state !== "off" && state !== "removing"}
+          aria-label={`${name}${LABEL[state]}${again ? ", nouvelle demande" : ""}${qty !== undefined && selected ? `, ${fmtQty(qty, unit)}` : ""}`}
+          data-testid={`card-${productId}`}
+          data-state={state}
+          onClick={tap}
+        >
+          <span className="card__photo">
+            {showPhoto ? (
+              <img src={photoUrl} alt="" loading="lazy" decoding="async" onError={() => setBroken(true)} />
+            ) : (
+              // No photo yet: a neutral tile with the name, never a stand-in picture.
+              <span className="card__noimg" aria-hidden="true">{emoji ?? name.slice(0, 1)}</span>
+            )}
+            {state === "bought" ? (
+              <span className="badge badge--bought" aria-hidden="true">🔒 Acheté{boughtQty ? ` · ${fmtQty(boughtQty.qty, boughtQty.unit)}` : ""}</span>
+            ) : state === "saved" ? (
+              <span className="badge badge--saved" aria-hidden="true">✓</span>
+            ) : state === "unsaved" ? (
+              <span className="badge badge--unsaved" aria-hidden="true">✓</span>
+            ) : state === "removing" ? (
+              <span className="badge badge--removing" aria-hidden="true">✕</span>
+            ) : (
+              <span className="badge badge--off" aria-hidden="true" />
+            )}
+          </span>
         </button>
-      )}
+        {selected && qty !== undefined && onQty && <QtyCounter productId={productId} name={name} unit={unit} qty={qty} onChange={onQty} />}
+        {state === "bought" && onAgain && (
+          <button type="button" className="btn btn--small again" data-testid={`again-${productId}`} onClick={() => onAgain(productId)}>
+            Nouvelle demande
+          </button>
+        )}
+      </div>
+      {/* Same action as the photo; hidden from assistive technology (the photo button already says everything). */}
+      <button type="button" className="card__name" tabIndex={-1} aria-hidden="true" onClick={tap}>
+        <span className="card__title" title={name}>{name}</span>
+        {brand ? <small>{brand}</small> : null}
+        {inactive ? <small>désactivé</small> : null}
+        {again ? <small className="card__again">Nouvelle demande</small> : null}
+      </button>
     </div>
   );
 });

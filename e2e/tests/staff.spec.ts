@@ -56,7 +56,7 @@ test.describe("parcours du personnel", () => {
     await page.getByTestId("validate").click();
     await expect(card(page, f, "Lait")).toHaveAttribute("data-state", "saved");
     await expect(page.getByTestId("validate")).toBeDisabled();
-    await expect(page.getByTestId("sync-state")).toContainText("Enregistré");
+    await expect(page.getByTestId("sync-state")).toContainText("Liste à jour");
     const list = (await (await f.lamiaa.get("/api/lists/active")).json()).list;
     expect(list.items.map((i: any) => i.name).sort()).toEqual(["Lait", "Riz"]);
     await page.screenshot({ path: "shots/staff-saved.png" });
@@ -95,8 +95,8 @@ test.describe("parcours du personnel", () => {
     await page.getByTestId("validate").click();
     await expect(page.getByTestId("banner-offline")).toBeVisible();
     await expect(page.getByTestId("banner-pending")).toBeVisible();
-    await expect(page.getByTestId("sync-state")).toContainText("En attente");
-    await expect(page.getByTestId("sync-state")).not.toContainText("Enregistré");
+    await expect(page.getByTestId("sync-state")).toContainText("En attente de connexion");
+    await expect(page.getByTestId("sync-state")).not.toContainText("Liste à jour");
     await expect(card(page, f, "Lait")).toHaveAttribute("data-state", "unsaved"); // pas « saved »
     await page.screenshot({ path: "shots/staff-offline-pending.png" });
 
@@ -177,7 +177,7 @@ test.describe("parcours du personnel", () => {
     expect(added.status()).toBe(201);
     await context.setOffline(false);
     await page.evaluate(() => (window as any).__engine.refresh());
-    const bare = page.getByTestId(`card-${(await added.json()).product.id}`);
+    const bare = page.getByTestId(`wrap-${(await added.json()).product.id}`);
     await expect(bare).toContainText("Article sans image");
     await expect(bare.locator("img")).toHaveCount(0);
   });

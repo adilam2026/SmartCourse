@@ -26,7 +26,7 @@ export function Banners({ engine, s }: { engine: Engine; s: State }) {
           )}
           {queued > 0 && (
             <span data-testid="banner-pending">
-              <strong>⏳ En attente de synchronisation :</strong> {queued} choix validé{queued > 1 ? "s" : ""} mais pas encore enregistré{queued > 1 ? "s" : ""} sur le serveur.
+              {queued} modification{queued > 1 ? "s" : ""} validée{queued > 1 ? "s" : ""} : envoi automatique dès que la connexion revient.
             </span>
           )}
         </div>

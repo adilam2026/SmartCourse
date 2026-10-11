@@ -3,11 +3,12 @@ import { copyFileSync, mkdirSync, mkdtempSync, readdirSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
 import { generateInstallToken } from "../src/auth.js";
 import { createPool, type Db } from "../src/db.js";
 import { SseHub } from "../src/hub.js";
+import { statsClock } from "../src/stats-routes.js";
 import { MIGRATIONS_DIR, migrate } from "../src/migrate.js";
 import { closeTestDb, resetData, testDb, testStore } from "./helpers.js";
 
@@ -22,6 +23,8 @@ beforeAll(async () => {
   app = await buildApp({ db, hub: new SseHub(), store: testStore(), loginRateLimit: { max: 10_000, timeWindow: "1 minute" } });
   await app.ready();
 });
+const realNow = statsClock.now;
+afterEach(() => { statsClock.now = realNow; });
 afterAll(async () => {
   await app.close();
   await closeTestDb();
@@ -89,6 +92,23 @@ describe("unités et quantités", () => {
     expect((await app.inject({ method: "PATCH", url: `/api/products/${f.products["Lait"]}`, cookies: f.adil, payload: { unit: "bouteille" } })).json().product.unit).toBe("bouteille");
     expect((await app.inject({ method: "PATCH", url: `/api/products/${f.products["Lait"]}`, cookies: f.adil, payload: { unit: "litre" } })).statusCode).toBe(400);
     expect(lines(await view(f.adil), f.products["Lait"]!)[0]).toMatchObject({ quantity: 2, unit: "piece" });
+  });
+});
+
+describe("unités adaptées (brique, pot, boîte)", () => {
+  it("les nouvelles unités sont admises ; l'ancienne « pièce » n'est jamais convertie ; quantités entières exigées", async () => {
+    const f = await newFamily();
+    await one(f.marie, f.list, op.add(f.products["Lait"]!, 2)); // demandé en « pièce »
+    for (const unit of ["brique", "pot", "boite"]) {
+      expect((await app.inject({ method: "PATCH", url: `/api/products/${f.products["Lait"]}`, cookies: f.adil, payload: { unit } })).json().product.unit).toBe(unit);
+    }
+    // la ligne déjà demandée garde son unité d'origine
+    expect(lines(await view(f.adil), f.products["Lait"]!)[0]).toMatchObject({ quantity: 2, unit: "piece" });
+    // un autre produit demandé après le changement prend la nouvelle unité, en nombres entiers
+    await app.inject({ method: "PATCH", url: `/api/products/${f.products["Riz"]}`, cookies: f.adil, payload: { unit: "brique" } });
+    expect((await one(f.marie, f.list, op.add(f.products["Riz"]!, 1.5))).reason).toBe("bad_quantity");
+    await one(f.marie, f.list, op.add(f.products["Riz"]!, 3));
+    expect(lines(await view(f.adil), f.products["Riz"]!)[0]).toMatchObject({ quantity: 3, unit: "brique" });
   });
 });
 
@@ -443,7 +463,7 @@ describe("Statistiques d'achats", () => {
     await db.query("UPDATE purchases SET purchased_at = $2 WHERE list_item_id = $1 AND voided_at IS NULL", [item.id, when]);
     return { itemId: item.id };
   }
-  const stats = async (c: Cookies, month?: string) => (await app.inject({ method: "GET", url: `/api/stats/purchases${month ? `?month=${month}` : ""}`, cookies: c })).json();
+  const stats = async (c: Cookies, month?: string, extra = "") => (await app.inject({ method: "GET", url: `/api/stats/purchases?${month ? `month=${month}` : ""}${extra}`, cookies: c })).json();
 
   it("réservé aux parents et administrateurs", async () => {
     const f = await newFamily();
@@ -453,7 +473,8 @@ describe("Statistiques d'achats", () => {
     expect((await app.inject({ method: "GET", url: "/api/stats/purchases?month=2026-13", cookies: f.adil })).statusCode).toBe(400);
   });
 
-  it("fréquence et quantité distinctes, mois en Africa/Casablanca, comparaison avec le mois précédent, pas de dépenses", async () => {
+  it("fréquence et quantité distinctes, mois en Africa/Casablanca, comparaison de périodes équivalentes, pas de dépenses", async () => {
+    statsClock.now = () => new Date("2026-11-20T12:00:00Z"); // octobre est un mois complet
     const f = await newFamily();
     // Fin septembre 23:30 UTC = 00:30 le 1er octobre à Casablanca (UTC+1) : compte pour octobre.
     await buy(f, "Tomates", 2, "2026-09-30T23:30:00Z");
@@ -462,15 +483,98 @@ describe("Statistiques d'achats", () => {
     await buy(f, "Lait", 2, "2026-09-15T10:00:00Z");
     await buy(f, "Tomates", 4, "2026-09-10T10:00:00Z");
     await buy(f, "Riz", 1, "2026-11-02T10:00:00Z"); // hors des deux mois
+    // l'historique de la famille commence aujourd'hui (liste créée maintenant) : pas de comparaison honnête possible
+    expect((await stats(f.lamiaa, "2026-10")).comparison.available).toBe(false);
+    await db.query("UPDATE lists SET created_at = '2026-08-01T00:00:00Z' WHERE family_id = $1", [f.familyId]);
     const s = await stats(f.lamiaa, "2026-10");
-    expect(s).toMatchObject({ month: "2026-10", previousMonth: "2026-09", timeZone: "Africa/Casablanca", spending: null });
+    expect(s).toMatchObject({ period: "month", month: "2026-10", timeZone: "Africa/Casablanca", spending: null });
+    expect(s.window).toMatchObject({ fromDay: "2026-10-01", toDay: "2026-10-31", partial: false });
+    expect(s.comparison).toMatchObject({ available: true, fromDay: "2026-09-01", toDay: "2026-09-30" });
     const row = (name: string) => s.rows.find((r: any) => r.name === name);
-    expect(row("Tomates")).toMatchObject({ unit: "kg", current: { purchases: 2, quantity: 3.5 }, previous: { purchases: 1, quantity: 4 } });
-    expect(row("Lait")).toMatchObject({ unit: "piece", current: { purchases: 1, quantity: 6 }, previous: { purchases: 1, quantity: 2 } });
+    expect(row("Tomates")).toMatchObject({ purchases: 2, units: [{ unit: "kg", purchases: 2, quantity: 3.5 }], compare: { purchases: 1, units: [{ unit: "kg", quantity: 4 }] } });
+    expect(row("Lait")).toMatchObject({ purchases: 1, units: [{ unit: "piece", quantity: 6 }], compare: { purchases: 1 } });
+    expect(row("Lait").lastPurchaseAt).toBe("2026-10-13T10:00:00.000Z");
     expect(row("Riz")).toBeUndefined();
     expect(s.rows[0].name).toBe("Tomates"); // le plus souvent acheté d'abord (fréquence, pas quantité : Lait a 6 unités)
-    expect(s.totals).toEqual({ purchases: 3, previousPurchases: 2 });
+    expect(s.totals).toMatchObject({ purchases: 3, products: 2, comparePurchases: 2 });
     expect(s.months).toContain("2026-11");
+  });
+
+  it("mois en cours : comparé aux mêmes jours du mois précédent ; trois derniers mois ; jamais de comparaison sans historique ni référence", async () => {
+    statsClock.now = () => new Date("2026-10-11T12:00:00Z");
+    const f = await newFamily();
+    await db.query("UPDATE lists SET created_at = '2026-06-01T00:00:00Z' WHERE family_id = $1", [f.familyId]);
+    await buy(f, "Lait", 2, "2026-10-03T10:00:00Z");
+    await buy(f, "Lait", 1, "2026-10-09T10:00:00Z");
+    await buy(f, "Lait", 4, "2026-09-05T10:00:00Z"); // dans 1–11 septembre
+    await buy(f, "Lait", 9, "2026-09-25T10:00:00Z"); // après le 11 : n'entre pas dans la comparaison
+    await buy(f, "Tomates", 1, "2026-10-04T10:00:00Z"); // rien à la même période en septembre
+    await buy(f, "Riz", 1, "2026-08-04T10:00:00Z");
+    const s = await stats(f.adil, "2026-10");
+    expect(s.window).toMatchObject({ fromDay: "2026-10-01", toDay: "2026-10-11", partial: true });
+    expect(s.comparison).toMatchObject({ available: true, fromDay: "2026-09-01", toDay: "2026-09-11" });
+    const row = (name: string) => s.rows.find((r: any) => r.name === name);
+    expect(row("Lait")).toMatchObject({ purchases: 2, compare: { purchases: 1, units: [{ unit: "piece", quantity: 4 }] } });
+    expect(row("Tomates").compare).toBeNull(); // aucune référence : ni « nouveau », ni pourcentage
+    const t = await stats(f.adil, undefined, "&period=last3");
+    expect(t).toMatchObject({ period: "last3", month: "2026-10" });
+    expect(t.window).toMatchObject({ fromDay: "2026-08-01", toDay: "2026-10-11" });
+    expect(t.comparison).toMatchObject({ fromDay: "2026-05-01", toDay: "2026-07-11" });
+    expect(t.rows.map((r: any) => r.name).sort()).toEqual(["Lait", "Riz", "Tomates"]);
+    // histoire incomplète : la liste la plus ancienne date de juin, la comparaison de trois mois (mai–juillet) n'est pas couverte
+    expect(t.comparison.available).toBe(false);
+    expect(t.rows.every((r: any) => r.compare === null)).toBe(true);
+  });
+
+  it("filtres par catégorie et par nom, tri par fréquence, dernier achat ou nom ; photo et dernier achat par produit", async () => {
+    statsClock.now = () => new Date("2026-10-20T12:00:00Z");
+    const f = await newFamily();
+    await buy(f, "Lait", 1, "2026-10-03T10:00:00Z");
+    await buy(f, "Tomates", 1, "2026-10-05T10:00:00Z");
+    await buy(f, "Tomates", 1, "2026-10-06T10:00:00Z");
+    await buy(f, "Riz", 1, "2026-10-09T10:00:00Z");
+    const names = async (qs: string) => (await stats(f.adil, "2026-10", qs)).rows.map((r: any) => r.name);
+    expect(await names("")).toEqual(["Tomates", "Riz", "Lait"]); // fréquence, puis dernier achat
+    expect(await names("&sort=last")).toEqual(["Riz", "Tomates", "Lait"]);
+    expect(await names("&sort=name")).toEqual(["Lait", "Riz", "Tomates"]);
+    expect(await names("&q=TOMATE")).toEqual(["Tomates"]);
+    expect(await names("&q=zzz")).toEqual([]);
+    const all = await stats(f.adil, "2026-10");
+    const cat = all.rows.find((r: any) => r.name === "Tomates").category;
+    expect(all.categories.map((c: any) => c.key)).toContain(cat);
+    expect((await names(`&category=${cat}`))).toContain("Tomates");
+    expect((await names("&category=inexistante"))).toEqual([]);
+    expect(typeof all.rows[0].categoryLabel).toBe("string");
+  });
+
+  it("fiche d'un produit : historique du plus récent au plus ancien, totaux par unité, achat corrigé visible mais jamais compté, six mois", async () => {
+    statsClock.now = () => new Date("2026-10-20T12:00:00Z");
+    const f = await newFamily();
+    await db.query("UPDATE lists SET created_at = '2026-08-15T00:00:00Z' WHERE family_id = $1", [f.familyId]);
+    await buy(f, "Lait", 3, "2026-09-05T10:00:00Z");
+    await buy(f, "Lait", 2, "2026-10-03T10:00:00Z");
+    const corrected = await buy(f, "Lait", 5, "2026-10-04T10:00:00Z");
+    await db.query("UPDATE purchases SET unit = 'brique' WHERE list_item_id IN (SELECT id FROM list_items WHERE product_id = $1) AND quantity = 2", [f.products["Lait"]]);
+    const pid = (await db.query("SELECT id FROM purchases WHERE list_item_id = $1", [corrected.itemId])).rows[0].id as string;
+    const listId = (await db.query("SELECT id FROM lists WHERE family_id = $1 AND status = 'active'", [f.familyId])).rows[0].id as string;
+    await one(f.lamiaa, listId, op.correct(pid));
+    const d = (await app.inject({ method: "GET", url: `/api/stats/products/${f.products["Lait"]}?month=2026-10`, cookies: f.adil })).json();
+    expect(d.product).toMatchObject({ name: "Lait" });
+    expect(d.purchases.map((p: any) => [p.quantity, p.unit, !!p.corrected])).toEqual([[5, "piece", true], [2, "brique", false]]);
+    expect(d.purchases[0].corrected).toMatchObject({ by: "Lamiaa" });
+    expect(d.purchases[1].by.displayName).toBe("Adil");
+    expect(d.summary.units).toEqual([expect.objectContaining({ unit: "brique", purchases: 1, quantity: 2 })]); // 5 corrigé : exclu
+    expect(d.summary.purchases).toBe(1);
+    expect(d.summary.lastPurchaseAt).toBe("2026-10-03T10:00:00.000Z");
+    expect(d.months).toHaveLength(6);
+    expect(d.months.at(-1)).toMatchObject({ month: "2026-10", covered: true });
+    expect(d.months.find((m: any) => m.month === "2026-09").units).toEqual([expect.objectContaining({ unit: "piece", quantity: 3 })]);
+    expect(d.months[0]).toMatchObject({ month: "2026-05", covered: false, units: [] }); // avant l'historique : pas de données
+    expect(d.months.find((m: any) => m.month === "2026-08")).toMatchObject({ covered: true, units: [] }); // mois couvert sans achat
+    // autre famille : introuvable ; rôle personnel : refusé
+    const other = await newFamily();
+    expect((await app.inject({ method: "GET", url: `/api/stats/products/${f.products["Lait"]}`, cookies: other.adil })).statusCode).toBe(404);
+    expect((await app.inject({ method: "GET", url: `/api/stats/products/${f.products["Lait"]}`, cookies: f.marie })).statusCode).toBe(403);
   });
 
   it("achats confirmés seulement, sans double comptage : un achat corrigé ne compte pas, son rachat compte une fois", async () => {
@@ -485,9 +589,9 @@ describe("Statistiques d'achats", () => {
     await db.query("UPDATE purchases SET purchased_at = '2026-10-06T10:00:00Z' WHERE list_item_id = $1 AND voided_at IS NULL", [open.id]);
     const s = await stats(f.adil, "2026-10");
     expect(s.rows).toHaveLength(1);
-    expect(s.rows[0].current).toEqual({ purchases: 1, quantity: 3, unknownQuantity: 0 });
+    expect(s.rows[0].units).toEqual([{ unit: "piece", purchases: 1, quantity: 3, unknownQuantity: 0 }]);
     // l'écran peut être appelé deux fois : même résultat
-    expect((await stats(f.adil, "2026-10")).rows[0].current).toEqual(s.rows[0].current);
+    expect((await stats(f.adil, "2026-10")).rows[0].units).toEqual(s.rows[0].units);
   });
 
   it("jamais de total mélangeant des unités ; renommer, désactiver ou changer l'unité d'un produit préserve l'historique", async () => {
@@ -500,7 +604,8 @@ describe("Statistiques d'achats", () => {
     await app.inject({ method: "PATCH", url: `/api/products/${f.products["Tomates"]}`, cookies: f.adil, payload: { active: false } });
     const s = await stats(f.adil, "2026-10");
     const tomates = s.rows.filter((r: any) => r.productId === f.products["Tomates"]);
-    expect(tomates.map((r: any) => [r.unit, r.current.purchases, r.current.quantity]).sort()).toEqual([["kg", 1, 2], ["paquet", 1, 3]]);
+    expect(tomates).toHaveLength(1); // un seul produit, deux unités gardées séparées
+    expect(tomates[0].units.map((u: any) => [u.unit, u.purchases, u.quantity]).sort()).toEqual([["kg", 1, 2], ["paquet", 1, 3]]);
     expect(tomates[0]).toMatchObject({ name: "Tomates grappe", active: false }); // nom actuel, produit désactivé : l'historique est conservé
     expect(JSON.stringify(s)).not.toMatch(/"quantity":5/); // 2 kg + 3 paquets n'est jamais additionné
   });
@@ -510,7 +615,7 @@ describe("Statistiques d'achats", () => {
     const { itemId } = await buy(f, "Lait", 1, "2026-10-05T10:00:00Z");
     await db.query("UPDATE purchases SET quantity = NULL, unit = NULL WHERE list_item_id = $1", [itemId]);
     const r = (await stats(f.adil, "2026-10")).rows[0];
-    expect(r).toMatchObject({ unit: null, current: { purchases: 1, quantity: null, unknownQuantity: 1 } });
+    expect(r).toMatchObject({ purchases: 1, units: [{ unit: null, purchases: 1, quantity: null, unknownQuantity: 1 }] });
   });
 
   it("une famille ne voit jamais les achats d'une autre", async () => {
@@ -545,7 +650,7 @@ describe("migration 009 sur des données existantes", () => {
       const l2 = (await old.query("INSERT INTO lists (family_id, created_by) VALUES ($1,$2) RETURNING id", [fam, prof])).rows[0].id as string;
       await old.query("INSERT INTO list_items (list_id, family_id, product_id, added_by, status) VALUES ($1,$2,$3,$4,'removed')", [l2, fam, lait, prof]);
 
-      expect(await migrate(old)).toEqual(["009_quantities.sql", "010_validation_times.sql"]);
+      expect(await migrate(old)).toEqual(["009_quantities.sql", "010_validation_times.sql", "011_units_more.sql"]);
       expect((await old.query("SELECT client_at FROM validations")).rows.every((r) => r.client_at === null)).toBe(true); // anciennes validations : heure du téléphone inconnue
 
       expect((await old.query("SELECT count(*)::int AS n FROM profiles")).rows[0].n).toBe(1);

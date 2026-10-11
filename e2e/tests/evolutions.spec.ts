@@ -17,14 +17,14 @@ test.describe("quantités sur les cartes", () => {
     await expect(page.getByTestId(`qty-${id(f, "Lait")}`)).toHaveCount(0);
     await card(page, f, "Lait").click();
     await expect(page.getByTestId(`qty-${id(f, "Lait")}`)).toBeVisible();
-    await expect(page.getByTestId(`qty-value-${id(f, "Lait")}`)).toHaveText("1");
+    await expect(page.getByTestId(`qty-input-${id(f, "Lait")}`)).toHaveValue("1");
     await expect(page.getByTestId(`minus-${id(f, "Lait")}`)).toBeDisabled();
     await page.getByTestId(`plus-${id(f, "Lait")}`).click();
     await page.getByTestId(`plus-${id(f, "Lait")}`).click();
-    await expect(page.getByTestId(`qty-value-${id(f, "Lait")}`)).toHaveText("3");
+    await expect(page.getByTestId(`qty-input-${id(f, "Lait")}`)).toHaveValue("3");
     await expect(card(page, f, "Lait")).toHaveAttribute("data-state", "unsaved"); // toujours sélectionnée
     await page.getByTestId(`minus-${id(f, "Lait")}`).click();
-    await expect(page.getByTestId(`qty-value-${id(f, "Lait")}`)).toHaveText("2");
+    await expect(page.getByTestId(`qty-input-${id(f, "Lait")}`)).toHaveValue("2");
     await expect(card(page, f, "Lait")).toHaveAttribute("data-state", "unsaved");
     // [−] à 1 reste grisé : décocher se fait en touchant la carte
     await page.getByTestId(`minus-${id(f, "Lait")}`).click();
@@ -76,13 +76,13 @@ test.describe("quantités sur les cartes", () => {
     const listId = await createList(f);
     await ops(f, "staff", listId, [add(f, "Lait", 2)]);
     await uiLogin(page, f);
-    await expect(page.getByTestId(`qty-value-${id(f, "Lait")}`)).toHaveText("2"); // quantité actuelle affichée
+    await expect(page.getByTestId(`qty-input-${id(f, "Lait")}`)).toHaveValue("2"); // quantité actuelle affichée
     await page.getByTestId(`plus-${id(f, "Lait")}`).click();
     await expect(card(page, f, "Lait")).toHaveAttribute("data-state", "unsaved");
     await page.getByTestId("validate").click();
-    await expect(page.getByTestId("sync-state")).toContainText("Enregistré");
+    await expect(page.getByTestId("sync-state")).toHaveText("Liste à jour");
     await expect(card(page, f, "Lait")).toHaveAttribute("data-state", "saved");
-    await expect(page.getByTestId(`qty-value-${id(f, "Lait")}`)).toHaveText("3");
+    await expect(page.getByTestId(`qty-input-${id(f, "Lait")}`)).toHaveValue("3");
     const list = (await (await f.lamiaa.get("/api/lists/active")).json()).list;
     expect(list.items.filter((i: any) => i.productId === id(f, "Lait"))).toHaveLength(1);
     expect(list.items[0].quantity).toBe(3);
@@ -104,7 +104,7 @@ test.describe("quantités sur les cartes", () => {
     await expect(page.getByText("Nouvelle demande").first()).toBeVisible();
     await page.getByTestId(`plus-${id(f, "Lait")}`).click();
     await page.getByTestId("validate").click();
-    await expect(page.getByTestId("sync-state")).toContainText("Enregistré");
+    await expect(page.getByTestId("sync-state")).toHaveText("Liste à jour");
     const list = (await (await f.lamiaa.get("/api/lists/active")).json()).list;
     const lines = list.items.filter((i: any) => i.productId === id(f, "Lait"));
     expect(lines.map((l: any) => [l.status, l.quantity]).sort()).toEqual([["purchased", 2], ["to_buy", 2]]);
@@ -127,8 +127,8 @@ test.describe("affichage du catalogue du personnel", () => {
     await page.getByTestId("view-categories").click();
     await expect(page.getByTestId("category-blocks")).toBeVisible();
     await expect(page.locator("[data-testid^=card-]")).toHaveCount(0);
-    await expect(page.getByTestId("catcount-legumes")).toHaveText("1");
-    await expect(page.getByTestId("catcount-laitages")).toHaveText("1");
+    await expect(page.getByTestId("catcount-legumes")).toHaveText("1 sélectionné");
+    await expect(page.getByTestId("catcount-laitages")).toHaveText("1 sélectionné");
     await expect(page.getByTestId("validate")).toBeEnabled(); // la validation de toute la sélection reste accessible
     await page.screenshot({ path: "shots/staff-categories.png" });
 
@@ -145,13 +145,13 @@ test.describe("affichage du catalogue du personnel", () => {
     // le choix est mémorisé (après rechargement) et la sélection aussi
     await page.reload();
     await expect(page.getByTestId("view-categories")).toHaveAttribute("aria-selected", "true");
-    await expect(page.getByTestId("catcount-legumes")).toHaveText("1");
+    await expect(page.getByTestId("catcount-legumes")).toHaveText("1 sélectionné");
     await page.getByTestId("view-all").click();
     await expect(page.locator("[data-testid^=card-]")).toHaveCount(80);
     await expect(page.getByTestId(`qty-input-${id(f, "Tomates")}`)).toHaveValue("1,5");
     await expect(card(page, f, "Lait")).toHaveAttribute("data-state", "unsaved");
     await page.getByTestId("validate").click();
-    await expect(page.getByTestId("sync-state")).toContainText("Enregistré");
+    await expect(page.getByTestId("sync-state")).toHaveText("Liste à jour");
     const list = (await (await f.lamiaa.get("/api/lists/active")).json()).list;
     expect(list.items.map((i: any) => [i.name, i.quantity]).sort()).toEqual([["Lait", 1], ["Tomates", 1.5]]);
   });
@@ -296,11 +296,11 @@ test.describe("liste d'achats des parents", () => {
     await ops(f, "staff", listId, [add(f, "Lait", 1)]);
     await uiLogin(page, f, "lamiaa", "573918");
     await page.getByTestId("edit-list").click();
-    await expect(page.getByTestId(`qty-value-${id(f, "Lait")}`)).toHaveText("1");
+    await expect(page.getByTestId(`qty-input-${id(f, "Lait")}`)).toHaveValue("1");
     await page.getByTestId(`plus-${id(f, "Lait")}`).click();
     await card(page, f, "Riz").click();
     await page.getByTestId("validate").click();
-    await expect(page.getByTestId("sync-state")).toContainText("Enregistré");
+    await expect(page.getByTestId("sync-state")).toHaveText("Liste à jour");
     const staffView = (await (await f.staff.get("/api/lists/active")).json()).list;
     expect(staffView.items.map((i: any) => [i.name, i.quantity]).sort()).toEqual([["Lait", 2], ["Riz", 1]]);
     // l'auteur de chaque action est conservé
@@ -322,10 +322,9 @@ test.describe("Statistiques d'achats", () => {
     await uiLogin(page, f, "lamiaa", "573918");
     await page.getByTestId("tab-stats").click();
     await expect(page.getByTestId("stats-month")).toBeVisible();
-    await expect(page.getByTestId("stats-total")).toContainText("2 achats confirmés");
-    await expect(page.getByTestId("freq-Tomates")).toHaveText("1 achat");
-    await expect(page.getByTestId("quant-Tomates")).toHaveText("2 kg");
-    await expect(page.getByTestId("quant-Lait")).toHaveText("3 pièces");
+    await expect(page.getByTestId("stats-total")).toContainText("2 achats · 2 produits");
+    await expect(page.getByTestId("freq-Tomates")).toHaveText("1 achat · 2 kg");
+    await expect(page.getByTestId("freq-Lait")).toHaveText("1 achat · 3 pièces");
     await expect(page.getByTestId("stats-no-spending")).toContainText("pas de statistiques de dépenses");
     await expect(page.getByText("Statistiques d'achats").first()).toBeVisible();
     await expect(page.getByTestId("stats-prev")).toBeDisabled(); // aucun mois plus ancien
@@ -346,7 +345,7 @@ test.describe("vérifications demandées : kg, heures, corrections", () => {
     await expect(page.getByTestId(`qty-input-${t}`)).toHaveValue("0,5");
     await expect(page.getByTestId(`minus-${t}`)).toBeDisabled();
     await page.getByTestId("validate").click();
-    await expect(page.getByTestId("sync-state")).toContainText("Enregistré");
+    await expect(page.getByTestId("sync-state")).toHaveText("Liste à jour");
     const list = (await (await f.lamiaa.get("/api/lists/active")).json()).list;
     expect(list.items[0]).toMatchObject({ quantity: 0.5, unit: "kg" });
     await page.screenshot({ path: "shots/kg-half.png" });

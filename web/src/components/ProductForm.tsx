@@ -90,6 +90,7 @@ export function ProductForm({ product, categories, onClose, onSaved }: Props) {
             {UNITS.map((u) => <option key={u} value={u}>{UNIT_CHOICE[u]}</option>)}
           </select>
         </label>
+        <p className="muted" data-testid="pf-unit-hint">Pour un produit comme le lait, choisissez « brique » ou « bouteille » plutôt que « pièce » : rien n'est converti automatiquement.</p>
         <p className="muted">Une quantité déjà demandée dans la liste en cours garde son unité ; les achats passés et les statistiques ne changent pas.</p>
         <label className="check"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} data-testid="pf-active" /> Article actif</label>
         <p className="muted" data-testid="pf-rule">Désactivé : l'article ne peut plus être ajouté à une liste. S'il est déjà dans la liste en cours, il y reste, marqué « désactivé » : il peut encore être acheté ou retiré. Les listes clôturées ne changent jamais.</p>

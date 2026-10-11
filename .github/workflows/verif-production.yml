@@ -11,7 +11,7 @@ on:
         default: "https://smartcourse-production-c7ce.up.railway.app"
       schema_attendu:
         description: "Dernière migration attendue"
-        default: "010_validation_times.sql"
+        default: "011_units_more.sql"
 permissions:
   contents: read
 jobs:
@@ -39,7 +39,7 @@ jobs:
           JS=$(grep -o '/assets/index-[A-Za-z0-9_-]*\.js' /tmp/index.html | head -1)
           echo "bundle : $JS"
           curl -fsS -m 30 "$U$JS" -o /tmp/app.js
-          for m in "Statistiques d'achats" "Historique des validations" "Par catégories" "Nouvelle demande" "envoyé plus tard" "autre unité" "Vérifier les mises à jour" "Version de l'application"; do
+          for m in "Statistiques d'achats" "Historique des validations" "Par catégories" "Nouvelle demande" "envoyé plus tard" "autre unité" "Vérifier les mises à jour" "Version de l'application" "Liste à jour" "En attente de connexion" "modification" "Qu'est-ce qu'un achat" "3 derniers mois" "Choisir un mois" "Quantités achetées par mois" "Heures affichées"; do
             grep -q "$m" /tmp/app.js && echo "présent : $m" || { echo "::error::absent du bundle servi : $m"; exit 1; }
           done
       - name: Identité de la version publiée (/version.json) et fichier manquant

@@ -9,7 +9,7 @@ export interface Me {
   family?: { code: string; name: string };
 }
 
-export type Unit = "piece" | "paquet" | "bouteille" | "kg";
+export type Unit = "piece" | "paquet" | "bouteille" | "brique" | "pot" | "boite" | "kg";
 
 export interface Product {
   id: string;
