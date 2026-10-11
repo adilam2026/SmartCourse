@@ -3,6 +3,7 @@ import { VersionInfo } from "../components/VersionInfo";
 import { useEffect, useState } from "react";
 import { api, ApiError, NetworkError, type AuditProduct, type BackupStatus, type Profile, type ResetPreview } from "../api";
 import { userMessage } from "../errors";
+import { ShareSheet, type ShareTarget } from "../components/ShareAccess";
 import { fmtDateTime } from "../format";
 import { CATEGORY_EMOJI } from "../categories";
 import { Dialog } from "../components/Dialog";
@@ -74,7 +75,7 @@ export function Settings({ engine, s }: { engine: Engine; s: State }) {
   return (
     <>
       <PageHead engine={engine} s={s} title={titles[section]} onBack={() => setSection(null)} backLabel="Réglages" backTestId="settings-back" subtitle={section === "profiles" && s.me?.family ? <>Code de la famille : <b data-testid="family-code">{s.me.family.code}</b></> : undefined} />
-      {section === "profiles" && <Profiles me={s.me!.id} />}
+      {section === "profiles" && <Profiles me={s.me!.id} familyCode={s.me!.family?.code ?? ""} />}
       {section === "recovery" && <RecoveryPanel />}
       {section === "reset" && <ResetFamily engine={engine} />}
       {section === "catalog" && <CatalogAdmin engine={engine} />}
@@ -97,12 +98,16 @@ function BackupCard({ st }: { st: BackupStatus | null }) {
   );
 }
 
-function Profiles({ me }: { me: string }) {
+function Profiles({ me, familyCode }: { me: string; familyCode: string }) {
   const [list, setList] = useState<Profile[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [changing, setChanging] = useState<Profile | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [editing, setEditing] = useState<Profile | null>(null);
+  const [shareAfter, setShareAfter] = useState(false); // « Définir un nouveau code et partager »
+  const [sharing, setSharing] = useState<(ShareTarget & { id?: string }) | null>(null);
+  // Result of the operation that just succeeded. The code lives here, in memory only, until the summary is closed or the screen left.
+  const [done, setDone] = useState<{ text: string; id: string; displayName: string; login: string; secret: string } | null>(null);
   const load = () => api.profiles().then((r) => setList(r.profiles)).catch((e) => setError(errText(e)));
   useEffect(() => void load(), []);
 
@@ -115,34 +120,74 @@ function Profiles({ me }: { me: string }) {
       setError(errText(e));
     }
   };
+  const openShare = (p: { id: string; displayName: string; login: string }) => setSharing({ id: p.id, displayName: p.displayName, login: p.login, secret: done?.id === p.id ? done.secret : undefined });
+  const closeShare = () => { setSharing(null); setDone(null); }; // closing the summary erases the code from memory
 
   return (
     <>
       {error && <p className="error" role="alert" data-testid="settings-error">{error}</p>}
-      {notice && <p className="notice" role="status" data-testid="settings-notice">{notice}</p>}
-      <ul className="rows" data-testid="profiles">
+      {done && (
+        <p className="notice notice--row" role="status" data-testid="settings-notice">
+          <span>{done.text}</span>
+          <button className="btn btn--small btn--primary" data-testid="share-open" onClick={() => openShare(done)}>Partager les accès</button>
+          <button className="btn btn--small btn--ghost" aria-label="Masquer" data-testid="notice-dismiss" onClick={() => setDone(null)}>✕</button>
+        </p>
+      )}
+      <ul className="rows rows--tight" data-testid="profiles">
         {list?.map((p) => (
-          <li key={p.id} className={`row row--stack ${p.active ? "" : "row--off"}`} data-testid={`profile-${p.login}`}>
-            <span className="row__name">{p.displayName}{p.id === me && " (vous)"}<small>@{p.login} · {ROLE_LABEL[p.role]}{p.primary ? " principal" : ""}{p.active ? "" : " · désactivé"}</small></span>
+          <li key={p.id} className={`row row--stack row--compact ${p.active ? "" : "row--off"}`} data-testid={`profile-${p.login}`}>
+            <span className="row__name">
+              <span className="row__title">{p.displayName}{p.id === me && " (vous)"}{p.primary && <span className="tag" data-testid={`primary-${p.login}`}>Principal</span>}</span>
+              <small>@{p.login} · {ROLE_LABEL[p.role]}{p.active ? "" : " · désactivé"}</small>
+            </span>
+            {/* Le profil principal n'a ni rôle à choisir ni désactivation : pas de fenêtre pour lui. */}
+            {!p.primary && <button className="btn btn--small btn--ghost" aria-label={`Modifier le profil de ${p.displayName}`} data-testid={`edit-${p.login}`} onClick={() => setEditing(p)}>Profil</button>}
             <span className="row__actions">
-              {p.primary ? (
-                <span className="muted" data-testid={`primary-${p.login}`}>Rôle protégé</span>
-              ) : (
-                <select aria-label="Rôle" value={p.role} onChange={(e) => void run(() => api.updateProfile(p.id, { role: e.target.value as Role }))}>
-                  {(["admin", "parent", "staff"] as Role[]).map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
-                </select>
-              )}
-              <button className="btn btn--small" data-testid={`reset-${p.login}`} onClick={() => { setNotice(null); setChanging(p); }}>Modifier le mot de passe</button>
-              {/* Un administrateur n'est jamais désactivé : le bouton n'existe pas (et le serveur refuse aussi). */}
-              {p.role !== "admin" && <button className="btn btn--small btn--ghost" data-testid={`toggle-${p.login}`} onClick={() => void run(() => api.updateProfile(p.id, { active: !p.active }))}>{p.active ? "Désactiver" : "Réactiver"}</button>}
+              <button className="btn btn--small" data-testid={`reset-${p.login}`} onClick={() => { setDone(null); setChanging(p); }}>Modifier le code</button>
+              <button className="btn btn--small" data-testid={`share-${p.login}`} onClick={() => openShare(p)}>Partager</button>
             </span>
           </li>
         ))}
       </ul>
-      <button className="btn btn--primary btn--big addbtn" data-testid="add-profile" onClick={() => setAdding(true)}>+ Ajouter un profil</button>
-      {adding && <AddProfile onClose={() => setAdding(false)} onCreated={(name) => { setAdding(false); setNotice(`Profil créé : ${name}. Communiquez-lui le code secret que vous avez choisi.`); void load(); }} />}
-      {changing && <ChangePassword profile={changing} onClose={() => setChanging(null)} onDone={() => { setNotice(`Code secret de ${changing.displayName} modifié. Ses sessions ont été fermées.`); setChanging(null); void load(); }} />}
+      <button className="btn btn--primary addbtn addbtn--compact" data-testid="add-profile" onClick={() => setAdding(true)}>+ Ajouter un profil</button>
+      {adding && <AddProfile onClose={() => setAdding(false)} onCreated={(r) => { setAdding(false); setDone({ text: `Profil créé : ${r.displayName}.`, ...r }); void load(); }} />}
+      {changing && <ChangePassword profile={changing} onClose={() => { setChanging(null); setShareAfter(false); }} onDone={(secret) => {
+        const r = { id: changing.id, displayName: changing.displayName, login: changing.login, secret };
+        setDone({ text: `Code secret de ${changing.displayName} modifié. Ses sessions ont été fermées.`, ...r });
+        if (shareAfter) setSharing(r); // the code was saved: the complete access summary opens at once
+        setShareAfter(false);
+        setChanging(null);
+        void load();
+      }} />}
+      {editing && <EditProfile profile={editing} onClose={() => setEditing(null)} run={async (fn) => { await run(fn); setEditing(null); }} />}
+      {sharing && (
+        <ShareSheet
+          target={sharing}
+          familyCode={familyCode}
+          onClose={closeShare}
+          onNewCode={() => { const p = list?.find((x) => x.id === sharing.id); setSharing(null); if (p) { setDone(null); setShareAfter(true); setChanging(p); } }}
+        />
+      )}
     </>
+  );
+}
+
+/** « Modifier le profil » : rôle, désactivation. Un administrateur n'est jamais désactivé (le bouton n'existe pas, le serveur refuse aussi). */
+function EditProfile({ profile, onClose, run }: { profile: Profile; onClose(): void; run(fn: () => Promise<unknown>): Promise<void> }) {
+  return (
+    <Dialog title={`Modifier le profil de ${profile.displayName}`} onClose={onClose}>
+      <div className="form">
+        <label className="field">Rôle
+          <select aria-label="Rôle" value={profile.role} data-testid="edit-role" onChange={(e) => void run(() => api.updateProfile(profile.id, { role: e.target.value as Role }))}>
+            {(["admin", "parent", "staff"] as Role[]).map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
+          </select>
+        </label>
+        {profile.role !== "admin" && (
+          <button className="btn" data-testid={`toggle-${profile.login}`} onClick={() => void run(() => api.updateProfile(profile.id, { active: !profile.active }))}>{profile.active ? "Désactiver ce profil" : "Réactiver ce profil"}</button>
+        )}
+        <button className="btn btn--ghost" onClick={onClose}>Fermer</button>
+      </div>
+    </Dialog>
   );
 }
 
@@ -158,20 +203,20 @@ function PasswordFields({ secret, again, setSecret, setAgain, prefix }: { secret
   );
 }
 
-function ChangePassword({ profile, onClose, onDone }: { profile: Profile; onClose(): void; onDone(): void }) {
+function ChangePassword({ profile, onClose, onDone }: { profile: Profile; onClose(): void; onDone(secret: string): void }) {
   const [secret, setSecret] = useState("");
   const [again, setAgain] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   return (
-    <Dialog title={`Modifier le mot de passe de ${profile.displayName}`} onClose={onClose}>
+    <Dialog title={`Modifier le code de ${profile.displayName}`} onClose={onClose}>
       <form className="form" onSubmit={async (e) => {
         e.preventDefault();
         setBusy(true);
         setError(null);
         try {
           await api.resetSecret(profile.id, secret, again);
-          onDone();
+          onDone(secret); // only after the server confirmed the change
         } catch (err) {
           setError(errText(err));
           setBusy(false);
@@ -187,7 +232,7 @@ function ChangePassword({ profile, onClose, onDone }: { profile: Profile; onClos
   );
 }
 
-function AddProfile({ onClose, onCreated }: { onClose(): void; onCreated(name: string): void }) {
+function AddProfile({ onClose, onCreated }: { onClose(): void; onCreated(r: { id: string; displayName: string; login: string; secret: string }): void }) {
   const [displayName, setName] = useState("");
   const [login, setLogin] = useState("");
   const [role, setRole] = useState<Role>("staff");
@@ -200,7 +245,7 @@ function AddProfile({ onClose, onCreated }: { onClose(): void; onCreated(name: s
         e.preventDefault();
         try {
           const r = await api.createProfile({ displayName, login: login.trim().toLowerCase(), role, secret, secretConfirm: again });
-          onCreated(r.profile.displayName);
+          onCreated({ id: r.profile.id, displayName: r.profile.displayName, login: r.profile.login, secret }); // only after the server confirmed the creation
         } catch (err) {
           setError(errText(err));
         }

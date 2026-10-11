@@ -60,3 +60,9 @@ Pour activer « remis / rejeté » : dans Brevo → Transactional → Settings �
 ## Tests simulés et test réel
 - **Simulés** (automatiques, à chaque livraison) : le vrai client d'envoi parle à un faux service local qui reçoit les messages. On y vérifie : envoi, « réception » dans la boîte factice, ouverture du lien, passage à « Adresse vérifiée », et tous les cas de refus. Ils ne prouvent rien sur Brevo lui-même.
 - **Réel** (à faire par vous, après la désactivation du blocage d'IP) : Réglages → Adresse de récupération → « Réessayer » ou « Renvoyer le lien », ouvrir le lien reçu dans la boîte mail réelle, constater « Adresse vérifiée », puis « Envoyer un e-mail de test » et constater sa réception. Tant que ce test réel n'est pas fait, la réception réelle n'est pas démontrée.
+
+## Partage des accès (Réglages → Famille et profils)
+- Après une création de profil ou un changement de code **réussis**, « Partager les accès » ouvre un récapitulatif : lien (adresse publique de l'application), code famille, identifiant, code secret saisi à l'instant. **« Partager par WhatsApp »** ouvre WhatsApp avec le message prérempli (la personne choisit le destinataire et envoie elle-même) ; **« Copier les accès »** est l'alternative.
+- Le code n'existe qu'en mémoire de l'écran : jamais en base (seul son hachage), ni dans les journaux, ni dans le stockage local ; il est effacé à la fermeture du récapitulatif ou au départ de l'écran. Annuler le partage ne défait rien.
+- Profil existant (code non disponible) : « Partager » donne lien, code famille et identifiant ; « Définir un nouveau code et partager » change le code puis ouvre les accès complets. L'ancien code n'est jamais retrouvé.
+- Cartes compactes : nom (badge « Principal »), identifiant et rôle, « Modifier le code » / « Partager » ; rôle et désactivation dans « Modifier le profil » (jamais pour le principal ; un administrateur n'est jamais désactivable).

@@ -56,11 +56,16 @@ test("administration : pas de bouton Désactiver pour un administrateur, rôle d
   await page.getByTestId("tab-settings").click();
   await page.getByTestId("seg-profiles").click();
   await expect(page.getByTestId("toggle-adil")).toHaveCount(0);
-  await expect(page.getByTestId("toggle-lamiaa2")).toHaveCount(0);
-  await expect(page.getByTestId("primary-adil")).toContainText("Rôle protégé");
+  await expect(page.getByTestId("primary-adil")).toHaveText("Principal"); // petit badge, aucun sélecteur de rôle ni fenêtre de profil
   await expect(page.getByTestId("profile-adil").locator("select")).toHaveCount(0);
-  await expect(page.getByTestId("profile-lamiaa2").locator("select")).toHaveCount(1);
+  await expect(page.getByTestId("edit-adil")).toHaveCount(0);
+  await page.getByTestId("edit-lamiaa2").click(); // un autre administrateur : rôle modifiable, jamais désactivable
+  await expect(page.getByTestId("edit-role")).toBeVisible();
+  await expect(page.getByTestId("toggle-lamiaa2")).toHaveCount(0);
+  await page.getByRole("button", { name: "Fermer" }).click();
+  await page.getByTestId(`edit-${f.staffLogin}`).click();
   await expect(page.getByTestId(`toggle-${f.staffLogin}`)).toBeVisible();
+  await page.getByRole("button", { name: "Fermer" }).click();
   // le serveur refuse aussi
   const lam = (await (await f.adil.get("/api/profiles")).json()).profiles.find((p: any) => p.login === "lamiaa2");
   expect((await f.adil.patch(`/api/profiles/${lam.id}`, { data: { active: false } })).status()).toBe(409);
@@ -84,8 +89,8 @@ test("administration : pas de bouton Désactiver pour un administrateur, rôle d
   const ok = await playwright.request.newContext({ baseURL });
   expect((await ok.post("/api/auth/login", { data: { familyCode: f.code, login: "sara", secret: "408213" } })).status()).toBe(200);
 
-  // « Modifier le mot de passe » : deux champs, l'ancien reste inaccessible, sessions révoquées
-  await expect(page.getByTestId("reset-sara")).toHaveText("Modifier le mot de passe");
+  // « Modifier le code » : deux champs, l'ancien reste inaccessible, sessions révoquées
+  await expect(page.getByTestId("reset-sara")).toHaveText("Modifier le code");
   await page.getByTestId("reset-sara").click();
   await expect(page.getByTestId("pw-secret")).toHaveValue("");
   await page.getByTestId("pw-secret").fill("739104");

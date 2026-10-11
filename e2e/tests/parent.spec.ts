@@ -166,6 +166,7 @@ test.describe("administration", () => {
     const ok = await playwright.request.newContext({ baseURL });
     expect((await ok.post("/api/auth/login", { data: { familyCode: f.code, login: "karim", secret } })).status()).toBe(200);
 
+    await page.getByTestId("edit-karim").click();
     await page.getByTestId("toggle-karim").click();
     await expect(page.getByTestId("profile-karim")).toContainText("désactivé");
     expect((await ok.get("/api/me")).status()).toBe(401); // session révoquée

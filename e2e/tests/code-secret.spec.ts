@@ -105,7 +105,7 @@ for (const [name, device] of PROFILES) {
       await page.getByTestId("np-secret2").pressSequentially("007319");
       await page.screenshot({ path: `${OUT}/nouveau-profil-code-${name}.png` });
       await page.getByTestId("np-submit").click();
-      await expect(page.getByTestId("settings-notice")).toContainText("code secret");
+      await expect(page.getByTestId("settings-notice")).toContainText("Profil créé");
       const ok = await playwright.request.newContext({ baseURL });
       expect((await ok.post("/api/auth/login", { data: { familyCode: f.code, login: "sara", secret: "007319" } })).status()).toBe(200);
       expect((await ok.post("/api/auth/login", { data: { familyCode: f.code, login: "sara", secret: "7319" } })).status()).toBeGreaterThanOrEqual(400);

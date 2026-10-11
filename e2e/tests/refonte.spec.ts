@@ -65,7 +65,7 @@ async function audit(page: Page, label: string, opts: { nav?: boolean; bar?: boo
       const b = e.getBoundingClientRect();
       if (b.width === 0 || b.height === 0) continue;
       if (e.closest(".sheet-backdrop") === null && getComputedStyle(e).visibility === "hidden") continue;
-      if (b.height < 47.5) small.push(`${e.className} ${Math.round(b.height)}px "${(e.textContent ?? "").trim().slice(0, 20)}"`);
+      if (b.height < (e.closest("[data-testid=profiles]") || e.classList.contains("addbtn--compact") ? 43.5 : 47.5)) small.push(`${e.className} ${Math.round(b.height)}px "${(e.textContent ?? "").trim().slice(0, 20)}"`);
     }
     out.small = small;
     // text clipped by its own box (one-line ellipsis aside, names must show in full)

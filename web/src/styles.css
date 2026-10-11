@@ -444,3 +444,17 @@ h3 { font-size: 1.05rem; font-weight: 800; }
 /* ---------- saisie du code secret ---------- */
 .kbtoggle { margin: 0.1rem 0 0; justify-self: start; }
 .field input[inputmode="numeric"], .auth input[inputmode="numeric"] { letter-spacing: 0.3em; font-variant-numeric: tabular-nums; }
+
+/* Famille et profils : cartes compactes (zones tactiles d'au moins 44 px) */
+.rows--tight { gap: 0.4rem; }
+.row--compact { padding: 0.5rem 0.65rem; gap: 0.3rem 0.5rem; }
+.row--compact .row__name { gap: 0; }
+.row--compact .row__title { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+.row--compact .row__actions { gap: 0.35rem; }
+.row--compact .btn--small { min-height: 44px; padding: 0.2rem 0.6rem; font-size: 0.9rem; flex: 0 1 auto; white-space: nowrap; }
+.tag { display: inline-block; padding: 0.05rem 0.5rem; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line-strong); color: var(--muted); font-size: 0.75rem; font-weight: 700; }
+.addbtn--compact { min-height: 44px; margin: 0.6rem 1rem; padding-top: 0.2rem; padding-bottom: 0.2rem; }
+.notice--row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.6rem; }
+.notice--row span { flex: 1 1 12rem; }
+.notice--row .btn { min-height: 44px; }
+.sharepreview { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 0.6rem 0.75rem; margin: 0; font: inherit; font-size: 0.92rem; }
