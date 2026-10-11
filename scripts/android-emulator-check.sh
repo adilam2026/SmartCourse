@@ -45,10 +45,10 @@ echo "$R" | grep -qE '"value":(401|429)' && ok "connexion : le serveur répond (
 echo "== Lien reçu par e-mail (faux jeton)"
 LINK="$URL/#/verify/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 adb shell cmd package resolve-activity --brief -a android.intent.action.VIEW -c android.intent.category.BROWSABLE -d "$LINK" | tail -2
-adb shell cmd package resolve-activity --brief -a android.intent.action.VIEW -c android.intent.category.BROWSABLE -d "$LINK" | grep -q "$PKG" && ok "le lien est attribué directement à l'application Courses" || ko "le lien ne s'ouvre pas dans l'application"
-adb shell am force-stop "$PKG"; sleep 2
+adb shell am force-stop "$PKG"; sleep 2   # application fermée : si elle réapparaît, c'est ce lien qui l'a ouverte
 adb shell am start -W -a android.intent.action.VIEW -c android.intent.category.BROWSABLE -d "$LINK" >/dev/null
 sleep 20
+adb shell dumpsys activity activities | grep -q "$PKG/com.google.androidbrowserhelper.trusted.LauncherActivity" && ok "le lien a ouvert l'application Courses (et non un onglet Chrome)" || ko "le lien ne s'ouvre pas dans l'application"
 adb forward tcp:9222 localabstract:chrome_devtools_remote >/dev/null
 top
 R=$(cdp "({href:location.href, text:document.body.innerText.slice(0,200), standalone:matchMedia('(display-mode: standalone)').matches})"); echo "$R"
@@ -59,6 +59,7 @@ echo "== WhatsApp (partage) : ouverture d'une adresse externe depuis l'applicati
 cdp "window.open('https://wa.me/?text=essai','_blank','noopener') ? 'ouvert' : 'ouvert-sans-fenetre'" | tail -1
 sleep 8
 top
+curl -s http://127.0.0.1:9222/json | grep -oE '"url": *"[^"]*(wa\.me|whatsapp)[^"]*"' | head -3 | sed 's/^/page externe ouverte : /' || true
 adb shell am start -a android.intent.action.MAIN -c android.intent.category.HOME >/dev/null
 
 echo "== Hors connexion"
