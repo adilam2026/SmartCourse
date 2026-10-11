@@ -7,7 +7,7 @@ import { unitLabel } from "../units";
 const PAGE = 24;
 
 /** A picture that is never someone else's: when the catalogue has none yet, say so plainly. */
-function CatPhoto({ url, name }: { url: string | null; name: string }) {
+export function CatPhoto({ url, name }: { url: string | null; name: string }) {
   const [broken, setBroken] = useState(false);
   return url && !broken ? (
     <img className="catphoto" src={url} alt="" loading="lazy" decoding="async" onError={() => setBroken(true)} data-testid={`photo-${name}`} />

@@ -1,28 +1,26 @@
-# Audit du catalogue (étapes 1 et 2)
+# Audit et décisions du catalogue
 
-## 1. Constat
-| Ensemble | Nombre | Photos | Verdict |
-|---|---|---|---|
-| Catalogue de départ | 80 | 80 présentes, WebP 512×512 | **Les 80 ont été vérifiées visuellement** (planches `planches/initial-01…04.png`, nom sous chaque photo) : chaque image représente bien son produit. Deux détails optionnels : « Levure chimique » et « Eau de Javel » portent le mot générique « LEVURE » / « JAVEL » sur l'emballage. |
-| Catalogue étendu (code, migration 004) | 100 | **aucune** | Tous sans photo : ils s'affichaient avec un emoji. Remplacé par un état explicite « Photo à venir ». |
-| Articles propres à chaque famille (saisis à la main, désactivés) | variable | variable | **Non lisibles depuis ici** (pas d'accès à la base de production). Un point d'audit administrateur est livré : `GET /api/catalog/audit` (source de la photo : catalogue / famille / aucune ; photo partagée par des noms différents). Le cas « papier cuisson avec une photo d'éponge » se verra ainsi ; il sera corrigé par la photo du catalogue (si la photo erronée est une photo commune) ou par « Modifier » (si c'est une photo personnelle). |
+## Constat
+| Ensemble | Nombre | Photos |
+|---|---|---|
+| Catalogue de départ | 80 | 80 présentes et **vérifiées une à une** (planches `planches/initial-01…04.png`) ; conservées telles quelles, y compris « Levure chimique » et « Eau de Javel ». |
+| Catalogue complémentaire existant | 99 visibles (+ « Salade verte » absorbée) | aucune |
+| Nouveaux articles | 64 | aucune |
+| **Total proposé** | **243** | **163 images à produire** (liste : `etat-photos.md`, manifeste : `manifeste-images.json` / `.csv`) |
 
-Défaut technique corrigé : les identifiants du catalogue étendu sont des UUID tirés au hasard par base, donc inutilisables pour rattacher une image de façon identique entre environnements. La migration 013 ajoute une **clé stable** (slug du nom) ; le manifeste d'images et l'import l'utilisent.
-
-## 2. Recoupements examinés (aucune suppression automatique)
-| Cas | Décision proposée |
+## Décisions validées et leur mise en œuvre (migration 014, générée par `scripts/catalogue-docs.py`)
+| Sujet | Mise en œuvre |
 |---|---|
-| Laitue (départ) / Salade verte (étendu) | Garder les deux : Laitue = pommée, Salade verte = feuilles (photo distincte). |
-| Pain / Baguette / Pain de mie / Pain complet | Garder : produits distincts. |
-| Biscuits / Gâteaux secs | Garder : industriels vs gâteaux secs marocains. |
-| Huile de table (départ) | À trancher : garder le nom courant « Huile de table » (recommandé) ou renommer « Huile végétale » (même article, historique conservé). |
-| Sel (départ) | Renommer « Sel alimentaire » (même identifiant), pour le distinguer du « Sel régénérant pour lave-vaisselle ». |
-| Lait d'amande (étendu) | Faire évoluer en « Boisson végétale » (amande/avoine/soja) : même clé, mêmes données ; les articles déjà ajoutés gardent leur nom. |
-| Raisins / Raisins secs ; Fèves fraîches / Fèves sèches ; Beurre / Smen ; Maïs / Maïs en conserve ; Piments / Piment en poudre | Distincts, notés dans la liste. |
-| Papier cuisson / Papier aluminium / Film alimentaire | Trois articles distincts. |
-| Doublons exacts entre départ, étendu et ajouts | **Aucun** (contrôle automatique par nom et par clé dans `scripts/catalogue-docs.py`). |
+| Laitue / Salade verte | Une seule entrée : **Laitue**, trouvable par « salade » et « salade verte ». L'entrée « Salade verte » reste en base (marquée *absorbée par laitue*) : jamais supprimée, plus proposée. Un article familial « Salade verte » garde son identifiant et son historique et est reconnu comme la Laitue (pas de nouvelle entrée équivalente). |
+| Huile de table | Nom conservé ; « huile végétale » ajouté comme terme de recherche ; aucun doublon. |
+| Sel | « Sel » → **« Sel alimentaire »** (même identifiant) ; les articles familiaux encore nommés « Sel » suivent (sauf conflit de nom). « Sel régénérant pour lave-vaisselle » reste séparé. |
+| Boisson végétale | « Lait d'amande » → **« Boisson végétale »** (recherches amande, avoine, soja, riz, et toujours « lait d'amande »). Les articles familiaux déjà ajoutés gardent leur nom et leurs données. |
+| Gâteaux secs | « Gâteaux secs » → **« Gâteaux secs marocains »** (photo adaptée), distinct de « Biscuits ». |
+| Maïs / Piments | « **Maïs frais** » / « **Piments frais** » (anciens noms toujours reconnus) ; « Maïs en conserve » et « Piment en poudre » séparés. |
+| Paires conservées | Pain, Baguette, Pain de mie, Pain complet ; Raisins / Raisins secs ; Fèves fraîches / Fèves sèches ; Beurre / Smen. |
+| Activation | Aucun nouvel article n'est activé dans une famille : tous sont dans « Tous les produits », la famille choisit. |
+| Unités | Colonnes distinctes dans `liste-finale.md` : **unité proposée** (nouvel article / nouvelle famille), **unité actuelle du catalogue de départ**, **unité configurée dans la famille** (non lisible depuis ici : visible dans Réglages → Catalogue → Mes produits). Bouteille pour les huiles, boîte pour les conserves (thon, sardines, concentré de tomates, maïs…). **Aucune unité d'une famille existante n'est modifiée** (les unités du catalogue de départ ne s'appliquent qu'aux nouvelles familles). |
+| Doublons | Aucun entre départ, complémentaire et nouveaux (contrôle automatique par nom et par clé). |
 
-## 3. Liste finale et manifeste
-- `liste-finale.md` / `.csv` : 244 produits (80 + 100 + 64 ajouts proposés), avec catégorie, unité, existe/nouveau, état de la photo.
-- `manifeste-images.csv` / `.json` : les **164 images à produire** (100 + 64), id stable `extended:<clé>`, nom exact, nom de fichier attendu `<clé>.webp`, description précise.
-- Les produits occasionnels (entretien, accessoires, épices rares…) sont dans « Tous les produits » mais **ne sont activés dans aucune famille** : ajout d'un clic.
+## Photo erronée (ex. papier cuisson avec une éponge)
+Réglages → Catalogue → **Mes produits** : chaque article affiche l'origine de sa photo (du catalogue / de la famille / aucune) et si elle est **partagée avec un autre article**. Filtres : *À vérifier*, *Photos de la famille*, *Sans photo*. Quand le catalogue possède la photo du **même nom** (jamais déduite de la catégorie), le bouton **Photo du catalogue** ouvre une comparaison Actuelle / Catalogue et remplace seulement cet article, y compris si la photo actuelle est personnelle. Les autres photos personnelles ne sont pas touchées. Sinon : **Modifier** pour envoyer la bonne photo.

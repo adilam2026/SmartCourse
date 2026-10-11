@@ -1,7 +1,7 @@
 import { unitLabel } from "../units";
 import { VersionInfo } from "../components/VersionInfo";
 import { useEffect, useState } from "react";
-import { api, ApiError, NetworkError, type BackupStatus, type Profile } from "../api";
+import { api, ApiError, NetworkError, type AuditProduct, type BackupStatus, type Profile } from "../api";
 import { fmtDateTime } from "../format";
 import { CATEGORY_EMOJI } from "../categories";
 import { Dialog } from "../components/Dialog";
@@ -11,7 +11,7 @@ import { PageHead } from "../components/PageHead";
 import { useBackLayer } from "../useBackLayer";
 import { ProductForm } from "../components/ProductForm";
 import { Thumb } from "../components/Thumb";
-import { CatalogBrowser } from "./CatalogBrowser";
+import { CatalogBrowser, CatPhoto } from "./CatalogBrowser";
 import type { Engine, State } from "../sync/engine";
 import type { Catalog, Product, Role } from "../types";
 
@@ -198,8 +198,20 @@ function CatalogAdmin({ engine }: { engine: Engine }) {
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [form, setForm] = useState<{ product?: Product } | null>(null);
-  const load = () => api.catalogAdmin().then(setCat).catch((e) => setError(errText(e)));
+  const [audit, setAudit] = useState<Record<string, AuditProduct>>({});
+  const [filter, setFilter] = useState<"all" | "check" | "own" | "none">("all");
+  const [compare, setCompare] = useState<{ product: Product; catalogUrl: string } | null>(null);
+  const load = () => Promise.all([
+    api.catalogAdmin().then(setCat),
+    api.catalogAudit().then((r) => setAudit(Object.fromEntries(r.products.map((p) => [p.id, p])))).catch(() => {}),
+  ]).catch((e) => setError(errText(e)));
   useEffect(() => void load(), []);
+  const count = (f: (a: AuditProduct) => boolean) => Object.values(audit).filter(f).length;
+  const matches = (p: Product) => {
+    const a = audit[p.id];
+    if (filter === "all" || !a) return filter === "all";
+    return filter === "check" ? a.sharedWithOtherNames || !!a.catalogPhotoUrl : filter === "own" ? a.photoSource === "famille" : a.photoSource === "none";
+  };
   const act = async (fn: () => Promise<unknown>) => {
     setError(null);
     try {
@@ -230,9 +242,14 @@ function CatalogAdmin({ engine }: { engine: Engine }) {
       <label className="field search">Chercher dans mes produits
         <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ex. lait, lessive…" data-testid="mine-search" />
       </label>
+      <div className="catchips" role="tablist" aria-label="Contrôle des photos" data-testid="photo-filters">
+        {([["all", "Tous"], ["check", `À vérifier (${count((a) => a.sharedWithOtherNames || !!a.catalogPhotoUrl)})`], ["own", `Photos de la famille (${count((a) => a.photoSource === "famille")})`], ["none", `Sans photo (${count((a) => a.photoSource === "none")})`]] as const).map(([k, label]) => (
+          <button key={k} role="tab" aria-selected={filter === k} className={`catchip ${filter === k ? "on" : ""}`} data-testid={`pf-${k}`} onClick={() => setFilter(k)}>{label}</button>
+        ))}
+      </div>
       {cat?.categories.map((c) => {
         const needle = flatten(q);
-        const prods = c.products.filter((p) => !needle || flatten(p.name).includes(needle));
+        const prods = c.products.filter((p) => (!needle || flatten(p.name).includes(needle)) && matches(p));
         if (!prods.length) return null;
         return (
         <section key={c.key}>
@@ -241,8 +258,10 @@ function CatalogAdmin({ engine }: { engine: Engine }) {
             {prods.map((p) => (
               <li key={p.id} className={`row row--cat ${p.active ? "" : "row--off"}`} data-testid={`prod-${p.name}`}>
                 <Thumb photoUrl={p.photoUrl} category={c.key} />
-                <span className="row__name">{p.name}{p.brand && <small>{p.brand}</small>}<small>Unité : {unitLabel(p.unit)}</small>{!p.active && <small>désactivé</small>}</span>
+                <span className="row__name">{p.name}{p.brand && <small>{p.brand}</small>}<small>Unité : {unitLabel(p.unit)}</small>{!p.active && <small>désactivé</small>}
+                  {audit[p.id] && <small data-testid={`photosrc-${p.name}`}>Photo : {audit[p.id]!.photoSource === "famille" ? "de la famille" : audit[p.id]!.photoSource === "catalogue" ? "du catalogue" : "aucune"}{audit[p.id]!.sharedWithOtherNames && <em> · partagée avec un autre article</em>}</small>}</span>
                 <span className="rowbtns">
+                  {audit[p.id]?.catalogPhotoUrl && <button className="btn btn--small" data-testid={`usecat-${p.name}`} aria-label={`Comparer la photo de ${p.name} avec celle du catalogue`} onClick={() => setCompare({ product: p, catalogUrl: audit[p.id]!.catalogPhotoUrl! })}>Photo du catalogue</button>}
                   <button className="btn btn--small" data-testid={`edit-${p.name}`} aria-label={`Modifier ${p.name}`} onClick={() => setForm({ product: p })}>Modifier</button>
                   <button className="btn btn--small btn--ghost" data-testid={`active-${p.name}`} onClick={() => void act(() => api.patchProduct(p.id, { active: !p.active }))}>{p.active ? "Désactiver" : "Réactiver"}</button>
                 </span>
@@ -253,6 +272,17 @@ function CatalogAdmin({ engine }: { engine: Engine }) {
         );
       })}
       </>}
+      {compare && (
+        <Dialog title={`Photo de « ${compare.product.name} »`} onClose={() => setCompare(null)}>
+          <div className="cmp" data-testid="photo-compare">
+            <figure><CatPhoto url={compare.product.photoUrl} name={compare.product.name} /><figcaption>Actuelle</figcaption></figure>
+            <figure><CatPhoto url={compare.catalogUrl} name={`${compare.product.name} (catalogue)`} /><figcaption>Catalogue</figcaption></figure>
+          </div>
+          <p className="muted">La photo du catalogue correspond au même nom de produit. Remplacer ne touche à aucune autre photo ; l'ancienne reste dans l'historique des listes archivées.</p>
+          <button className="btn btn--primary btn--big" data-testid="usecat-confirm" onClick={() => { const id = compare.product.id; setCompare(null); void act(() => api.patchProduct(id, { resetImage: true })); }}>Utiliser la photo du catalogue</button>
+          <button className="btn btn--ghost" onClick={() => setCompare(null)}>Garder la photo actuelle</button>
+        </Dialog>
+      )}
     </>
   );
 }

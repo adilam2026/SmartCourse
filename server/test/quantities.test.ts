@@ -652,6 +652,8 @@ describe("migration 009 sur des données existantes", () => {
       const fam = (await old.query("INSERT INTO families (code, name) VALUES ('MIG123','Ancienne') RETURNING id")).rows[0].id as string;
       const prof = (await old.query("INSERT INTO profiles (family_id, display_name, login, role, secret_hash) VALUES ($1,'Adil','adil','admin','x') RETURNING id", [fam])).rows[0].id as string;
       await old.query(`INSERT INTO products (family_id, category, name, catalog_key, position) SELECT $1, category, name, key, position FROM initial_catalog`, [fam]);
+      const hExt = await old.query(`INSERT INTO products (family_id, category, name, extended_id, position) SELECT $1, category, name, id, 50 FROM extended_catalog WHERE name IN ('Lait d''amande','Salade verte','Gâteaux secs') RETURNING id, name`, [fam]);
+      const huileId = (await old.query("SELECT id, name FROM products WHERE family_id = $1 AND name IN ('Huile de table','Sel') ORDER BY name", [fam])).rows;
       const tom = (await old.query("SELECT id FROM products WHERE family_id = $1 AND name = 'Tomates'", [fam])).rows[0].id as string;
       const lait = (await old.query("SELECT id FROM products WHERE family_id = $1 AND name = 'Lait'", [fam])).rows[0].id as string;
       const l1 = (await old.query("INSERT INTO lists (family_id, created_by) VALUES ($1,$2) RETURNING id", [fam, prof])).rows[0].id as string;
@@ -662,7 +664,15 @@ describe("migration 009 sur des données existantes", () => {
       const l2 = (await old.query("INSERT INTO lists (family_id, created_by) VALUES ($1,$2) RETURNING id", [fam, prof])).rows[0].id as string;
       await old.query("INSERT INTO list_items (list_id, family_id, product_id, added_by, status) VALUES ($1,$2,$3,$4,'removed')", [l2, fam, lait, prof]);
 
-      expect(await migrate(old)).toEqual(["009_quantities.sql", "010_validation_times.sql", "011_units_more.sql", "012_push_notifications.sql", "013_catalog_keys.sql"]);
+      expect(await migrate(old)).toEqual(["009_quantities.sql", "010_validation_times.sql", "011_units_more.sql", "012_push_notifications.sql", "013_catalog_keys.sql", "014_catalog_complete.sql"]);
+      // catalogue complet : rien n'est perdu ni activé, les unités des familles ne bougent pas, les articles liés gardent leur nom et leur identifiant
+      const after = (await old.query("SELECT id, name, unit FROM products WHERE family_id = $1", [fam])).rows;
+      expect(after).toHaveLength(80 + hExt.rows.length);
+      for (const r of hExt.rows) expect(after.find((a) => a.id === r.id)!.name).toBe(r.name);
+      expect(after.find((a) => a.id === huileId[0].id)).toMatchObject({ name: "Huile de table", unit: "paquet" });
+      expect(after.find((a) => a.id === huileId[1].id)!.name).toBe("Sel alimentaire");
+      expect((await old.query("SELECT merged_into FROM extended_catalog WHERE key = 'salade-verte'")).rows[0].merged_into).toBe("laitue");
+      expect((await old.query("SELECT count(*)::int AS n FROM extended_catalog WHERE id IN (SELECT extended_id FROM products)")).rows[0].n).toBe(hExt.rows.length);
       expect((await old.query("SELECT client_at FROM validations")).rows.every((r) => r.client_at === null)).toBe(true); // anciennes validations : heure du téléphone inconnue
 
       expect((await old.query("SELECT count(*)::int AS n FROM profiles")).rows[0].n).toBe(1);

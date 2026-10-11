@@ -89,6 +89,7 @@ export const api = {
   createProduct: (b: { name: string; category: string; image?: string; active?: boolean; unit?: Unit }) => request<{ product: Product }>("POST", "/api/products", b),
   searchExtended: (q: string) => request<{ results: ExtendedResult[] }>("GET", `/api/catalog/extended?q=${encodeURIComponent(q)}`),
   addFromExtended: (extendedId: string) => request<{ product: Product }>("POST", "/api/products/from-extended", { extendedId }),
+  catalogAudit: () => request<{ products: AuditProduct[] }>("GET", "/api/catalog/audit"),
   catalogAll: (o: { category?: string; q?: string; offset?: number; limit?: number }) => {
     const qs = new URLSearchParams();
     if (o.category) qs.set("category", o.category);
@@ -204,6 +205,17 @@ export interface Profile {
   active: boolean;
 }
 
+export interface AuditProduct {
+  id: string;
+  name: string;
+  category: string;
+  active: boolean;
+  unit: Unit;
+  photoSource: "none" | "catalogue" | "famille";
+  sharedWithOtherNames: boolean;
+  /** Picture the catalogue holds for this very product (by name or link), when it differs from the one shown. */
+  catalogPhotoUrl: string | null;
+}
 export interface CatalogAllItem {
   key: string;
   origin: "initial" | "extended" | "family";

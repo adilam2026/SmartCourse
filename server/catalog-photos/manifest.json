@@ -696,7 +696,7 @@
     {
       "target": "initial",
       "key": "sel",
-      "name": "Sel",
+      "name": "Sel alimentaire",
       "category": "Épicerie",
       "file": "files/sel.webp",
       "sha256": "ba0ef28f002f1f45081b014082ed014d58c2e9cba602ece982aa52100689a01a",

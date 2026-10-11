@@ -1,5 +1,6 @@
 {
  "version": 1,
+ "count": 163,
  "style": "fond blanc ou très clair, produit entier reconnaissable, sans marque ni texte publicitaire, 512x512 WebP, même style que les 80 photos existantes",
  "items": [
   {
@@ -85,9 +86,9 @@
   },
   {
    "target": "extended",
-   "key": "mais",
-   "name": "Maïs",
-   "file": "files/mais.webp",
+   "key": "mais-frais",
+   "name": "Maïs frais",
+   "file": "files/mais-frais.webp",
    "category": "legumes",
    "origin": "Complémentaire (étendu actuel)",
    "description": "Deux épis de maïs frais avec quelques feuilles, grains jaunes visibles"
@@ -112,9 +113,9 @@
   },
   {
    "target": "extended",
-   "key": "piments",
-   "name": "Piments",
-   "file": "files/piments.webp",
+   "key": "piments-frais",
+   "name": "Piments frais",
+   "file": "files/piments-frais.webp",
    "category": "legumes",
    "origin": "Complémentaire (étendu actuel)",
    "description": "Piments verts et rouges frais, entiers, avec queue"
@@ -135,7 +136,7 @@
    "file": "files/potiron.webp",
    "category": "legumes",
    "origin": "Complémentaire (étendu actuel)",
-   "description": "Un quartier de potiron/courge orange avec la chair visible et graines"
+   "description": "Un quartier de potiron orange avec la chair et les graines visibles"
   },
   {
    "target": "extended",
@@ -145,15 +146,6 @@
    "category": "legumes",
    "origin": "Complémentaire (étendu actuel)",
    "description": "Botte de radis rouges ronds avec fanes"
-  },
-  {
-   "target": "extended",
-   "key": "salade-verte",
-   "name": "Salade verte",
-   "file": "files/salade-verte.webp",
-   "category": "legumes",
-   "origin": "Complémentaire (étendu actuel)",
-   "description": "Salade à feuilles vertes séparées (batavia/feuille de chêne), pas une laitue pommée"
   },
   {
    "target": "extended",
@@ -414,7 +406,7 @@
    "file": "files/raisins-secs.webp",
    "category": "fruits",
    "origin": "Ajout proposé",
-   "description": "Bol de raisins secs bruns/dorés ridés (surtout pas du raisin frais)"
+   "description": "Bol de raisins secs bruns ridés avec quelques raisins secs devant (surtout pas du raisin frais)"
   },
   {
    "target": "extended",
@@ -423,7 +415,7 @@
    "file": "files/creme-dessert.webp",
    "category": "laitages",
    "origin": "Complémentaire (étendu actuel)",
-   "description": "Trois pots individuels de crème dessert (chocolat/vanille), un avec cuillère, sans marque"
+   "description": "Trois pots individuels de crème dessert au chocolat, un pot ouvert avec une cuillère, sans marque"
   },
   {
    "target": "extended",
@@ -468,7 +460,7 @@
    "file": "files/lben.webp",
    "category": "laitages",
    "origin": "Complémentaire (étendu actuel)",
-   "description": "Bouteille ou verre de lben (lait fermenté) blanc, sans marque"
+   "description": "Bouteille de lben (lait fermenté) blanc avec un verre rempli, sans marque"
   },
   {
    "target": "extended",
@@ -522,7 +514,7 @@
    "file": "files/smen.webp",
    "category": "laitages",
    "origin": "Ajout proposé",
-   "description": "Pot en verre ou en terre de smen (beurre rance marocain) ouvert, jaune pâle, cuillère"
+   "description": "Pot en verre de smen (beurre salé fermenté marocain) ouvert, jaune pâle, avec une cuillère"
   },
   {
    "target": "extended",
@@ -549,7 +541,7 @@
    "file": "files/cacao-en-poudre.webp",
    "category": "epicerie",
    "origin": "Complémentaire (étendu actuel)",
-   "description": "Boîte ou bol de cacao en poudre brun foncé avec une cuillère"
+   "description": "Boîte de cacao en poudre avec un bol de poudre brun foncé et une cuillère"
   },
   {
    "target": "extended",
@@ -567,7 +559,7 @@
    "file": "files/couscous.webp",
    "category": "epicerie",
    "origin": "Complémentaire (étendu actuel)",
-   "description": "Paquet de couscous avec un bol de grains de couscous cuit/sec, sans marque"
+   "description": "Paquet de couscous avec un bol de graines de couscous sec, sans marque"
   },
   {
    "target": "extended",
@@ -612,7 +604,7 @@
    "file": "files/harissa.webp",
    "category": "epicerie",
    "origin": "Complémentaire (étendu actuel)",
-   "description": "Petit pot ou tube de harissa rouge avec une cuillère, piments rouges à côté"
+   "description": "Petit pot de harissa rouge avec une cuillère, piments rouges à côté"
   },
   {
    "target": "extended",
@@ -630,7 +622,7 @@
    "file": "files/levure-de-boulanger.webp",
    "category": "epicerie",
    "origin": "Complémentaire (étendu actuel)",
-   "description": "Sachets de levure de boulanger sèche et un peu de poudre/granulés, sans marque"
+   "description": "Sachets de levure de boulanger sèche et un petit tas de granulés, sans marque"
   },
   {
    "target": "extended",
@@ -639,7 +631,7 @@
    "file": "files/mayonnaise.webp",
    "category": "epicerie",
    "origin": "Complémentaire (étendu actuel)",
-   "description": "Pot ou tube de mayonnaise avec une cuillère, sans marque"
+   "description": "Pot de mayonnaise avec une cuillère, sans marque"
   },
   {
    "target": "extended",
@@ -657,7 +649,7 @@
    "file": "files/moutarde.webp",
    "category": "epicerie",
    "origin": "Complémentaire (étendu actuel)",
-   "description": "Pot de moutarde jaune avec une cuillère"
+   "description": "Pot de moutarde jaune avec une cuillère de moutarde"
   },
   {
    "target": "extended",
@@ -720,7 +712,7 @@
    "file": "files/vinaigre.webp",
    "category": "epicerie",
    "origin": "Complémentaire (étendu actuel)",
-   "description": "Bouteille de vinaigre (blanc ou de cidre), étiquette neutre"
+   "description": "Bouteille de vinaigre blanc, étiquette neutre"
   },
   {
    "target": "extended",
@@ -729,7 +721,7 @@
    "file": "files/bicarbonate-alimentaire.webp",
    "category": "epicerie",
    "origin": "Ajout proposé",
-   "description": "Boîte ou sachet de bicarbonate blanc, un petit tas de poudre avec cuillère"
+   "description": "Boîte de bicarbonate de soude avec un petit tas de poudre blanche et une cuillère"
   },
   {
    "target": "extended",
@@ -738,7 +730,7 @@
    "file": "files/bouillon.webp",
    "category": "epicerie",
    "origin": "Ajout proposé",
-   "description": "Boîte de cubes de bouillon avec deux cubes emballés/déballés, sans marque"
+   "description": "Boîte de cubes de bouillon avec deux cubes déballés devant, sans marque"
   },
   {
    "target": "extended",
@@ -792,7 +784,7 @@
    "file": "files/fecule-de-mais.webp",
    "category": "epicerie",
    "origin": "Ajout proposé",
-   "description": "Boîte ou sachet de fécule de maïs avec bol de poudre blanche très fine"
+   "description": "Boîte de fécule de maïs avec un bol de poudre blanche très fine"
   },
   {
    "target": "extended",
@@ -837,7 +829,7 @@
    "file": "files/pesto.webp",
    "category": "epicerie",
    "origin": "Ajout proposé",
-   "description": "Pot de pesto vert ouvert avec cuillère et feuilles de basilic"
+   "description": "Pot de pesto vert ouvert avec une cuillère et des feuilles de basilic"
   },
   {
    "target": "extended",
@@ -873,7 +865,7 @@
    "file": "files/sauce-tomate.webp",
    "category": "epicerie",
    "origin": "Ajout proposé",
-   "description": "Boîte ou bocal de sauce tomate avec filet de sauce sur cuillère, tomate à côté"
+   "description": "Bocal de sauce tomate avec une cuillère de sauce et une tomate à côté"
   },
   {
    "target": "extended",
@@ -900,7 +892,7 @@
    "file": "files/crevettes.webp",
    "category": "viandes",
    "origin": "Complémentaire (étendu actuel)",
-   "description": "Crevettes crues roses/grises dans un bol, quelques-unes devant"
+   "description": "Crevettes crues rosées dans un bol, quelques-unes devant"
   },
   {
    "target": "extended",
@@ -918,7 +910,7 @@
    "file": "files/jambon-de-dinde.webp",
    "category": "viandes",
    "origin": "Complémentaire (étendu actuel)",
-   "description": "Tranches de jambon de dinde roulées/empilées sur assiette"
+   "description": "Tranches de jambon de dinde rose pâle empilées sur une assiette"
   },
   {
    "target": "extended",
@@ -945,7 +937,7 @@
    "file": "files/saucisses.webp",
    "category": "viandes",
    "origin": "Complémentaire (étendu actuel)",
-   "description": "Saucisses de volaille/bœuf crues alignées sur plateau"
+   "description": "Saucisses de volaille crues alignées sur plateau"
   },
   {
    "target": "extended",
@@ -963,7 +955,7 @@
    "file": "files/legumes-surgeles.webp",
    "category": "surgeles",
    "origin": "Complémentaire (étendu actuel)",
-   "description": "Sachet transparent de macédoine/mélange de légumes surgelés (carottes, petits pois, haricots)"
+   "description": "Sachet transparent de macédoine de légumes surgelés (carottes, petits pois, haricots verts), givre visible"
   },
   {
    "target": "extended",
@@ -1008,7 +1000,7 @@
    "file": "files/brioche.webp",
    "category": "pain",
    "origin": "Complémentaire (étendu actuel)",
-   "description": "Une brioche dorée tressée ou ronde avec une tranche coupée"
+   "description": "Une brioche ronde dorée avec une tranche coupée"
   },
   {
    "target": "extended",
@@ -1017,16 +1009,16 @@
    "file": "files/crepes.webp",
    "category": "pain",
    "origin": "Complémentaire (étendu actuel)",
-   "description": "Pile de crêpes pliées avec un filet de sirop/miel"
+   "description": "Pile de crêpes pliées avec un filet de miel"
   },
   {
    "target": "extended",
-   "key": "gateaux-secs",
-   "name": "Gâteaux secs",
-   "file": "files/gateaux-secs.webp",
+   "key": "gateaux-secs-marocains",
+   "name": "Gâteaux secs marocains",
+   "file": "files/gateaux-secs-marocains.webp",
    "category": "pain",
    "origin": "Complémentaire (étendu actuel)",
-   "description": "Assortiment de gâteaux secs marocains (sablés, cornes de gazelle) sur assiette"
+   "description": "Assortiment de gâteaux secs marocains sur assiette : cornes de gazelle, ghriba, sablés à la confiture"
   },
   {
    "target": "extended",
@@ -1044,7 +1036,7 @@
    "file": "files/amlou.webp",
    "category": "pain",
    "origin": "Ajout proposé",
-   "description": "Pot d'amlou (pâte d'amande, huile d'argan et miel), texture brune, avec pain trempé"
+   "description": "Pot d'amlou (pâte d'amande, huile d'argan et miel) ouvert, texture brune, avec un morceau de pain trempé"
   },
   {
    "target": "extended",
@@ -1062,7 +1054,7 @@
    "file": "files/caramel-a-tartiner.webp",
    "category": "pain",
    "origin": "Ajout proposé",
-   "description": "Pot de caramel à tartiner (spéculoos/caramel) ouvert avec un couteau"
+   "description": "Pot de caramel à tartiner couleur caramel ouvert avec un couteau"
   },
   {
    "target": "extended",
@@ -1071,7 +1063,7 @@
    "file": "files/compote-de-fruits.webp",
    "category": "pain",
    "origin": "Ajout proposé",
-   "description": "Pot ou gourde de compote de pommes avec cuillère et pomme à côté"
+   "description": "Pot de compote de pommes avec cuillère et une pomme à côté"
   },
   {
    "target": "extended",
@@ -1080,7 +1072,7 @@
    "file": "files/flocons-d-avoine.webp",
    "category": "pain",
    "origin": "Ajout proposé",
-   "description": "Sachet ou bol de flocons d'avoine avec épis d'avoine"
+   "description": "Sachet de flocons d'avoine avec un bol de flocons et des épis d'avoine"
   },
   {
    "target": "extended",
@@ -1089,7 +1081,16 @@
    "file": "files/boisson-gazeuse.webp",
    "category": "boissons",
    "origin": "Complémentaire (étendu actuel)",
-   "description": "Bouteille de boisson gazeuse brune avec verre et glaçons, étiquette neutre sans logo"
+   "description": "Bouteille de boisson gazeuse brune avec un verre et des glaçons, étiquette neutre sans logo"
+  },
+  {
+   "target": "extended",
+   "key": "boisson-vegetale",
+   "name": "Boisson végétale",
+   "file": "files/boisson-vegetale.webp",
+   "category": "boissons",
+   "origin": "Complémentaire (étendu actuel)",
+   "description": "Brique générique de boisson végétale avec un verre de boisson blanche, quelques amandes, des flocons d'avoine et des fèves de soja à côté (aucun texte)"
   },
   {
    "target": "extended",
@@ -1111,21 +1112,12 @@
   },
   {
    "target": "extended",
-   "key": "lait-d-amande",
-   "name": "Lait d'amande",
-   "file": "files/lait-d-amande.webp",
-   "category": "boissons",
-   "origin": "Complémentaire (étendu actuel)",
-   "description": "Brique de boisson végétale à l'amande avec verre et amandes (à faire évoluer en « Boisson végétale »)"
-  },
-  {
-   "target": "extended",
    "key": "sirop",
    "name": "Sirop",
    "file": "files/sirop.webp",
    "category": "boissons",
    "origin": "Complémentaire (étendu actuel)",
-   "description": "Bouteille de sirop coloré (grenadine/menthe) avec un verre dilué"
+   "description": "Bouteille de sirop coloré de grenadine rouge avec un verre de sirop dilué"
   },
   {
    "target": "extended",
@@ -1170,7 +1162,7 @@
    "file": "files/desodorisant.webp",
    "category": "maison",
    "origin": "Complémentaire (étendu actuel)",
-   "description": "Flacon spray désodorisant d'intérieur avec fleurs/citron, sans marque"
+   "description": "Flacon spray désodorisant d'intérieur avec quelques fleurs blanches à côté, sans marque"
   },
   {
    "target": "extended",
@@ -1179,7 +1171,7 @@
    "file": "files/detartrant.webp",
    "category": "maison",
    "origin": "Complémentaire (étendu actuel)",
-   "description": "Flacon de détartrant avec pommeau de douche/robinet sans calcaire"
+   "description": "Flacon de détartrant avec un robinet chromé propre sans calcaire"
   },
   {
    "target": "extended",
@@ -1215,7 +1207,7 @@
    "file": "files/piles.webp",
    "category": "maison",
    "origin": "Complémentaire (étendu actuel)",
-   "description": "Quatre piles alcalines AA/AAA génériques, sans marque"
+   "description": "Quatre piles alcalines AA génériques, sans marque"
   },
   {
    "target": "extended",
@@ -1269,7 +1261,7 @@
    "file": "files/briquet.webp",
    "category": "maison",
    "origin": "Ajout proposé",
-   "description": "Un briquet de cuisine/ordinaire plastique coloré, sans marque"
+   "description": "Un briquet plastique rouge, sans marque"
   },
   {
    "target": "extended",
@@ -1287,7 +1279,7 @@
    "file": "files/deboucheur.webp",
    "category": "maison",
    "origin": "Ajout proposé",
-   "description": "Flacon de déboucheur d'évier avec évier propre ou ventouse"
+   "description": "Flacon de déboucheur d'évier avec une ventouse à côté"
   },
   {
    "target": "extended",
@@ -1305,7 +1297,7 @@
    "file": "files/desinfectant-menager.webp",
    "category": "maison",
    "origin": "Ajout proposé",
-   "description": "Flacon de désinfectant ménager avec gants et lingette, étiquette neutre"
+   "description": "Flacon de désinfectant ménager avec une paire de gants jaunes, étiquette neutre"
   },
   {
    "target": "extended",
@@ -1314,7 +1306,7 @@
    "file": "files/detachant-du-linge.webp",
    "category": "maison",
    "origin": "Ajout proposé",
-   "description": "Flacon ou spray détachant avec un vêtement blanc taché puis propre"
+   "description": "Spray détachant avec un tee-shirt blanc propre à côté"
   },
   {
    "target": "extended",
@@ -1368,7 +1360,7 @@
    "file": "files/savon-noir-menager.webp",
    "category": "maison",
    "origin": "Ajout proposé",
-   "description": "Pot ou bouteille de savon noir pâteux brun-noir avec éponge"
+   "description": "Pot de savon noir pâteux brun-noir avec une éponge"
   },
   {
    "target": "extended",
@@ -1377,7 +1369,7 @@
    "file": "files/sel-regenerant-pour-lave-vaisselle.webp",
    "category": "maison",
    "origin": "Ajout proposé",
-   "description": "Sac ou boîte générique de gros sel blanc avec un petit tas de gros cristaux et un lave-vaisselle à côté, sans marque"
+   "description": "Boîte générique de sel régénérant pour lave-vaisselle avec un petit tas de gros cristaux blancs, un verre propre à côté, sans marque"
   },
   {
    "target": "extended",
@@ -1404,7 +1396,7 @@
    "file": "files/coton.webp",
    "category": "hygiene",
    "origin": "Complémentaire (étendu actuel)",
-   "description": "Paquet de cotons-tiges ou rondelles de coton démaquillantes"
+   "description": "Paquet de rondelles de coton démaquillantes avec deux rondelles devant"
   },
   {
    "target": "extended",
@@ -1422,7 +1414,7 @@
    "file": "files/creme-hydratante.webp",
    "category": "hygiene",
    "origin": "Complémentaire (étendu actuel)",
-   "description": "Pot de crème hydratante ouvert avec texture blanche"
+   "description": "Pot de crème hydratante blanc ouvert avec un peu de crème sur le couvercle"
   },
   {
    "target": "extended",
@@ -1431,7 +1423,7 @@
    "file": "files/deodorant.webp",
    "category": "hygiene",
    "origin": "Complémentaire (étendu actuel)",
-   "description": "Déodorant bille ou stick générique blanc/bleu, sans marque"
+   "description": "Déodorant stick générique blanc, sans marque"
   },
   {
    "target": "extended",

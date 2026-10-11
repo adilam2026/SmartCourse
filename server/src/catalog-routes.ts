@@ -30,6 +30,13 @@ export const normalizeSearch = (s: string): string =>
 export const defaultUnit = (category: string): Unit =>
   category === "legumes" || category === "fruits" || category === "viandes" ? "kg" : category === "boissons" ? "bouteille" : category === "epicerie" || category === "surgeles" ? "paquet" : "piece";
 
+/** The shared catalogue picture matching a family article: by link, else by exact name (or a former name). Never by category. */
+const catalogPhotoSql = `coalesce(
+  (SELECT i.photo_asset_id FROM initial_catalog i WHERE i.key = p.catalog_key),
+  (SELECT e.photo_asset_id FROM extended_catalog e WHERE e.id = p.extended_id AND e.merged_into IS NULL),
+  (SELECT i.photo_asset_id FROM initial_catalog i WHERE lower(i.name) = lower(p.name) OR lower(p.name) = ANY (i.former_names) LIMIT 1),
+  (SELECT e.photo_asset_id FROM extended_catalog e WHERE e.merged_into IS NULL AND ((lower(e.name) = lower(p.name) AND coalesce(lower(e.brand),'') = coalesce(lower(p.brand),'')) OR lower(p.name) = ANY (e.former_names)) LIMIT 1))`;
+
 const photoUrl = (id: string | null) => (id ? `/api/photos/${id}` : null);
 
 const productView = (r: any) => ({
@@ -115,7 +122,7 @@ export function catalogRoutes(app: FastifyInstance, { db, store, guard, hub }: D
           return r.rows[0];
         }
         // Same id before and after: renaming, moving or deactivating never detaches history (archives keep their own snapshot).
-        const cur = (await c.query("SELECT p.*, i.photo_asset_id AS catalog_photo FROM products p LEFT JOIN initial_catalog i ON i.key = p.catalog_key WHERE p.id = $1 AND p.family_id = $2 FOR UPDATE OF p", [input.id, auth.familyId])).rows[0];
+        const cur = (await c.query(`SELECT p.*, ${catalogPhotoSql} AS catalog_photo FROM products p WHERE p.id = $1 AND p.family_id = $2 FOR UPDATE OF p`, [input.id, auth.familyId])).rows[0];
         if (!cur) throw new HttpError(404, "not_found", "Produit introuvable");
         const category = input.category ?? cur.category;
         const position = category !== cur.category ? (await c.query("SELECT coalesce(max(position), -1) + 1 AS p FROM products WHERE family_id = $1 AND category = $2", [auth.familyId, category])).rows[0].p : cur.position;
@@ -170,7 +177,7 @@ export function catalogRoutes(app: FastifyInstance, { db, store, guard, hub }: D
               EXISTS (SELECT 1 FROM products p WHERE p.family_id = $2
                        AND (p.extended_id = e.id OR (lower(p.name) = lower(e.name) AND coalesce(lower(p.brand),'') = coalesce(lower(e.brand),'')))) AS already_added
          FROM extended_catalog e
-        WHERE e.search_text LIKE '%' || $1 || '%'
+        WHERE e.merged_into IS NULL AND e.search_text LIKE '%' || $1 || '%'
         ORDER BY (e.search_text LIKE $1 || '%') DESC, e.name
         LIMIT 20`,
       [needle, req.auth!.familyId],
@@ -207,21 +214,25 @@ export function catalogRoutes(app: FastifyInstance, { db, store, guard, hub }: D
     const base = `
       WITH ref AS (
         SELECT 'initial'::text AS origin, i.key, i.category, i.name, NULL::text AS brand, i.photo_asset_id, i.position AS pos,
-               lower(i.name) AS lname, ''::text AS lbrand, ${flat("i.name")} AS stext, i.key AS catalog_key, NULL::uuid AS extended_id
+               lower(i.name) AS lname, ''::text AS lbrand, ${flat("i.name || ' ' || i.aliases")} AS stext, i.key AS catalog_key, NULL::uuid AS extended_id,
+               i.former_names AS former, i.unit AS cunit
           FROM initial_catalog i
         UNION ALL
         SELECT 'extended', e.key, e.category, e.name, e.brand, e.photo_asset_id, 1000,
-               lower(e.name), coalesce(lower(e.brand),''), e.search_text, NULL, e.id
-          FROM extended_catalog e
+               lower(e.name), coalesce(lower(e.brand),''), e.search_text, NULL, e.id, e.former_names, e.unit
+          FROM extended_catalog e WHERE e.merged_into IS NULL
         UNION ALL
         -- Articles propres à la famille (créés à la main) : ils apparaissent aussi, pour que la recherche soit commune.
         SELECT 'family', f.id::text, f.category, f.name, f.brand, f.photo_asset_id, 2000,
-               lower(f.name), coalesce(lower(f.brand),''), ${flat("f.name")}, NULL, NULL
+               lower(f.name), coalesce(lower(f.brand),''), ${flat("f.name")}, NULL, NULL, '{}'::text[], NULL
           FROM products f
-         WHERE f.family_id = $1 AND f.catalog_key IS NULL AND f.extended_id IS NULL
-           AND NOT EXISTS (SELECT 1 FROM extended_catalog e WHERE lower(e.name) = lower(f.name) AND coalesce(lower(e.brand),'') = coalesce(lower(f.brand),''))
+         WHERE f.family_id = $1 AND f.catalog_key IS NULL
+           AND (f.extended_id IS NULL OR EXISTS (SELECT 1 FROM extended_catalog m WHERE m.id = f.extended_id AND m.merged_into IS NOT NULL
+                  AND EXISTS (SELECT 1 FROM products d WHERE d.family_id = $1 AND d.catalog_key = m.merged_into) ))
+           AND NOT EXISTS (SELECT 1 FROM extended_catalog e WHERE e.merged_into IS NULL AND ((lower(e.name) = lower(f.name) AND coalesce(lower(e.brand),'') = coalesce(lower(f.brand),'')) OR lower(f.name) = ANY (e.former_names)))
+           AND NOT EXISTS (SELECT 1 FROM initial_catalog i WHERE lower(f.name) = ANY (i.former_names) OR lower(i.name) = lower(f.name))
       )
-      SELECT r.origin, r.key, r.category, r.name, r.brand, r.pos, r.photo_asset_id AS ref_photo,
+      SELECT r.origin, r.key, r.category, r.name, r.brand, r.pos, r.photo_asset_id AS ref_photo, r.cunit,
              p.id AS product_id, p.active AS product_active, p.unit AS product_unit, p.photo_asset_id AS product_photo
         FROM ref r
         LEFT JOIN LATERAL (
@@ -229,7 +240,9 @@ export function catalogRoutes(app: FastifyInstance, { db, store, guard, hub }: D
            WHERE p.family_id = $1
              AND ((r.catalog_key IS NOT NULL AND p.catalog_key = r.catalog_key)
                OR (r.extended_id IS NOT NULL AND p.extended_id = r.extended_id)
-               OR (lower(p.name) = r.lname AND coalesce(lower(p.brand),'') = r.lbrand))
+               OR (r.catalog_key IS NOT NULL AND p.extended_id IN (SELECT m.id FROM extended_catalog m WHERE m.merged_into = r.catalog_key))
+               OR (lower(p.name) = r.lname AND coalesce(lower(p.brand),'') = r.lbrand)
+               OR lower(p.name) = ANY (r.former))
            ORDER BY (p.catalog_key = r.catalog_key OR p.extended_id = r.extended_id) DESC NULLS LAST, p.active DESC
            LIMIT 1
         ) p ON true
@@ -255,7 +268,7 @@ export function catalogRoutes(app: FastifyInstance, { db, store, guard, hub }: D
         photoUrl: photoUrl(x.product_photo ?? x.ref_photo),
         status: (x.product_id ? (x.product_active ? "active" : "inactive") : "absent") as "active" | "inactive" | "absent",
         productId: (x.product_id as string | null) ?? null,
-        unit: ((x.product_unit as Unit | null) ?? defaultUnit(x.category)) as Unit,
+        unit: ((x.product_unit as Unit | null) ?? (x.cunit as Unit | null) ?? defaultUnit(x.category)) as Unit,
       })),
     };
   });
@@ -268,11 +281,12 @@ export function catalogRoutes(app: FastifyInstance, { db, store, guard, hub }: D
       const e = (await c.query(origin === "initial" ? "SELECT * FROM initial_catalog WHERE key = $1" : "SELECT * FROM extended_catalog WHERE key = $1", [key])).rows[0];
       if (!e) throw new HttpError(404, "not_found", "Produit introuvable dans le catalogue");
       const brand: string | null = origin === "extended" ? e.brand : null;
-      const link = origin === "initial" ? "catalog_key = $2" : "extended_id = $2";
+      const link = origin === "initial" ? "catalog_key = $2 OR extended_id IN (SELECT m.id FROM extended_catalog m WHERE m.merged_into = $2)" : "extended_id = $2";
+      const former: string[] = e.former_names ?? [];
       const existing = (
         await c.query(
-          `SELECT * FROM products WHERE family_id = $1 AND (${link} OR (lower(name) = lower($3) AND coalesce(lower(brand),'') = coalesce(lower($4),''))) ORDER BY active DESC LIMIT 1 FOR UPDATE`,
-          [familyId, origin === "initial" ? e.key : e.id, e.name, brand],
+          `SELECT * FROM products WHERE family_id = $1 AND (${link} OR (lower(name) = lower($3) AND coalesce(lower(brand),'') = coalesce(lower($4),'')) OR lower(name) = ANY ($5::text[])) ORDER BY (catalog_key IS NOT NULL OR extended_id IS NOT NULL) DESC, active DESC LIMIT 1 FOR UPDATE`,
+          [familyId, origin === "initial" ? e.key : e.id, e.name, brand, former],
         )
       ).rows[0];
       if (existing) {
@@ -284,7 +298,7 @@ export function catalogRoutes(app: FastifyInstance, { db, store, guard, hub }: D
       const ins = await c.query(
         `INSERT INTO products (family_id, category, name, brand, photo_asset_id, ${origin === "initial" ? "catalog_key" : "extended_id"}, position, unit)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-        [familyId, e.category, e.name, brand, e.photo_asset_id, origin === "initial" ? e.key : e.id, pos, defaultUnit(e.category)],
+        [familyId, e.category, e.name, brand, e.photo_asset_id, origin === "initial" ? e.key : e.id, pos, e.unit ?? defaultUnit(e.category)],
       );
       return { product: ins.rows[0], created: true, reactivated: false };
     });
@@ -292,18 +306,30 @@ export function catalogRoutes(app: FastifyInstance, { db, store, guard, hub }: D
     return reply.code(out.created ? 201 : 200).send({ product: productView(out.product), created: out.created, reactivated: out.reactivated });
   });
 
-  // Audit des articles de la famille : d'où vient la photo, et laquelle est partagée par des noms différents (à vérifier).
+  // Audit des articles de la famille : d'où vient la photo, laquelle est partagée par des noms différents, et la photo
+  // du catalogue qui correspond au nom (jamais déduite de la catégorie) — de quoi repérer et remplacer une association erronée.
   app.get("/api/catalog/audit", { preHandler: guard("family.manage") }, async (req) => {
     const r = await db.query(
-      `SELECT p.id, p.name, p.category, p.active,
+      `SELECT p.id, p.name, p.category, p.active, p.unit, p.photo_asset_id,
               CASE WHEN p.photo_asset_id IS NULL THEN 'none' WHEN a.owner_family_id IS NULL THEN 'catalogue' ELSE 'famille' END AS photo_source,
-              (SELECT count(DISTINCT lower(q.name)) FROM products q WHERE q.family_id = p.family_id AND q.photo_asset_id = p.photo_asset_id) AS names_sharing
+              (SELECT count(DISTINCT lower(q.name)) FROM products q WHERE q.family_id = p.family_id AND q.photo_asset_id = p.photo_asset_id) AS names_sharing,
+              ${catalogPhotoSql} AS catalog_photo
          FROM products p LEFT JOIN photo_assets a ON a.id = p.photo_asset_id
         WHERE p.family_id = $1 ORDER BY p.category, lower(p.name)`,
       [req.auth!.familyId],
     );
     return {
-      products: r.rows.map((x) => ({ id: x.id as string, name: x.name as string, category: x.category as string, active: x.active as boolean, photoSource: x.photo_source as "none" | "catalogue" | "famille", sharedWithOtherNames: Number(x.names_sharing) > 1 })),
+      products: r.rows.map((x) => ({
+        id: x.id as string,
+        name: x.name as string,
+        category: x.category as string,
+        active: x.active as boolean,
+        unit: x.unit as Unit,
+        photoSource: x.photo_source as "none" | "catalogue" | "famille",
+        sharedWithOtherNames: Number(x.names_sharing) > 1,
+        /** Picture the catalogue holds for this very product, when it differs from the one shown. */
+        catalogPhotoUrl: x.catalog_photo && x.catalog_photo !== x.photo_asset_id ? photoUrl(x.catalog_photo) : null,
+      })),
     };
   });
 
@@ -318,7 +344,7 @@ export function catalogRoutes(app: FastifyInstance, { db, store, guard, hub }: D
         `INSERT INTO products (family_id, category, name, brand, photo_asset_id, extended_id, position, unit)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
          ON CONFLICT DO NOTHING RETURNING *`,
-        [familyId, e.category, e.name, e.brand, e.photo_asset_id, e.id, pos, defaultUnit(e.category)],
+        [familyId, e.category, e.name, e.brand, e.photo_asset_id, e.id, pos, e.unit ?? defaultUnit(e.category)],
       );
       if (!ins.rows[0]) throw new HttpError(409, "product_exists", "Ce produit existe déjà dans le catalogue familial");
       return ins.rows[0];

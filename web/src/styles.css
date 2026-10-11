@@ -402,3 +402,7 @@ h3 { font-size: 1.05rem; font-weight: 800; }
 .catphoto--todo small { font-size: 0.68rem; line-height: 1.1; font-weight: 600; }
 .allrow .btn, .allrow .statebadge { flex: none; }
 .notice { margin: 0 1rem 0.5rem; padding: 0.5rem 0.75rem; border-radius: 12px; background: var(--green-soft, var(--surface-2)); color: var(--green-ink); font-weight: 600; }
+.cmp { display: flex; gap: 1rem; justify-content: center; margin: 0.5rem 0; }
+.cmp figure { margin: 0; display: grid; justify-items: center; gap: 0.3rem; }
+.cmp .catphoto { width: 7rem; height: 7rem; }
+.cmp figcaption { font-weight: 700; color: var(--muted); }

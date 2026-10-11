@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
 import { generateInstallToken } from "../src/auth.js";
@@ -92,5 +93,70 @@ describe("catalogue complet (Tous les produits)", () => {
     expect(rows.length).toBe(80);
     expect(rows.find((r: any) => r.name === "Tomates").photoSource).toMatch(/catalogue|none/);
     expect((await app.inject({ method: "GET", url: "/api/catalog/audit", cookies: f.staff })).statusCode).toBe(403);
+  });
+
+  it("décisions validées : Laitue trouvable par « salade », huile végétale, Sel alimentaire, Boisson végétale, Gâteaux secs marocains", async () => {
+    const f = await newFamily();
+    const names = async (q: string) => (await all(f.admin, `?q=${encodeURIComponent(q)}`)).items.map((i: any) => i.name);
+    expect(await names("salade")).toContain("Laitue");
+    expect(await names("salade verte")).toEqual(["Laitue"]); // une seule entrée équivalente
+    expect(await names("huile végétale")).toContain("Huile de table");
+    expect((await names("huile")).filter((n: string) => n === "Huile de table")).toHaveLength(1);
+    expect(await names("sel")).toEqual(expect.arrayContaining(["Sel alimentaire", "Sel régénérant pour lave-vaisselle"]));
+    for (const q of ["amande", "avoine", "soja", "riz"]) expect(await names(q)).toContain("Boisson végétale");
+    expect(await names("Lait d'amande")).toContain("Boisson végétale");
+    expect(await names("gâteaux secs")).toContain("Gâteaux secs marocains");
+    for (const n of ["Pain", "Baguette", "Pain de mie", "Pain complet", "Raisins", "Raisins secs", "Fèves fraîches", "Fèves sèches", "Beurre", "Smen", "Maïs frais", "Maïs en conserve", "Piments frais", "Piment en poudre", "Papier cuisson", "Papier aluminium", "Film alimentaire"])
+      expect((await all(f.admin, "?limit=60&offset=0")).total).toBeGreaterThan(0), expect((await all(f.admin, `?q=${encodeURIComponent(n)}&limit=60`)).items.map((i: any) => i.name)).toContain(n);
+  });
+
+  it("une famille qui avait « Salade verte » retrouve ce même article sous Laitue : pas de nouvelle entrée, identifiant conservé", async () => {
+    const f = await newFamily();
+    const fam = (await db.query("SELECT id FROM families ORDER BY created_at DESC LIMIT 1")).rows[0].id;
+    await db.query("UPDATE products SET active = false WHERE family_id = $1 AND catalog_key = 'laitue'", [fam]);
+    await db.query("UPDATE products SET catalog_key = NULL, name = 'Salade verte', extended_id = (SELECT id FROM extended_catalog WHERE key = 'salade-verte'), active = true WHERE family_id = $1 AND catalog_key = 'laitue'", [fam]);
+    const it = (await all(f.admin, "?q=laitue")).items;
+    expect(it).toHaveLength(1);
+    expect(it[0]).toMatchObject({ name: "Laitue", status: "active" });
+    const before = (await db.query("SELECT id FROM products WHERE family_id = $1 AND name = 'Salade verte'", [fam])).rows[0].id;
+    expect(it[0].productId).toBe(before);
+    const add = await app.inject({ method: "POST", url: "/api/products/from-catalog", cookies: f.admin, payload: { origin: "initial", key: "laitue" } });
+    expect(add.json()).toMatchObject({ created: false, product: { id: before } });
+    expect((await db.query("SELECT count(*)::int AS n FROM products WHERE family_id = $1 AND lower(name) IN ('laitue','salade verte')", [fam])).rows[0].n).toBe(1);
+  });
+
+  it("aucun nouvel article n'est activé dans une famille ; unités proposées (bouteille pour les huiles, boîte pour les conserves)", async () => {
+    const f = await newFamily();
+    const fam = (await db.query("SELECT id FROM families ORDER BY created_at DESC LIMIT 1")).rows[0].id;
+    expect((await db.query("SELECT count(*)::int AS n FROM products WHERE family_id = $1", [fam])).rows[0].n).toBe(80);
+    const unitOf = async (name: string) => (await all(f.admin, `?q=${encodeURIComponent(name)}`)).items.find((i: any) => i.name === name).unit;
+    expect(await unitOf("Huile de table")).toBe("bouteille");
+    expect(await unitOf("Huile d’olive")).toBe("bouteille");
+    expect(await unitOf("Thon en conserve")).toBe("boite");
+    expect(await unitOf("Sardines en conserve")).toBe("boite");
+    expect(await unitOf("Smen")).toBe("pot");
+    const add = await app.inject({ method: "POST", url: "/api/products/from-catalog", cookies: f.admin, payload: { origin: "extended", key: "smen" } });
+    expect(add.json().product.unit).toBe("pot");
+  });
+
+  it("audit + remplacement : une photo personnelle erronée est remplacée par la photo du catalogue du même nom, les autres photos personnelles sont intactes", async () => {
+    const f = await newFamily();
+    const fam = (await db.query("SELECT id FROM families ORDER BY created_at DESC LIMIT 1")).rows[0].id;
+    const png = (await sharp({ create: { width: 32, height: 32, channels: 3, background: "#aa3333" } }).png().toBuffer()).toString("base64");
+    const mk = async (name: string) => (await app.inject({ method: "POST", url: "/api/products", cookies: f.admin, payload: { name, category: "maison", image: png } })).json().product.id;
+    const papier = await mk("Papier cuisson");
+    const autre = await mk("Boîte à tartes");
+    // le catalogue reçoit (plus tard) la bonne photo de « Papier cuisson »
+    const asset = (await db.query("INSERT INTO photo_assets (owner_family_id, storage_key, content_hash, mime, width, height, bytes, source_name, license) VALUES (NULL,'k','h','image/webp',512,512,1,'test','GENERATED') RETURNING id")).rows[0].id;
+    await db.query("UPDATE extended_catalog SET photo_asset_id = $1 WHERE key = 'papier-cuisson'", [asset]);
+    const audit = async () => (await app.inject({ method: "GET", url: "/api/catalog/audit", cookies: f.admin })).json().products;
+    const a1 = (await audit()).find((p: any) => p.id === papier);
+    expect(a1).toMatchObject({ photoSource: "famille", catalogPhotoUrl: `/api/photos/${asset}` });
+    expect((await audit()).find((p: any) => p.id === autre).catalogPhotoUrl).toBeNull(); // pas d'approximation par catégorie
+    const r = await app.inject({ method: "PATCH", url: `/api/products/${papier}`, cookies: f.admin, payload: { resetImage: true } });
+    expect(r.json().product.photoUrl).toBe(`/api/photos/${asset}`);
+    const other = (await db.query("SELECT a.owner_family_id FROM products p JOIN photo_assets a ON a.id = p.photo_asset_id WHERE p.id = $1", [autre])).rows[0];
+    expect(other.owner_family_id).toBe(fam);
+    await db.query("UPDATE extended_catalog SET photo_asset_id = NULL WHERE key = 'papier-cuisson'");
   });
 });
