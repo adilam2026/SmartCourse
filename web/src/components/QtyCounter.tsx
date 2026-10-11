@@ -11,8 +11,8 @@ interface Props {
 }
 
 /**
- * [−]  1 kg  [+] at the bottom of a selected card (drawn over the lower edge of the photo, so the card keeps its size and the
- * grid stays regular). The buttons live OUTSIDE the card's tap area, so a tap on them can never select or unselect the card.
+ * [−] 1 [+] in its own zone at the bottom of a selected card, under the photo and the name (never over the photo), with the full
+ * unit on a line of its own so it is never cut. The buttons live OUTSIDE the card's tap area, so a tap on them can never select or unselect the card.
  * [−] is disabled at the minimum (1, or 0,5 kg from 1 kg: 0,1 kg is the smallest value that can be typed): removing the article
  * is done by unselecting the card. The centre is an input for every unit: tap it to type a quantity ("1,25" for kilograms,
  * whole numbers for the other units).
@@ -33,22 +33,19 @@ export function QtyCounter({ productId, name, unit, qty, onChange }: Props) {
   return (
     <div className="qty" role="group" aria-label={`Quantité de ${name}`} data-testid={`qty-${productId}`}>
       <button type="button" className="qty__btn" aria-label={`Diminuer la quantité de ${name}`} disabled={minus === null} data-testid={`minus-${productId}`} onClick={() => minus !== null && onChange(productId, minus)}>−</button>
-      <label className="qty__val">
-        <input
-          className="qty__input"
-          inputMode={unit === "kg" ? "decimal" : "numeric"}
-          aria-label={`Quantité de ${name}, en ${unit === "kg" ? "kilogrammes" : unitPlural(unit)}`}
-          data-testid={`qty-input-${productId}`}
-          style={{ width: `${Math.min(5, Math.max(1.2, text.length * 0.6 + 0.3))}em` }}
-          value={text}
-          onFocus={(e) => e.currentTarget.select()}
-          onChange={(e) => setText(e.target.value)}
-          onBlur={commit}
-          onKeyDown={(e) => e.key === "Enter" && (e.currentTarget.blur(), e.preventDefault())}
-        />
-        <small data-testid={`qty-unit-${productId}`}>{qty > 1 && unit !== "kg" ? unitPlural(unit) : unitLabel(unit)}</small>
-      </label>
+      <input
+        className="qty__input"
+        inputMode={unit === "kg" ? "decimal" : "numeric"}
+        aria-label={`Quantité de ${name}, en ${unit === "kg" ? "kilogrammes" : unitPlural(unit)}`}
+        data-testid={`qty-input-${productId}`}
+        value={text}
+        onFocus={(e) => e.currentTarget.select()}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => e.key === "Enter" && (e.currentTarget.blur(), e.preventDefault())}
+      />
       <button type="button" className="qty__btn" aria-label={`Augmenter la quantité de ${name}`} disabled={plus === null} data-testid={`plus-${productId}`} onClick={() => plus !== null && onChange(productId, plus)}>+</button>
+      <span className="qty__unit" data-testid={`qty-unit-${productId}`}>{qty > 1 && unit !== "kg" ? unitPlural(unit) : unitLabel(unit)}</span>
     </div>
   );
 }

@@ -85,13 +85,12 @@ h1, h2 { margin: 0; }
 @media (min-width: 640px) { .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 
 .cardwrap { display: flex; flex-direction: column; min-width: 0; border: 4px solid var(--line); border-radius: var(--radius); background: var(--surface); overflow: hidden; }
-.card__media { position: relative; }
 .card { display: block; width: 100%; padding: 0; border: 0; background: transparent; cursor: pointer; touch-action: manipulation; }
 .card__photo { position: relative; display: block; aspect-ratio: 1 / 1; background: #fff; }
 .card__photo img { width: 100%; height: 100%; object-fit: contain; background: #fff; display: block; }
 .card__noimg { position: absolute; inset: 0; display: grid; place-items: center; font-size: 3.4rem; opacity: 0.85; }
-.card__name { flex: 1; display: grid; align-content: start; gap: 2px; padding: 8px 6px 10px; border: 0; background: transparent; text-align: center; font-weight: 700; font-size: 1.02rem; overflow-wrap: anywhere; cursor: pointer; touch-action: manipulation; }
-.card__title { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.card__name { flex: 1; display: grid; align-content: center; gap: 2px; padding: 8px 6px 10px; border: 0; background: transparent; text-align: center; font-weight: 700; font-size: 1.02rem; overflow-wrap: anywhere; cursor: pointer; touch-action: manipulation; }
+.card__title { display: block; overflow-wrap: anywhere; }
 .card__name small { font-weight: 500; color: var(--muted); font-size: 0.78rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .badge { position: absolute; top: 8px; right: 8px; min-width: 44px; height: 44px; border-radius: 22px; display: grid; place-items: center; font-weight: 900; font-size: 1.5rem; color: #fff; box-shadow: 0 2px 6px rgb(0 0 0 / 0.3); }
@@ -177,17 +176,17 @@ h1, h2 { margin: 0; }
 .form__actions .btn--big { min-height: 52px; }
 @media (max-height: 560px) { .form__actions { grid-template-columns: 1fr 1fr; } .sheet { scroll-padding-bottom: 80px; } }
 
-/* ---- quantités : [−] 1 kg [+] dans le bas de la carte sélectionnée ---- */
-.qty { --qc: var(--green); position: absolute; left: 4px; right: 4px; bottom: 4px; display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: 0; height: 52px; padding: 0; border: 2px solid var(--qc); border-radius: 14px; background: rgb(255 255 255 / 0.95); box-shadow: 0 1px 4px rgb(0 0 0 / 0.2); }
-@media (prefers-color-scheme: dark) { .qty { background: rgb(29 43 36 / 0.96); } }
+/* ---- quantités : zone propre sous le nom — [−] 3 [+] puis l'unité complète sur sa ligne ---- */
+.qty { --qc: var(--green); display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; grid-template-areas: "minus val plus" "unit unit unit"; align-items: center; gap: 2px 2px; margin: 0 4px 6px; padding: 4px; border-radius: 14px; background: var(--surface); border: 2px solid var(--qc); }
 .cardwrap--unsaved .qty { --qc: var(--amber); }
-.qty__btn { width: 44px; height: 44px; border-radius: 10px; border: 0; background: color-mix(in srgb, var(--qc) 16%, transparent); color: var(--qc); font-size: 1.5rem; font-weight: 800; line-height: 1; padding: 0; touch-action: manipulation; cursor: pointer; }
+.qty__btn { width: 44px; height: 46px; border-radius: 12px; border: 0; background: color-mix(in srgb, var(--qc) 18%, transparent); color: var(--qc); font-size: 1.6rem; font-weight: 800; line-height: 1; padding: 0; touch-action: manipulation; cursor: pointer; }
+.qty__btn:first-child { grid-area: minus; }
+.qty__btn:last-of-type { grid-area: plus; }
 .qty__btn:disabled { background: transparent; color: var(--muted); opacity: 0.55; cursor: default; }
-.qty__val { display: flex; align-items: baseline; justify-content: center; gap: 2px; min-width: 0; line-height: 1.1; cursor: text; }
-.qty__input { min-width: 0; height: 34px; text-align: center; font-size: 1.1rem; font-weight: 800; border: 0; border-bottom: 2px dotted var(--qc); border-radius: 0; background: transparent; color: var(--ink); padding: 0; }
+.qty__input { grid-area: val; width: 100%; min-width: 0; height: 40px; text-align: center; font-size: 1.15rem; font-weight: 800; border: 0; border-bottom: 2px dotted var(--qc); border-radius: 0; background: transparent; color: var(--ink); padding: 0; }
 .qty__input:focus { outline: 2px solid var(--qc); border-radius: 6px; border-bottom-color: transparent; }
-.qty__val small { color: var(--muted); font-size: 0.74rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.again { position: absolute; left: 6px; right: 6px; bottom: 6px; width: auto; min-height: 40px; padding: 0 8px; background: var(--surface); box-shadow: 0 1px 4px rgb(0 0 0 / 0.2); font-size: 0.9rem; }
+.qty__unit { grid-area: unit; text-align: center; color: var(--muted); font-size: 0.9rem; font-weight: 700; overflow-wrap: anywhere; }
+.again { margin: 0 6px 8px; min-height: 44px; padding: 0 8px; font-size: 0.92rem; }
 .card__again { color: var(--amber); font-weight: 800; }
 
 /* ---- affichage du catalogue du personnel ---- */
@@ -197,14 +196,15 @@ h1, h2 { margin: 0; }
 .searchbox input { flex: 1; min-height: 48px; padding: 0 14px; border-radius: 12px; border: 2px solid var(--line); background: var(--surface); font-size: 1rem; }
 .catblocks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding-top: 10px; }
 @media (min-width: 640px) { .catblocks { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-.catblock { display: grid; gap: 3px; align-content: start; padding: 6px; border: 3px solid var(--line); border-radius: var(--radius); background: var(--surface); text-align: center; cursor: pointer; touch-action: manipulation; overflow: hidden; }
+.catblock { display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 3px solid var(--line); border-radius: var(--radius); background: var(--surface); text-align: center; cursor: pointer; touch-action: manipulation; }
 .catblock--sel { border-color: var(--green); background: var(--green-soft); }
-.catblock__mosaic { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 50px; gap: 4px; height: 50px; overflow: hidden; }
-.catblock__mosaic img, .catblock__mosaic span { width: 100%; height: 50px; max-height: 50px; min-width: 0; object-fit: contain; background: #fff; border-radius: 8px; display: grid; place-items: center; font-size: 1.8rem; }
-.catblock__mosaic span:only-child { grid-column: 1 / -1; }
-.catblock__title { font-weight: 800; font-size: 1.1rem; line-height: 1.15; overflow-wrap: anywhere; }
-.catblock__none { font-size: 0.85rem; color: var(--muted); }
-.catblock__count { font-size: 0.9rem; font-weight: 800; color: var(--green); }
+.catblock__mosaic { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.catblock__mosaic > * { aspect-ratio: 1 / 1; min-width: 0; background: #fff; border-radius: 10px; overflow: hidden; display: grid; place-items: center; font-size: 2rem; }
+.catblock__mosaic img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.catblock__mosaic span:only-child { grid-column: 1 / -1; aspect-ratio: 2 / 1; }
+.catblock__title { font-weight: 800; font-size: 1.1rem; line-height: 1.2; overflow-wrap: anywhere; }
+.catblock__none { font-size: 0.88rem; color: var(--muted); }
+.catblock__count { font-size: 0.92rem; font-weight: 800; color: var(--green); }
 .catback { display: flex; align-items: center; gap: 10px; padding: 10px 0 4px; }
 .catback .btn { min-height: 56px; font-size: 1.1rem; }
 .catback h2 { margin: 0; font-size: 1.25rem; }
@@ -243,7 +243,7 @@ h1, h2 { margin: 0; }
 .updatebar { position: sticky; top: 0; z-index: 60; display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 0; border-radius: 0; }
 
 /* ---- lignes de la liste : nom, quantité en dessous (toujours au même endroit), auteur/date en texte secondaire, bouton à droite ---- */
-.row__main b { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 1.05rem; }
+.row__main b { overflow-wrap: anywhere; font-size: 1.05rem; }
 .rowqty { color: var(--green); font-weight: 800; font-size: 0.95rem; }
 .row--bought .rowqty { color: var(--slate); }
 .rowqty--unknown { color: var(--muted); font-weight: 600; }
@@ -254,12 +254,12 @@ h1, h2 { margin: 0; }
 .seg--wrap button { padding: 0 6px; font-size: 0.92rem; }
 .monthnav__title { flex: 1; min-height: 48px; border-radius: 14px; border: 2px dashed var(--line); background: var(--surface); font-weight: 800; font-size: 1.15rem; cursor: pointer; }
 .statnote--tight { margin-top: 0; text-align: center; }
-.statfilters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 6px 12px; }
-.statfilters__q { grid-column: 1 / -1; min-height: 48px; padding: 0 14px; border-radius: 12px; border: 2px solid var(--line); background: var(--surface); font-size: 1rem; }
+.statfilters { display: grid; grid-template-columns: 1fr; gap: 8px; padding: 6px 12px; }
+.statfilters__q { min-height: 48px; padding: 0 14px; border-radius: 12px; border: 2px solid var(--line); background: var(--surface); font-size: 1rem; }
 .statfilters select { min-width: 0; font-size: 0.92rem; }
 .linkbtn--inline { display: inline; margin: 0; min-height: 0; font-size: 0.9rem; }
 .statrow { align-items: center; }
-.statrow .row__name b { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 1.05rem; }
+.statrow .row__name b { overflow-wrap: anywhere; font-size: 1.05rem; }
 .statrow__line { color: var(--green); font-weight: 800; font-size: 0.95rem; }
 .statrow__cmp { color: var(--muted); }
 .chev { color: var(--muted); font-size: 1.6rem; flex: none; }
@@ -291,4 +291,10 @@ h1, h2 { margin: 0; }
 .chart__legend { margin: 0; }
 
 .pstats__list .linkbtn--inline { justify-self: start; text-align: left; }
-.statfilters__f { display: grid; gap: 2px; font-size: 0.75rem; color: var(--muted); font-weight: 700; min-width: 0; }
+.statfilters__f { display: grid; gap: 2px; font-size: 0.85rem; color: var(--muted); font-weight: 700; min-width: 0; }
+
+.statfilters select { width: 100%; font-size: 1rem; }
+.phead .thumb { width: 76px; height: 76px; }
+.phead__name { font-size: 1.25rem; line-height: 1.2; }
+.chart__bar--partial { fill: url(#partial); stroke: var(--green); stroke-width: 1.5; }
+.chart__partial { fill: var(--amber); font-size: 9px; font-weight: 700; }

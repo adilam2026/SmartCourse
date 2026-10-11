@@ -67,13 +67,16 @@ test.describe("1 · cartes produits : compteur intégré dans le bas de la carte
     expect(qty.x + qty.width).toBeLessThanOrEqual(box.x + box.width);
     expect(qty.y).toBeGreaterThanOrEqual(box.y);
     expect(qty.y + qty.height).toBeLessThanOrEqual(box.y + box.height);
-    // boutons accessibles au pouce (≥ 44 px) mais plus légers : la barre entière reste < 60 px de haut
+    // trois zones distinctes : photo, nom, compteur — le compteur est SOUS la photo et le nom, jamais dessus
+    const photo = (await card(page, f, "Lait").boundingBox())!;
+    const nameBox = (await wrap(page, f, "Lait").locator(".card__name").boundingBox())!;
+    expect(qty.y).toBeGreaterThanOrEqual(photo.y + photo.height - 1);
+    expect(qty.y).toBeGreaterThanOrEqual(nameBox.y + nameBox.height - 1);
     for (const t of ["minus", "plus"]) {
       const b = (await page.getByTestId(`${t}-${pid(f, "Lait")}`).boundingBox())!;
       expect(b.width).toBeGreaterThanOrEqual(44);
       expect(b.height).toBeGreaterThanOrEqual(44);
     }
-    expect(qty.height).toBeLessThan(60);
 
     // grille régulière : toutes les cartes d'une même rangée ont la même hauteur, sélectionnées ou non
     const rows = await page.locator("[data-testid^=wrap-]").evaluateAll((els) => {
@@ -93,6 +96,7 @@ test.describe("1 · cartes produits : compteur intégré dans le bas de la carte
     await page.getByTestId(`plus-${lait}`).click();
     await expect(page.getByTestId(`qty-input-${lait}`)).toHaveValue("2");
     await expect(page.getByTestId(`qty-unit-${lait}`)).toHaveText("pièces");
+    expect(await page.getByTestId(`qty-unit-${lait}`).evaluate((e) => e.scrollWidth <= e.clientWidth)).toBe(true); // unité jamais tronquée
     await page.getByTestId(`qty-input-${lait}`).tap();
     await page.getByTestId(`qty-input-${lait}`).fill("12");
     await page.getByTestId(`qty-input-${lait}`).press("Enter");
@@ -177,11 +181,17 @@ test.describe("2 · haut du catalogue simplifié", () => {
     await page.getByTestId("view-categories").click();
     const blocks = page.locator("[data-testid^=catblock-]");
     expect(await blocks.count()).toBeGreaterThan(8);
-    const dims = await blocks.evaluateAll((els) => els.map((e) => ({ h: e.getBoundingClientRect().height, imgs: e.querySelectorAll("img").length, fs: parseFloat(getComputedStyle(e.querySelector(".catblock__title")!).fontSize) })));
+    const dims = await blocks.evaluateAll((els) => els.map((e) => {
+      const m = e.querySelector(".catblock__mosaic")!.getBoundingClientRect();
+      const t = e.querySelector(".catblock__title") as HTMLElement;
+      return { imgs: e.querySelectorAll("img").length, fs: parseFloat(getComputedStyle(t).fontSize), titleBelow: t.getBoundingClientRect().top >= m.bottom - 1, titleWhole: t.scrollHeight <= t.clientHeight + 1, side: Math.min(m.width / 2, m.height) };
+    }));
     for (const d of dims) {
-      expect(d.h).toBeLessThanOrEqual(140);
       expect(d.imgs).toBeLessThanOrEqual(2);
       expect(d.fs).toBeGreaterThanOrEqual(16);
+      expect(d.titleBelow).toBe(true); // aucun texte sur les images
+      expect(d.titleWhole).toBe(true); // titre jamais coupé
+      expect(d.side).toBeGreaterThanOrEqual(60); // illustrations assez grandes pour être reconnues
     }
     await expect(page.getByTestId("catcount-laitages")).toContainText("sélectionné");
     await page.screenshot({ path: `${CAP}/amelioration-par-categories.png` });

@@ -26,7 +26,7 @@ export function ProductStatsSheet({ row, period, month, onOpenList, onClose }: {
   }, [row.productId, period, month]);
 
   return (
-    <Dialog title={row.name} onClose={onClose}>
+    <Dialog title="Historique d'achats" onClose={onClose}>
       <div className="phead">
         <Thumb photoUrl={row.photoUrl} category={row.category} />
         <div>
@@ -52,7 +52,7 @@ export function ProductStatsSheet({ row, period, month, onOpenList, onClose }: {
             <p className="muted" data-testid="pstats-last">{data.summary.lastPurchaseAt ? lastPurchaseText(data.summary.lastPurchaseAt) : "Aucun achat enregistré."}</p>
           </section>
 
-          <Chart months={data.months} />
+          <Chart months={data.months} partialLast={data.window.partial} />
 
           <h3 className="pstats__h">Historique</h3>
           {data.purchases.length === 0 ? (
@@ -91,7 +91,7 @@ const cellOf = (units: StatsUnitCell[], unit: Unit | null): StatsUnitCell | unde
  * One small bar chart per unit (units are never drawn together). Months before the household's first list show « pas de données »;
  * a month with data tracking but no purchase shows an empty bar (zero), which is different.
  */
-export function Chart({ months }: { months: ProductStats["months"] }) {
+export function Chart({ months, partialLast = false }: { months: ProductStats["months"]; partialLast?: boolean }) {
   const units: Unit[] = [];
   for (const m of months) for (const u of m.units) if (u.unit && !units.includes(u.unit)) units.push(u.unit);
   const hasPurchases = months.some((m) => m.units.length > 0);
@@ -101,17 +101,17 @@ export function Chart({ months }: { months: ProductStats["months"] }) {
   return (
     <section aria-label="Quantités achetées par mois" data-testid="pstats-charts">
       <h3 className="pstats__h">Quantités achetées par mois</h3>
-      {units.map((unit) => <UnitChart key={unit} unit={unit} months={months} />)}
+      {units.map((unit) => <UnitChart key={unit} unit={unit} months={months} partialLast={partialLast} />)}
       {unknownOnly && <p className="muted"><small>Certains achats anciens n'ont pas de quantité : ils ne sont pas dessinés.</small></p>}
     </section>
   );
 }
 
-function UnitChart({ unit, months }: { unit: Unit; months: ProductStats["months"] }) {
+function UnitChart({ unit, months, partialLast }: { unit: Unit; months: ProductStats["months"]; partialLast: boolean }) {
   const values = months.map((m) => cellOf(m.units, unit)?.quantity ?? 0);
   const max = Math.max(...values, 1);
   const W = 300;
-  const H = 118;
+  const H = 124;
   const top = 22;
   const base = 92;
   const step = W / months.length;
@@ -120,6 +120,7 @@ function UnitChart({ unit, months }: { unit: Unit; months: ProductStats["months"
     <figure className="chart" data-testid={`chart-${unit}`}>
       <figcaption>En {unit === "kg" ? "kilogrammes" : unitPlural(unit)}</figcaption>
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${unitLabel(unit)} : ${summary}`}>
+        <defs><pattern id="partial" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="var(--green-soft)" /><line x1="0" y1="0" x2="0" y2="6" stroke="var(--green)" strokeWidth="3" /></pattern></defs>
         <line x1="0" y1={base} x2={W} y2={base} className="chart__axis" />
         {months.map((m, i) => {
           const x = i * step + step * 0.18;
@@ -127,24 +128,25 @@ function UnitChart({ unit, months }: { unit: Unit; months: ProductStats["months"
           const q = values[i]!;
           const h = q > 0 ? Math.max(3, ((base - top) * q) / max) : 0;
           return (
-            <g key={m.month} data-testid={`bar-${m.month}`} data-state={!m.covered ? "nodata" : q > 0 ? "value" : "zero"}>
+            <g key={m.month} data-testid={`bar-${m.month}`} data-state={!m.covered ? "nodata" : q > 0 ? "value" : "zero"} data-incomplete={partialLast && i === months.length - 1 ? "true" : undefined}>
               {!m.covered ? (
                 <rect x={x} y={base - 14} width={w} height={14} className="chart__nodata" />
               ) : q > 0 ? (
                 <>
-                  <rect x={x} y={base - h} width={w} height={h} rx="3" className="chart__bar" />
+                  <rect x={x} y={base - h} width={w} height={h} rx="3" className={partialLast && i === months.length - 1 ? "chart__bar chart__bar--partial" : "chart__bar"} />
                   <text x={x + w / 2} y={base - h - 4} textAnchor="middle" className="chart__val">{String(q).replace(".", ",")}</text>
                 </>
               ) : (
                 <text x={x + w / 2} y={base - 4} textAnchor="middle" className="chart__zero">0</text>
               )}
               <text x={x + w / 2} y={base + 14} textAnchor="middle" className="chart__lbl">{fmtMonthShort(m.month)}</text>
+              {partialLast && i === months.length - 1 && <text x={x + w / 2} y={base + 26} textAnchor="middle" className="chart__partial">en cours</text>}
               {!m.covered && <text x={x + w / 2} y={base + 26} textAnchor="middle" className="chart__lbl chart__lbl--small">—</text>}
             </g>
           );
         })}
       </svg>
-      <p className="chart__legend muted"><small>0 = aucun achat ce mois-là · pointillé = pas de données (avant le début de l'historique)</small></p>
+      <p className="chart__legend muted"><small>0 = aucun achat ce mois-là · pointillé = pas de données (avant le début de l'historique) · hachuré = mois en cours, incomplet</small></p>
     </figure>
   );
 }

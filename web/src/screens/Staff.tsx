@@ -237,7 +237,7 @@ export function StaffScreen({ engine, s, onBack }: { engine: Engine; s: State; o
               return (
                 <button key={c.key} type="button" className={`catblock ${n > 0 ? "catblock--sel" : ""}`} data-testid={`catblock-${c.key}`} aria-label={`${c.label}, ${c.products.length} produit${c.products.length > 1 ? "s" : ""}${n > 0 ? `, ${n} sélectionné${n > 1 ? "s" : ""}` : ""}`} onClick={() => setOpenCat(c.key)}>
                   <span className="catblock__mosaic" aria-hidden="true">
-                    {pics.length > 0 ? pics.map((p) => <img key={p.id} src={p.photoUrl!} alt="" loading="lazy" decoding="async" />) : <span>{CATEGORY_EMOJI[c.key] ?? "•"}</span>}
+                    {pics.length > 0 ? pics.map((p) => <img key={p.id} src={p.photoUrl!} alt="" decoding="async" />) : <span>{CATEGORY_EMOJI[c.key] ?? "•"}</span>}
                   </span>
                   <span className="catblock__title">{c.label}</span>
                   {n > 0 ? <span className="catblock__count" data-testid={`catcount-${c.key}`} aria-hidden="true">{n} sélectionné{n > 1 ? "s" : ""}</span> : <span className="catblock__none" aria-hidden="true">{c.products.length} produit{c.products.length > 1 ? "s" : ""}</span>}
