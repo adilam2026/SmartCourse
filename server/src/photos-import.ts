@@ -118,7 +118,9 @@ export async function syncCatalogPhotos(db: Db, store: PhotoStore, manifestPath:
         const e = (await c.query("SELECT id, name, brand, former_names FROM extended_catalog WHERE key = $1", [it.key])).rows[0];
         await c.query(
           `UPDATE products SET extended_id = coalesce(extended_id, $1), photo_asset_id = $2
-            WHERE (extended_id = $1 OR (extended_id IS NULL AND catalog_key IS NULL AND lower(name) = lower($3) AND coalesce(lower(brand),'') = coalesce(lower($4),'')) OR lower(name) = ANY ($5::text[])))
+            WHERE (extended_id = $1
+                   OR (extended_id IS NULL AND catalog_key IS NULL
+                       AND ((lower(name) = lower($3) AND coalesce(lower(brand),'') = coalesce(lower($4),'')) OR lower(name) = ANY ($5::text[]))))
               AND (photo_asset_id IS NULL OR photo_asset_id IN (SELECT id FROM photo_assets WHERE owner_family_id IS NULL))`,
           [e.id, assetId, e.name, e.brand, e.former_names],
         );

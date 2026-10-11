@@ -51,8 +51,9 @@ test("Tous les produits : ouvert sans recherche, catégories, plus de 20 résult
   await expect(page.getByTestId("all-Tomates")).toHaveCount(0);
   await reveal(page, "Pêches");
   await expect(page.getByTestId("all-Tomates")).toHaveCount(0);
-  // pas de photo : état explicite, jamais la photo d'un autre produit
-  await expect(page.getByTestId("photo-todo-Pêches")).toContainText("Photo à venir");
+  // photo du catalogue chargée (pas d'emoji, pas de « Photo à venir »)
+  await expect(page.getByTestId("photo-Pêches")).toBeVisible();
+  expect(await page.getByTestId("photo-Pêches").evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth === 512)).toBe(true);
 });
 
 test("ajout, déjà disponible, réactivation sans recréer ; recherche commune", async ({ page, playwright, baseURL }) => {
@@ -127,25 +128,43 @@ test("photo erronée d'un article : repérée, comparée, remplacée par la phot
   const f = await newFamily(playwright, baseURL!);
   await f.adil.post("/api/products", { data: { name: "Papier cuisson", category: "maison", image: PNG } });
   await f.adil.post("/api/products", { data: { name: "Boîte à gâteaux", category: "maison", image: PNG } });
-  const asset = (await sql("INSERT INTO photo_assets (owner_family_id, storage_key, content_hash, mime, width, height, bytes, source_name, license) VALUES (NULL,'t','t','image/png',1,1,1,'test','GENERATED') RETURNING id"))[0].id;
-  await sql("UPDATE extended_catalog SET photo_asset_id = $1 WHERE key = 'papier-cuisson'", [asset]);
-  try {
-    await uiLogin(page, f, "adil", "482913");
-    await page.getByTestId("tab-settings").click();
-    await page.getByTestId("seg-catalog").click();
-    await expect(page.getByTestId("photosrc-Papier cuisson")).toContainText("de la famille");
-    await page.getByTestId("pf-check").click();
-    await expect(page.getByTestId("prod-Papier cuisson")).toBeVisible();
-    await expect(page.getByTestId("prod-Boîte à gâteaux")).toHaveCount(0); // pas d'approximation par catégorie
-    await page.getByTestId("usecat-Papier cuisson").click();
-    await expect(page.getByTestId("photo-compare")).toBeVisible();
-    await page.screenshot({ path: `${OUT}/photo-comparer-390.png` });
-    await page.getByTestId("usecat-confirm").click();
-    await page.getByTestId("pf-all").click();
-    await expect(page.getByTestId("photosrc-Papier cuisson")).toContainText("du catalogue");
-    await page.getByTestId("pf-all").click();
-    await expect(page.getByTestId("photosrc-Boîte à gâteaux")).toContainText("de la famille");
-  } finally {
-    await sql("UPDATE extended_catalog SET photo_asset_id = NULL WHERE key = 'papier-cuisson'");
-  }
+  await uiLogin(page, f, "adil", "482913");
+  await page.getByTestId("tab-settings").click();
+  await page.getByTestId("seg-catalog").click();
+  await expect(page.getByTestId("photosrc-Papier cuisson")).toContainText("de la famille");
+  await page.getByTestId("pf-check").click();
+  await expect(page.getByTestId("prod-Papier cuisson")).toBeVisible();
+  await expect(page.getByTestId("prod-Boîte à gâteaux")).toHaveCount(0); // pas d'approximation par catégorie
+  await page.getByTestId("usecat-Papier cuisson").click();
+  await expect(page.getByTestId("photo-compare")).toBeVisible();
+  await expect(page.getByTestId("photo-Papier cuisson (catalogue)")).toBeVisible();
+  await page.screenshot({ path: `${OUT}/photo-comparer-390.png` });
+  await page.getByTestId("usecat-confirm").click();
+  await page.getByTestId("pf-all").click();
+  await expect(page.getByTestId("photosrc-Papier cuisson")).toContainText("du catalogue");
+  await expect(page.getByTestId("photosrc-Boîte à gâteaux")).toContainText("de la famille");
 });
+
+const CATS = ["legumes", "fruits", "laitages", "epicerie", "viandes", "surgeles", "pain", "boissons", "maison", "hygiene"];
+for (const w of [360, 390]) {
+  test(`toutes les photos du catalogue complet s'affichent à ${w} px (aucune « Photo à venir »)`, async ({ page, playwright, baseURL }) => {
+    await page.setViewportSize({ width: w, height: 844 });
+    const f = await newFamily(playwright, baseURL!);
+    await openAll(page, f);
+    for (const c of CATS) {
+      const loaded = page.waitForResponse((r) => r.url().includes(`category=${c}`) && r.url().includes("offset=0"));
+      await page.getByTestId(`allcat-${c}`).click();
+      await loaded;
+      await expect(page.locator('[data-testid="all-list"] .allrow').first()).toBeVisible();
+      for (let i = 0; i < 40 && (await page.getByTestId("all-more").count()); i++) { const more = page.waitForResponse((r) => r.url().includes(`category=${c}`) && !r.url().includes("offset=0"), { timeout: 2500 }).catch(() => null); await page.getByTestId("all-more").click({ timeout: 1500 }).catch(() => {}); await more; await page.waitForTimeout(100); }
+      await page.evaluate(() => document.querySelectorAll<HTMLImageElement>("img.catphoto").forEach((i) => { i.loading = "eager"; }));
+      await page.evaluate(() => Promise.all([...document.querySelectorAll<HTMLImageElement>("img.catphoto")].map((i) => i.decode().catch(() => {}))));
+      const bad = await page.locator("img.catphoto").evaluateAll((els) => (els as HTMLImageElement[]).filter((i) => i.naturalWidth !== 512).map((i) => i.dataset.testid));
+      expect(bad).toEqual([]);
+      await expect(page.locator(".catphoto--todo")).toHaveCount(0);
+      expect(await noOverflow(page)).toBe(true);
+      await page.evaluate(() => window.scrollTo(0, 0));
+      if (w === 390) await page.screenshot({ path: `${OUT}/photos-${c}-390.png` });
+    }
+  });
+}

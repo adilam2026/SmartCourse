@@ -73,7 +73,9 @@ async function seedOldCatalogue(keys: string[]) {
 
 describe("le pack de 80 visuels", () => {
   it("le manifeste du dépôt : 80 clés uniques, noms exacts, aucune marque, provenance « générée »", async () => {
-    const m = JSON.parse(await readFile(MANIFEST, "utf8"));
+    const all = JSON.parse(await readFile(MANIFEST, "utf8"));
+    expect(all.items.filter((i: any) => i.target === "extended")).toHaveLength(163); // pack du catalogue complémentaire
+    const m = { ...all, items: all.items.filter((i: any) => i.target === "initial") };
     expect(m.items).toHaveLength(80);
     expect(new Set(m.items.map((i: any) => i.key)).size).toBe(80);
     const ref = (await db.query("SELECT key, name FROM initial_catalog")).rows;
@@ -123,11 +125,11 @@ describe("remplacement des anciennes images", () => {
   let freedExpected = 0;
   it("la synchronisation remplace les 80 références sans doublon ni changement d'identifiant", async () => {
     const r = await syncCatalogPhotos(db, store, MANIFEST);
-    expect(r.imported).toHaveLength(80);
+    expect(r.imported).toHaveLength(243); // 80 de départ + 163 du catalogue complémentaire
     const ic = (await db.query("SELECT i.key, a.generated, a.source_sha256, a.license, a.source_name, a.author FROM initial_catalog i JOIN photo_assets a ON a.id = i.photo_asset_id")).rows;
     expect(ic).toHaveLength(80);
     const m = JSON.parse(await readFile(MANIFEST, "utf8"));
-    for (const it of m.items) {
+    for (const it of m.items.filter((x: any) => x.target === "initial")) {
       const row = ic.find((x) => x.key === it.key)!;
       expect(row).toMatchObject({ generated: true, source_sha256: it.sha256, license: "GENERATED", source_name: "Image générée avec ChatGPT", author: null });
     }
@@ -183,7 +185,7 @@ describe("remplacement des anciennes images", () => {
     for (let i = 0; i < 3; i++) {
       const r = await syncCatalogPhotos(db, store, MANIFEST);
       expect(r.imported).toEqual([]);
-      expect(r.skipped).toHaveLength(80);
+      expect(r.skipped).toHaveLength(243);
       const p = await purgeOrphanAssets(db, store, { minAgeMinutes: 0 });
       expect(p.assets).toBe(0);
     }

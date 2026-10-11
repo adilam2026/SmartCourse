@@ -332,8 +332,4 @@ json.dump({"version": 1, "count": len(need), "style": "fond blanc ou très clair
           open(OUT / "manifeste-images.json", "w", encoding="utf8"), ensure_ascii=False, indent=1)
 print(len(rows), ni, ne, nn, len(need))
 
-with open(OUT / "etat-photos.md", "w", encoding="utf8") as f:
-    f.write(f"# Articles encore sans photo (jusqu'à l'intégration du pack)\n\n**{len(need)} articles** n'ont pas de photo ; ils s'affichent « Photo à venir » (jamais la photo d'un autre produit). Les {ni} articles de départ ont une photo vérifiée.\n")
-    for c in ORDER:
-        lst = [r["name"] for r in need if r["cat"] == c]
-        if lst: f.write(f"\n## {CATS[c]} ({len(lst)})\n\n" + ", ".join(lst) + "\n")
+# etat-photos.md est maintenant rédigé à la main (pack intégré) : plus généré ici.
