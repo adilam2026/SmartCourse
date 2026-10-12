@@ -177,7 +177,7 @@ fun ToggleChip(text: String, selected: Boolean, onClick: () -> Unit) {
     val cmp = LocalCompact.current
     val shape = RoundedCornerShape(50)
     // Zone tactile : 48 dp au moins pour le personnel ; la pastille garde son aspect (36 dp).
-    Box(Modifier.heightIn(min = if (cmp) 36.dp else 48.dp).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
+    Box(Modifier.heightIn(min = if (cmp) 36.dp else 48.dp).widthIn(min = if (cmp) 0.dp else 48.dp).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
         Box(
             Modifier.heightIn(min = 36.dp).clip(shape)
                 .background(if (selected) C.Navy else Color.White)

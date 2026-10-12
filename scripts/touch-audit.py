@@ -28,7 +28,7 @@ for n in tree.iter("node"):
         continue
     x1, y1, x2, y2 = map(int, m)
     w, h = x2 - x1, y2 - y1
-    if clipped((x1, y1, x2, y2)):
+    if clipped((x1, y1, x2, y2)) or min(w, h) < 12 * dpi / 160.0:  # coupé par le bord de l'écran ou de la liste : bande visible, pas un vrai bouton
         continue
     count += 1
     if min(w, h) < limit:
