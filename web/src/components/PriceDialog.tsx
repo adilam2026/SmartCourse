@@ -4,6 +4,7 @@ import { userMessage } from "../errors";
 import { fmtPrice, REF_UNITS, type RefUnit } from "../pricing";
 import type { Product } from "../types";
 import { CityPrompt } from "./CityPicker";
+import { priceNature } from "../priceNature";
 import { Dialog } from "./Dialog";
 
 const REF_LABEL: Record<RefUnit, string> = { kg: "kg", g: "g", litre: "litre", ml: "ml", piece: "pièce", paquet: "paquet", bouteille: "bouteille", brique: "brique", pot: "pot", boite: "boîte" };
@@ -34,6 +35,8 @@ export function PriceDialog({ product, onClose, onChanged }: { product: Product;
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [why, setWhy] = useState(false);
+  const nature = priceNature(p);
   const missing = NEEDS_PACKAGING.has(ref.refUnit) && !ref.packaging.trim();
   const askPackaging = missing || format;
   const known = { refQty: ref.refQty, refUnit: ref.refUnit, packaging: COUNTED.has(ref.refUnit) ? ref.packaging.trim() || null : null };
@@ -57,6 +60,13 @@ export function PriceDialog({ product, onClose, onChanged }: { product: Product;
         void run(() => api.setPrice(product.id, { amount: amount.trim(), refQty: ref.refQty.trim(), refUnit: ref.refUnit, packaging: known.packaging, pieceWeightG: p?.pieceWeightG ?? null }), "", true);
       }}>
         <p data-testid="price-ref"><b>{product.name}</b> · {refText(known)}</p>
+        {nature && (
+          <p className="pricenature" data-testid="price-nature-line">
+            {nature.chip && <span className={`naturechip naturechip--${nature.chip === "observé" ? "obs" : "est"}`} data-testid="price-nature">{nature.chip}</span>}
+            <button type="button" className="linkbtn linkbtn--inline" aria-expanded={why} data-testid="price-nature-more" onClick={() => setWhy((v) => !v)}>{why ? "Masquer" : "D'où vient ce prix ?"}</button>
+            {why && <span className="pricenature__detail" data-testid="price-nature-detail">{nature.detail}</span>}
+          </p>
+        )}
         <label className="field">Prix (DH)<input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="9,90" autoFocus data-testid="price-amount" /></label>
         {askPackaging && !format && <label className="field">Contenu (ex. 500 g)<input value={ref.packaging} onChange={(e) => setRef({ ...ref, packaging: e.target.value })} maxLength={60} placeholder="500 g, 1 L…" data-testid="price-packaging" /></label>}
         {format && (

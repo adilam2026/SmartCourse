@@ -1,5 +1,7 @@
 # Courses V3 — état des lieux de réalisation (audit)
 
+> **Mise à jour du lot « régressions + parcours personnel »** : les lignes B9, D1, G11, K7 ci-dessous ont changé (voir la section « Lot 2 » en fin de document). Les autres lignes sont inchangées.
+
 Audit de réalisation, sans nouveau développement. Rien n'est fusionné vers la production.
 
 **Légende**
@@ -195,3 +197,22 @@ Audit de réalisation, sans nouveau développement. Rien n'est fusionné vers la
 | M8 | Expiration indiquée | 🟡 | V3 | Statut du commit `recette/acces` | — | Heure affichée « 18:22 Maroc » alors que c'est 18:22 UTC (19:22 Maroc) : corrigé pour les prochaines sessions |
 | M9 | Validation sur un vrai téléphone | ❌ | — | — | — | Aucun test réel à ce jour (hors votre capture montrant l'échec des notifications) |
 | M10 | Captures réelles 360/390 px | 🟡 | V3 | `docs/captures/` | — | Captures de Chromium émulant 360/390 px, pas d'un téléphone réel |
+
+## Lot 2 — régressions et parcours personnel (mise à jour)
+Branche `claude/v3-selection`, derrière l'aperçu V3 pour la partie personnel ; aucune fusion, aucun déploiement.
+
+| # | Élément | Statut | Version | Accès · rôles | Preuve | Ce qui manque |
+|---|---|---|---|---|---|---|
+| G11 | Nature du prix (observé / estimé), détail à la demande | ✅ | V3 | Catalogue → Prix → pastille + « D'où vient ce prix ? » ; panneau de quantité (pastille) · P, A, S | `v3-personnel` · `v3/prix-nature-observe-390.png`, `prix-nature-estime-390.png` | Prix de la famille : pas de pastille, détail « Prix saisi par votre famille » |
+| K7 | Aide des statistiques exacte | ✅ | V3 | Statistiques → « ? » | `evolutions` (texte mis à jour) | Total estimé et répartition : lot Statistiques |
+| B9 | Sélection par le personnel sans liste (brouillon) | ✅ | V3 | « Choisir » · S | `v3-personnel`, `audit-v3` · `v3/personnel-sans-liste-brouillon-390.png` | — (V2 inchangée : lecture seule sans liste) |
+| B9b | Validation qui crée la liste, sans droit en plus | ✅ | V3 | Bouton « Valider » · S | `v3-personnel`, tests serveur `active-list-requests` · `v3/personnel-validation-390.png` | Le personnel ne crée, ne clôture ni n'achète toujours rien (403 vérifiés) |
+| B9c | Deux appareils qui valident en même temps | ✅ | V3 | — | `v3-personnel`, tests serveur | Une seule liste en cours ; aucune demande perdue ; rejeu d'un lot sans doublon |
+| B9d | Validation hors connexion sans liste | ✅ | V3 | — | `v3-personnel` | Annoncée « gardée sur ce téléphone » tant que le serveur n'a pas répondu |
+| D1 | Liste du jour du personnel | ✅ | V3 | Onglet « Liste du jour » · S | `v3-personnel` · `v3/liste-du-jour-demandes-390.png`, `liste-du-jour-progression-390.png`, `liste-du-jour-a-valider-390.png` | Le personnel ne marque aucun achat (droit inchangé) |
+| D1b | États À valider / Demandé / Acheté distincts | ✅ | V3 | Liste du jour, écran de choix | `v3-personnel` | Il n'existe pas d'étape d'approbation par un administrateur : « Demandé » = enregistré dans la liste |
+| D1c | Progression sur les articles réellement à acheter | ✅ | V3 | Liste du jour | `v3-personnel` (brouillon exclu ; 1 sur 3 = 33 %) | — |
+| D1d | Filtres Tous / À acheter / Achetés | ✅ | V3 | Liste du jour | `v3-personnel` | — |
+| D1e | Confirmation permettant de rejoindre la liste | ✅ | V3 | Après « Valider » : « Voir la liste du jour » | `v3-personnel` | — |
+| B1b | Trois modes visibles sur l'écran de sélection | ✅ | V3 | Choisir | `v3-personnel`, `v3-selection` | — |
+| B1c | Nombre réel d'articles accessibles | ✅ | V3 | Choisir (« 80 articles ») | `v3-personnel` (égal au catalogue actif) | — |

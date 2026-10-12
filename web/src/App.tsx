@@ -2,6 +2,9 @@ import { LinkScreen, LoginScreen, SetupVerify, Welcome } from "./screens/Login";
 import { UpdateBanner } from "./components/VersionInfo";
 import { ParentApp } from "./screens/Parent";
 import { StaffScreen } from "./screens/Staff";
+import { StaffApp } from "./components/v3/StaffApp";
+import { V3Boundary } from "./components/v3/Boundary";
+import { useV3 } from "./v3";
 import { useEffect, useState } from "react";
 import { reconcilePush } from "./push";
 import { clearOpenTarget } from "./openTarget";
@@ -43,6 +46,7 @@ function takeInstallLink(engine: Engine): void {
 
 function Screens({ engine }: { engine: Engine }) {
   const s = useEngine(engine);
+  const v3 = useV3();
   useEffect(() => {
     takeInstallLink(engine);
     const on = () => takeInstallLink(engine);
@@ -83,6 +87,7 @@ function Screens({ engine }: { engine: Engine }) {
   if (s.phase === "loggedOut" || !s.me) return <LoginScreen engine={engine} s={s} />;
   if (s.me.setupPending) return <SetupVerify engine={engine} />;
   if (s.welcomeCode) return <Welcome code={s.welcomeCode} onDone={engine.dismissWelcome} />;
-  if (s.me.role === "staff") return <StaffScreen engine={engine} s={s} />;
+  // Personnel : l'écran de choix (V2) ou, avec l'aperçu V3 de cet appareil, le parcours V3 (Choisir + Liste du jour).
+  if (s.me.role === "staff") return v3 ? <V3Boundary><StaffApp engine={engine} s={s} /></V3Boundary> : <StaffScreen engine={engine} s={s} />;
   return <ParentApp engine={engine} s={s} />;
 }

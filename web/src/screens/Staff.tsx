@@ -62,13 +62,13 @@ function useKeyboardOpen(): boolean {
 }
 
 /** Fixed bottom button « Valider N modifications »: always reachable, never over the last cards (the page keeps room for it). */
-function ValidateBar({ engine, s }: { engine: Engine; s: State }) {
+function ValidateBar({ engine, s, onValidated }: { engine: Engine; s: State; onValidated?(sent: number, result: "sent" | "queued" | "failed" | "nothing"): void }) {
   const pending = Object.keys(s.toggles).length;
   const keyboard = useKeyboardOpen();
   const label = s.sending ? "Enregistrement…" : pending > 0 ? `Valider ${pending} modification${pending > 1 ? "s" : ""}` : "Aucune modification à valider";
   return (
     <div className={`actionbar ${keyboard ? "actionbar--hidden" : ""}`} data-testid="actionbar">
-      <button className="btn btn--primary validate" disabled={s.sending || pending === 0} aria-busy={s.sending} data-testid="validate" onClick={() => void engine.validate()}>
+      <button className="btn btn--primary validate" disabled={s.sending || pending === 0} aria-busy={s.sending} data-testid="validate" onClick={() => void engine.validate().then((r) => onValidated?.(pending, r))}>
         {pending > 0 && !s.sending && <Icon name="check" size={22} />}
         {label}
       </button>
@@ -93,7 +93,7 @@ interface CatSection {
 /** Lowercase, accents removed: "peche" finds "Pêches". */
 const norm = (t: string) => t.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().trim();
 
-export function StaffScreen({ engine, s, onBack }: { engine: Engine; s: State; onBack?: () => void }) {
+export function StaffScreen({ engine, s, onBack, onValidated }: { engine: Engine; s: State; onBack?: () => void; onValidated?(sent: number, result: "sent" | "queued" | "failed" | "nothing"): void }) {
   const { catalog, list, toggles, batches } = s;
   const refs = useRef<Record<string, HTMLElement | null>>({});
   const [query, setQuery] = useState("");
@@ -138,8 +138,8 @@ export function StaffScreen({ engine, s, onBack }: { engine: Engine; s: State; o
   // Without a list nothing is selected: the catalogue is shown, read-only, until a parent opens one.
   const noList = list === null;
   const stateOf = (productId: string): CardState => {
-    if (!list) return "off";
-    if (boughtItem(list, productId) && !projectedPresence(list, batches, productId) && !toggles[productId]?.again) return "bought";
+    if (!list && !v3) return "off"; // V2 : sans liste rien n'est sélectionnable (V3 : brouillon possible, la validation crée la liste)
+    if (list && boughtItem(list, productId) && !projectedPresence(list, batches, productId) && !toggles[productId]?.again) return "bought";
     const t = toggles[productId];
     if (t) return t.want ? "unsaved" : "removing";
     if (!projectedPresence(list, batches, productId)) return "off";
@@ -148,7 +148,7 @@ export function StaffScreen({ engine, s, onBack }: { engine: Engine; s: State; o
     return line && projectedQty(list, batches, productId) === line.quantity ? "saved" : "unsaved";
   };
 
-  const tap = (id: string) => { if (!noList) void engine.toggle(id); };
+  const tap = (id: string) => { if (!noList) void engine.toggle(id); }; // (V2 seulement : l'écran V3 appelle le moteur lui-même)
   const setQty = (id: string, q: number) => void engine.setQuantity(id, q);
   const again = (id: string) => void engine.requestAgain(id);
   const selectedIn = (c: CatSection) => c.products.filter((p) => { const st = stateOf(p.id); return st === "saved" || st === "unsaved"; }).length;
@@ -203,10 +203,11 @@ export function StaffScreen({ engine, s, onBack }: { engine: Engine; s: State; o
 
   return (
     <div className="staff">
-      <PageHead engine={engine} s={s} title="Préparer les courses" onBack={onBack} backLabel="Retour à la liste" subtitle={noList ? undefined : <SyncLine s={s} />} />
+      <PageHead engine={engine} s={s} title="Préparer les courses" onBack={onBack} backLabel="Retour à la liste" subtitle={noList && !v3 ? undefined : <SyncLine s={s} />} />
       <div className={`stickyhead ${bannerCount(s) > 0 ? "has-banners" : ""}`}>
       <Banners engine={engine} s={s} />
-      {noList && <p className="banner banner--notice" role="status" data-testid="no-list">Aucune liste en cours : rien n'est sélectionné. Un parent doit ouvrir une nouvelle liste ; cet écran se met à jour tout seul.</p>}
+      {noList && v3 && <p className="banner banner--notice" role="status" data-testid="no-list-v3">Aucune liste en cours : votre demande créera la liste du jour.</p>}
+      {noList && !v3 && <p className="banner banner--notice" role="status" data-testid="no-list">Aucune liste en cours : rien n'est sélectionné. Un parent doit ouvrir une nouvelle liste ; cet écran se met à jour tout seul.</p>}
       {view === "all" && !searching && (
         <nav className="chips" aria-label="Catégories">
           {sections.map((c) => (
@@ -218,7 +219,7 @@ export function StaffScreen({ engine, s, onBack }: { engine: Engine; s: State; o
       )}
       </div>
       <main className="catalog" data-testid="catalog">
-        {!noList && prefs.showTotals && <EstimateTotal summary={totalOf(lines)} />}
+        {(!noList || v3) && prefs.showTotals && <EstimateTotal summary={totalOf(lines)} />}
         {v3 ? (
           <V3Boundary>
             <SelectionV3
@@ -232,7 +233,7 @@ export function StaffScreen({ engine, s, onBack }: { engine: Engine; s: State; o
               priceOf={(id) => prices.get(id) ?? null}
               boughtOf={(id) => { const b = list ? boughtItem(list, id) : undefined; return b ? { qty: b.purchase?.quantity ?? b.quantity, unit: (b.purchase?.unit ?? b.unit) as Unit } : undefined; }}
               registerRef={(key, el) => void (refs.current[key] = el)}
-              noList={noList}
+              noList={false}
             />
           </V3Boundary>
         ) : (<>
@@ -293,7 +294,7 @@ export function StaffScreen({ engine, s, onBack }: { engine: Engine; s: State; o
         )}
         </>)}
       </main>
-      {!noList && <ValidateBar engine={engine} s={s} />}
+      {(!noList || v3) && <ValidateBar engine={engine} s={s} onValidated={onValidated} />}
     </div>
   );
 }

@@ -102,6 +102,7 @@ export function SelectionV3({ engine, s, groups, searching, query, setQuery, sta
     timer.current = setTimeout(() => setToast(null), 2600);
   };
   const all = groups.flatMap((g) => g.products.map((p) => ({ p, key: g.key })));
+  const count = all.filter((x) => !x.p.inactive).length; // nombre réel d'articles accessibles (jamais un chiffre fixe)
   const open = openId ? all.find((x) => x.p.id === openId) : undefined;
   const qtyOf = (id: string) => effectiveQty(s.list, s.batches, s.toggles, id);
   const priceNote = (id: string) => (prefs.showPrices ? <PriceTag price={priceOf(id)} unit={(all.find((x) => x.p.id === id)?.p.unit ?? "piece") as Unit} prefs={{ ...prefs, showTotals: false }} testid={`v3price-${id}`} /> : null);
@@ -134,6 +135,7 @@ export function SelectionV3({ engine, s, groups, searching, query, setQuery, sta
           <Icon name="search" size={20} />
           <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Rechercher un article…" aria-label="Chercher un produit dans toutes les catégories" data-testid="catalog-search" />
         </label>
+        <p className="muted v3count" data-testid="v3-count">{count} article{count > 1 ? "s" : ""}{searching ? " trouvé" + (count > 1 ? "s" : "") : ""}</p>
       </div>
       {toast && <p className="v3toast" role="status" data-testid="v3-toast"><Icon name="check" size={18} /> {toast}</p>}
       {searching && all.length === 0 && <p className="empty" data-testid="search-empty">Aucun produit « {query.trim()} ».</p>}

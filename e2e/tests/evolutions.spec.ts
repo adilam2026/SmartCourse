@@ -328,7 +328,7 @@ test.describe("Statistiques d'achats", () => {
     await expect(page.getByTestId("freq-Lait")).toHaveText("1 achat · 3 pièces");
     await expect(page.getByTestId("stats-no-spending")).toHaveCount(0); // plus de texte permanent : l'aide les donne à la demande
     await page.getByTestId("stats-help").click();
-    await expect(page.getByTestId("stats-no-spending")).toContainText("pas de statistiques de dépenses");
+    await expect(page.getByTestId("stats-no-spending")).toContainText("jamais une dépense réellement payée"); // texte corrigé : les prix existent mais restent indicatifs
     await page.getByRole("dialog").getByRole("button", { name: "Fermer" }).first().click();
     await expect(page.getByText("Vos achats").first()).toBeVisible();
     await expect(page.getByTestId("stats-prev")).toBeDisabled(); // aucun mois plus ancien

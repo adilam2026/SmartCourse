@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Dialog } from "../Dialog";
 import { PriceTag } from "../PriceTag";
+import { priceNature } from "../../priceNature";
 import { clampQty, isFractional, stepQty, unitLabel, unitPlural } from "../../units";
 import { fmtQty } from "../../units";
 import type { CardState } from "../ProductCard";
@@ -108,7 +109,7 @@ export function QuantitySheet({ product, state, qty, bought, price, prefs, emoji
           <span className="v3sheet__id">
             {product.brand && <small>{product.brand}</small>}
             {product.inactive && <small>désactivé</small>}
-            {prefs.showPrices && price && <span className="v3sheet__price" data-testid="sheet-price">Prix indicatif : <PriceTag price={price} unit={unit} prefs={{ ...prefs, showTotals: false }} testid="sheet-price-tag" /></span>}
+            {prefs.showPrices && price && <span className="v3sheet__price" data-testid="sheet-price">Prix indicatif : <PriceTag price={price} unit={unit} prefs={{ ...prefs, showTotals: false }} testid="sheet-price-tag" />{(() => { const n = priceNature(price); return n?.chip ? <span className={`naturechip naturechip--${n.chip === "observé" ? "obs" : "est"}`} title={n.detail} data-testid="sheet-nature">{n.chip}</span> : null; })()}</span>}
           </span>
         </div>
         {state === "bought" ? (

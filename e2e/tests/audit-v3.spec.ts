@@ -36,7 +36,7 @@ test("V3 : les quantités choisies sont conservées quand on change d'affichage 
   await ctx.close();
 });
 
-test("personnel sans liste : consultation seule, aucune sélection possible (constat), aucune liste créée", async ({ browser, playwright, baseURL }) => {
+test("personnel sans liste (V3) : sélection possible en brouillon, aucune liste créée avant validation", async ({ browser, playwright, baseURL }) => {
   const f = await newFamily(playwright, baseURL!);
   const ctx = await browser.newContext({ ...PIXEL, viewport: { width: 390, height: 844 }, baseURL });
   await ctx.addInitScript(V3_ON);
@@ -44,11 +44,10 @@ test("personnel sans liste : consultation seule, aucune sélection possible (con
   await uiLogin(page, f);
   await expect(page.getByTestId("v3-selection")).toBeVisible();
   expect(await page.locator(".v3tile").count()).toBeGreaterThan(30);
-  await page.locator(".v3tile").first().click({ force: true });
-  await expect(page.getByTestId("qty-sheet")).toHaveCount(0); // on ne peut pas sélectionner sans liste
-  await expect(page.getByTestId("no-list")).toBeVisible();
+  await page.locator(".v3tile").first().click();
+  await expect(page.getByTestId("qty-sheet")).toBeVisible();
+  await expect(page.getByTestId("no-list-v3")).toBeVisible();
   expect((await (await f.adil.get("/api/lists/active")).json()).list).toBeNull(); // rien n'a été créé
-  await page.screenshot({ path: `${OUT}/personnel-sans-liste-390.png` });
   await ctx.close();
 });
 

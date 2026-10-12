@@ -295,11 +295,12 @@ for (const s of SIZES) {
       const f = await newFamily(playwright, baseURL!);
       const { ctx, page } = await phone(browser, baseURL, s, true);
       await uiLogin(page, f);
-      // sans liste : les produits actifs sont visibles, rien ne s'ouvre ni ne se sélectionne
+      // sans liste : les produits actifs sont visibles et se choisissent (brouillon) ; rien n'est créé avant « Valider »
       await expect(page.getByTestId("v3-selection")).toBeVisible();
       expect(await page.locator(".v3tile").count()).toBeGreaterThan(30);
-      await page.locator(".v3tile").first().click({ force: true });
-      await expect(page.getByTestId("qty-sheet")).toHaveCount(0);
+      await page.locator(".v3tile").first().click();
+      await expect(page.getByTestId("qty-sheet")).toBeVisible();
+      expect((await (await f.adil.get("/api/lists/active")).json()).list).toBeNull();
       await ctx.close();
       await openList(f);
       const c2 = await phone(browser, baseURL, s, true);
