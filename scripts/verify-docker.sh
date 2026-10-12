@@ -89,7 +89,7 @@ docker exec -e T="$TOKEN" "$APP" node -e '
 const sharp=require("sharp");
 (async()=>{
  const b="http://127.0.0.1:3000";
- const r=await fetch(b+"/api/setup/family",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({installToken:process.env.T,familyName:"Verif",admin:{displayName:"Adil",login:"adil",secret:"482913",secretConfirm:"482913",recoveryEmail:"verif@example.org"}})});
+ const r=await fetch(b+"/api/setup/family",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({installToken:process.env.T,familyName:"Verif",admin:{displayName:"Adil",login:"adil",secret:"482913",secretConfirm:"482913",recoveryEmail:"verif@example.org",city:"Casablanca"}})});
  if(r.status!==201) throw new Error("setup "+r.status);
  const cookie=r.headers.get("set-cookie").split(";")[0];
  // installation en deux temps : le lien reçu (faux Brevo) est ouvert, la famille est alors installée
