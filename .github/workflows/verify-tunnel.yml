@@ -69,18 +69,26 @@ jobs:
           curl -fsS "$URL/.well-known/assetlinks.json" | grep -q "app.smartcourse.courses.recette"
           curl -fsSI "$URL/courses-v3-recette.apk" | head -1 | grep -q " 200"
           echo "APK de recette prête : $(stat -c %s "$APK") octets, signature $FP"
-      - name: Environnement ouvert pour un test sur téléphone
+      - name: Annonce de la session de recette
         if: inputs.minutes != '0'
         run: |
           M="${{ inputs.minutes }}"; case "$M" in ''|*[!0-9]*) M=60;; esac
           [ "$M" -lt 10 ] && M=10; [ "$M" -gt 120 ] && M=120
+          echo "MINUTES=$M" >> "$GITHUB_ENV"
           URL=$(grep -oE 'Application prête : https://[a-z0-9-]+\.trycloudflare\.com' /tmp/recette.out | awk '{print $4}')
           CODE=$(grep -oE 'Code famille : [A-Z0-9]+' /tmp/recette.out | awk '{print $4}')
           UTC=$(date -u -d "+$M minutes" +%H:%M); MA=$(TZ=Africa/Casablanca date -d "+$M minutes" +%H:%M)
-          MSG="ADRESSE $URL | CODE FAMILLE $CODE | ADMINISTRATEUR adil / 482913 | PERSONNEL marie / 573918 | PARENT lamiaa / 573918 | APK $URL/courses-v3-recette.apk | EXPIRE à $MA (heure du Maroc) / $UTC UTC"
-          echo "::notice title=RECETTE_PRETE::$MSG"
+          echo "::notice title=RECETTE_ADRESSE::$URL"
+          echo "::notice title=RECETTE_CODE_FAMILLE::$CODE"
+          echo "::notice title=RECETTE_COMPTES::administrateur adil / 482913 | personnel marie / 573918 | parent lamiaa / 573918"
+          echo "::notice title=RECETTE_APK::$URL/courses-v3-recette.apk"
+          echo "::notice title=RECETTE_EXPIRATION::$MA (heure du Maroc) / $UTC UTC"
           { echo "## Recette sur téléphone (environnement jetable, $M minutes)"; echo; echo "- Adresse : $URL"; echo "- Code famille : $CODE"; echo "- Administrateur : adil / 482913 · Personnel : marie / 573918 · Parent : lamiaa / 573918"; echo "- APK de recette : $URL/courses-v3-recette.apk"; echo "- Expire à $MA (heure du Maroc), $UTC UTC"; echo "- Activer la V3 : connexion en adil → Réglages → Aperçu V3."; } >> "$GITHUB_STEP_SUMMARY"
-          echo "$MSG"
-          sleep $((M * 60))
+          echo "Adresse $URL · code famille $CODE · expire à $MA (Maroc) / $UTC UTC"
+      - name: Environnement ouvert (attente)
+        if: inputs.minutes != '0'
+        run: |
+          echo "Ouvert $MINUTES minutes. Annuler l'exécution pour l'arrêter plus tôt."
+          sleep $((MINUTES * 60))
       - run: scripts/recette-locale.sh --stop
         if: always()
