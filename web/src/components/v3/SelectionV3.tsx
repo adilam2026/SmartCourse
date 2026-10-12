@@ -118,7 +118,7 @@ export function SelectionV3({ engine, s, groups, searching, query, setQuery, sta
     close();
     if (st !== "saved" && st !== "unsaved") await engine.toggle(p.id);
     const cur = effectiveQty(engine.getState().list, engine.getState().batches, engine.getState().toggles, p.id);
-    if (cur !== undefined && cur !== qty) await engine.setQuantity(p.id, qty);
+    if (cur !== undefined && cur !== qty) await engine.setQuantity(p.id, qty, true); // exacte : 125 g = 0,125 kg
     say(st === "saved" || st === "unsaved" ? `Quantité de ${p.name} mise à jour` : `${p.name} ajouté à la sélection`);
   };
 

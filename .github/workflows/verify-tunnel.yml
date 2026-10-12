@@ -2,12 +2,14 @@ name: Vérification du tunnel HTTPS de recette (manuelle, sans déploiement)
 # Lance scripts/recette-locale.sh AVEC son tunnel Cloudflare gratuit sur un serveur GitHub (base jetable, quelques minutes),
 # puis contrôle l'adresse publique comme le ferait Chrome sur Android. Aucun secret, aucun accès à Railway.
 #
-# RECETTE SUR TÉLÉPHONE (V3 ou autre) : lancer avec « minutes » > 0 (10 à 120). L'application DE LA BRANCHE choisie reste ouverte pendant
-# ce temps dans un environnement jetable (AUCUNE donnée réelle, production ni touchée ni visible) ; l'adresse et les identifiants d'essai
-# sont dans le résumé de l'exécution. Tout est effacé à la fin (ou en annulant l'exécution).
+# RECETTE SUR TÉLÉPHONE : lancer avec « minutes » > 0 (10 à 120). L'application DE LA BRANCHE choisie reste ouverte pendant ce temps dans
+# un environnement jetable (AUCUNE donnée réelle ; la production n'est ni touchée ni visible) avec :
+#   - une adresse HTTPS temporaire ;
+#   - une APK de RECETTE « Courses V3 essai » (identifiant app.smartcourse.courses.recette : s'installe À CÔTÉ de l'application actuelle),
+#     reliée EXCLUSIVEMENT à cette adresse et téléchargeable à <adresse>/courses-v3-recette.apk.
+# L'adresse, le code famille, les identifiants d'essai et l'heure d'expiration sont publiés en ANNONCES de l'exécution (et dans son résumé).
+# Quand l'environnement s'arrête, l'adresse disparaît : l'APK de recette n'ouvre alors plus rien (ce n'est PAS une application autonome).
 # Attention : le dépôt est public, donc le journal aussi : il ne contient que l'adresse temporaire et des identifiants d'essai sans valeur.
-# Sur le téléphone : ouvrir l'adresse, se connecter en administrateur (adil), Réglages → Aperçu V3 → activer ; se reconnecter en
-# personnel (marie) pour voir le parcours de sélection.
 on:
   workflow_dispatch:
     inputs:
@@ -19,7 +21,7 @@ permissions:
 jobs:
   tunnel:
     runs-on: ubuntu-latest
-    timeout-minutes: 150
+    timeout-minutes: 170
     steps:
       - uses: actions/checkout@v4
       - name: Démarrage de l'application et du tunnel
@@ -32,15 +34,53 @@ jobs:
           mkdir -p /tmp/pw && cd /tmp/pw && npm init -y >/dev/null && npm i playwright-core@1.64.0 >/dev/null
           cp "$GITHUB_WORKSPACE/scripts/check-tunnel.mjs" /tmp/pw/check.mjs
           BASE="$URL" FAMILY="$CODE" node /tmp/pw/check.mjs
-      - name: Environnement ouvert pour un test sur téléphone
+      # ---- APK de recette (seulement pour une session de test sur téléphone) ----
+      - uses: actions/setup-java@v4
+        if: inputs.minutes != '0'
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: APK de recette (identifiant distinct, reliée à cette adresse seulement)
+        if: inputs.minutes != '0'
         run: |
-          M="${{ inputs.minutes }}"; case "$M" in ''|*[!0-9]*) M=0;; esac
-          [ "$M" -eq 0 ] && { echo "Vérification seule (minutes = 0)."; exit 0; }
+          set -euo pipefail
+          URL=$(grep -oE 'Application prête : https://[a-z0-9-]+\.trycloudflare\.com' /tmp/recette.out | awk '{print $4}')
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" | tail -1
+          # Clé jetable : n'a aucun lien avec la clé de l'application actuelle
+          F="$RUNNER_TEMP/recette.jks"; P=$(openssl rand -hex 16); echo "::add-mask::$P"
+          keytool -genkeypair -noprompt -keystore "$F" -storetype PKCS12 -alias recette -keyalg RSA -keysize 2048 -validity 3 -storepass "$P" -keypass "$P" -dname "CN=Courses V3 recette jetable" >/dev/null 2>&1
+          export ANDROID_KEYSTORE_PATH="$F" ANDROID_KEYSTORE_PASSWORD="$P" ANDROID_KEY_ALIAS=recette ANDROID_KEY_PASSWORD="$P"
+          (cd android && ./gradlew --no-daemon assembleRelease -PappUrl="$URL" -PappId=app.smartcourse.courses.recette -PappLabel="Courses V3 essai" -PversionCode="${{ github.run_number }}" -PversionName="3.0.0-recette.${{ github.run_number }}")
+          APK=$(ls android/app/build/outputs/apk/release/*.apk)
+          BT="$ANDROID_HOME/build-tools/36.0.0"
+          "$BT/aapt2" dump badging "$APK" > /tmp/badging.txt
+          grep -q "name='app.smartcourse.courses.recette'" /tmp/badging.txt
+          grep -q "application-label:'Courses V3 essai'" /tmp/badging.txt
+          ! grep -q "name='app.smartcourse.courses'" /tmp/badging.txt
+          "$BT/apksigner" verify --print-certs "$APK" | tee /tmp/apksigner.txt | grep -E "Verifies|SHA-256"
+          FP=$(grep -m1 "certificate SHA-256 digest" /tmp/apksigner.txt | sed 's/.*: //' | tr 'a-f' 'A-F' | sed 's/../&:/g; s/:$//')
+          # Le serveur d'essai déclare cette APK (plein écran sans barre d'adresse) ; la production n'est pas concernée
+          printf '[{"relation":["delegate_permission/common.handle_all_urls"],"target":{"namespace":"android_app","package_name":"app.smartcourse.courses.recette","sha256_cert_fingerprints":["%s"]}}]\n' "$FP" > /tmp/assetlinks-recette.json
+          docker cp /tmp/assetlinks-recette.json sc-recette-app:/app/server/assetlinks.json
+          docker cp "$APK" sc-recette-app:/app/web/dist/courses-v3-recette.apk
+          docker restart sc-recette-app >/dev/null
+          for _ in $(seq 1 60); do curl -fsS --max-time 5 "$URL/health" >/dev/null 2>&1 && break; sleep 2; done
+          curl -fsS "$URL/.well-known/assetlinks.json" | grep -q "app.smartcourse.courses.recette"
+          curl -fsSI "$URL/courses-v3-recette.apk" | head -1 | grep -q " 200"
+          echo "APK de recette prête : $(stat -c %s "$APK") octets, signature $FP"
+      - name: Environnement ouvert pour un test sur téléphone
+        if: inputs.minutes != '0'
+        run: |
+          M="${{ inputs.minutes }}"; case "$M" in ''|*[!0-9]*) M=60;; esac
           [ "$M" -lt 10 ] && M=10; [ "$M" -gt 120 ] && M=120
           URL=$(grep -oE 'Application prête : https://[a-z0-9-]+\.trycloudflare\.com' /tmp/recette.out | awk '{print $4}')
           CODE=$(grep -oE 'Code famille : [A-Z0-9]+' /tmp/recette.out | awk '{print $4}')
-          { echo "## Recette sur téléphone (environnement jetable, $M minutes)"; echo; echo "- Adresse : $URL"; echo "- Code famille : $CODE"; echo "- Administrateur : adil / 482913 · Personnel : marie / 573918 · Parent : lamiaa / 573918"; echo "- Activer la V3 : connexion en adil → Réglages → Aperçu V3."; } >> "$GITHUB_STEP_SUMMARY"
-          echo "Adresse : $URL (code famille $CODE) : ouverte $M minutes. Annuler l'exécution pour l'arrêter plus tôt."
+          UTC=$(date -u -d "+$M minutes" +%H:%M); MA=$(TZ=Africa/Casablanca date -d "+$M minutes" +%H:%M)
+          MSG="ADRESSE $URL | CODE FAMILLE $CODE | ADMINISTRATEUR adil / 482913 | PERSONNEL marie / 573918 | PARENT lamiaa / 573918 | APK $URL/courses-v3-recette.apk | EXPIRE à $MA (heure du Maroc) / $UTC UTC"
+          echo "::notice title=RECETTE_PRETE::$MSG"
+          { echo "## Recette sur téléphone (environnement jetable, $M minutes)"; echo; echo "- Adresse : $URL"; echo "- Code famille : $CODE"; echo "- Administrateur : adil / 482913 · Personnel : marie / 573918 · Parent : lamiaa / 573918"; echo "- APK de recette : $URL/courses-v3-recette.apk"; echo "- Expire à $MA (heure du Maroc), $UTC UTC"; echo "- Activer la V3 : connexion en adil → Réglages → Aperçu V3."; } >> "$GITHUB_STEP_SUMMARY"
+          echo "$MSG"
           sleep $((M * 60))
       - run: scripts/recette-locale.sh --stop
         if: always()

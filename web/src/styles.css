@@ -722,3 +722,6 @@ html[data-ui="compact"] .row--line .menubtn { min-width: 2.25rem; padding: 0 0.3
 .v3qty__val small { color: var(--muted); font-weight: 700; font-size: 0.9rem; }
 html[data-ui="compact"] .v3tile--list .v3tile__photo { width: 4.5rem; height: 4.5rem; }
 .v3modes button { white-space: nowrap; font-size: 0.88rem; padding: 0.2rem 0.3rem; }
+.v3units { display: grid; gap: 0.4rem; }
+.v3units__seg { max-width: 14rem; }
+.v3units__seg button { min-height: 2.75rem; }

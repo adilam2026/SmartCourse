@@ -62,6 +62,13 @@ test("activation V3 : désactivée par défaut, réservée à l'administrateur p
   // le personnel de cet appareil voit la V3 (test sur le téléphone de l'administrateur) ; coupure immédiate
   await uiLogin(page, f);
   await expect(page.getByTestId("v3-selection")).toBeVisible();
+  // le personnel ne peut pas activer l'aperçu : ni réglage ni option dans son profil (seul l'administrateur principal le peut)
+  await page.getByTestId("avatar").click();
+  await expect(page.getByRole("dialog", { name: "Mon profil" })).toBeVisible();
+  await expect(page.getByTestId("v3-toggle")).toHaveCount(0);
+  await expect(page.getByText("Aperçu V3")).toHaveCount(0);
+  await page.getByRole("dialog", { name: "Mon profil" }).getByRole("button", { name: "Fermer" }).click();
+  await expect(page.getByTestId("tab-settings")).toHaveCount(0);
   await page.getByTestId("v3-to-v2").click();
   await expect(page.getByTestId("v3-selection")).toHaveCount(0);
   await expect(page.getByTestId("view-all")).toBeVisible(); // V2 intacte
@@ -215,6 +222,73 @@ for (const s of SIZES) {
       await expect(tom).toHaveAttribute("data-state", "unsaved");
       expect(await noOverflow(page)).toBe(true);
       await ctx.close();
+    });
+
+    test("unités : kg/g et L/ml avec conversion exacte ; jamais « pièce » pour un produit au kilo ; compatible V2", async ({ browser, playwright, baseURL }) => {
+      const f = await newFamily(playwright, baseURL!);
+      await openList(f);
+      const cat = Object.fromEntries((await (await f.adil.get("/api/catalog")).json()).categories.flatMap((c: any) => c.products).map((p: any) => [p.name, p]));
+      const litre = "Huile d'essai";
+      expect((await f.adil.post("/api/products", { data: { name: litre, category: "epicerie", unit: "litre" } })).status()).toBe(201);
+      f.products[litre] = (await (await f.adil.get("/api/catalog")).json()).categories.flatMap((c: any) => c.products).find((p: any) => p.name === litre).id;
+      const counted = Object.keys(cat).find((n) => ["piece", "paquet", "bouteille", "brique", "pot", "boite"].includes(cat[n].unit))!;
+      const { ctx, page } = await phone(browser, baseURL, s, true);
+      await uiLogin(page, f);
+      const tom = page.getByTestId(`v3-${f.products["Tomates"]}`);
+      await tom.click();
+      // l'unité du produit par défaut ; kg et g seulement (pas de « pièce »)
+      await expect(page.getByTestId("sheet-unit-base")).toHaveText("kg");
+      await expect(page.getByTestId("sheet-unit-small")).toHaveText("g");
+      await expect(page.getByRole("dialog")).not.toContainText(/pièce/i);
+      await page.screenshot({ path: `${OUT}/panneau-unites-${s.name}.png` });
+      await page.getByTestId("sheet-unit-small").click();
+      await expect(page.getByTestId("sheet-input")).toHaveValue("1000"); // 1 kg = 1000 g
+      await expect(page.getByTestId("sheet-unit")).toHaveText("g");
+      await page.getByTestId("sheet-plus").click();
+      await expect(page.getByTestId("sheet-input")).toHaveValue("1100");
+      await page.getByTestId("sheet-input").fill("250");
+      await page.getByTestId("sheet-input").blur();
+      await page.getByTestId("sheet-unit-base").click();
+      await expect(page.getByTestId("sheet-input")).toHaveValue("0,25"); // 250 g = 0,25 kg
+      await expect(page.getByTestId("sheet-unit")).toHaveText("kg");
+      // saisie invalide en g : message, rien n'est converti ni enregistré
+      await page.getByTestId("sheet-unit-small").click();
+      await page.getByTestId("sheet-input").fill("12,5");
+      await page.getByTestId("sheet-input").blur();
+      await expect(page.getByTestId("sheet-problem")).toContainText("nombre entier de grammes");
+      await expect(page.getByTestId("sheet-confirm")).toBeDisabled();
+      await page.getByTestId("sheet-unit-base").click(); // changer d'unité ne convertit pas une saisie invalide
+      await expect(page.getByTestId("sheet-unit-small")).toHaveAttribute("aria-pressed", "true");
+      await page.getByTestId("sheet-input").fill("125"); // 125 g : exactement 0,125 kg (3 décimales gardées par le serveur)
+      await page.getByTestId("sheet-input").blur();
+      await expect(page.getByTestId("sheet-problem")).toHaveCount(0);
+      await page.screenshot({ path: `${OUT}/panneau-grammes-${s.name}.png` });
+      await page.getByTestId("sheet-confirm").click();
+      await expect(page.getByTestId(`v3qty-${f.products["Tomates"]}`)).toContainText("0,125 kg");
+      await page.getByTestId("validate").click();
+      await expect.poll(async () => ((await activeList(f)).items as any[]).map((i) => Number(i.quantity))).toEqual([0.125]);
+      expect(((await activeList(f)).items[0]).unit).toBe("kg"); // stocké dans l'unité du produit
+      // la V2 lit la même quantité
+      await page.getByTestId("v3-to-v2").click();
+      await expect(page.getByTestId(`qty-input-${f.products["Tomates"]}`)).toHaveValue("0,125");
+      await ctx.close();
+      // volume : L / ml ; unités comptées : aucune petite unité
+      const c2 = await phone(browser, baseURL, s, true);
+      await uiLogin(c2.page, f);
+      await c2.page.getByTestId(`v3-${f.products[litre]}`).click();
+      await expect(c2.page.getByTestId("sheet-unit-base")).toHaveText("L");
+      await expect(c2.page.getByTestId("sheet-unit-small")).toHaveText("ml");
+      await c2.page.getByTestId("sheet-unit-small").click();
+      await c2.page.getByTestId("sheet-input").fill("750");
+      await c2.page.getByTestId("sheet-input").blur();
+      await c2.page.getByTestId("sheet-unit-base").click();
+      await expect(c2.page.getByTestId("sheet-input")).toHaveValue("0,75");
+      await c2.page.getByTestId("sheet-confirm").click();
+      await expect(c2.page.getByTestId(`v3qty-${f.products[litre]}`)).toContainText("0,75");
+      await c2.page.getByTestId(`v3-${f.products[counted]}`).click();
+      await expect(c2.page.getByTestId("sheet-unit-small")).toHaveCount(0);
+      await expect(c2.page.getByTestId("sheet-unit-base")).toHaveCount(0);
+      await c2.ctx.close();
     });
 
     test("unités adaptées au produit et sans liste en cours", async ({ browser, playwright, baseURL }) => {

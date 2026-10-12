@@ -1,7 +1,7 @@
 import { api as realApi, ApiError, NetworkError } from "../api";
 import { AppDbClass, type AppDb, type OrphanRow } from "../db";
 import type { Batch, Catalog, ListView, Me, Op, OpResult, Toggles } from "../types";
-import { clampQty, fmtQty } from "../units";
+import { clampQty, clampQtyFine, fmtQty } from "../units";
 import { buildOps, cancelQueuedAdd, editQueuedAdd, interpretResults, isPurchased, normalizeToggles, openItem, planBasket, projectedPresence, requestAgainToggle, setQuantityToggle, toggleProduct } from "./logic";
 import type { BasketItem, BasketMode, BasketReport } from "./logic";
 
@@ -615,10 +615,10 @@ export class Engine {
   }
 
   /** Sets the wanted quantity of a selected product. Never adds a second line; never touches other articles. */
-  async setQuantity(productId: string, wanted: number): Promise<void> {
+  async setQuantity(productId: string, wanted: number, exact = false): Promise<void> {
     const { list, batches, toggles } = this.s;
     if (!list || list.status !== "active") return;
-    const qty = clampQty(wanted, this.unitFor(productId));
+    const qty = exact ? clampQtyFine(wanted, this.unitFor(productId)) : clampQty(wanted, this.unitFor(productId));
     const present = projectedPresence(list, batches, productId);
     if (!(toggles[productId]?.want ?? present)) return; // the counter only exists on a selected card
     if (present && !openItem(list, productId) && !toggles[productId]) {
