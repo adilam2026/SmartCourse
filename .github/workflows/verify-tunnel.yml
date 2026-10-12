@@ -1,14 +1,25 @@
 name: Vérification du tunnel HTTPS de recette (manuelle, sans déploiement)
 # Lance scripts/recette-locale.sh AVEC son tunnel Cloudflare gratuit sur un serveur GitHub (base jetable, quelques minutes),
 # puis contrôle l'adresse publique comme le ferait Chrome sur Android. Aucun secret, aucun accès à Railway.
+#
+# RECETTE SUR TÉLÉPHONE (V3 ou autre) : lancer avec « minutes » > 0 (10 à 120). L'application DE LA BRANCHE choisie reste ouverte pendant
+# ce temps dans un environnement jetable (AUCUNE donnée réelle, production ni touchée ni visible) ; l'adresse et les identifiants d'essai
+# sont dans le résumé de l'exécution. Tout est effacé à la fin (ou en annulant l'exécution).
+# Attention : le dépôt est public, donc le journal aussi : il ne contient que l'adresse temporaire et des identifiants d'essai sans valeur.
+# Sur le téléphone : ouvrir l'adresse, se connecter en administrateur (adil), Réglages → Aperçu V3 → activer ; se reconnecter en
+# personnel (marie) pour voir le parcours de sélection.
 on:
   workflow_dispatch:
+    inputs:
+      minutes:
+        description: "Garder l'environnement d'essai ouvert N minutes pour un test sur téléphone (0 = vérification seule ; 10 à 120)"
+        default: "0"
 permissions:
   contents: read
 jobs:
   tunnel:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
       - name: Démarrage de l'application et du tunnel
@@ -21,5 +32,15 @@ jobs:
           mkdir -p /tmp/pw && cd /tmp/pw && npm init -y >/dev/null && npm i playwright-core@1.64.0 >/dev/null
           cp "$GITHUB_WORKSPACE/scripts/check-tunnel.mjs" /tmp/pw/check.mjs
           BASE="$URL" FAMILY="$CODE" node /tmp/pw/check.mjs
+      - name: Environnement ouvert pour un test sur téléphone
+        run: |
+          M="${{ inputs.minutes }}"; case "$M" in ''|*[!0-9]*) M=0;; esac
+          [ "$M" -eq 0 ] && { echo "Vérification seule (minutes = 0)."; exit 0; }
+          [ "$M" -lt 10 ] && M=10; [ "$M" -gt 120 ] && M=120
+          URL=$(grep -oE 'Application prête : https://[a-z0-9-]+\.trycloudflare\.com' /tmp/recette.out | awk '{print $4}')
+          CODE=$(grep -oE 'Code famille : [A-Z0-9]+' /tmp/recette.out | awk '{print $4}')
+          { echo "## Recette sur téléphone (environnement jetable, $M minutes)"; echo; echo "- Adresse : $URL"; echo "- Code famille : $CODE"; echo "- Administrateur : adil / 482913 · Personnel : marie / 573918 · Parent : lamiaa / 573918"; echo "- Activer la V3 : connexion en adil → Réglages → Aperçu V3."; } >> "$GITHUB_STEP_SUMMARY"
+          echo "Adresse : $URL (code famille $CODE) : ouverte $M minutes. Annuler l'exécution pour l'arrêter plus tôt."
+          sleep $((M * 60))
       - run: scripts/recette-locale.sh --stop
         if: always()
