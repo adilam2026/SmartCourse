@@ -344,6 +344,27 @@ test.describe("affichage des prix : trois modes par profil", () => {
     });
   }
 
+  test("les préférences suivent le profil sur ses autres appareils, sans toucher aux autres profils", async ({ browser, playwright, baseURL }) => {
+    const f = await newFamily(playwright, baseURL!);
+    await setBase(f.products["Tomates"]!, "9.90");
+    const listId = await createList(f);
+    await post(f.adil, listId, [add(f, "Tomates", 1)]);
+    const mk = async (login: string, secret: string) => {
+      const ctx = await browser.newContext({ ...devices["Pixel 7"], baseURL });
+      const page = await ctx.newPage();
+      await uiLogin(page, f, login, secret);
+      await expect(page.getByTestId(`row-${f.products["Tomates"]}`)).toBeVisible();
+      return { ctx, page };
+    };
+    const phoneA = await mk("lamiaa", "573918");
+    const phoneB = await mk("lamiaa", "573918"); // même profil, autre téléphone
+    const other = await mk("adil", "482913");
+    await setPrefs(phoneA.page, true, false);
+    await expect(phoneB.page.getByTestId(`price-${f.products["Tomates"]}`)).toHaveText("9,90 DH / kg", { timeout: 20_000 }); // sans rechargement
+    await expect(other.page.getByTestId(`price-${f.products["Tomates"]}`)).toHaveCount(0);
+    for (const x of [phoneA, phoneB, other]) await x.ctx.close();
+  });
+
   test("le personnel est aussi en trois modes ; un autre profil garde le sien", async ({ browser, playwright, baseURL }) => {
     const f = await newFamily(playwright, baseURL!);
     await setBase(f.products["Tomates"]!, "9.90");
