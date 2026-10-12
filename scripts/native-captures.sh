@@ -12,12 +12,24 @@ adb shell settings put global window_animation_scale 0 || true
 adb shell settings put global transition_animation_scale 0 || true
 adb shell settings put global animator_duration_scale 0 || true
 adb shell settings put system accelerometer_rotation 0 || true
+# L'émulateur logiciel est lent : on masque les boîtes système « ne répond pas » (lanceur) qui recouvriraient les captures.
+adb shell settings put global hide_error_dialogs 1 || true
+adb shell settings put global anr_show_background 0 || true
+adb shell settings put secure anr_show_background 0 || true
+adb shell input keyevent KEYCODE_WAKEUP || true
+adb shell wm dismiss-keyguard || true
+sleep 20
 
 W=360
 shot() { # nom, extras...
   local name=$1; shift
   adb shell am start -S -W -n "$PKG/.MainActivity" "$@" >/dev/null 2>&1
-  sleep 3
+  sleep 4
+  # Si une boîte « ne répond pas » est malgré tout apparue, on choisit « Attendre » puis on laisse l'écran se rétablir.
+  if adb shell uiautomator dump /sdcard/d.xml >/dev/null 2>&1 && adb shell cat /sdcard/d.xml | grep -q "isn't responding"; then
+    adb shell input keyevent KEYCODE_BACK; sleep 2
+    adb shell am start -W -n "$PKG/.MainActivity" "$@" >/dev/null 2>&1; sleep 3
+  fi
   adb exec-out screencap -p > "$OUT/${name}-${W}.png"
 }
 
