@@ -19,6 +19,8 @@ interface Props {
   /** The selection is an explicit new request for something already bought. */
   again?: boolean;
   inactive?: boolean;
+  /** No list to select into (staff without a current list): the card only displays the product. */
+  readOnly?: boolean;
   emoji?: string;
   onTap(productId: string): void;
   onQty?(productId: string, qty: number): void;
@@ -27,13 +29,13 @@ interface Props {
 
 const LABEL: Record<CardState, string> = {
   off: "",
-  saved: ", dans la liste",
-  unsaved: ", dans la liste, pas encore enregistré",
+  saved: ", sélectionné pour acheter",
+  unsaved: ", sélectionné pour acheter, pas encore enregistré",
   removing: ", sera retiré, pas encore enregistré",
-  bought: ", déjà acheté, verrouillé",
+  bought: ", acheté, verrouillé",
 };
 
-export const ProductCard = memo(function ProductCard({ productId, name, brand, photoUrl, state, unit, qty, boughtQty, again, inactive, emoji, onTap, onQty, onAgain }: Props) {
+export const ProductCard = memo(function ProductCard({ productId, name, brand, photoUrl, state, unit, qty, boughtQty, again, inactive, readOnly, emoji, onTap, onQty, onAgain }: Props) {
   const [broken, setBroken] = useState(false);
   const showPhoto = photoUrl && !broken;
   const selected = state === "saved" || state === "unsaved";
@@ -44,7 +46,8 @@ export const ProductCard = memo(function ProductCard({ productId, name, brand, p
       <button
         type="button"
         className={`card card--${state}`}
-        aria-pressed={state !== "off" && state !== "removing"}
+        aria-pressed={readOnly ? undefined : state !== "off" && state !== "removing"}
+        aria-disabled={readOnly || undefined}
         aria-label={`${name}${LABEL[state]}${again ? ", nouvelle demande" : ""}${qty !== undefined && selected ? `, ${fmtQty(qty, unit)}` : ""}`}
         data-testid={`card-${productId}`}
         data-state={state}
@@ -76,7 +79,7 @@ export const ProductCard = memo(function ProductCard({ productId, name, brand, p
         {brand ? <small>{brand}</small> : null}
         {inactive ? <small>désactivé</small> : null}
         {again ? <small className="card__again">Nouvelle demande</small> : null}
-        {state === "saved" ? <span className="card__tag" data-testid={`tag-${productId}`}>✓ Dans la liste</span> : null}
+        {state === "saved" ? <span className="card__tag" data-testid={`tag-${productId}`}>✓ À acheter</span> : null}
         {state === "unsaved" ? <span className="card__tag card__tag--unsaved" data-testid={`tag-${productId}`}>● À valider</span> : null}
         {state === "removing" ? <span className="card__tag card__tag--removing" data-testid={`tag-${productId}`}>✕ À retirer</span> : null}
       </button>

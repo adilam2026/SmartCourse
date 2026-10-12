@@ -18,6 +18,7 @@ import type { Db } from "./db.js";
 import { HttpError } from "./errors.js";
 import { SseHub } from "./hub.js";
 import { can, type Action } from "./permissions.js";
+import { priceRoutes } from "./prices.js";
 import { createProfile, deleteOwnAccount, deleteProfile, listProfiles, resetSecret, updateProfile } from "./profiles.js";
 import { mailerFromEnv } from "./mail.js";
 import { countFamilyData, identifyFamily, purgeFamily } from "./family-purge.js";
@@ -158,6 +159,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.get("/api/me", { preHandler: guard(undefined, { allowPending: true }) }, async (req) => {
     const a = req.auth!;
     const me: Record<string, unknown> = publicMe(a);
+    const pr = (await db.query("SELECT show_prices, show_totals, prefs_rev FROM profiles WHERE id = $1", [a.profileId])).rows[0];
+    me.prefs = { showPrices: !!pr?.show_prices, showTotals: !!pr?.show_totals, rev: Number(pr?.prefs_rev ?? 0) };
     if (can(a.role, "family.manage")) {
       const f = await db.query("SELECT code, name FROM families WHERE id = $1", [a.familyId]);
       me.family = { code: f.rows[0].code, name: f.rows[0].name };
@@ -302,6 +305,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
   catalogRoutes(app, { db, store: deps.store, guard, hub });
   listRoutes(app, { db, hub, guard, push });
+  priceRoutes(app, { db, guard, hub });
   statsRoutes(app, { db, guard });
   pushRoutes(app, { db, guard, push });
 

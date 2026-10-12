@@ -4,6 +4,7 @@ import type { AuthContext } from "./auth.js";
 import { HttpError } from "./errors.js";
 import type { PushService } from "./push.js";
 import type { SseHub } from "./hub.js";
+import { priceOfItem, snapshotPrice } from "./prices.js";
 
 /*
  * Concurrency protocol (one transaction per operation):
@@ -15,8 +16,10 @@ import type { SseHub } from "./hub.js";
  * list -> item -> purchase, so there is no deadlock cycle.
  */
 
-export type Unit = "piece" | "paquet" | "bouteille" | "brique" | "pot" | "boite" | "kg";
-export const UNITS: readonly Unit[] = ["piece", "paquet", "bouteille", "brique", "pot", "boite", "kg"];
+export type Unit = "piece" | "paquet" | "bouteille" | "brique" | "pot" | "boite" | "kg" | "litre";
+export const UNITS: readonly Unit[] = ["piece", "paquet", "bouteille", "brique", "pot", "boite", "kg", "litre"];
+/** Units sold by weight or volume: quantities may have decimals (all others are whole numbers). */
+export const isFractional = (u: Unit): boolean => u === "kg" || u === "litre";
 
 export type OpIn =
   | { opId: string; type: "add"; productId: string; quantity?: number }
@@ -69,7 +72,7 @@ export function normalizeQuantity(q: number | undefined, unit: Unit): number | n
   const v = q ?? 1;
   if (!Number.isFinite(v) || v <= 0 || v > 999) return null;
   const r = Math.round(v * 1000) / 1000;
-  if (unit !== "kg" && !Number.isInteger(r)) return null;
+  if (!isFractional(unit) && !Number.isInteger(r)) return null;
   return r;
 }
 
@@ -313,6 +316,8 @@ async function runOp(db: Db, a: AuthContext, listId: string, op: OpIn, batch?: B
       else ex = await execCorrect(e, op);
     }
 
+    // Le prix de référence est figé sur la ligne à chaque validation qui la crée ou la modifie (jamais sur les achats : la ligne garde celui de sa validation).
+    if (ex.result.status === "applied" && ex.itemId && op.type !== "purchase") await snapshotPrice(c, a.familyId, ex.itemId);
     const result: OpResult = { opId: op.opId, ...ex.result };
     await c.query("UPDATE op_log SET result = $3 WHERE profile_id = $1 AND op_id = $2", [a.profileId, op.opId, JSON.stringify(result)]);
     return { result, itemId: ex.itemId, changed: ex.result.status === "applied", validationId };
@@ -358,6 +363,20 @@ export async function createList(db: Db, hub: SseHub, a: AuthContext): Promise<{
     }
     throw e;
   }
+}
+
+/** Réévaluation EXPLICITE d'une liste en cours : les lignes à acheter reprennent les prix actuels. Une liste archivée ne change jamais. */
+export async function repriceList(db: Db, hub: SseHub, a: AuthContext, listId: string): Promise<number> {
+  const n = await withTx(db, async (c) => {
+    const list = (await c.query("SELECT status FROM lists WHERE id = $1 AND family_id = $2 FOR SHARE", [listId, a.familyId])).rows[0];
+    if (!list) throw new HttpError(404, "not_found", "Liste introuvable");
+    if (list.status !== "active") throw new HttpError(409, "list_closed", "Cette liste est clôturée");
+    const items = (await c.query("SELECT id FROM list_items WHERE list_id = $1 AND status = 'to_buy' FOR UPDATE", [listId])).rows;
+    for (const it of items) await snapshotPrice(c, a.familyId, it.id);
+    return items.length;
+  });
+  hub.broadcast(a.familyId, "list.updated", { listId, itemIds: [] });
+  return n;
 }
 
 export interface CloseResult {
@@ -406,7 +425,7 @@ export async function getListView(db: Db, a: AuthContext, listId: string) {
   const archived = l.status === "archived";
   const parentView = a.role !== "staff";
   const items = await db.query(
-    `SELECT i.id, i.product_id, i.status, i.rev, i.quantity, i.unit, i.added_at, cat.key AS category, p.active AS product_active, p.position,
+    `SELECT i.id, i.product_id, i.status, i.rev, i.quantity, i.unit, i.added_at, i.price_amount, i.price_ref_qty, i.price_ref_unit, i.price_packaging, i.price_weight_g, i.price_source, cat.key AS category, p.active AS product_active, p.position,
             ${archived ? "coalesce(i.snapshot_name, p.name)" : "p.name"} AS name,
             ${archived ? "i.snapshot_brand" : "p.brand"} AS brand,
             ${archived ? "i.snapshot_photo_asset_id" : "p.photo_asset_id"} AS photo_asset_id,
@@ -480,6 +499,8 @@ export async function getListView(db: Db, a: AuthContext, listId: string) {
         rev: r.rev,
         quantity: num(r.quantity),
         unit: r.unit as Unit,
+        price: priceOfItem(r),
+        priceFrozen: r.price_source !== null,
         // Staff only learn "bought" (locked); who bought / who added is for parents.
         ...(parentView && r.purchase_id
           ? { purchase: { id: r.purchase_id, at: r.purchased_at.toISOString(), by: { id: r.buyer_id, displayName: r.buyer_name }, quantity: r.purchase_qty === null ? null : num(r.purchase_qty), unit: (r.purchase_unit ?? null) as Unit | null } }

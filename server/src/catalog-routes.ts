@@ -6,6 +6,7 @@ import type { Guard } from "./guard.js";
 import { can } from "./permissions.js";
 import type { SseHub } from "./hub.js";
 import { UNITS, type Unit } from "./lists.js";
+import { loadPrices, type PriceView } from "./prices.js";
 import { insertPhotoAsset, MAX_INPUT_BYTES, preparePhoto, type PhotoStore, type PreparedPhoto } from "./photos.js";
 
 interface Deps {
@@ -39,7 +40,7 @@ const catalogPhotoSql = `coalesce(
 
 const photoUrl = (id: string | null) => (id ? `/api/photos/${id}` : null);
 
-const productView = (r: any) => ({
+const productView = (r: any, price: PriceView | null = null) => ({
   id: r.id,
   category: r.category,
   name: r.name,
@@ -47,6 +48,7 @@ const productView = (r: any) => ({
   active: r.active,
   unit: r.unit as Unit,
   photoUrl: photoUrl(r.photo_asset_id),
+  price,
 });
 
 export function catalogRoutes(app: FastifyInstance, { db, store, guard, hub }: Deps): void {
@@ -62,6 +64,7 @@ export function catalogRoutes(app: FastifyInstance, { db, store, guard, hub }: D
     // Revision read FIRST: if the catalogue changes while it is being read, the client holds a revision older than its data
     // and simply downloads once more; it can never keep stale data under a fresh revision.
     const rev = Number((await db.query("SELECT catalog_rev FROM families WHERE id = $1", [a.familyId])).rows[0]?.catalog_rev ?? 0);
+    const prices = await loadPrices(db, a.familyId);
     const [cats, prods] = await Promise.all([
       db.query("SELECT key, label FROM categories ORDER BY position"),
       db.query(
@@ -74,7 +77,7 @@ export function catalogRoutes(app: FastifyInstance, { db, store, guard, hub }: D
       categories: cats.rows.map((c) => ({
         key: c.key,
         label: c.label,
-        products: prods.rows.filter((p) => p.category === c.key).map(productView),
+        products: prods.rows.filter((p) => p.category === c.key).map((p) => productView(p, prices.get(p.id) ?? null)),
       })),
     };
   });

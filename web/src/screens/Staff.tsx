@@ -9,21 +9,6 @@ import { useBackLayer } from "../useBackLayer";
 import type { Engine, State } from "../sync/engine";
 import type { Unit } from "../types";
 
-export function NoList({ engine, s }: { engine: Engine; s: State }) {
-  const hasDraft = Object.keys(s.toggles).length > 0;
-  return (
-    <main className="nolist" data-testid="no-list">
-      <PageHead engine={engine} s={s} title="Préparer les courses" />
-      <div className="nolist__body">
-        <img className="nolist__logo" src="/icons/icon-192.png" alt="" width="96" height="96" />
-        <h2>Aucune liste en cours</h2>
-        <p className="muted">Un parent doit ouvrir une nouvelle liste. Cet écran se mettra à jour tout seul.</p>
-        {hasDraft && <p className="muted">Vos choix non enregistrés sont gardés pour la prochaine liste.</p>}
-      </div>
-    </main>
-  );
-}
-
 export type SyncKind = "sending" | "todo" | "waiting" | "offline" | "ok";
 /**
  * ONE short indication in the header, in plain words, never two at once:
@@ -115,12 +100,12 @@ export function StaffScreen({ engine, s, onBack }: { engine: Engine; s: State; o
 
   // Catalogue (active products) + articles already on the list whose product was deactivated since.
   const sections: CatSection[] = useMemo(() => {
-    if (!catalog || !list) return [];
+    if (!catalog) return [];
     return catalog.categories
       .map((c) => {
         const products: CatProduct[] = c.products.map((p) => ({ id: p.id, name: p.name, brand: p.brand, photoUrl: p.photoUrl, unit: p.unit ?? "piece", inactive: false }));
         const known = new Set(products.map((p) => p.id));
-        for (const i of list.items) if (i.category === c.key && !known.has(i.productId)) {
+        for (const i of list?.items ?? []) if (i.category === c.key && !known.has(i.productId)) {
           known.add(i.productId);
           products.push({ id: i.productId, name: i.name, brand: i.brand, photoUrl: i.photoUrl, unit: i.unit, inactive: true });
         }
@@ -129,8 +114,8 @@ export function StaffScreen({ engine, s, onBack }: { engine: Engine; s: State; o
       .filter((c) => c.products.length > 0);
   }, [catalog, list]);
 
-  if (list === null) return onBack ? (onBack(), null) : <NoList engine={engine} s={s} />;
-  if (!catalog || !list) {
+  if (list === null && onBack) return (onBack(), null);
+  if (!catalog || list === undefined) {
     return (
       <main className="nolist">
         <div className="nolist__body">
@@ -142,7 +127,10 @@ export function StaffScreen({ engine, s, onBack }: { engine: Engine; s: State; o
     );
   }
 
+  // Without a list nothing is selected: the catalogue is shown, read-only, until a parent opens one.
+  const noList = list === null;
   const stateOf = (productId: string): CardState => {
+    if (!list) return "off";
     if (boughtItem(list, productId) && !projectedPresence(list, batches, productId) && !toggles[productId]?.again) return "bought";
     const t = toggles[productId];
     if (t) return t.want ? "unsaved" : "removing";
@@ -152,15 +140,15 @@ export function StaffScreen({ engine, s, onBack }: { engine: Engine; s: State; o
     return line && projectedQty(list, batches, productId) === line.quantity ? "saved" : "unsaved";
   };
 
-  const tap = (id: string) => void engine.toggle(id);
+  const tap = (id: string) => { if (!noList) void engine.toggle(id); };
   const setQty = (id: string, q: number) => void engine.setQuantity(id, q);
   const again = (id: string) => void engine.requestAgain(id);
   const selectedIn = (c: CatSection) => c.products.filter((p) => { const st = stateOf(p.id); return st === "saved" || st === "unsaved"; }).length;
 
   const card = (c: CatSection, p: CatProduct) => {
     const st = stateOf(p.id);
-    const bought = st === "bought" ? boughtItem(list, p.id) : undefined;
-    const qty = effectiveQty(list, batches, toggles, p.id);
+    const bought = st === "bought" && list ? boughtItem(list, p.id) : undefined;
+    const qty = list ? effectiveQty(list, batches, toggles, p.id) : undefined;
     return (
       <ProductCard
         key={p.id}
@@ -171,13 +159,14 @@ export function StaffScreen({ engine, s, onBack }: { engine: Engine; s: State; o
         photoUrl={p.photoUrl}
         inactive={p.inactive}
         state={st}
-        unit={openItem(list, p.id)?.unit ?? p.unit}
+        unit={(list && openItem(list, p.id)?.unit) || p.unit}
         qty={qty}
         again={!!toggles[p.id]?.again}
         boughtQty={bought ? { qty: bought.quantity, unit: bought.unit } : undefined}
+        readOnly={noList}
         onTap={tap}
-        onQty={setQty}
-        onAgain={again}
+        onQty={noList ? undefined : setQty}
+        onAgain={noList ? undefined : again}
       />
     );
   };
@@ -193,9 +182,10 @@ export function StaffScreen({ engine, s, onBack }: { engine: Engine; s: State; o
 
   return (
     <div className="staff">
-      <PageHead engine={engine} s={s} title="Préparer les courses" onBack={onBack} backLabel="Retour à la liste" subtitle={<SyncLine s={s} />} />
+      <PageHead engine={engine} s={s} title="Préparer les courses" onBack={onBack} backLabel="Retour à la liste" subtitle={noList ? undefined : <SyncLine s={s} />} />
       <div className={`stickyhead ${bannerCount(s) > 0 ? "has-banners" : ""}`}>
       <Banners engine={engine} s={s} />
+      {noList && <p className="banner banner--notice" role="status" data-testid="no-list">Aucune liste en cours : rien n'est sélectionné. Un parent doit ouvrir une nouvelle liste ; cet écran se met à jour tout seul.</p>}
       {view === "all" && !searching && (
         <nav className="chips" aria-label="Catégories">
           {sections.map((c) => (
@@ -263,7 +253,7 @@ export function StaffScreen({ engine, s, onBack }: { engine: Engine; s: State; o
           </div>
         )}
       </main>
-      <ValidateBar engine={engine} s={s} />
+      {!noList && <ValidateBar engine={engine} s={s} />}
     </div>
   );
 }

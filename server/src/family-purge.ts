@@ -5,7 +5,7 @@ import { HttpError } from "./errors.js";
 import type { PhotoStore } from "./photos.js";
 
 /** Tables carrying family_id : counted for identification, deleted, and compared before/after for the OTHER families. */
-const FAMILY_TABLES = ["profiles", "products", "lists", "list_items", "purchases", "validations", "list_events", "push_subscriptions", "push_events", "audit_log"] as const;
+const FAMILY_TABLES = ["profiles", "products", "lists", "list_items", "purchases", "validations", "list_events", "push_subscriptions", "push_events", "family_prices", "list_templates", "audit_log"] as const;
 
 export interface FamilyIdentity {
   id: string;
@@ -129,6 +129,9 @@ export async function purgeFamily(db: Db, store: PhotoStore, familyId: string, e
       `DELETE FROM op_log WHERE profile_id IN ${mine}`,
       "DELETE FROM list_items WHERE family_id = $1",
       "DELETE FROM lists WHERE family_id = $1",
+      "DELETE FROM list_template_items WHERE template_id IN (SELECT id FROM list_templates WHERE family_id = $1)",
+      "DELETE FROM list_templates WHERE family_id = $1",
+      "DELETE FROM family_prices WHERE family_id = $1",
       "DELETE FROM products WHERE family_id = $1",
       `DELETE FROM sessions WHERE profile_id IN ${mine}`,
       `DELETE FROM auth_tokens WHERE profile_id IN ${mine}`,
