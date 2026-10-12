@@ -1,1 +1,4 @@
-# Règles R8 : aucune règle spécifique requise (Compose fournit les siennes).
+# Compose fournit ses propres règles. Bibliothèque de chiffrement (Tink) : annotations d'analyse absentes à l'exécution.
+-dontwarn com.google.errorprone.annotations.**
+-dontwarn javax.annotation.**
+-dontwarn org.checkerframework.**
