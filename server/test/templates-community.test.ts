@@ -162,12 +162,23 @@ describe("partage communautaire des prix", () => {
     expect((await app.inject({ method: "GET", url: "/api/prices/community", cookies: viewer.admin })).json().proposals.filter((p: any) => p.productId === vid)).toHaveLength(0);
   });
 
-  it("la suppression d'une famille retire ses prix, favoris et profils ; ses contributions ne contiennent aucun lien vers elle", async () => {
+  it("la suppression d'une famille retire ses prix, favoris, profils ET les prix qu'elle avait partagés ; les autres familles et leurs contributions restent", async () => {
     const f = await family();
+    const other = await family();
     await setPrice(f, f.products["Tomates"].id);
+    await setPrice(other, other.products["Tomates"].id);
+    await share(f, f.products["Tomates"].id);
+    await share(other, other.products["Tomates"].id);
     await app.inject({ method: "POST", url: "/api/templates", cookies: f.admin, payload: { name: "Z", items: [{ productId: f.products["Tomates"].id, quantity: 1 }] } });
-    const fid = (await db.query("SELECT id FROM families ORDER BY created_at DESC LIMIT 1")).rows[0].id;
+    const rows = (await db.query("SELECT f.id, f.code FROM families f ORDER BY f.created_at DESC LIMIT 2")).rows; // [other, f]
+    const fid = rows[1].id as string;
     expect((await db.query("SELECT count(*)::int AS n FROM family_prices WHERE family_id = $1", [fid])).rows[0].n).toBe(1);
-    expect((await db.query("SELECT count(*)::int AS n FROM list_templates WHERE family_id = $1", [fid])).rows[0].n).toBe(1);
+    const before = (await db.query("SELECT count(*)::int AS n FROM price_contributions")).rows[0].n;
+    const { purgeFamily } = await import("../src/family-purge.js");
+    await purgeFamily(db, testStore(), fid, rows[1].code);
+    expect((await db.query("SELECT count(*)::int AS n FROM family_prices WHERE family_id = $1", [fid])).rows[0].n).toBe(0);
+    expect((await db.query("SELECT count(*)::int AS n FROM list_templates WHERE family_id = $1", [fid])).rows[0].n).toBe(0);
+    expect((await db.query("SELECT count(*)::int AS n FROM price_contributions")).rows[0].n).toBe(before - 1); // la sienne seulement
+    expect((await db.query("SELECT count(*)::int AS n FROM family_prices WHERE family_id = $1", [rows[0].id])).rows[0].n).toBe(1);
   });
 });

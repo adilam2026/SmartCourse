@@ -53,7 +53,8 @@ Vérifié dans le code (juin à octobre 2026) : aucune bibliothèque d'analyse, 
 | Nom | Oui (nom affiché) | Non | `profiles.display_name` | Anonymisé à la suppression du profil |
 | Identifiants utilisateur | Oui (identifiant, code famille) | Non | `profiles.login`, `families.code` | Le code secret n'est jamais conservé en clair (scrypt) |
 | Photos | Oui, facultatif (photos d'articles) | Non | `photo_assets`, stockage Railway | Supprimées avec la famille |
-| Autre contenu / activité dans l'application | Oui (listes, achats, historique) | Non | `lists`, `purchases`, `list_events` | Non utilisé pour la publicité ni l'analyse |
+| Autre contenu / activité dans l'application | Oui (listes, achats, historique, favoris, prix de la famille, préférences d'affichage) | Non | `lists`, `purchases`, `list_events`, `list_templates`, `family_prices`, `profiles.show_*` | Non utilisé pour la publicité ni l'analyse |
+| Prix partagés à la communauté (facultatif) | Oui, seulement si un administrateur choisit « Partager ce prix » : produit du catalogue, prix, unité, conditionnement, date, ville et magasin facultatifs | Visible des autres familles **sous forme de médiane** de plusieurs familles ; jamais de nom, e-mail, code famille ni historique | `price_contributions` (empreinte opaque, retirée à la suppression de la famille) | Fonctionnement (prix indicatifs) |
 | Identifiants d'appareil ou autres | Oui | Oui, au service de notifications du système | `push_subscriptions` (adresse d'abonnement, *user agent*) ; adresse IP dans les journaux et la limitation des essais | Facultatif : seulement si les notifications sont activées ; IP : journaux techniques temporaires |
 | Localisation, contacts, fichiers, micro, caméra en continu, santé, finances | **Non** | — | — | La caméra et la galerie passent par le sélecteur de fichiers de Chrome |
 

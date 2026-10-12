@@ -1,4 +1,5 @@
-import type { Catalog, ListView, Me, Op, OpResult, Product, Role, Unit } from "./types";
+import type { RefUnit } from "./pricing";
+import type { Catalog, ListView, Me, Op, OpResult, Prefs, Price, Product, Role, Unit } from "./types";
 
 /** The server could not be reached (offline, timeout, DNS…): nothing is known about what happened. */
 export class NetworkError extends Error {
@@ -67,7 +68,7 @@ export const api = {
   pushCheck: (endpoint: string) => request<{ registered: boolean }>("POST", "/api/push/subscriptions/check", { endpoint }),
   me: () => request<{ me: Me }>("GET", "/api/me"),
   catalog: () => request<Catalog>("GET", "/api/catalog"),
-  activeList: () => request<{ list: ListView | null; catalogRev?: number }>("GET", "/api/lists/active"),
+  activeList: () => request<{ list: ListView | null; catalogRev?: number; prefsRev?: number }>("GET", "/api/lists/active"),
   postOps: (listId: string, ops: Op[], batch?: { id: string; at?: string }) =>
     request<{ results: OpResult[]; list: ListView }>("POST", `/api/lists/${listId}/ops`, { ops, ...(batch ? { batch } : {}) }),
   purchaseStats: (q: StatsQuery = {}) => request<PurchaseStats>("GET", `/api/stats/purchases?${statsParams(q)}`),
@@ -84,6 +85,19 @@ export const api = {
   updateProfile: (id: string, b: { displayName?: string; role?: Role; active?: boolean }) => request<{ profile: Profile }>("PATCH", `/api/profiles/${id}`, b),
   deleteProfile: (id: string) => request<{ ok: true }>("DELETE", `/api/profiles/${id}`),
   deleteOwnAccount: (secret: string) => request<{ ok: true }>("POST", "/api/me/delete", { secret }),
+  // prix, favoris, préférences d'affichage
+  setPrefs: (b: { showPrices: boolean; showTotals: boolean }) => request<{ prefs: Prefs }>("PUT", "/api/me/prefs", b),
+  setPrice: (id: string, b: PriceInput) => request<{ price: Price | null }>("PUT", `/api/products/${id}/price`, b),
+  resetPrice: (id: string) => request<{ price: Price | null }>("DELETE", `/api/products/${id}/price`),
+  repriceList: (listId: string) => request<{ updated: number; list: ListView }>("POST", `/api/lists/${listId}/reprice`),
+  templates: () => request<{ templates: Template[] }>("GET", "/api/templates"),
+  createTemplate: (b: { name: string; items?: { productId: string; quantity: number }[]; fromListId?: string }) => request<{ template: Template }>("POST", "/api/templates", b),
+  updateTemplate: (id: string, b: { name?: string; items?: { productId: string; quantity: number }[] }) => request<{ template: Template }>("PUT", `/api/templates/${id}`, b),
+  deleteTemplate: (id: string) => request<{ ok: true }>("DELETE", `/api/templates/${id}`),
+  sharePrice: (b: { productId: string; observedOn?: string; city?: string; store?: string }) => request<{ ok: true }>("POST", "/api/prices/share", b),
+  communityPrices: () => request<{ proposals: PriceProposal[]; minContributors: number }>("GET", "/api/prices/community"),
+  applyCommunityPrice: (b: { productId: string; format: string }) => request<{ price: Price | null }>("POST", "/api/prices/community/apply", b),
+  reportCommunityPrice: (b: { productId: string; format: string; reason?: string }) => request<{ ok: true }>("POST", "/api/prices/community/report", b),
   resetSecret: (id: string, secret: string, secretConfirm: string) => request<{ ok: true }>("POST", `/api/profiles/${id}/reset-secret`, { secret, secretConfirm }),
   recoveryState: () => request<RecoveryState>("GET", "/api/recovery-email"),
   setRecoveryEmail: (email: string) => request<RecoveryState>("PUT", "/api/recovery-email", { email }),
@@ -121,6 +135,42 @@ export const api = {
     return (await res.json()) as { product: Product };
   },
 };
+
+export interface PriceInput {
+  amount: string;
+  refQty: string;
+  refUnit: RefUnit;
+  packaging?: string | null;
+  pieceWeightG?: string | null;
+}
+export interface TemplateItem {
+  productId: string;
+  name: string;
+  brand: string | null;
+  category: string;
+  photoUrl: string | null;
+  quantity: number;
+  unit: Unit;
+  productActive: boolean;
+  currentUnit: Unit;
+}
+export interface Template {
+  id: string;
+  name: string;
+  updatedAt: string;
+  items: TemplateItem[];
+}
+export interface PriceProposal {
+  productId: string;
+  name: string;
+  format: string;
+  price: { amount: string; refQty: string; refUnit: RefUnit; packaging: string | null };
+  contributors: number;
+  min: string;
+  max: string;
+  latestObservedOn: string;
+  current: Price | null;
+}
 
 /** `image` is a base64 picture (already shrunk by the phone); `resetImage` goes back to the catalogue picture. */
 export interface ProductPatch {

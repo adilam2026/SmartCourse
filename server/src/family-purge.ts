@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { withTx, type Db } from "./db.js";
 import { generateInstallToken } from "./auth.js";
+import { opaque } from "./price-community.js";
 import { HttpError } from "./errors.js";
 import type { PhotoStore } from "./photos.js";
 
@@ -139,6 +140,9 @@ export async function purgeFamily(db: Db, store: PhotoStore, familyId: string, e
       `DELETE FROM audit_log WHERE family_id = $1 OR actor_profile_id IN ${mine} OR target_profile_id IN ${mine}`,
     ];
     for (const s of steps) await c.query(s, [familyId]);
+    // Prix partagés à la communauté par cette famille (empreinte opaque, jamais son identité) : retirés avec elle.
+    await c.query("DELETE FROM price_reports WHERE reporter = $1", [opaque(familyId)]);
+    await c.query("DELETE FROM price_contributions WHERE contributor = $1", [opaque(familyId)]);
     // Pictures that belong to this family (never a shared catalogue picture): every reference to them is gone by now.
     const photos = (await c.query("DELETE FROM photo_assets WHERE owner_family_id = $1 RETURNING storage_key", [familyId])).rows.map((r) => r.storage_key as string);
     await c.query("UPDATE install_tokens SET family_id = NULL WHERE family_id = $1", [familyId]); // the consumed token stays consumed

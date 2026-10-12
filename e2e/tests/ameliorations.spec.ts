@@ -259,7 +259,7 @@ test.describe("4 · unités adaptées", () => {
     await admin.getByTestId("seg-catalog").click();
     await admin.getByTestId("edit-Lait").click();
     const options = await admin.getByTestId("pf-unit").locator("option").allTextContents();
-    expect(options).toEqual(["Pièce", "Paquet", "Bouteille", "Brique", "Pot", "Boîte", "Kilogramme (kg)"]);
+    expect(options).toEqual(["Pièce", "Paquet", "Bouteille", "Brique", "Pot", "Boîte", "Kilogramme (kg)", "Litre"]);
     await expect(admin.getByTestId("pf-unit-hint")).toContainText("brique");
     await admin.getByTestId("pf-unit").selectOption("brique");
     await admin.screenshot({ path: `${CAP}/amelioration-unites-reglage.png` });

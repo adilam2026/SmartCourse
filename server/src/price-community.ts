@@ -31,7 +31,7 @@ interface Deps {
   hub: SseHub;
 }
 
-const opaque = (familyId: string): string => createHash("sha256").update(`price-contrib:${familyId}`).digest("hex");
+export const opaque = (familyId: string): string => createHash("sha256").update(`price-contrib:${familyId}`).digest("hex");
 const median = (v: number[]): number => {
   const s = [...v].sort((a, b) => a - b);
   const m = Math.floor(s.length / 2);

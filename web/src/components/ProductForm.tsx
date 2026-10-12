@@ -6,6 +6,7 @@ import { prepareImage } from "../image";
 import type { Product, Unit } from "../types";
 import { UNIT_CHOICE, UNITS } from "../units";
 import { Dialog } from "./Dialog";
+import { ProductPrice } from "./ProductPrice";
 
 interface Props {
   /** Absent = « Ajouter un article ». */
@@ -13,12 +14,14 @@ interface Props {
   categories: { key: string; label: string }[];
   onClose(): void;
   onSaved(): void;
+  /** The price changed (the dialog stays open): reload the catalogue. */
+  onPriceChanged?(): void;
 }
 
 const errText = (e: unknown): string => (e instanceof NetworkError ? "Pas de connexion : l'enregistrement d'un article demande le réseau. Réessayez quand il est revenu." : userMessage(e));
 
 /** « Ajouter un article » / « Modifier un article » (administrateur). L'image est vue avant l'enregistrement. */
-export function ProductForm({ product, categories, onClose, onSaved }: Props) {
+export function ProductForm({ product, categories, onClose, onSaved, onPriceChanged }: Props) {
   const [name, setName] = useState(product?.name ?? "");
   const [category, setCategory] = useState(product?.category ?? categories[0]?.key ?? "");
   const [active, setActive] = useState(product?.active ?? true);
@@ -99,6 +102,7 @@ export function ProductForm({ product, categories, onClose, onSaved }: Props) {
           <button type="button" className="btn btn--ghost" disabled={busy} data-testid="pf-cancel" onClick={onClose}>Annuler</button>
         </div>
       </form>
+      {product && <ProductPrice product={product} onChanged={onPriceChanged ?? onSaved} />}
     </Dialog>
   );
 }

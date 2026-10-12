@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import type { Unit } from "../types";
-import { clampQty, stepQty, unitLabel, unitPlural } from "../units";
+import { clampQty, isFractional, stepQty, unitLabel, unitPlural } from "../units";
 
 interface Props {
   productId: string;
   name: string;
   unit: Unit;
   qty: number;
+  /** « Prix et total » : pas d'un quart de kilo ou de litre. */
+  fine?: boolean;
   onChange(productId: string, qty: number): void;
 }
 
@@ -17,9 +19,9 @@ interface Props {
  * is done by unselecting the card. The centre is an input for every unit: tap it to type a quantity ("1,25" for kilograms,
  * whole numbers for the other units).
  */
-export function QtyCounter({ productId, name, unit, qty, onChange }: Props) {
-  const minus = stepQty(qty, unit, -1);
-  const plus = stepQty(qty, unit, 1);
+export function QtyCounter({ productId, name, unit, qty, fine, onChange }: Props) {
+  const minus = stepQty(qty, unit, -1, fine);
+  const plus = stepQty(qty, unit, 1, fine);
   const shown = String(qty).replace(".", ",");
   const [text, setText] = useState(shown);
   useEffect(() => setText(shown), [shown]);
@@ -35,7 +37,7 @@ export function QtyCounter({ productId, name, unit, qty, onChange }: Props) {
       <button type="button" className="qty__btn" aria-label={`Diminuer la quantité de ${name}`} disabled={minus === null} data-testid={`minus-${productId}`} onClick={() => minus !== null && onChange(productId, minus)}>−</button>
       <input
         className="qty__input"
-        inputMode={unit === "kg" ? "decimal" : "numeric"}
+        inputMode={isFractional(unit) ? "decimal" : "numeric"}
         aria-label={`Quantité de ${name}, en ${unit === "kg" ? "kilogrammes" : unitPlural(unit)}`}
         data-testid={`qty-input-${productId}`}
         value={text}
@@ -45,7 +47,7 @@ export function QtyCounter({ productId, name, unit, qty, onChange }: Props) {
         onKeyDown={(e) => e.key === "Enter" && (e.currentTarget.blur(), e.preventDefault())}
       />
       <button type="button" className="qty__btn" aria-label={`Augmenter la quantité de ${name}`} disabled={plus === null} data-testid={`plus-${productId}`} onClick={() => plus !== null && onChange(productId, plus)}>+</button>
-      <span className="qty__unit" data-testid={`qty-unit-${productId}`}>{qty > 1 && unit !== "kg" ? unitPlural(unit) : unitLabel(unit)}</span>
+      <span className="qty__unit" data-testid={`qty-unit-${productId}`}>{(unit === "litre" ? qty >= 2 : qty > 1 && unit !== "kg") ? unitPlural(unit) : unitLabel(unit)}</span>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api, type Credit } from "../api";
 import { useBackLayer } from "../useBackLayer";
 import { DeleteAccount } from "./DeleteAccount";
+import { PriceDisplaySettings } from "./PriceDisplaySettings";
 import { NotificationSettings } from "./NotificationSettings";
 import { VersionInfo } from "./VersionInfo";
 import type { Engine, State } from "../sync/engine";
@@ -29,6 +30,7 @@ export function UserSheet({ engine, s, onClose }: { engine: Engine; s: State; on
           </div>
         </div>
         {pending > 0 && <p className="banner banner--pending">Des choix ne sont pas encore enregistrés. Ils resteront sur ce téléphone et seront envoyés à la prochaine connexion.</p>}
+        <PriceDisplaySettings engine={engine} s={s} />
         {s.me && s.me.role !== "staff" && <NotificationSettings />}
         <button className="btn" onClick={() => setShowCredits((v) => !v)}>Crédits photos</button>
         {showCredits && (

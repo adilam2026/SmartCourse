@@ -2,7 +2,8 @@ import { api as realApi, ApiError, NetworkError } from "../api";
 import { AppDbClass, type AppDb, type OrphanRow } from "../db";
 import type { Batch, Catalog, ListView, Me, Op, OpResult, Toggles } from "../types";
 import { clampQty, fmtQty } from "../units";
-import { buildOps, cancelQueuedAdd, editQueuedAdd, interpretResults, isPurchased, normalizeToggles, openItem, projectedPresence, requestAgainToggle, setQuantityToggle, toggleProduct } from "./logic";
+import { buildOps, cancelQueuedAdd, editQueuedAdd, interpretResults, isPurchased, normalizeToggles, openItem, planBasket, projectedPresence, requestAgainToggle, setQuantityToggle, toggleProduct } from "./logic";
+import type { BasketItem, BasketMode, BasketReport } from "./logic";
 
 export interface Notice {
   id: number;
@@ -330,6 +331,14 @@ export class Engine {
       this.scheduleRefresh();
     });
     for (const t of ["list.updated", "list.created", "list.closed", "catalog.updated"]) es.addEventListener(t, () => this.scheduleRefresh());
+    // Another phone of THIS profile changed the display preferences: read them again (other profiles' changes are ignored).
+    es.addEventListener("prefs.updated", (e) => {
+      try {
+        if (JSON.parse(e.data as string).profileId === this.s.me?.id) this.scheduleRefresh();
+      } catch {
+        /* malformed event: the next poll will catch up */
+      }
+    });
     es.onerror = () => {
       this.set({ live: false });
       if (es.readyState === 2 && this.es === es) {
@@ -432,11 +441,12 @@ export class Engine {
     try {
       // The list is small (a few hundred bytes to a few KB) and comes with the catalogue revision: the catalogue (≈ 15 KB)
       // is downloaded only when it is unknown or its revision changed (article added, edited, deactivated, new picture).
-      const { list, catalogRev } = await this.api.activeList();
+      const { list, catalogRev, prefsRev } = await this.api.activeList();
       const known = this.s.catalog;
       const catalog = known && catalogRev !== undefined && known.rev === catalogRev ? known : await this.api.catalog();
       this.set({ conn: "online" });
       await this.applyServerState(catalog, list);
+      await this.syncPrefs(prefsRev);
     } catch (e) {
       if (e instanceof NetworkError) this.set({ conn: "offline" });
       else if (e instanceof ApiError && e.status === 401) this.set({ phase: "loggedOut" });
@@ -457,6 +467,51 @@ export class Engine {
     }
     await this.refresh();
     return true;
+  }
+
+  // ---- display preferences (prices): per profile, synchronised on all of its phones ----------------------
+  private pendingPrefs: { showPrices: boolean; showTotals: boolean } | null = null;
+
+  /** A preference changed on another phone (revision differs): read the profile again. A change not sent yet always wins locally. */
+  private async syncPrefs(serverRev: number | undefined): Promise<void> {
+    const me = this.s.me;
+    if (!me) return;
+    if (this.pendingPrefs) {
+      await this.pushPrefs();
+      return;
+    }
+    if (serverRev === undefined || serverRev === (me.prefs?.rev ?? 0)) return;
+    const fresh = (await this.api.me()).me;
+    if (fresh.prefs) await this.setMe({ ...me, prefs: fresh.prefs });
+  }
+
+  private async setMe(me: Me): Promise<void> {
+    this.set({ me });
+    await this.db.meta.put({ key: "lastMe", value: me });
+  }
+
+  private async pushPrefs(): Promise<void> {
+    const want = this.pendingPrefs;
+    const me = this.s.me;
+    if (!want || !me) return;
+    try {
+      const { prefs } = await this.api.setPrefs(want);
+      this.pendingPrefs = null;
+      await this.setMe({ ...me, prefs });
+    } catch (e) {
+      if (!(e instanceof NetworkError)) this.pendingPrefs = null; // refused: the server value will be read again
+    }
+  }
+
+  /** Show prices / show amounts and total. The choice applies at once on this phone (even offline) and follows the profile to its other phones. */
+  async setPrefs(showPrices: boolean, showTotals: boolean): Promise<void> {
+    const me = this.s.me;
+    if (!me) return;
+    const totals = showTotals;
+    const prices = showPrices || totals; // amounts imply prices
+    await this.setMe({ ...me, prefs: { showPrices: prices, showTotals: totals, rev: me.prefs?.rev ?? 0 } });
+    this.pendingPrefs = { showPrices: prices, showTotals: totals };
+    await this.pushPrefs();
   }
 
   private async applyServerState(catalog: Catalog, list: ListView | null): Promise<void> {
@@ -695,6 +750,38 @@ export class Engine {
       else if (e instanceof ApiError && e.status === 409) await this.refresh(); // someone just created it
       else this.notice("Impossible de créer la liste.");
     }
+  }
+
+  /**
+   * Favourite or past order → pending choices in the list being edited (nothing is sent before « Valider »; the favourite or the old
+   * order is never changed). Without a current list, one is created first. Returns what was done, or null if nothing could be prepared.
+   */
+  async applyBasket(items: BasketItem[], mode: BasketMode, title: string): Promise<BasketReport | null> {
+    if (!this.s.list) await this.createList();
+    const { list, catalog, batches, toggles } = this.s;
+    if (!list || list.status !== "active") return null;
+    if (mode === "replace" && (batches.length > 0 || this.s.sending)) {
+      this.notice("Un envoi est en cours : réessayez dans un instant.");
+      return null;
+    }
+    const byId = new Map<string, { active: boolean; unit: import("../types").Unit }>();
+    for (const c of catalog?.categories ?? []) for (const p of c.products) byId.set(p.id, { active: p.active, unit: p.unit });
+    const { toggles: next, report } = planBasket({ list, batches, toggles, items, mode, product: (id) => byId.get(id) });
+    this.set({ toggles: next, draftListId: this.s.draftListId ?? list.id });
+    await this.persistDraft();
+    const parts = [
+      report.added.length ? `${report.added.length} ajouté${report.added.length > 1 ? "s" : ""}` : "",
+      report.summed.length ? `${report.summed.length} quantité${report.summed.length > 1 ? "s" : ""} additionnée${report.summed.length > 1 ? "s" : ""}` : "",
+      report.set.length ? `${report.set.length} quantité${report.set.length > 1 ? "s" : ""} remplacée${report.set.length > 1 ? "s" : ""}` : "",
+      report.removed.length ? `${report.removed.length} retiré${report.removed.length > 1 ? "s" : ""}` : "",
+    ].filter(Boolean);
+    this.notice(`« ${title} » préparé : ${parts.length ? parts.join(", ") : "rien à changer"}. Modifiez si besoin puis validez.`);
+    const skipped: string[] = [];
+    if (report.inactive.length) skipped.push(`produits désactivés (non réactivés) : ${report.inactive.join(", ")}`);
+    if (report.unitMismatch.length) skipped.push(`unité différente (non modifiés) : ${report.unitMismatch.join(", ")}`);
+    if (report.purchased.length) skipped.push(`déjà achetés dans cette liste : ${report.purchased.join(", ")}`);
+    if (skipped.length) this.notice(`Non repris — ${skipped.join(" ; ")}.`);
+    return report;
   }
 
   /** Returns what the server reports (remaining / purchased) or null if it did not happen. */

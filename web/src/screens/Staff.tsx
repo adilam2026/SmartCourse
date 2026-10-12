@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Banners, bannerCount } from "../components/Banners";
 import { ProductCard, type CardState } from "../components/ProductCard";
+import { EstimateTotal, PriceTag } from "../components/PriceTag";
+import { NO_PREFS, priceIndex, priceOfLine, totalOf, type Line } from "../priceView";
 import { Icon } from "../components/Icon";
 import { PageHead } from "../components/PageHead";
 import { CATEGORY_EMOJI } from "../categories";
@@ -95,6 +97,8 @@ export function StaffScreen({ engine, s, onBack }: { engine: Engine; s: State; o
   const [openCat, setOpenCat] = useState<string | null>(null);
   const searching = norm(query).length > 0;
   const view = s.catalogView;
+  const prefs = s.me?.prefs ?? NO_PREFS;
+  const prices = useMemo(() => priceIndex(catalog), [catalog]);
   // Android Back: leaves the opened category (before leaving the screen).
   useBackLayer(view === "categories" && openCat !== null && !searching, () => setOpenCat(null));
 
@@ -164,12 +168,25 @@ export function StaffScreen({ engine, s, onBack }: { engine: Engine; s: State; o
         again={!!toggles[p.id]?.again}
         boughtQty={bought ? { qty: bought.quantity, unit: bought.unit } : undefined}
         readOnly={noList}
+        fine={prefs.showTotals}
+        priceNode={!prefs.showPrices ? undefined : <PriceTag price={priceOfLine(st === "bought" ? bought : list ? openItem(list, p.id) : undefined, p.id, prices, true)} qty={st === "bought" ? bought?.purchase?.quantity ?? bought?.quantity : qty} unit={(st === "bought" ? bought?.unit : undefined) ?? (list && openItem(list, p.id)?.unit) ?? p.unit} prefs={prefs} testid={`price-${p.id}`} />}
         onTap={tap}
         onQty={noList ? undefined : setQty}
         onAgain={noList ? undefined : again}
       />
     );
   };
+  // Total estimé (profil en mode « prix et total ») : lignes de la liste, avec les choix pas encore validés.
+  const lines: Line[] = [];
+  if (list && prefs.showTotals) {
+    for (const i of list.items) if (i.status === "purchased") lines.push({ price: priceOfLine(i, i.productId, prices, true), qty: i.purchase?.quantity ?? i.quantity, unit: i.purchase?.unit ?? i.unit });
+    for (const c of sections) for (const p of c.products) {
+      const q = effectiveQty(list, batches, toggles, p.id);
+      if (q === undefined || stateOf(p.id) === "bought") continue;
+      const line = openItem(list, p.id);
+      lines.push({ price: priceOfLine(line, p.id, prices, true), qty: q, unit: line?.unit ?? p.unit });
+    }
+  }
   const grid = (c: CatSection, products: CatProduct[]) => <div className="gridhost"><div className="grid">{products.map((p) => card(c, p))}</div></div>;
 
   const q = norm(query);
@@ -197,6 +214,7 @@ export function StaffScreen({ engine, s, onBack }: { engine: Engine; s: State; o
       )}
       </div>
       <main className="catalog" data-testid="catalog">
+        {!noList && prefs.showTotals && <EstimateTotal summary={totalOf(lines)} />}
         <div className="viewbar">
           <div className="seg" role="tablist" aria-label="Affichage du catalogue">
             <button role="tab" aria-selected={view === "all"} className={view === "all" ? "on" : ""} data-testid="view-all" onClick={() => void engine.setCatalogView("all")}>Tous les produits</button>

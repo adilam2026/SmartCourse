@@ -25,6 +25,7 @@ const PATHS = {
   calendar: <><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M4 10h16M8 3v4M16 3v4" /></>,
   undo: <><path d="M4 9h10a6 6 0 0 1 0 12H8" /><path d="m8 5-4 4 4 4" /></>,
   image: <><rect x="3.5" y="5" width="17" height="14" rx="2" /><circle cx="9" cy="10" r="1.6" /><path d="m4 17 5-4.5 3.5 3 2.5-2L20 17" /></>,
+  star: <path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8-4.3-4.1 5.9-.9L12 3.5Z" />,
   cart: <><circle cx="9" cy="20" r="1.5" /><circle cx="18" cy="20" r="1.5" /><path d="M2.5 3.5h3l2.4 11h11l2-7.5H6.4" /></>,
 } as const;
 

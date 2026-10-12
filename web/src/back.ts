@@ -21,9 +21,16 @@ interface Layer {
 export function createBackStack(win: WindowLike) {
   const stack: Layer[] = [];
   let ignore = 0;
+  let waiters: (() => void)[] = [];
+  const release = () => {
+    const w = waiters;
+    waiters = [];
+    for (const fn of w) fn();
+  };
   win.addEventListener("popstate", () => {
     if (ignore > 0) {
       ignore--;
+      if (ignore === 0) release();
       return;
     }
     const top = stack[stack.length - 1];
@@ -50,6 +57,17 @@ export function createBackStack(win: WindowLike) {
       };
     },
     depth: () => stack.length,
+    /**
+     * Resolves once every history entry released by the UI has really been popped (or after `ms`). Opening a new layer in the same tick
+     * as closing others would let the queued Back steps pop the NEW entry: callers wait here first.
+     */
+    settled(ms = 600): Promise<void> {
+      if (ignore === 0) return Promise.resolve();
+      return new Promise((resolve) => {
+        const t = setTimeout(resolve, ms);
+        waiters.push(() => (clearTimeout(t), resolve()));
+      });
+    },
   };
 }
 

@@ -11,9 +11,29 @@ export interface Me {
   primary?: boolean;
   /** Famille créée mais adresse de récupération pas encore vérifiée. */
   setupPending?: boolean;
+  prefs?: Prefs;
 }
 
-export type Unit = "piece" | "paquet" | "bouteille" | "brique" | "pot" | "boite" | "kg";
+export type Unit = "piece" | "paquet" | "bouteille" | "brique" | "pot" | "boite" | "kg" | "litre";
+
+/** Prix indicatif d'un produit (MAD) : montant pour une quantité de référence. Voir pricing.ts. */
+export interface Price {
+  amount: string;
+  refQty: string;
+  refUnit: import("./pricing").RefUnit;
+  packaging: string | null;
+  pieceWeightG: string | null;
+  source: "base" | "family" | "community";
+  basis?: { kind: "observed" | "average" | "rounded"; source: string; observedOn: string };
+  updatedAt?: string;
+}
+
+/** Préférences d'affichage des prix, propres au profil (désactivées par défaut). */
+export interface Prefs {
+  showPrices: boolean;
+  showTotals: boolean;
+  rev: number;
+}
 
 export interface Product {
   id: string;
@@ -23,6 +43,7 @@ export interface Product {
   brand: string | null;
   active: boolean;
   photoUrl: string | null;
+  price?: Price | null;
 }
 
 export interface Catalog {
@@ -89,6 +110,10 @@ export interface ListItem {
   rev: number;
   quantity: number;
   unit: Unit;
+  /** Prix figé à la validation de la ligne (null : aucun prix connu alors). */
+  price?: Price | null;
+  /** false : ligne antérieure aux prix, rien n'y a jamais été figé. */
+  priceFrozen?: boolean;
   purchase?: PurchaseInfo;
   /** Parents only: who asked for it and when (its first/last addition). */
   addedBy?: Person;

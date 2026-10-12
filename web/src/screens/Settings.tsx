@@ -3,6 +3,8 @@ import { VersionInfo } from "../components/VersionInfo";
 import { useEffect, useState } from "react";
 import { api, ApiError, NetworkError, type AuditProduct, type BackupStatus, type Profile, type ResetPreview } from "../api";
 import { userMessage } from "../errors";
+import { PriceDisplaySettings } from "../components/PriceDisplaySettings";
+import { SyncPrices } from "../components/SyncPrices";
 import { ShareSheet, type ShareTarget } from "../components/ShareAccess";
 import { fmtDateTime } from "../format";
 import { CATEGORY_EMOJI } from "../categories";
@@ -26,7 +28,7 @@ const ROLE_LABEL: Record<Role, string> = { admin: "Administrateur", parent: "Par
 
 const errText = userMessage;
 
-type Section = "profiles" | "recovery" | "reset" | "catalog" | "notifications" | "backups" | "about";
+type Section = "profiles" | "recovery" | "reset" | "catalog" | "prices" | "notifications" | "backups" | "about";
 
 /** Backup state in one sentence: what matters to the family. How it works stays on the operator side (server logs). */
 function backupSummary(st: BackupStatus | null): { ok: boolean; text: string } {
@@ -50,7 +52,8 @@ export function Settings({ engine, s }: { engine: Engine; s: State }) {
     const items: { key: Section; icon: IconName; title: string; text: string; testid: string }[] = [
       { key: "profiles", icon: "users", title: "Famille et profils", text: "Profils, rôles, codes d'accès", testid: "seg-profiles" },
       { key: "recovery", icon: "lock", title: "Adresse de récupération", text: "Code famille et mot de passe oubliés", testid: "seg-recovery" },
-      { key: "catalog", icon: "grid", title: "Catalogue", text: "Produits, photos et unités", testid: "seg-catalog" },
+      { key: "catalog", icon: "grid", title: "Catalogue", text: "Produits, photos, unités et prix", testid: "seg-catalog" },
+      { key: "prices", icon: "info", title: "Prix", text: s.me?.prefs?.showTotals ? "Prix et total estimé" : s.me?.prefs?.showPrices ? "Prix indicatifs" : "Affichage simple, sans prix", testid: "seg-prices" },
       { key: "notifications", icon: "bell", title: "Notifications", text: pushText, testid: "seg-notifications" },
       { key: "backups", icon: "shield", title: "Sauvegarde", text: bs.text, testid: "seg-backups" },
       ...(s.me?.primary ? [{ key: "reset" as Section, icon: "shield" as IconName, title: "Réinitialiser la famille", text: "Suppression définitive, pour recommencer", testid: "seg-reset" }] : []),
@@ -71,7 +74,7 @@ export function Settings({ engine, s }: { engine: Engine; s: State }) {
       </>
     );
   }
-  const titles: Record<Section, string> = { profiles: "Famille et profils", recovery: "Adresse de récupération", reset: "Réinitialiser la famille", catalog: "Catalogue", notifications: "Notifications", backups: "Sauvegarde", about: "À propos" };
+  const titles: Record<Section, string> = { profiles: "Famille et profils", recovery: "Adresse de récupération", reset: "Réinitialiser la famille", catalog: "Catalogue", prices: "Prix", notifications: "Notifications", backups: "Sauvegarde", about: "À propos" };
   return (
     <>
       <PageHead engine={engine} s={s} title={titles[section]} onBack={() => setSection(null)} backLabel="Réglages" backTestId="settings-back" subtitle={section === "profiles" && s.me?.family ? <>Code de la famille : <b data-testid="family-code">{s.me.family.code}</b></> : undefined} />
@@ -79,6 +82,7 @@ export function Settings({ engine, s }: { engine: Engine; s: State }) {
       {section === "recovery" && <RecoveryPanel />}
       {section === "reset" && <ResetFamily engine={engine} />}
       {section === "catalog" && <CatalogAdmin engine={engine} />}
+      {section === "prices" && <><PriceDisplaySettings engine={engine} s={s} /><h2 className="sect">Synchroniser les prix</h2><SyncPrices /></>}
       {section === "notifications" && <div className="menu"><NotificationSettings /></div>}
       {section === "backups" && <BackupCard st={backup} />}
       {section === "about" && <div className="versioninfo--page"><VersionInfo engine={engine} /></div>}
@@ -365,7 +369,8 @@ function CatalogAdmin({ engine }: { engine: Engine }) {
       {view === "mine" && <><button className="btn btn--primary btn--big addbtn" data-testid="add-article" onClick={() => setForm({})}>+ Ajouter un article</button>
       {form && cat && (
         <ProductForm
-          product={form.product}
+          product={form.product ? cat.categories.flatMap((c) => c.products).find((x) => x.id === form.product!.id) ?? form.product : undefined}
+          onPriceChanged={() => void act(async () => {})}
           categories={cat.categories.map((c) => ({ key: c.key, label: c.label }))}
           onClose={() => setForm(null)}
           onSaved={() => { setForm(null); void act(async () => {}); }}

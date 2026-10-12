@@ -458,3 +458,16 @@ h3 { font-size: 1.05rem; font-weight: 800; }
 .notice--row span { flex: 1 1 12rem; }
 .notice--row .btn { min-height: 44px; }
 .sharepreview { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 0.6rem 0.75rem; margin: 0; font: inherit; font-size: 0.92rem; }
+
+/* Prix indicatifs, total estimé, favoris */
+.price { display: block; color: var(--muted); font-weight: 500; font-size: 0.82rem; overflow-wrap: anywhere; }
+.price b { color: var(--ink); }
+.price--todo { color: var(--amber, #a15c00); font-weight: 700; }
+.estimate { margin: 0.5rem 1rem; padding: 0.6rem 0.8rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.estimate__line b { white-space: nowrap; }
+.estimate__line { display: flex; justify-content: space-between; gap: 0.6rem; font-weight: 700; }
+.estimate__warn { margin: 0.25rem 0 0; color: var(--amber, #a15c00); font-weight: 700; font-size: 0.9rem; }
+.estimate__note { margin: 0.25rem 0 0; font-size: 0.78rem; }
+.panel .check { display: flex; gap: 0.6rem; align-items: flex-start; padding: 0.4rem 0; min-height: 44px; }
+.panel .check input { width: 1.4rem; height: 1.4rem; flex: none; margin-top: 0.15rem; }
+.panel .check small { display: block; }

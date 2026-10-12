@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo, useState, type ReactNode } from "react";
 import type { Unit } from "../types";
 import { fmtQty } from "../units";
 import { QtyCounter } from "./QtyCounter";
@@ -21,6 +21,10 @@ interface Props {
   inactive?: boolean;
   /** No list to select into (staff without a current list): the card only displays the product. */
   readOnly?: boolean;
+  /** Price line (only when the profile chose to see prices). */
+  priceNode?: ReactNode;
+  /** « Prix et total » mode: quarter steps for kilograms and litres. */
+  fine?: boolean;
   emoji?: string;
   onTap(productId: string): void;
   onQty?(productId: string, qty: number): void;
@@ -35,7 +39,7 @@ const LABEL: Record<CardState, string> = {
   bought: ", acheté, verrouillé",
 };
 
-export const ProductCard = memo(function ProductCard({ productId, name, brand, photoUrl, state, unit, qty, boughtQty, again, inactive, readOnly, emoji, onTap, onQty, onAgain }: Props) {
+export const ProductCard = memo(function ProductCard({ productId, name, brand, photoUrl, state, unit, qty, boughtQty, again, inactive, readOnly, priceNode, fine, emoji, onTap, onQty, onAgain }: Props) {
   const [broken, setBroken] = useState(false);
   const showPhoto = photoUrl && !broken;
   const selected = state === "saved" || state === "unsaved";
@@ -79,11 +83,12 @@ export const ProductCard = memo(function ProductCard({ productId, name, brand, p
         {brand ? <small>{brand}</small> : null}
         {inactive ? <small>désactivé</small> : null}
         {again ? <small className="card__again">Nouvelle demande</small> : null}
+        {priceNode}
         {state === "saved" ? <span className="card__tag" data-testid={`tag-${productId}`}>✓ À acheter</span> : null}
         {state === "unsaved" ? <span className="card__tag card__tag--unsaved" data-testid={`tag-${productId}`}>● À valider</span> : null}
         {state === "removing" ? <span className="card__tag card__tag--removing" data-testid={`tag-${productId}`}>✕ À retirer</span> : null}
       </button>
-      {selected && qty !== undefined && onQty && <QtyCounter productId={productId} name={name} unit={unit} qty={qty} onChange={onQty} />}
+      {selected && qty !== undefined && onQty && <QtyCounter productId={productId} name={name} unit={unit} qty={qty} fine={fine} onChange={onQty} />}
       {state === "bought" && onAgain && (
         <button type="button" className="btn btn--small again" data-testid={`again-${productId}`} onClick={() => onAgain(productId)}>
           Nouvelle demande

@@ -1,4 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { afterLayersClosed, BasketChoice } from "../components/Basket";
+import { EstimateTotal, PriceTag } from "../components/PriceTag";
+import { listLines, NO_PREFS, priceIndex, priceOfLine, totalOf } from "../priceView";
 import { api, type HistoryEntry } from "../api";
 import { Thumb } from "../components/Thumb";
 import { fmtDay, fmtTime, fmtWhen } from "../format";
@@ -10,9 +13,9 @@ import { GroupedRows } from "../components/GroupedRows";
 import { RowMeta } from "../components/ItemDetail";
 import { ValidationHistory } from "../components/ValidationHistory";
 import { fmtQty } from "../units";
-import type { ListView } from "../types";
+import type { ListView, Unit } from "../types";
 
-export function History({ engine, s, categories, openId, onOpened }: { engine: Engine; s: State; categories: { key: string; label: string }[]; openId?: string | null; onOpened?(): void }) {
+export function History({ engine, s, categories, openId, onOpened, onPrepared }: { engine: Engine; s: State; categories: { key: string; label: string }[]; openId?: string | null; onOpened?(): void; onPrepared?(): void }) {
   const [entries, setEntries] = useState<HistoryEntry[] | null>(null);
   const [open, setOpen] = useState<ListView | null>(null);
   const [error, setError] = useState(false);
@@ -25,7 +28,7 @@ export function History({ engine, s, categories, openId, onOpened }: { engine: E
     api.history().then((r) => setEntries(r.lists)).catch(() => setError(true));
   }, []);
 
-  if (open) return <Archive engine={engine} s={s} list={open} categories={categories} onBack={() => setOpen(null)} />;
+  if (open) return <Archive engine={engine} s={s} list={open} categories={categories} onBack={() => setOpen(null)} onPrepared={() => { setOpen(null); afterLayersClosed(() => onPrepared?.()); }} />;
   return (
     <>
       <PageHead engine={engine} s={s} title="Historique" subtitle="Les listes clôturées, de la plus récente à la plus ancienne" />
@@ -58,18 +61,24 @@ export function History({ engine, s, categories, openId, onOpened }: { engine: E
   );
 }
 
-function Archive({ engine, s, list, categories, onBack }: { engine: Engine; s: State; list: ListView; categories: { key: string; label: string }[]; onBack(): void }) {
+function Archive({ engine, s, list, categories, onBack, onPrepared }: { engine: Engine; s: State; list: ListView; categories: { key: string; label: string }[]; onBack(): void; onPrepared(): void }) {
   const bought = list.items.filter((i) => i.status === "purchased");
   const left = list.items.filter((i) => i.status === "to_buy");
   const [validations, setValidations] = useState(false);
+  const [reorder, setReorder] = useState(false);
+  const prefs = s.me?.prefs ?? NO_PREFS;
+  const prices = useMemo(() => priceIndex(s.catalog), [s.catalog]);
+  const lines = [...bought, ...left].map((i) => ({ productId: i.productId, name: i.name, quantity: i.status === "purchased" ? (i.purchase?.quantity ?? i.quantity) : i.quantity, unit: ((i.status === "purchased" ? i.purchase?.unit : null) ?? i.unit) as Unit }));
+  const when = list.closedAt ? fmtDay(list.closedAt) : "";
   return (
     <div data-testid="archive">
       <PageHead engine={engine} s={s} onBack={onBack} backLabel="Historique" backTestId="archive-back" title={list.closedAt ? fmtDay(list.closedAt) : "Liste"} subtitle={list.closedAt ? `Clôturée à ${fmtTime(list.closedAt)} par ${list.closedBy?.displayName} · lecture seule` : "Lecture seule"} />
-      {(list.validations?.length ?? 0) > 0 && (
-        <div className="actions">
-          <button className="btn btn--small" data-testid="archive-validations" onClick={() => setValidations(true)}><Icon name="history" size={20} /> Validations ({list.validations!.length})</button>
-        </div>
-      )}
+      <div className="actions">
+        {lines.length > 0 && <button className="btn btn--primary btn--small" data-testid="reorder" onClick={() => setReorder(true)}><Icon name="plus" size={20} /> Recommander</button>}
+        {(list.validations?.length ?? 0) > 0 && <button className="btn btn--small" data-testid="archive-validations" onClick={() => setValidations(true)}><Icon name="history" size={20} /> Validations ({list.validations!.length})</button>}
+      </div>
+      {reorder && <BasketChoice engine={engine} s={s} items={lines} title={`Commande du ${when}`} onClose={() => setReorder(false)} onDone={() => { setReorder(false); onPrepared(); }} />}
+      {prefs.showTotals && <EstimateTotal summary={totalOf(listLines(list, prices))} testid="archive-estimate" />}
       {validations && <ValidationHistory list={list} onClose={() => setValidations(false)} />}
       <h2 className="sect">Achetés <span className="count-pill">{bought.length}</span></h2>
       <GroupedRows
@@ -78,7 +87,7 @@ function Archive({ engine, s, list, categories, onBack }: { engine: Engine; s: S
         row={(i) => (
           <li key={i.id} className="row row--bought">
             <Thumb photoUrl={i.photoUrl} category={i.category} />
-            <span className="row__name">{i.name}<span className="rowqty">{fmtQty(i.purchase?.quantity ?? i.quantity, i.purchase?.unit ?? i.unit)}</span>{i.brand && <small>{i.brand}</small>}<small>Acheté par {i.purchase?.by.displayName} · {i.purchase ? fmtWhen(i.purchase.at) : ""}</small></span>
+            <span className="row__name">{i.name}<span className="rowqty">{fmtQty(i.purchase?.quantity ?? i.quantity, i.purchase?.unit ?? i.unit)}</span>{i.brand && <small>{i.brand}</small>}<PriceTag price={priceOfLine(i, i.productId, prices, false)} qty={i.purchase?.quantity ?? i.quantity} unit={i.purchase?.unit ?? i.unit} prefs={prefs} testid={`price-${i.productId}`} showMissing={i.priceFrozen} /><small>Acheté par {i.purchase?.by.displayName} · {i.purchase ? fmtWhen(i.purchase.at) : ""}</small></span>
           </li>
         )}
       />
@@ -89,7 +98,7 @@ function Archive({ engine, s, list, categories, onBack }: { engine: Engine; s: S
         row={(i) => (
           <li key={i.id} className="row">
             <Thumb photoUrl={i.photoUrl} category={i.category} />
-            <span className="row__name">{i.name}<span className="rowqty">{fmtQty(i.quantity, i.unit)}</span>{i.brand && <small>{i.brand}</small>}<RowMeta item={i} /></span>
+            <span className="row__name">{i.name}<span className="rowqty">{fmtQty(i.quantity, i.unit)}</span>{i.brand && <small>{i.brand}</small>}<PriceTag price={priceOfLine(i, i.productId, prices, false)} qty={i.quantity} unit={i.unit} prefs={prefs} testid={`price-${i.productId}`} showMissing={i.priceFrozen} /><RowMeta item={i} /></span>
           </li>
         )}
       />

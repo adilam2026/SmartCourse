@@ -1,4 +1,4 @@
-import type { Batch, ListItem, ListView, Op, OpResult, Toggles } from "../types";
+import type { Batch, ListItem, ListView, Op, OpResult, Toggles, Unit } from "../types";
 import { fmtQty } from "../units";
 
 /*
@@ -206,4 +206,97 @@ export function interpretResults(batch: Batch, results: OpResult[], nameOf: (pro
   }
   if (closed) notices.unshift("La liste a été clôturée : vos choix n'ont pas été enregistrés.");
   return { notices, orphanAdds };
+}
+
+// ---- Favoris et « Recommander » : produits et quantités repris dans une liste modifiable avant validation ------------
+
+export interface BasketItem {
+  productId: string;
+  name: string;
+  quantity: number;
+  /** Unit the quantity was expressed in (a favourite or an old order). */
+  unit: Unit;
+}
+export type BasketMode = "add" | "replace";
+export interface BasketReport {
+  /** New in the list. */
+  added: string[];
+  /** Quantity added to a line already there (same unit only). */
+  summed: string[];
+  /** Quantity replaced (replace mode). */
+  set: string[];
+  /** Removed from the list (replace mode). */
+  removed: string[];
+  /** Deactivated products: reported, never reactivated. */
+  inactive: string[];
+  /** Unit differs from the line's or the product's current one: nothing is merged or converted. */
+  unitMismatch: string[];
+  /** Already bought in this list: left alone. */
+  purchased: string[];
+}
+
+const round3 = (n: number) => Math.round(n * 1000) / 1000;
+
+/**
+ * Prepares the pending choices (toggles) for a basket, in the list being edited. Nothing is sent: the person adjusts and presses
+ * « Valider ». The basket itself (favourite or past order) is never modified.
+ *  - add: products already in the list keep their line; quantities are added together ONLY when the units are the same;
+ *  - replace: the lines still to buy take the basket's content (bought lines stay: they are locked);
+ *  - a deactivated product is reported and never reactivated; a unit that differs is reported, never converted.
+ */
+export function planBasket(a: {
+  list: ListView;
+  batches: Batch[];
+  toggles: Toggles;
+  items: BasketItem[];
+  mode: BasketMode;
+  product: (productId: string) => { active: boolean; unit: Unit } | undefined;
+}): { toggles: Toggles; report: BasketReport } {
+  const { list, batches, items, mode } = a;
+  let toggles = a.toggles;
+  const report: BasketReport = { added: [], summed: [], set: [], removed: [], inactive: [], unitMismatch: [], purchased: [] };
+  const wanted = new Set(items.map((i) => i.productId));
+  for (const it of items) {
+    const prod = a.product(it.productId);
+    const present = effectivePresence(list, batches, toggles, it.productId);
+    if (present) {
+      const line = openItem(list, it.productId);
+      const lineUnit = line?.unit ?? prod?.unit ?? it.unit;
+      if (lineUnit !== it.unit) {
+        report.unitMismatch.push(it.name);
+        continue;
+      }
+      const cur = effectiveQty(list, batches, toggles, it.productId) ?? 1;
+      const next = mode === "add" ? Math.min(999, round3(cur + it.quantity)) : it.quantity;
+      if (next !== cur) {
+        toggles = setQuantityToggle(list, batches, toggles, it.productId, next);
+        (mode === "add" ? report.summed : report.set).push(it.name);
+      }
+      continue;
+    }
+    if (!prod || !prod.active) {
+      report.inactive.push(it.name);
+      continue;
+    }
+    if (isPurchased(list, it.productId, batches)) {
+      report.purchased.push(it.name);
+      continue;
+    }
+    if (prod.unit !== it.unit) {
+      report.unitMismatch.push(it.name);
+      continue;
+    }
+    toggles = toggleProduct(list, batches, toggles, it.productId);
+    toggles = setQuantityToggle(list, batches, toggles, it.productId, it.quantity);
+    report.added.push(it.name);
+  }
+  if (mode === "replace") {
+    for (const line of list.items) {
+      if (line.status !== "to_buy" || wanted.has(line.productId)) continue;
+      if (!effectivePresence(list, batches, toggles, line.productId)) continue;
+      toggles = toggleProduct(list, batches, toggles, line.productId);
+      report.removed.push(line.name);
+    }
+  }
+  return { toggles: normalizeToggles(list, batches, toggles), report };
 }

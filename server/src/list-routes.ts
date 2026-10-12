@@ -33,7 +33,8 @@ export function listRoutes(app: FastifyInstance, { db, hub, guard, push }: { db:
   app.get("/api/lists/active", { preHandler: guard() }, async (req) => {
     const list = await getActiveListView(db, req.auth!);
     const catalogRev = Number((await db.query("SELECT catalog_rev FROM families WHERE id = $1", [req.auth!.familyId])).rows[0]?.catalog_rev ?? 0);
-    return { list, catalogRev };
+    const prefsRev = Number((await db.query("SELECT prefs_rev FROM profiles WHERE id = $1", [req.auth!.profileId])).rows[0]?.prefs_rev ?? 0);
+    return { list, catalogRev, prefsRev };
   });
 
   // Réévaluer une liste en cours avec les prix actuels (action explicite d'un parent ou d'un administrateur).
