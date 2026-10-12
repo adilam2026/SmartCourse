@@ -120,7 +120,7 @@ test("adresse vérifiée : coche verte, aucun ancien message ; modifier l'adress
   // masqués : anciens messages, erreurs, boutons de vérification
   for (const id of ["mail-problem", "verify-instruction", "recovery-error", "recovery-resend", "recovery-tech", "mail-diagnose"]) await expect(page.getByTestId(id)).toHaveCount(0);
   await expectNoInfra(page);
-  await expect(page.getByTestId("recovery-sentence")).toHaveText("Cette adresse permet de récupérer votre code famille et de réinitialiser votre mot de passe.");
+  await expect(page.getByTestId("recovery-sentence")).toHaveText("Pour récupérer l'accès à votre famille.");
   await expect(page.getByTestId("recovery-edit")).toHaveText("Modifier l'adresse");
   await expect(page.getByTestId("recovery-test")).toHaveText("Envoyer un e-mail de test");
   await expect(page.getByTestId("recovery-input")).toHaveCount(0); // champs seulement quand on modifie

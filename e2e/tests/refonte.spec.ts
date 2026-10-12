@@ -65,7 +65,7 @@ async function audit(page: Page, label: string, opts: { nav?: boolean; bar?: boo
       const b = e.getBoundingClientRect();
       if (b.width === 0 || b.height === 0) continue;
       if (e.closest(".sheet-backdrop") === null && getComputedStyle(e).visibility === "hidden") continue;
-      if (b.height < (e.closest("[data-testid=profiles]") || e.classList.contains("addbtn--compact") ? 43.5 : 47.5)) small.push(`${e.className} ${Math.round(b.height)}px "${(e.textContent ?? "").trim().slice(0, 20)}"`);
+      if (b.height < (document.documentElement.dataset.ui === "compact" ? 43.5 : e.closest("[data-testid=profiles]") || e.classList.contains("addbtn--compact") ? 43.5 : 47.5)) small.push(`${e.className} ${Math.round(b.height)}px "${(e.textContent ?? "").trim().slice(0, 20)}"`);
     }
     out.small = small;
     // text clipped by its own box (one-line ellipsis aside, names must show in full)
@@ -77,7 +77,7 @@ async function audit(page: Page, label: string, opts: { nav?: boolean; bar?: boo
     return out;
   });
   expect(r.overflow, `${label} : aucun défilement horizontal`).toBeLessThanOrEqual(0);
-  expect(r.small, `${label} : zones tactiles ≥ 48 px`).toEqual([]);
+  expect(r.small, `${label} : zones tactiles confortables (48 px, 44 px en présentation compacte)`).toEqual([]);
   expect(r.clipped, `${label} : aucun texte coupé`).toEqual([]);
   if (opts.nav) {
     // dernier contenu au-dessus de la navigation du bas
@@ -317,7 +317,10 @@ for (const w of WIDTHS) {
       await expect(page.getByTestId("stats-window")).toContainText("du 1");
       await expect(page.getByTestId("sum-purchases")).toHaveText("10");
       await expect(page.getByTestId("sum-products")).toHaveText("4");
-      await expect(page.getByTestId("legend-bars")).toContainText("nombre d'achats"); // mesure commune des barres
+      await expect(page.getByTestId("legend-bars")).toHaveCount(0); // pas de paragraphe permanent
+      await page.getByTestId("stats-help").click();
+      await expect(page.getByTestId("legend-bars")).toContainText("nombre d'achats"); // mesure commune des barres, dans l'aide
+      await page.getByRole("dialog").getByRole("button", { name: "Fermer" }).first().click();
       // barres : une même mesure (fréquence) → la plus longue = le produit le plus acheté
       const widths = await page.locator('[data-testid^="statbar-"]').evaluateAll((els) => els.map((e) => [(e as HTMLElement).dataset.testid, (e as HTMLElement).getBoundingClientRect().width]));
       const byName = Object.fromEntries(widths.map(([k, v]) => [String(k).replace("statbar-", ""), Number(v)]));

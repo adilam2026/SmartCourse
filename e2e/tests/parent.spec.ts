@@ -192,6 +192,7 @@ test.describe("administration", () => {
     await uiLogin(page, f, "adil", "482913");
     await page.getByTestId("tab-settings").click();
     await page.getByTestId("seg-catalog").click();
+    await page.getByTestId("more-Tomates").click();
     await page.getByTestId("active-Tomates").click();
     await expect(page.getByTestId("prod-Tomates")).toContainText("désactivé");
 

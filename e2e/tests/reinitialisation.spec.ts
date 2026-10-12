@@ -47,7 +47,8 @@ test("réinitialiser ma famille : suppression de cette famille seulement, accès
   await page.getByTestId("tab-settings").click();
   await page.getByTestId("seg-reset").click();
   await expect(page.getByTestId("reset-code")).toHaveText(A.code);
-  await expect(page.getByTestId("reset-counts")).toContainText("3 profil(s)");
+  await expect(page.getByTestId("reset-counts")).toHaveText("Tous les profils, listes, achats et articles de cette famille seront supprimés. Cette action est définitive.");
+  await expect(page.getByTestId("reset-panel")).not.toContainText(/profil\(s\)|243|sauvegardes/);
   await expect(page.getByTestId("reset-submit")).toBeDisabled();
   await page.getByTestId("reset-password").fill("000111");
   await page.getByTestId("reset-confirm-code").fill(A.code);

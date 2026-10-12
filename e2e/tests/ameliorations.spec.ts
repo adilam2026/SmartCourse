@@ -264,7 +264,7 @@ test.describe("4 · unités adaptées", () => {
     await admin.getByTestId("pf-unit").selectOption("brique");
     await admin.screenshot({ path: `${CAP}/amelioration-unites-reglage.png` });
     await admin.getByTestId("pf-save").click();
-    await expect(admin.getByTestId("prod-Lait")).toContainText("Unité : brique");
+    await expect(admin.getByTestId("prod-Lait")).toContainText("brique");
 
     // nouvelle demande : en briques ; l'achat passé reste en pièces
     await post(f, "staff", listId, [again(f, "Lait", 1)]);

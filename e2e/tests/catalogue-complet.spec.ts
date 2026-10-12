@@ -67,6 +67,7 @@ test("ajout, déjà disponible, réactivation sans recréer ; recherche commune"
   await page.getByTestId("all-search").fill("tomates");
   await expect(page.getByTestId("all-have-Tomates")).toBeVisible();
   await page.getByTestId("cat-view-mine").click();
+  await page.getByTestId("more-Tomates").click();
   await page.getByTestId("active-Tomates").click();
   await page.getByTestId("cat-view-all").click();
   await page.getByTestId("all-search").fill("tomates");
@@ -131,18 +132,21 @@ test("photo erronée d'un article : repérée, comparée, remplacée par la phot
   await uiLogin(page, f, "adil", "482913");
   await page.getByTestId("tab-settings").click();
   await page.getByTestId("seg-catalog").click();
-  await expect(page.getByTestId("photosrc-Papier cuisson")).toContainText("de la famille");
+  await expect(page.getByTestId("pf-own")).toContainText("(2)"); // les deux photos propres à la famille sont comptées ; plus de mention répétée par ligne
+  await expect(page.locator("[data-testid^='photosrc-']")).toHaveCount(0);
   await page.getByTestId("pf-check").click();
   await expect(page.getByTestId("prod-Papier cuisson")).toBeVisible();
   await expect(page.getByTestId("prod-Boîte à gâteaux")).toHaveCount(0); // pas d'approximation par catégorie
+  await page.getByTestId("more-Papier cuisson").click();
   await page.getByTestId("usecat-Papier cuisson").click();
   await expect(page.getByTestId("photo-compare")).toBeVisible();
   await expect(page.getByTestId("photo-Papier cuisson (catalogue)")).toBeVisible();
   await page.screenshot({ path: `${OUT}/photo-comparer-390.png` });
   await page.getByTestId("usecat-confirm").click();
-  await page.getByTestId("pf-all").click();
-  await expect(page.getByTestId("photosrc-Papier cuisson")).toContainText("du catalogue");
-  await expect(page.getByTestId("photosrc-Boîte à gâteaux")).toContainText("de la famille");
+  await expect(page.getByTestId("pf-own")).toContainText("(1)"); // « Papier cuisson » n'est plus une photo de la famille ; l'autre l'est toujours
+  await page.getByTestId("pf-own").click();
+  await expect(page.getByTestId("prod-Boîte à gâteaux")).toBeVisible();
+  await expect(page.getByTestId("prod-Papier cuisson")).toHaveCount(0);
 });
 
 const CATS = ["legumes", "fruits", "laitages", "epicerie", "viandes", "surgeles", "pain", "boissons", "maison", "hygiene"];

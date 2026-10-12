@@ -538,8 +538,8 @@ html[data-ui="compact"] .pagehead__title { margin-top: 0.1rem; }
 html[data-ui="compact"] .pagehead__sub { font-size: 0.85rem; }
 html[data-ui="compact"] .brand { font-size: 1rem; }
 html[data-ui="compact"] .brand img { width: 24px; height: 24px; }
-html[data-ui="compact"] .avatar { width: 2.5rem; height: 2.5rem; min-width: 2.5rem; min-height: 2.5rem; font-size: 0.95rem; }
-html[data-ui="compact"] .backbtn { min-height: 2.5rem; font-size: 0.95rem; border-radius: 10px; }
+html[data-ui="compact"] .avatar { width: 2.65rem; height: 2.65rem; min-width: 2.65rem; min-height: 2.65rem; font-size: 0.95rem; }
+html[data-ui="compact"] .backbtn { min-height: 2.65rem; font-size: 0.95rem; border-radius: 10px; }
 /* boutons */
 html[data-ui="compact"] .btn { min-height: var(--tap); padding: 0.25rem 0.85rem; font-size: 0.95rem; border-radius: 10px; }
 html[data-ui="compact"] .btn--primary { box-shadow: none; }
@@ -565,7 +565,7 @@ html[data-ui="compact"] .catgroup { margin: 0.2rem 0 0.3rem; }
 html[data-ui="compact"] .catgroup__title { margin: 0.3rem 1rem 0.2rem; font-size: 0.9rem; color: var(--muted); }
 html[data-ui="compact"] .rows { gap: 0.3rem; }
 html[data-ui="compact"] .row { padding: 0.35rem 0.55rem; gap: 0.5rem; border-radius: var(--radius); }
-html[data-ui="compact"] .row__main { min-height: 2.5rem; }
+html[data-ui="compact"] .row__main { min-height: 2.65rem; }
 html[data-ui="compact"] .row__main b, html[data-ui="compact"] .statrow .row__name b { font-size: 0.98rem; }
 html[data-ui="compact"] .row__main small, html[data-ui="compact"] .row__name small { font-size: 0.78rem; }
 html[data-ui="compact"] .rowqty { font-size: 0.9rem; }
@@ -581,8 +581,8 @@ html[data-ui="compact"] .hcard__time { font-size: 0.82rem; }
 html[data-ui="compact"] .thumbs .thumb, html[data-ui="compact"] .thumbs__more { width: 2.2rem; height: 2.2rem; }
 /* statistiques */
 html[data-ui="compact"] .monthnav { margin: 0.4rem 1rem 0.15rem; padding: 0.2rem; }
-html[data-ui="compact"] .monthnav .btn { min-width: 2.5rem; min-height: 2.5rem; }
-html[data-ui="compact"] .monthnav__title { min-height: 2.5rem; font-size: 0.98rem; }
+html[data-ui="compact"] .monthnav .btn { min-width: 2.65rem; min-height: 2.65rem; }
+html[data-ui="compact"] .monthnav__title { min-height: 2.65rem; font-size: 0.98rem; }
 html[data-ui="compact"] .statnote { margin: 0.2rem 1rem; font-size: 0.8rem; }
 html[data-ui="compact"] .statsum { margin: 0.4rem 1rem 0; gap: 0.4rem; }
 html[data-ui="compact"] .statsum__card { padding: 0.4rem 0.6rem; gap: 0.5rem; box-shadow: none; }
@@ -591,7 +591,7 @@ html[data-ui="compact"] .statsum__num { display: inline; font-size: 1.2rem; marg
 html[data-ui="compact"] .statsum__lbl { font-size: 0.82rem; }
 html[data-ui="compact"] .listhead { margin: 0.6rem 1rem 0.3rem; }
 html[data-ui="compact"] .statsearch { margin: 0 1rem 0.4rem; }
-html[data-ui="compact"] .searchbox input { min-height: 2.5rem; border-radius: 10px; }
+html[data-ui="compact"] .searchbox input { min-height: 2.65rem; border-radius: 10px; }
 html[data-ui="compact"] .statbar { height: 0.35rem; margin-top: 0.15rem; }
 html[data-ui="compact"] .statrow__line { font-size: 0.88rem; }
 /* réglages */
@@ -601,7 +601,7 @@ html[data-ui="compact"] .menuitem__icon { width: 2.25rem; height: 2.25rem; borde
 html[data-ui="compact"] .menuitem__text b { font-size: 0.98rem; }
 html[data-ui="compact"] .menuitem__text small { font-size: 0.8rem; }
 html[data-ui="compact"] .panel { padding: 0.7rem 0.8rem; }
-html[data-ui="compact"] .seg button { min-height: 2.5rem; }
+html[data-ui="compact"] .seg button { min-height: 2.65rem; }
 html[data-ui="compact"] .recovery .verified { font-size: 1rem; }
 html[data-ui="compact"] .recovery .addr { font-size: 0.95rem; color: var(--muted); }
 /* fenêtres et formulaires */
@@ -611,15 +611,15 @@ html[data-ui="compact"] .sheetsection { padding: 0.55rem 0.7rem; gap: 0.35rem; }
 html[data-ui="compact"] .form { gap: 0.55rem; }
 html[data-ui="compact"] .field { gap: 0.25rem; font-size: 0.95rem; }
 html[data-ui="compact"] .preview { width: 6.5rem; height: 6.5rem; }
-html[data-ui="compact"] .check { min-height: 2.5rem; }
+html[data-ui="compact"] .check { min-height: 2.65rem; }
 html[data-ui="compact"] .form__actions { bottom: calc(-0.9rem - var(--safe-bottom)); }
 /* choix des produits (écran « Ajouter / modifier ») : cartes plus basses */
 html[data-ui="compact"] .grid { gap: 0.5rem; }
 html[data-ui="compact"] .card__photo { aspect-ratio: 4 / 3; }
 html[data-ui="compact"] .card__name { padding: 0.3rem 0.3rem 0.4rem; font-size: 0.92rem; }
 html[data-ui="compact"] .catblock { padding: 0.4rem; gap: 0.25rem; }
-html[data-ui="compact"] .qty__btn { height: 2.5rem; width: 2.5rem; }
-html[data-ui="compact"] .qty { grid-template-columns: 2.5rem minmax(0, 1fr) 2.5rem; margin-bottom: 0.2rem; }
+html[data-ui="compact"] .qty__btn { height: 2.65rem; width: 2.65rem; }
+html[data-ui="compact"] .qty { grid-template-columns: 2.65rem minmax(0, 1fr) 2.65rem; margin-bottom: 0.2rem; }
 html[data-ui="compact"] .actionbar { padding-top: 0.4rem; padding-bottom: calc(0.4rem + var(--safe-bottom)); }
 html[data-ui="compact"] .actionbar .btn { min-height: 3rem; box-shadow: none; }
 /* états vides */
@@ -627,8 +627,9 @@ html[data-ui="compact"] .nolist__body { gap: 0.6rem; padding: 1rem; }
 html[data-ui="compact"] .nolist__logo { width: 64px; height: 64px; box-shadow: none; }
 html[data-ui="compact"] .statrow .row__name { gap: 0; line-height: 1.2; }
 html[data-ui="compact"] .statrow .row__name small, html[data-ui="compact"] .statrow__line { line-height: 1.2; }
-html[data-ui="compact"] .actions--bar { flex-wrap: nowrap; gap: 0.3rem; }
-html[data-ui="compact"] .actions--bar .btn { padding: 0.2rem 0.5rem; font-size: 0.88rem; gap: 0.3rem; min-width: 0; }
+html[data-ui="compact"] .actions--bar { flex-wrap: nowrap; gap: 0.25rem; }
+html[data-ui="compact"] .actions--bar .btn { padding: 0.2rem 0.4rem; font-size: 0.84rem; gap: 0.25rem; min-width: 0; flex: 0 1 auto; white-space: nowrap; }
+html[data-ui="compact"] .actions--bar .btn .icon { width: 17px; height: 17px; }
 html[data-ui="compact"] .actions--bar .menuwrap { margin-left: auto; }
 /* ligne de liste : nom et quantité sur la même ligne, détails dessous */
 html[data-ui="compact"] .row__main { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 0.5rem; row-gap: 0; align-content: center; }
@@ -643,8 +644,8 @@ html[data-ui="compact"] .row--line .row__name { flex: 1 1 6.5rem; }
 html[data-ui="compact"] .catchip { min-height: 2.25rem; padding: 0 0.65rem; font-size: 0.85rem; }
 html[data-ui="compact"] .catchips { gap: 0.3rem; padding-bottom: 0.3rem; }
 html[data-ui="compact"] .seg button { font-size: 0.9rem; }
-html[data-ui="compact"] .catbar input { min-height: 2.5rem; }
-html[data-ui="compact"] .catbar .btn { min-height: 2.5rem; }
+html[data-ui="compact"] .catbar input { min-height: 2.65rem; }
+html[data-ui="compact"] .catbar .btn { min-height: 2.65rem; }
 .panel.danger, .panel.recovery { margin: 0.5rem 1rem; display: grid; gap: 0.6rem; }
 .panel.danger p, .panel.recovery p { margin: 0; }
 html[data-ui="compact"] .row--line .row__name { flex: 1 1 5rem; }
