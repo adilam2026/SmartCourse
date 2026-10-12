@@ -1,0 +1,12 @@
+Physical size: 1080x2400
+Override size: 1080x2340
+Physical density: 420
+Override density: 480
+Physical size: 1080x2400
+Override size: 1080x2340
+Physical density: 420
+Override density: 443
+RETOUR_ECRAN_PRECEDENT=ECHEC
+CLAVIER_VISIBLE=NON
+RETOUR_FERME_CLAVIER_SANS_QUITTER=ECHEC
+CRASH_LIGNES=0
