@@ -36,6 +36,9 @@ const catalog = async (f: Family) => {
   const c = await (await f.adil.get("/api/catalog?includeInactive=1")).json();
   return Object.fromEntries(c.categories.flatMap((x: any) => x.products).map((p: any) => [p.name, p]));
 };
+test.beforeEach(async () => {
+  await sql("DELETE FROM base_prices"); // ces scénarios posent leurs propres prix de base ; la base réelle est contrôlée dans prix-base-initiale.spec.ts
+});
 const noOverflow = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth);
 async function openList(page: Page) {
   await page.getByTestId("tab-current").click();

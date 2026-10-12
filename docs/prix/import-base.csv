@@ -1,0 +1,99 @@
+﻿cle_stable;origine;produit_observe;montant;quantite_reference;unite_reference;conditionnement;poids_piece_g;nature;source;date_capture;statut;remise_conditionnelle;valide_pour_generique;remarque
+tomates;initial;Tomates;9,90;1;kg;;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;tomates rondes
+pommes-de-terre;initial;Pommes de terre;9,00;1;kg;;;arrondi;captures du 12/10/2026;2026-10-12;confirmé;non;;estimation arrondie validée
+oignons;initial;Oignons;8,40;1;kg;;;moyen;captures du 12/10/2026;2026-10-12;confirmé;non;;moyenne rouge et blanc
+carottes;initial;Carottes;7,90;1;kg;;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+concombres;initial;Concombres;10,90;1;kg;;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+courgettes;initial;Courgettes;15,80;1;kg;;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+poivrons-verts;initial;Poivrons verts;17,00;1;kg;;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+poivrons-rouges;initial;Poivrons rouges;23,80;1;kg;;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+betteraves;extended;Betteraves;9,80;1;kg;;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+navets;extended;Navets;17,80;1;kg;;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+aubergines;initial;Aubergines;9,80;1;kg;;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+haricots-verts;initial;Haricots verts;27,00;1;kg;;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+champignons;extended;Champignons;64,50;1;kg;;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;frais
+gingembre;extended;Gingembre;64,50;1;kg;;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+ail;initial;Ail;71,60;1;kg;;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;ne pas convertir en prix par tête sans poids
+laitue;initial;Laitue;7,50;1;piece;;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+persil;initial;Persil;3,90;1;paquet;sachet (poids non précisé);;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;poids non précisé, prix par sachet uniquement
+sauge;extended;Sauge;7,95;1;paquet;barquette de 25 g;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+thym;extended;Thym;7,95;1;paquet;barquette de 25 g;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+bananes;initial;Bananes;19,90;1;kg;;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+clementines;initial;Clémentines;10,90;1;kg;;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+citrons;initial;Citrons;7,80;1;kg;;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+pamplemousse;extended;Pamplemousse;7,00;1;kg;;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+avocats;initial;Avocats;25,80;1;kg;;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;référence ordinaire, hors Hass
+poires;initial;Poires;32,00;1;kg;;;arrondi;captures du 12/10/2026;2026-10-12;confirmé;non;;estimation arrondie validée
+pommes;initial;Pommes;25,00;1;kg;;;arrondi;captures du 12/10/2026;2026-10-12;confirmé;non;;référence indicative validée
+grenades;extended;Grenades;11,90;1;kg;;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+kiwis;extended;Kiwis;61,80;1;kg;;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+ananas;extended;Ananas;26,90;1;piece;;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+noix-de-coco;extended;Noix de coco;14,50;1;piece;;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+mangues;extended;Mangues;13,90;1;piece;;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;aucune conversion au kg sans poids
+lait;initial;Lait;11,00;1;litre;;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+boisson-vegetale;extended;Boisson végétale;30,00;1;litre;;;arrondi;captures du 12/10/2026;2026-10-12;confirmé;non;;estimation arrondie validée
+oeufs;initial;Œufs;1,86;1;piece;;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+creme-fraiche;initial;Crème fraîche;12,95;1;pot;200 ml;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+creme-de-cuisson;extended;Crème de cuisson;19,95;1;brique;500 ml;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+creme-chantilly;extended;Crème chantilly;36,50;1;piece;bombe de 250 g;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;prête à utiliser
+fromage-frais;extended;Fromage frais;14,95;1;pot;190 g;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+fromage-a-tartiner;initial;Fromage à tartiner;19,95;1;pot;200 g;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+fromage-en-portions;initial;Fromage en portions;26,00;1;boite;16 portions;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+fromage-en-tranches;extended;Fromage en tranches;13,75;1;paquet;200 g;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+fromage-rape;initial;Fromage râpé;19,50;1;paquet;100 g;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+farine;initial;Farine;6,75;1;kg;;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;farine blanche courante
+farine-complete;extended;Farine complète;10,20;1;kg;;;arrondi;captures du 12/10/2026;2026-10-12;confirmé;non;;montant arrondi après conversion
+sucre;initial;Sucre;5,20;1;kg;;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;sucre granulé
+pates;initial;Pâtes;10,00;1;paquet;500 g;;arrondi;captures du 12/10/2026;2026-10-12;confirmé;non;;estimation arrondie validée
+vermicelles;initial;Vermicelles;9,90;1;paquet;500 g;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+couscous;extended;Couscous;15,00;1;kg;;;arrondi;captures du 12/10/2026;2026-10-12;confirmé;non;;estimation arrondie validée
+huile-de-table;initial;Huile de table;17,64;1;litre;;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+huile-d-olive;initial;Huile d’olive;47,45;1;litre;;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;référence courante
+concentre-de-tomates;initial;Concentré de tomates;7,40;1;boite;140 g;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+sauce-tomate;extended;Sauce tomate;32,00;1;pot;400 g;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;sauce préparée
+ketchup;extended;Ketchup;14,50;1;bouteille;flacon de 310 g;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+mayonnaise;extended;Mayonnaise;14,95;1;pot;280 g;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+moutarde;extended;Moutarde;16,50;1;pot;300 g;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+cornichons;extended;Cornichons;9,80;1;pot;210 g;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+mais-en-conserve;extended;Maïs en conserve;6,65;1;boite;150 g;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+bouillon;extended;Bouillon;7,50;1;boite;8 cubes;;arrondi;captures du 12/10/2026;2026-10-12;confirmé;non;;référence poisson utilisée comme estimation
+piment-en-poudre;extended;Piment en poudre;10,00;1;pot;quantité de 125 g;;arrondi;captures du 12/10/2026;2026-10-12;confirmé;non;;"estimation arrondie validée; conteneur non précisé : rattaché à l'unité du catalogue (pot)"
+melange-d-epices;extended;Mélange d’épices;29,30;1;pot;130 g;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+bicarbonate-alimentaire;extended;Bicarbonate alimentaire;24,50;1;pot;250 g;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+citrons-confits;extended;Citrons confits;23,00;1;pot;950 g;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+feuilles-de-brick;extended;Feuilles de brick;19,50;1;paquet;10 feuilles, 200 g;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+flocons-d-avoine;extended;Flocons d’avoine;20,95;1;paquet;500 g;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+baguette;extended;Baguette;3,50;1;piece;;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;référence de 200 à 250 g
+pain;initial;Pain;2,00;1;piece;;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;pain rond
+pain-complet;extended;Pain complet;1,32;1;piece;petit pain;;arrondi;captures du 12/10/2026;2026-10-12;confirmé;non;;référence du lot de 6
+brioche;extended;Brioche;2,74;1;piece;;;arrondi;captures du 12/10/2026;2026-10-12;confirmé;non;;référence du lot de 8
+confiture;initial;Confiture;18,95;1;pot;430 g;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+miel;initial;Miel;56,95;1;pot;450 g;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;référence eucalyptus
+amlou;extended;Amlou;83,95;1;pot;200 g;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;traditionnel
+caramel-a-tartiner;extended;Caramel à tartiner;64,00;1;pot;380 g;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+compote-de-fruits;extended;Compote de fruits;19,50;1;pot;390 g;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+pate-a-tartiner;extended;Pâte à tartiner;73,50;1;pot;600 g;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+viande-de-boeuf;initial;Viande de bœuf;149,90;1;kg;;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;référence tajine sans os
+agneau;extended;Agneau;193,80;1;kg;;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;référence côte/filet
+saucisses;extended;Saucisses;75,60;1;kg;;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;référence poulet
+thon-en-conserve;initial;Thon en conserve;11,17;1;boite;80 g;;arrondi;captures du 12/10/2026;2026-10-12;confirmé;non;;montant arrondi après division du lot
+eau-minerale;initial;Eau minérale;4,45;1;bouteille;1,5 litre;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+boisson-gazeuse;extended;Boisson gazeuse;8,00;1;bouteille;1 litre;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+jus-de-fruits;initial;Jus de fruits;17,20;1;brique;1 litre;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;référence pur jus d’orange
+liquide-vaisselle;initial;Liquide vaisselle;10,95;1;bouteille;flacon de 750 ml;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+assouplissant;initial;Assouplissant;22,95;1;bouteille;flacon de 1 litre;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+eau-de-javel;initial;Eau de Javel;9,98;1;bouteille;bidon de 2,5 litres;;arrondi;captures du 12/10/2026;2026-10-12;confirmé;non;;montant arrondi après division du lot
+deboucheur;extended;Déboucheur;36,10;1;bouteille;flacon de 1 litre;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;liquide
+blocs-wc;extended;Blocs WC;31,50;1;paquet;3 blocs de 38 g;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+aide-au-repassage;extended;Aide au repassage;36,50;1;bouteille;flacon de 500 ml;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+papier-cuisson;extended;Papier cuisson;42,95;1;piece;rouleau de 20 mètres;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+essuie-tout;initial;Essuie-tout;28,50;1;paquet;3 rouleaux;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+papier-toilette;initial;Papier toilette;54,50;1;paquet;12 rouleaux;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+mouchoirs-en-papier;initial;Mouchoirs en papier;15,95;1;boite;100 mouchoirs;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+sacs-poubelle;initial;Sacs-poubelle;18,95;1;piece;rouleau de 10 sacs de 60 litres;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+eponges;initial;Éponges;14,00;1;paquet;5;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+gel-douche;initial;Gel douche;43,50;1;bouteille;flacon de 250 ml;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+brosse-a-dents;extended;Brosse à dents;6,95;1;piece;;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+bain-de-bouche;extended;Bain de bouche;50,50;1;bouteille;flacon de 500 ml;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;
+creme-hydratante;extended;Crème hydratante;34,50;1;pot;75 ml;;observation;captures du 12/10/2026;2026-10-12;confirmé;non;;référence visage
+rasoirs;extended;Rasoirs;14,99;1;piece;;;arrondi;captures du 12/10/2026;2026-10-12;confirmé;non;;montant arrondi après division du lot

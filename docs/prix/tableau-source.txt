@@ -1,0 +1,149 @@
+Voici la base initiale de prix pour Courses, issue des captures du 12/10/2026.
+(Texte transmis tel quel ; les prix sont indicatifs, pas garantis ; masqués par défaut ; cashbacks et remises conditionnelles jamais déduits.)
+
+Format :
+Produit ; prix en DH ; unité de référence ; précision
+
+PRIX À INTÉGRER
+
+LÉGUMES ET HERBES
+Tomates ; 9,90 ; kg ; tomates rondes
+Pommes de terre ; 9,00 ; kg ; estimation arrondie validée
+Oignons ; 8,40 ; kg ; moyenne rouge et blanc
+Carottes ; 7,90 ; kg
+Concombres ; 10,90 ; kg
+Courgettes ; 15,80 ; kg
+Poivrons verts ; 17,00 ; kg
+Poivrons rouges ; 23,80 ; kg
+Betteraves ; 9,80 ; kg
+Navets ; 17,80 ; kg
+Aubergines ; 9,80 ; kg
+Haricots verts ; 27,00 ; kg
+Champignons ; 64,50 ; kg ; frais
+Gingembre ; 64,50 ; kg
+Ail ; 71,60 ; kg ; ne pas convertir en prix par tête sans poids
+Laitue ; 7,50 ; pièce
+Persil ; 3,90 ; sachet ; poids non précisé, prix par sachet uniquement
+Sauge ; 7,95 ; barquette de 25 g
+Thym ; 7,95 ; barquette de 25 g
+
+FRUITS
+Bananes ; 19,90 ; kg
+Clémentines ; 10,90 ; kg
+Citrons ; 7,80 ; kg
+Pamplemousse ; 7,00 ; kg
+Avocats ; 25,80 ; kg ; référence ordinaire, hors Hass
+Poires ; 32,00 ; kg ; estimation arrondie validée
+Pommes ; 25,00 ; kg ; référence indicative validée
+Grenades ; 11,90 ; kg
+Kiwis ; 61,80 ; kg
+Ananas ; 26,90 ; pièce
+Noix de coco ; 14,50 ; pièce
+Mangues ; 13,90 ; pièce ; aucune conversion au kg sans poids
+
+LAITAGES ET ŒUFS
+Lait ; 11,00 ; litre
+Boisson végétale ; 30,00 ; litre ; estimation arrondie validée
+Œufs ; 1,86 ; pièce
+Crème fraîche ; 12,95 ; pot de 200 ml
+Crème de cuisson ; 19,95 ; brique de 500 ml
+Crème chantilly ; 36,50 ; bombe de 250 g ; prête à utiliser
+Fromage frais ; 14,95 ; pot de 190 g
+Fromage à tartiner ; 19,95 ; pot de 200 g
+Fromage en portions ; 26,00 ; boîte de 16 portions
+Fromage en tranches ; 13,75 ; paquet de 200 g
+Fromage râpé ; 19,50 ; paquet de 100 g
+
+ÉPICERIE
+Farine ; 6,75 ; kg ; farine blanche courante
+Farine complète ; 10,20 ; kg ; montant arrondi après conversion
+Sucre ; 5,20 ; kg ; sucre granulé
+Pâtes ; 10,00 ; paquet de 500 g ; estimation arrondie validée
+Vermicelles ; 9,90 ; paquet de 500 g
+Couscous ; 15,00 ; kg ; estimation arrondie validée
+Huile de table ; 17,64 ; litre
+Huile d’olive ; 47,45 ; litre ; référence courante
+Concentré de tomates ; 7,40 ; boîte de 140 g
+Sauce tomate ; 32,00 ; pot de 400 g ; sauce préparée
+Ketchup ; 14,50 ; flacon de 310 g
+Mayonnaise ; 14,95 ; pot de 280 g
+Moutarde ; 16,50 ; pot de 300 g
+Cornichons ; 9,80 ; pot de 210 g
+Maïs en conserve ; 6,65 ; boîte de 150 g
+Bouillon ; 7,50 ; boîte de 8 cubes ; référence poisson utilisée comme estimation
+Piment en poudre ; 10,00 ; quantité de 125 g ; estimation arrondie validée
+Mélange d’épices ; 29,30 ; pot de 130 g
+Bicarbonate alimentaire ; 24,50 ; pot de 250 g
+Citrons confits ; 23,00 ; pot de 950 g
+Feuilles de brick ; 19,50 ; paquet de 10 feuilles, 200 g
+Flocons d’avoine ; 20,95 ; paquet de 500 g
+
+PAIN ET PETIT-DÉJEUNER
+Baguette ; 3,50 ; pièce ; référence de 200 à 250 g
+Pain ; 2,00 ; pièce ; pain rond
+Pain complet ; 1,32 ; petit pain ; référence du lot de 6
+Brioche ; 2,74 ; pièce ; référence du lot de 8
+Confiture ; 18,95 ; pot de 430 g
+Miel ; 56,95 ; pot de 450 g ; référence eucalyptus
+Amlou ; 83,95 ; pot de 200 g ; traditionnel
+Caramel à tartiner ; 64,00 ; pot de 380 g
+Compote de fruits ; 19,50 ; pot de 390 g
+Pâte à tartiner ; 73,50 ; pot de 600 g
+
+VIANDES ET POISSON
+Viande de bœuf ; 149,90 ; kg ; référence tajine sans os
+Agneau ; 193,80 ; kg ; référence côte/filet
+Saucisses ; 75,60 ; kg ; référence poulet
+Thon en conserve ; 11,17 ; boîte de 80 g ; montant arrondi après division du lot
+
+BOISSONS
+Eau minérale ; 4,45 ; bouteille de 1,5 litre
+Boisson gazeuse ; 8,00 ; bouteille de 1 litre
+Jus de fruits ; 17,20 ; brique de 1 litre ; référence pur jus d’orange
+
+MAISON
+Liquide vaisselle ; 10,95 ; flacon de 750 ml
+Assouplissant ; 22,95 ; flacon de 1 litre
+Eau de Javel ; 9,98 ; bidon de 2,5 litres ; montant arrondi après division du lot
+Déboucheur ; 36,10 ; flacon de 1 litre ; liquide
+Blocs WC ; 31,50 ; paquet de 3 blocs de 38 g
+Aide au repassage ; 36,50 ; flacon de 500 ml
+Papier cuisson ; 42,95 ; rouleau de 20 mètres
+Essuie-tout ; 28,50 ; paquet de 3 rouleaux
+Papier toilette ; 54,50 ; paquet de 12 rouleaux
+Mouchoirs en papier ; 15,95 ; boîte de 100 mouchoirs
+Sacs-poubelle ; 18,95 ; rouleau de 10 sacs de 60 litres
+Éponges ; 14,00 ; paquet de 5
+
+HYGIÈNE
+Gel douche ; 43,50 ; flacon de 250 ml
+Brosse à dents ; 6,95 ; pièce
+Bain de bouche ; 50,50 ; flacon de 500 ml
+Crème hydratante ; 34,50 ; pot de 75 ml ; référence visage
+Rasoirs ; 14,99 ; pièce ; montant arrondi après division du lot
+
+PRIX À CONSERVER EN ATTENTE, SANS ACTIVATION
+Riz ; 64,90 DH/kg ; référence basmati uniquement, pas validée pour le riz générique
+Huile d’argan alimentaire ; 1 100 DH/litre ; référence chère à confirmer
+Dinde ; 75,60 DH/kg ; brochettes préparées, ne pas attribuer à la dinde nature
+Nettoyant multiusage ; 12,50 DH/flacon ; volume manquant
+Désodorisant ; 19,50 DH/aérosol ; volume manquant
+Désinfectant du linge ; 48,20 DH/flacon ; volume manquant
+Liquide de rinçage pour lave-vaisselle ; 19,99 DH/flacon ; volume manquant
+Déodorant ; 43,50 DH/pièce ; format à préciser
+Shampooing ; 36,95 DH/flacon ; volume manquant
+Après-shampooing ; 41,90 DH/flacon ; volume manquant
+Dentifrice ; 21,13 DH/tube ; contenu du tube manquant
+Coton ; 25,95 DH/paquet ; nombre de disques manquant
+
+RÈGLES D'IMPORT
+- Associer par clé stable du catalogue, jamais par catégorie ou rapprochement approximatif.
+- Enregistrer séparément le montant, l'unité, la quantité de référence et le conditionnement.
+- Conserver la distinction entre prix observé et estimation arrondie.
+- Ne pas modifier les unités existantes des familles.
+- Ne pas écraser leurs prix personnalisés.
+- Si l'unité de la liste est incompatible avec celle du prix, ne pas calculer un montant.
+- Les produits non listés restent sans prix, jamais à zéro.
+- Nettoyant sol : aucun prix. Le montant 32,20 DH/500 ml concernait un nettoyant four et doit être exclu.
+- Ne pas créer de nouveaux articles pour les marques ou variantes.
+- Générer un tableau de contrôle de l'import : produit, clé, prix, référence, statut intégré/en attente.

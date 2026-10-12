@@ -1,6 +1,11 @@
 # Base initiale des prix — règles d'import
 
-**État : le tableau validé annoncé avec la demande n'était pas joint** (aucun fichier reçu dans la session). Aucun prix n'a donc été importé : la base initiale est vide, les prix s'affichent « Prix à compléter » tant qu'ils ne sont pas saisis par une famille. L'outillage est prêt et testé ; il suffit de fournir le tableau.
+**État : tableau reçu et intégré** (captures du 12/10/2026). Source verbatim : `tableau-source.txt` ; régénération : `python3 scripts/prices-build.py` (produit `import-base.csv`, `prix-en-attente.csv`, `controle-import.md` et la migration `019_base_prices_initial.sql`, appliquée au déploiement, idempotente).
+
+- **Tableau de contrôle** (produit, clé stable, prix, référence, nature, statut intégré / en attente) : [controle-import.md](controle-import.md) — **98 intégrés**, **12 en attente** (conservés sans activation : riz basmati, huile d'argan, dinde brochettes, nettoyant multiusage, désodorisant, désinfectant du linge, liquide de rinçage, déodorant, shampooing, après-shampooing, dentifrice, coton), **nettoyant sol : aucun prix**.
+- 19 prix intégrés ne se calculent pas avec l'unité actuelle du catalogue de départ (ex. farine au kg, catalogue en paquet ; lait au litre, catalogue en pièce) : le montant n'est pas calculé et « Prix à compléter » s'affiche quand les prix sont activés. Aucune unité de famille n'a été modifiée.
+- « Piment en poudre » : le tableau donne « quantité de 125 g » sans contenant ; la ligne est rattachée à l'unité du catalogue (pot) et signalée comme telle.
+- Natures : *observé* (capture), *moyenne* (oignons), *estimation arrondie* (« estimation arrondie validée », « montant arrondi après conversion/division du lot », « référence indicative validée », référence « lot de 6/8 »).
 
 ## Contrôler le tableau (aucune écriture)
 ```

@@ -48,6 +48,8 @@ describe("calcul décimal des prix", () => {
     expect(fmtPrice(kg("9.90"))).toBe("9,90 DH / kg");
     expect(fmtPrice({ amount: "12.5", refQty: 500, refUnit: "g" })).toBe("12,50 DH / 500 g");
     expect(fmtPrice({ amount: "14", refQty: 1, refUnit: "paquet", packaging: "250 g" })).toBe("14,00 DH / paquet de 250 g");
+    expect(fmtPrice({ amount: "10.95", refQty: 1, refUnit: "bouteille", packaging: "flacon de 750 ml" })).toBe("10,95 DH / flacon de 750 ml");
+    expect(fmtPrice({ amount: "42.95", refQty: 1, refUnit: "piece", packaging: "rouleau de 20 mètres" })).toBe("42,95 DH / rouleau de 20 mètres");
   });
   it("prix comparables : formats différents jamais mélangés", () => {
     expect(comparable(kg("10", 1))!.centsPerBase).toBe(comparable({ amount: "5", refQty: 500, refUnit: "g" })!.centsPerBase);

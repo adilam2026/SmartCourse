@@ -99,6 +99,7 @@ export function summarize(lines: { price?: PriceRef | null; qty: number | string
 export const fmtMoney = (cents: number): string => `${(cents / 100).toFixed(2).replace(".", ",")} DH`;
 
 const UNIT_SINGULAR: Record<string, string> = { piece: "pièce", paquet: "paquet", bouteille: "bouteille", brique: "brique", pot: "pot", boite: "boîte", kg: "kg", litre: "litre", g: "g", ml: "ml" };
+const CONTAINER = /^(flacon|bidon|bombe|rouleau|barquette|sachet|petit pain|quantité)\b/i;
 const trimNum = (v: string | number): string => String(Number(String(v).replace(",", "."))).replace(".", ",");
 
 /** « 9,90 DH / kg », « 12,50 DH / 500 g », « 14,00 DH / paquet de 250 g ». Seulement le prix, son unité ou son conditionnement. */
@@ -108,6 +109,8 @@ export function fmtPrice(p: PriceRef): string {
   const q = Number(String(p.refQty).replace(",", "."));
   const u = UNIT_SINGULAR[p.refUnit] ?? p.refUnit;
   const per = q === 1 ? u : `${trimNum(p.refQty)} ${p.refUnit === "kg" || p.refUnit === "g" || p.refUnit === "ml" || p.refUnit === "litre" ? u : u + (q > 1 ? "s" : "")}`;
+  // Un conditionnement qui nomme son propre contenant (« flacon de 750 ml », « rouleau de 20 mètres ») remplace l'unité : « 10,95 DH / flacon de 750 ml ».
+  if (p.packaging && CONTAINER.test(p.packaging)) return `${head} / ${p.packaging}`;
   const pack = p.packaging ? (COUNT_UNITS.has(p.refUnit) ? ` de ${p.packaging}` : ` (${p.packaging})`) : "";
   return `${head} / ${per}${pack}`;
 }
