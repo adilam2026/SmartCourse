@@ -18,6 +18,7 @@ on:
         default: "0"
 permissions:
   contents: read
+  statuses: write   # publie l'adresse de recette comme statut du commit (lisible pendant la session)
 jobs:
   tunnel:
     runs-on: ubuntu-latest
@@ -71,6 +72,8 @@ jobs:
           echo "APK de recette prête : $(stat -c %s "$APK") octets, signature $FP"
       - name: Annonce de la session de recette
         if: inputs.minutes != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           M="${{ inputs.minutes }}"; case "$M" in ''|*[!0-9]*) M=60;; esac
           [ "$M" -lt 10 ] && M=10; [ "$M" -gt 120 ] && M=120
@@ -85,6 +88,10 @@ jobs:
           echo "::notice title=RECETTE_EXPIRATION::$MA (heure du Maroc) / $UTC UTC"
           { echo "## Recette sur téléphone (environnement jetable, $M minutes)"; echo; echo "- Adresse : $URL"; echo "- Code famille : $CODE"; echo "- Administrateur : adil / 482913 · Personnel : marie / 573918 · Parent : lamiaa / 573918"; echo "- APK de recette : $URL/courses-v3-recette.apk"; echo "- Expire à $MA (heure du Maroc), $UTC UTC"; echo "- Activer la V3 : connexion en adil → Réglages → Aperçu V3."; } >> "$GITHUB_STEP_SUMMARY"
           echo "Adresse $URL · code famille $CODE · expire à $MA (Maroc) / $UTC UTC"
+          # Statuts du commit : les journaux d'une exécution en cours ne sont pas lisibles, les statuts le sont tout de suite
+          gh api "repos/${{ github.repository }}/statuses/${{ github.sha }}" -f state=success -f context="recette/acces" -f target_url="$URL" -f description="$URL | code $CODE | expire $MA Maroc / $UTC UTC" >/dev/null
+          gh api "repos/${{ github.repository }}/statuses/${{ github.sha }}" -f state=success -f context="recette/apk" -f target_url="$URL/courses-v3-recette.apk" -f description="APK de recette : $URL/courses-v3-recette.apk" >/dev/null
+          gh api "repos/${{ github.repository }}/statuses/${{ github.sha }}" -f state=success -f context="recette/comptes" -f description="adil 482913 (admin) | marie 573918 (personnel) | lamiaa 573918 (parent)" >/dev/null
       - name: Environnement ouvert (attente)
         if: inputs.minutes != '0'
         run: |
