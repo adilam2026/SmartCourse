@@ -2,10 +2,28 @@ Physical size: 1080x2400
 Override size: 1080x2340
 Physical density: 420
 Override density: 480
+TOUCH_V01-connexion_360=ECHEC | 9 éléments cliquables, 1 sous 48 dp   trop petit : "Besoin d'aide ?": 123x46 dp 
+TOUCH_V03-liste-personnel_360=OK | 11 éléments cliquables, 0 sous 48 dp 
+TOUCH_V03-a-acheter_360=ECHEC | 13 éléments cliquables, 2 sous 48 dp   trop petit : 'Augmenter': 48x2 dp   trop petit : 'Retirer Menthe': 48x2 dp 
+TOUCH_V03-vide_360=OK | 4 éléments cliquables, 0 sous 48 dp 
+TOUCH_V03-textes-longs_360=OK | 12 éléments cliquables, 0 sous 48 dp 
+TOUCH_V04-selection-carres-personnel_360=OK | 13 éléments cliquables, 0 sous 48 dp 
+TOUCH_V04-selection-liste-personnel_360=OK | 15 éléments cliquables, 0 sous 48 dp 
+TOUCH_V04-selection-cartes-personnel_360=OK | 12 éléments cliquables, 0 sous 48 dp 
+TOUCH_V05-personnel-quantite_360=ECHEC | 8 éléments cliquables, 1 sous 48 dp   trop petit : 'android.view.View': 46x48 dp 
 Physical size: 1080x2400
 Override size: 1080x2340
 Physical density: 420
 Override density: 443
+TOUCH_V01-connexion_390=ECHEC | 9 éléments cliquables, 1 sous 48 dp   trop petit : "Besoin d'aide ?": 122x46 dp 
+TOUCH_V03-liste-personnel_390=OK | 11 éléments cliquables, 0 sous 48 dp 
+TOUCH_V03-a-acheter_390=OK | 13 éléments cliquables, 0 sous 48 dp 
+TOUCH_V03-vide_390=OK | 4 éléments cliquables, 0 sous 48 dp 
+TOUCH_V03-textes-longs_390=OK | 12 éléments cliquables, 0 sous 48 dp 
+TOUCH_V04-selection-carres-personnel_390=OK | 13 éléments cliquables, 0 sous 48 dp 
+TOUCH_V04-selection-liste-personnel_390=ECHEC | 16 éléments cliquables, 1 sous 48 dp   trop petit : 'android.view.View': 358x36 dp 
+TOUCH_V04-selection-cartes-personnel_390=OK | 12 éléments cliquables, 0 sous 48 dp 
+TOUCH_V05-personnel-quantite_390=ECHEC | 8 éléments cliquables, 1 sous 48 dp   trop petit : 'android.view.View': 46x48 dp 
 RETOUR_ECRAN_PRECEDENT=OK
 CLAVIER_VISIBLE=OUI
 RETOUR_FERME_CLAVIER_SANS_QUITTER=OK

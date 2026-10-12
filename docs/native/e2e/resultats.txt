@@ -1,0 +1,30 @@
+PASS  1a. premier lancement : écran de connexion
+PASS  1b. aucun serveur : 'Serveur : à définir'
+PASS  1c. connexion sans serveur : ouvre la saisie du serveur
+PASS  2a. serveur injoignable : message clair
+PASS  2b. serveur valide enregistré
+PASS  3a. mauvais code d'accès : message d'erreur
+PASS  3b. bon code : liste de l'administrateur
+PASS  3c. bandeau : connexion réelle
+PASS  4a. compte : nom du profil
+PASS  4b. compte : rôle réel
+PASS  4c. compte : famille réelle
+PASS  5a. rouvre directement sur la liste (session conservée)
+PASS  5b. pas d'écran de connexion
+PASS  6a. serveur arrêté : l'application reste ouverte
+PASS  6b. serveur arrêté : indication hors connexion
+PASS  6c. serveur de retour : plus d'indication hors connexion
+PASS  7a. session révoquée : retour à la connexion
+PASS  7b. session révoquée : explication
+PASS  7c. session révoquée : reste déconnecté au lancement suivant
+PASS  8a. personnel : liste du jour
+PASS  8b. personnel : rôle réel
+PASS  9a. déconnexion : retour à la connexion
+PASS  9b. déconnexion : session révoquée côté serveur (actives=0)
+PASS  9c. après déconnexion : pas de reconnexion automatique
+PASS  10a. serveur arrêté : connexion refusée avec message clair
+PASS  11a. profil désactivé : accès refusé
+PASS  11b. profil réactivé : connexion du parent
+PASS  11c. parent : pas d'onglet Réglages
+ECHECS=0
+CRASH_LIGNES=0
