@@ -28,7 +28,7 @@ test("états distincts : enregistré sur le serveur / validé en attente / chois
   await ctx.setOffline(true);
   await page.getByTestId("validate").click();
   await expect(page.getByTestId("banner-pending")).toContainText("1 modification validée");
-  await expect(page.getByTestId("sync-state")).toHaveText("En attente de connexion"); // une seule indication : pas de « 0 à valider »
+  await expect(page.getByTestId("sync-state")).toHaveText("Envoi en attente"); // une seule indication : pas de « 0 à valider »
   await expect(page.getByTestId("banner-offline")).toContainText("Hors connexion");
   await expect(card(page, f, "Riz")).toHaveAttribute("data-state", "unsaved"); // ambre : jamais vert tant que le serveur n'a pas confirmé
 

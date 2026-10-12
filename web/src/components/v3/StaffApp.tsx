@@ -28,7 +28,7 @@ export function StaffApp({ engine, s }: { engine: Engine; s: State }) {
       {done !== null && (
         <div className={`v3confirm ${done.failed ? "v3confirm--failed" : ""}`} role="status" data-testid="v3-confirm">
           <span className="v3confirm__text" data-testid="v3-confirm-text">
-            {done.failed ? "La demande n'a pas pu être enregistrée. Vérifiez la liste et réessayez." : <><Icon name="check" size={18} /> {queued ? `${done.n} article${done.n > 1 ? "s" : ""} gardé${done.n > 1 ? "s" : ""} sur ce téléphone, envoyé${done.n > 1 ? "s" : ""} au retour du réseau` : `Demande enregistrée : ${done.n} article${done.n > 1 ? "s" : ""}`}</>}
+            {done.failed ? "La sélection n'a pas pu être enregistrée. Vérifiez la liste et réessayez." : <><Icon name="check" size={18} /> {queued ? `Envoi en attente : ${done.n} article${done.n > 1 ? "s" : ""} gardé${done.n > 1 ? "s" : ""} sur ce téléphone, pas encore enregistré${done.n > 1 ? "s" : ""}` : `Sélection enregistrée dans la liste : ${done.n} article${done.n > 1 ? "s" : ""}`}</>}
           </span>
           <span className="v3confirm__actions">
             {tab === "choose" && !done.failed && <button className="btn btn--small" data-testid="v3-see-list" onClick={() => { setTab("list"); setDone(null); }}>Voir la liste du jour</button>}

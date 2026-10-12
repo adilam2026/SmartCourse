@@ -18,7 +18,7 @@ export type SyncKind = "sending" | "todo" | "waiting" | "offline" | "ok";
 /**
  * ONE short indication in the header, in plain words, never two at once:
  *   - choices not validated yet                    → « 3 modifications à valider » (the only thing shown in orange)
- *   - validated, the server has not received them  → « En attente de connexion »
+ *   - validated, the server has not received them  → « Envoi en attente »
  *   - nothing to send, phone offline               → « Hors connexion »
  *   - nothing to send                              → « Liste à jour »
  */
@@ -26,7 +26,7 @@ export function syncState(s: State, unsent: number): { kind: SyncKind; text: str
   const queued = s.batches.reduce((n, b) => n + b.ops.length, 0);
   if (s.sending) return { kind: "sending", text: "Envoi en cours…" };
   if (unsent > 0) return { kind: "todo", text: `${unsent} modification${unsent > 1 ? "s" : ""} à valider` };
-  if (queued > 0) return { kind: "waiting", text: "En attente de connexion" };
+  if (queued > 0) return { kind: "waiting", text: "Envoi en attente" };
   if (s.conn === "offline") return { kind: "offline", text: "Hors connexion" };
   return { kind: "ok", text: "Liste à jour" };
 }

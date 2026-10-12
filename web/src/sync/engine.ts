@@ -85,6 +85,8 @@ export class Engine {
   private listeners = new Set<() => void>();
   /** Lots refusés par le serveur (jamais enregistrés) : lus par validate() pour ne pas annoncer un succès. */
   private dropped = new Set<string>();
+  /** Demandes non envoyées d'une AUTRE famille, effacées de ce téléphone à la connexion (annoncées une fois). */
+  private lostOnSwitch = 0;
   private api: typeof realApi;
   private db: AppDb;
   private newId: () => string;
@@ -236,6 +238,10 @@ export class Engine {
     const other = (known && known.familyId !== mine) || (await stale(this.db.cache as never)) || (await stale(this.db.outbox as never)) || (await stale(this.db.drafts as never)) || (await stale(this.db.orphans as never));
     if (!other) return;
     const login = (await this.db.meta.get("lastLogin"))?.value;
+    // Jamais de perte silencieuse : ce qui n'avait pas encore été envoyé (lots en attente, brouillons) est compté puis annoncé.
+    const lost = (await this.db.outbox.filter((r) => r.familyId !== mine).toArray()).reduce((n, b) => n + (b as unknown as { ops: unknown[] }).ops.length, 0)
+      + (await this.db.drafts.filter((r) => r.familyId !== mine).toArray()).reduce((n, d) => n + Object.keys(d.toggles).length, 0);
+    this.lostOnSwitch = lost;
     await this.wipeLocal();
     if (login && this.s.lastLogin) await this.db.meta.put({ key: "lastLogin", value: this.s.lastLogin });
   }
@@ -307,6 +313,10 @@ export class Engine {
     }
     this.set({ me, phase: "ready" });
     await this.loadLocal(me);
+    if (this.lostOnSwitch > 0) {
+      this.notice(`${this.lostOnSwitch} demande${this.lostOnSwitch > 1 ? "s" : ""} non envoyée${this.lostOnSwitch > 1 ? "s" : ""} d'une autre famille ${this.lostOnSwitch > 1 ? "ont" : "a"} été effacée${this.lostOnSwitch > 1 ? "s" : ""} de ce téléphone : rien n'est mélangé avec cette famille.`);
+      this.lostOnSwitch = 0;
+    }
     this.openEvents();
     if (online) await this.refresh();
     await this.flush(); // the screen is already up (phase "ready"); this only drains the outbox
@@ -573,7 +583,7 @@ export class Engine {
   /** Explicit, one-tap resume of the choices made for a closed list, into the current list. */
   async resumeOrphan(): Promise<void> {
     const { orphan, list, catalog } = this.s;
-    if (!orphan || !list || list.status !== "active") return;
+    if (!orphan || !this.selectable()) return;
     const active = new Set(catalog?.categories.flatMap((c) => c.products.map((p) => p.id)));
     let toggles = this.s.toggles;
     for (const productId of orphan.productIds) {
@@ -582,7 +592,7 @@ export class Engine {
       if (toggles[productId]?.want === false) toggles = toggleProduct(list, this.s.batches, toggles, productId); // never un-select by accident
     }
     await this.db.orphans.delete(orphan.id);
-    this.set({ toggles, orphan: null });
+    this.set({ toggles, orphan: null, draftListId: this.s.draftListId ?? list?.id ?? NO_LIST });
     await this.persistDraft();
   }
 
@@ -714,6 +724,18 @@ export class Engine {
         }
         if (e instanceof ApiError && e.status === 401) return void this.set({ phase: "loggedOut" });
         if (e instanceof ApiError && e.status >= 500) return this.scheduleRetry();
+        // La liste visée n'existe plus (clôturée puis supprimée) : rien n'est ajouté à une archive ni recréé ; les articles redeviennent une
+        // proposition « Reprendre » (jamais perdus en silence).
+        if (e instanceof ApiError && e.status === 404 && batch.listId !== NO_LIST) {
+          const adds = [...new Set(batch.ops.filter((o) => o.type === "add" || o.type === "request_again").map((o) => (o as { productId: string }).productId))];
+          const rest = this.s.batches.filter((b) => b.id !== batch.id);
+          this.dropped.add(batch.id);
+          this.set({ batches: rest, toggles: normalizeToggles(this.s.list, rest, this.s.toggles), sending: false });
+          await this.stashOrphan(batch.listId, adds);
+          this.notice("Cette liste n'existe plus : vos articles vous sont proposés à nouveau, rien n'a été ajouté à une liste archivée.");
+          await this.persistOutbox();
+          continue;
+        }
         // 400/403/404: the server will never accept this batch — drop it rather than retry forever.
         this.dropped.add(batch.id);
         this.set({ batches: this.s.batches.filter((b) => b.id !== batch.id), toggles: normalizeToggles(this.s.list, this.s.batches.filter((b) => b.id !== batch.id), this.s.toggles) });

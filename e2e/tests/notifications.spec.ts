@@ -199,7 +199,7 @@ test.describe("envoi côté serveur depuis l'application du personnel", () => {
     await card("Riz").click();
     await ctx.setOffline(true);
     await page.getByTestId("validate").click();
-    await expect(page.getByTestId("sync-state")).toHaveText("En attente de connexion");
+    await expect(page.getByTestId("sync-state")).toHaveText("Envoi en attente");
     expect(await pg("SELECT count(*)::int AS n FROM push_events pe JOIN families fa ON fa.id = pe.family_id WHERE fa.code = $1", [f.code])).toEqual([{ n: 0 }]); // rien tant que le serveur n'a rien enregistré
     // retour du réseau ; la RÉPONSE du premier envoi est perdue (le serveur l'a pourtant enregistré) : le téléphone réessaie
     let posts = 0;

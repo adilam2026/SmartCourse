@@ -30,11 +30,13 @@ interface TileProps {
   price?: ReactNode;
   emoji?: string;
   readOnly: boolean;
+  /** Validé hors connexion : gardé sur ce téléphone, pas encore enregistré sur le serveur. */
+  queued?: boolean;
   onOpen(id: string): void;
 }
 
 /** Une carte d'article (les trois présentations partagent le même contenu : photo, nom, prix indicatif unitaire, action). */
-const Tile = memo(function Tile({ p, mode, state, qty, price, emoji, readOnly, onOpen }: TileProps) {
+const Tile = memo(function Tile({ p, mode, state, qty, price, emoji, readOnly, queued, onOpen }: TileProps) {
   const [broken, setBroken] = useState(false);
   const selected = state === "saved" || state === "unsaved";
   const action =
@@ -43,7 +45,7 @@ const Tile = memo(function Tile({ p, mode, state, qty, price, emoji, readOnly, o
     : state === "removing" ? <span className="v3tile__mark v3tile__mark--removing" aria-hidden="true">✕</span>
     : <span className="v3tile__mark v3tile__mark--add" aria-hidden="true">+</span>;
   const status =
-    state === "bought" ? "acheté" : state === "saved" ? "à acheter" : state === "unsaved" ? "à valider" : state === "removing" ? "à retirer" : "";
+    state === "bought" ? "acheté" : state === "saved" ? "à acheter" : state === "unsaved" ? (queued ? "envoi en attente" : "sélection en cours") : state === "removing" ? "à retirer" : "";
   return (
     <button
       type="button"
@@ -61,7 +63,8 @@ const Tile = memo(function Tile({ p, mode, state, qty, price, emoji, readOnly, o
         <span className="v3tile__name" title={p.name}>{p.name}</span>
         {p.brand && <small>{p.brand}</small>}
         {p.inactive && <small>désactivé</small>}
-        {selected && qty !== undefined && <span className="v3tile__qty" data-testid={`v3qty-${p.id}`}>{fmtQty(qty, p.unit as Unit)}{state === "unsaved" ? " · à valider" : ""}</span>}
+        {selected && qty !== undefined && <span className="v3tile__qty" data-testid={`v3qty-${p.id}`}>{fmtQty(qty, p.unit as Unit)}</span>}
+        {selected && <span className={`v3tile__status v3tile__status--${state}`} data-testid={`v3status-${p.id}`}>{status[0]!.toUpperCase() + status.slice(1)}</span>}
         {state === "bought" && <span className="v3tile__qty v3tile__qty--bought">Acheté</span>}
         {price}
       </span>
@@ -102,6 +105,7 @@ export function SelectionV3({ engine, s, groups, searching, query, setQuery, sta
     timer.current = setTimeout(() => setToast(null), 2600);
   };
   const all = groups.flatMap((g) => g.products.map((p) => ({ p, key: g.key })));
+  const queuedIds = new Set(s.batches.flatMap((b) => b.ops.filter((o) => o.type === "add" || o.type === "request_again").map((o) => (o as { productId: string }).productId)));
   const count = all.filter((x) => !x.p.inactive).length; // nombre réel d'articles accessibles (jamais un chiffre fixe)
   const open = openId ? all.find((x) => x.p.id === openId) : undefined;
   const qtyOf = (id: string) => effectiveQty(s.list, s.batches, s.toggles, id);
@@ -144,7 +148,7 @@ export function SelectionV3({ engine, s, groups, searching, query, setQuery, sta
           <h2 id={`v3cat-${g.key}`} className="v3cat__title"><span aria-hidden="true">{CATEGORY_EMOJI[g.key]} </span>{g.label}</h2>
           <div className={`v3grid v3grid--${mode}`}>
             {g.products.map((p) => (
-              <Tile key={p.id} p={p} mode={mode} state={stateOf(p.id)} qty={qtyOf(p.id)} price={priceNote(p.id)} emoji={CATEGORY_EMOJI[g.key]} readOnly={noList} onOpen={onOpen} />
+              <Tile key={p.id} p={p} mode={mode} state={stateOf(p.id)} qty={qtyOf(p.id)} price={priceNote(p.id)} emoji={CATEGORY_EMOJI[g.key]} readOnly={noList} queued={queuedIds.has(p.id)} onOpen={onOpen} />
             ))}
           </div>
         </section>

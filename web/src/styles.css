@@ -768,3 +768,7 @@ html[data-ui="compact"] .v3tile--list .v3tile__photo { width: 4.5rem; height: 4.
 .v3confirm--failed { background: var(--red); box-shadow: 0 6px 18px rgb(179 38 30 / 0.35); }
 .v3modes button { font-size: 0.84rem; padding: 0.2rem 0.15rem; }
 .slmore { margin: 1rem; text-align: left; }
+.v3tile__status { font-size: 0.8rem; font-weight: 800; color: var(--green-ink); }
+.v3tile__status--unsaved { color: var(--amber); }
+.slbadge--pending { color: var(--slate); background: var(--slate-soft); border-style: dashed; }
+.slrow--pending { border-style: dashed; border-color: var(--slate); background: var(--slate-soft); }

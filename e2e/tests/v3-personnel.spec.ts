@@ -71,7 +71,7 @@ for (const s of SIZES) {
       await expect(tile(page, f, "Tomates")).toHaveAttribute("data-state", "unsaved");
       // validation : la liste est créée par le personnel, avec ses seules demandes
       await page.getByTestId("validate").click();
-      await expect(page.getByTestId("v3-confirm-text")).toContainText("Demande enregistrée : 2 articles");
+      await expect(page.getByTestId("v3-confirm-text")).toContainText("Sélection enregistrée dans la liste : 2 articles");
       await expect(page.getByTestId("v3-see-list")).toBeVisible();
       await page.screenshot({ path: `${OUT}/personnel-validation-${s.name}.png` });
       const list = await activeList(f);
@@ -86,7 +86,7 @@ for (const s of SIZES) {
       await expect(page.getByTestId("staff-list")).toBeVisible();
       await expect(page.getByTestId("sl-progress-text")).toHaveText("0 sur 2 acheté");
       await expect(page.getByTestId("sl-pct")).toHaveText("0 %");
-      await expect(page.getByTestId(`sl-badge-${f.products["Tomates"]}`)).toHaveText("Demandé");
+      await expect(page.getByTestId(`sl-badge-${f.products["Tomates"]}`)).toHaveText("À acheter");
       await expect(page.getByTestId(`sl-qty-${f.products["Tomates"]}`)).toHaveText("1,5 kg");
       await expect(page.getByTestId("sl-filter-all")).toHaveText("Tous (2)");
       await expect(page.getByTestId("sl-filter-todo")).toHaveText("À acheter (2)");
@@ -114,11 +114,11 @@ for (const s of SIZES) {
       await pick(page, f, "Lait");
       await page.getByTestId("stafftab-list").click();
       await expect(page.getByTestId("sl-drafts")).toBeVisible();
-      await expect(page.getByTestId(`sl-badge-${f.products["Lait"]}`)).toHaveText("À valider");
+      await expect(page.getByTestId(`sl-badge-${f.products["Lait"]}`)).toHaveText("Sélection en cours");
       await expect(page.getByTestId("sl-progress-text")).toHaveText("1 sur 2 acheté"); // le brouillon ne compte pas
       await page.screenshot({ path: `${OUT}/liste-du-jour-a-valider-${s.name}.png` });
       await page.getByTestId("sl-validate").click();
-      await expect(page.getByTestId(`sl-badge-${f.products["Lait"]}`)).toHaveText("Demandé");
+      await expect(page.getByTestId(`sl-badge-${f.products["Lait"]}`)).toHaveText("À acheter");
       await expect(page.getByTestId("sl-progress-text")).toHaveText("1 sur 3 acheté");
       await expect(page.getByTestId("sl-pct")).toHaveText("33 %");
       await ctx.close();
@@ -157,12 +157,12 @@ test("validation hors connexion sans liste : demande gardée sur le téléphone,
   await ctx.setOffline(true);
   await pick(page, f, "Tomates", "1,25");
   await page.getByTestId("validate").click();
-  await expect(page.getByTestId("v3-confirm-text")).toContainText("gardé sur ce téléphone"); // jamais annoncé comme enregistré
+  await expect(page.getByTestId("v3-confirm-text")).toContainText("Envoi en attente"); // jamais annoncé comme enregistré : gardé sur le téléphone
   expect(await activeList(f)).toBeNull();
   await ctx.setOffline(false);
   await page.evaluate(() => (window as any).__engine.flush());
   await expect.poll(async () => ((await activeList(f))?.items ?? []).map((i: any) => `${i.name}:${i.quantity}`), { timeout: 30_000 }).toEqual(["Tomates:1.25"]);
-  await expect(page.getByTestId("v3-confirm-text")).toContainText("Demande enregistrée", { timeout: 20_000 });
+  await expect(page.getByTestId("v3-confirm-text")).toContainText("Sélection enregistrée dans la liste", { timeout: 20_000 });
   await page.evaluate(() => (window as any).__engine.flush());
   expect((await activeList(f)).items).toHaveLength(1); // une seule fois
   await ctx.close();

@@ -22,17 +22,18 @@ interface Row {
   category: string;
   qty: number;
   unit: Unit;
-  /** draft : choisi, pas encore validé · asked : demandé (dans la liste) · bought : acheté */
-  status: "draft" | "asked" | "bought";
+  /** draft : sélection en cours (pas validée) · pending : validée, envoi en attente (gardée sur ce téléphone) · asked : à acheter (enregistrée dans la liste) · bought : acheté */
+  status: "draft" | "pending" | "asked" | "bought";
   item?: ListItem;
 }
 
-const BADGE: Record<Row["status"], string> = { draft: "À valider", asked: "Demandé", bought: "Acheté" };
+const BADGE: Record<Row["status"], string> = { draft: "Sélection en cours", pending: "Envoi en attente", asked: "À acheter", bought: "Acheté" };
 
 /**
- * V3 · Liste du jour du personnel. Trois états bien distincts : « À valider » (choisi sur ce téléphone, pas encore envoyé),
- * « Demandé » (enregistré dans la liste, à acheter) et « Acheté ». La progression ne compte que les articles réellement à acheter
- * (demandés + achetés ; jamais un brouillon). Le personnel ne marque aucun achat : ce droit reste aux parents et administrateurs.
+ * V3 · Liste du jour du personnel. États bien distincts : « Sélection en cours » (choisi sur ce téléphone, pas validé), « Envoi en attente »
+ * (validé hors connexion : gardé sur ce téléphone, PAS encore enregistré sur le serveur), « À acheter » (enregistré dans la liste partagée) et « Acheté ».
+ * La progression ne compte que les articles ENREGISTRÉS (à acheter + achetés). Valider enregistre la sélection dans la liste partagée, sans approbation.
+ * Le personnel ne marque aucun achat : ce droit reste aux parents et administrateurs.
  */
 export function StaffList({ engine, s, onChoose, onValidated }: { engine: Engine; s: State; onChoose(): void; onValidated?(sent: number, result: "sent" | "queued" | "failed" | "nothing"): void }) {
   const { list, catalog, toggles, batches } = s;
@@ -57,6 +58,21 @@ export function StaffList({ engine, s, onChoose, onValidated }: { engine: Engine
       const p = byId.get(id)!;
       return { key: `d-${id}`, productId: id, name: p.name, photoUrl: p.photoUrl, category: p.category, qty: effectiveQty(list, batches, toggles, id) ?? t.qty ?? 1, unit: p.unit, status: "draft" as const };
     });
+  // Validé mais pas encore reçu par le serveur (hors connexion) : visible, mais ni compté ni confondu avec une demande enregistrée.
+  const queuedQty = new Map<string, number>();
+  for (const b of batches) {
+    for (const op of b.ops) {
+      if (op.type === "add" || op.type === "request_again") queuedQty.set(op.productId, op.quantity ?? 1);
+      else if (op.type === "set_qty" && queuedQty.has(op.productId)) queuedQty.set(op.productId, op.quantity);
+      else if (op.type === "remove") queuedQty.delete(op.productId);
+    }
+  }
+  const pendingRows: Row[] = [...queuedQty.entries()]
+    .filter(([id]) => byId.has(id) && !items.some((i) => i.productId === id && i.status === "to_buy"))
+    .map(([id, q]) => {
+      const p = byId.get(id)!;
+      return { key: `q-${id}`, productId: id, name: p.name, photoUrl: p.photoUrl, category: p.category, qty: q, unit: p.unit, status: "pending" as const };
+    });
   const rows: Row[] = items.map((i) => ({
     key: i.id,
     productId: i.productId,
@@ -70,6 +86,7 @@ export function StaffList({ engine, s, onChoose, onValidated }: { engine: Engine
   }));
   const shown = rows.filter((r) => filter === "all" || (filter === "todo" ? r.status === "asked" : r.status === "bought"));
   const groups = groupByCategory(shown, cats);
+  const nothingYet = total === 0 && drafts.length === 0 && pendingRows.length === 0;
   const FILTERS: { key: Filter; label: string; n: number }[] = [
     { key: "all", label: "Tous", n: total },
     { key: "todo", label: "À acheter", n: asked.length },
@@ -91,9 +108,19 @@ export function StaffList({ engine, s, onChoose, onValidated }: { engine: Engine
       )}
       {prefs.showTotals && list && <EstimateTotal summary={totalOf(listLines(list, prices))} />}
 
+      {pendingRows.length > 0 && (
+        <section className="slsection" aria-label="Envoi en attente" data-testid="sl-pending">
+          <h2 className="slsection__title">Envoi en attente <span className="count-pill">{pendingRows.length}</span></h2>
+          <p className="muted" data-testid="sl-pending-note">Gardé sur ce téléphone, envoyé dès le retour du réseau.</p>
+          <ul className="slrows">
+            {pendingRows.map((r) => <RowView key={r.key} r={r} prefs={prefs} price={priceOfLine(undefined, r.productId, prices, true)} />)}
+          </ul>
+        </section>
+      )}
+
       {drafts.length > 0 && (
-        <section className="slsection" aria-label="À valider" data-testid="sl-drafts">
-          <h2 className="slsection__title">À valider <span className="count-pill">{drafts.length}</span></h2>
+        <section className="slsection" aria-label="Sélection en cours" data-testid="sl-drafts">
+          <h2 className="slsection__title">Sélection en cours <span className="count-pill">{drafts.length}</span></h2>
           <ul className="slrows">
             {drafts.map((r) => <RowView key={r.key} r={r} prefs={prefs} price={priceOfLine(undefined, r.productId, prices, true)} />)}
           </ul>
@@ -111,9 +138,9 @@ export function StaffList({ engine, s, onChoose, onValidated }: { engine: Engine
         </div>
       )}
 
-      {total === 0 && drafts.length === 0 && (
+      {nothingYet && (
         <div className="slempty" data-testid="sl-empty">
-          <p>Aucune demande pour le moment.</p>
+          <p>Aucun article dans la liste pour le moment.</p>
           <button className="btn btn--primary" data-testid="sl-choose" onClick={onChoose}>Choisir des articles</button>
         </div>
       )}
