@@ -86,7 +86,9 @@ class Session(val storage: SessionStorage, val api: ApiClient, private val scope
                     storage.clearSession()
                     return Failure.SETUP_INCOMPLETE
                 }
-                online = true; remember(r.value); state = AuthState.SignedIn(r.value); null
+                // /api/auth/login ne renvoie ni la famille ni le rang « principal » : on complète tout de suite avec /api/me.
+                val full = (api.me() as? Outcome.Ok)?.value ?: r.value
+                online = true; remember(full); state = AuthState.SignedIn(full); null
             }
             is Outcome.Fail -> r.failure
         }

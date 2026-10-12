@@ -35,7 +35,7 @@ launch
 expect "1a. premier lancement : écran de connexion" $UI wait "Bienvenue" 25
 expect "1b. aucun serveur : 'Serveur : à définir'" $UI has "à définir"
 $UI tap "Se connecter" --last >/dev/null; sleep 2
-expect "1c. connexion sans serveur : message clair" $UI wait "Aucun serveur" 8
+expect "1c. connexion sans serveur : ouvre la saisie du serveur" $UI wait "Tester et enregistrer" 8
 shot e2e-1-sans-serveur
 
 # 2. Serveur injoignable puis serveur valide

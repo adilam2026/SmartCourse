@@ -161,18 +161,21 @@ class AuthTest {
 
     @Test fun signIn_ok_thenSignOut_revokesOnServer() = runBlocking {
         server.enqueue(MockResponse().setBody(meJson).addHeader("Set-Cookie", "sc_session=T1; Path=/"))
+        server.enqueue(MockResponse().setBody("""{"me":{"id":"p1","displayName":"Adil","login":"adil","role":"admin","primary":true,"family":{"code":"ABCD","name":"Recette"}}}"""))
         val s = session()
         assertNull(s.signIn(" abcd ", " ADIL ", "482913"))
         assertTrue(s.state is AuthState.SignedIn)
-        assertEquals("ABCD", store.lastFamily ?: "ABCD")
+        assertEquals("ABCD", store.lastFamily) // famille connue grâce à /api/me après la connexion
+        assertEquals(true, (s.state as AuthState.SignedIn).me.primary)
         assertEquals("adil", store.lastLogin)
         val loginBody = server.takeRequest().body.readUtf8()
+        assertEquals("/api/me", server.takeRequest().path)
         assertTrue(loginBody.contains("\"familyCode\":\"ABCD\"") && loginBody.contains("\"login\":\"adil\""))
         server.enqueue(MockResponse().setBody("""{"ok":true}"""))
         s.signOut()
         assertEquals(AuthState.SignedOut, s.state)
         assertNull(store.cookie)
-        waitFor { server.requestCount >= 2 }
+        waitFor { server.requestCount >= 3 }
         assertEquals("/api/auth/logout", server.takeRequest().path)
         assertNull(store.pendingRevoke)
     }
