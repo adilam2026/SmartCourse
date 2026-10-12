@@ -471,3 +471,19 @@ h3 { font-size: 1.05rem; font-weight: 800; }
 .panel .check { display: flex; gap: 0.6rem; align-items: flex-start; padding: 0.4rem 0; min-height: 44px; }
 .panel .check input { width: 1.4rem; height: 1.4rem; flex: none; margin-top: 0.15rem; }
 .panel .check small { display: block; }
+
+/* ---------- ville ---------- */
+.citypicker { display: grid; gap: 0.3rem; position: relative; }
+.citypicker__list { list-style: none; margin: 0; padding: 0.2rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); display: grid; }
+.citypicker__opt { width: 100%; min-height: var(--tap); text-align: left; padding: 0 0.85rem; background: transparent; border: 0; font: inherit; border-radius: var(--radius-sm); }
+.citypicker__opt:hover, .citypicker__opt:focus-visible { background: var(--green-line); }
+.form--compact { gap: 0.6rem; }
+.formatbox { display: grid; gap: 0.6rem; border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); padding: 0.6rem; margin: 0; }
+.minilinks { display: flex; flex-wrap: wrap; gap: 0.2rem 1rem; justify-content: center; }
+.minilinks .linkbtn { margin: 0; }
+
+/* ---------- menu discret ---------- */
+.morewrap { position: relative; }
+.moremenu { position: absolute; right: 0; top: calc(100% + 0.25rem); z-index: 20; min-width: 12rem; background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--radius-sm); box-shadow: var(--shadow); padding: 0.2rem; }
+.moremenu__item { width: 100%; min-height: var(--tap); text-align: left; padding: 0 0.85rem; background: transparent; border: 0; font: inherit; font-weight: 600; border-radius: var(--radius-sm); }
+.moremenu__item--danger { color: var(--danger, #b3261e); }

@@ -97,17 +97,34 @@ function Current({ engine, s, onEdit, onFavorites }: { engine: Engine; s: State;
   const prices = useMemo(() => priceIndex(s.catalog), [s.catalog]);
 
   if (list === undefined) return <><PageHead engine={engine} s={s} title="Les courses du jour" subtitle={fmtToday()} /><p className="empty">Chargement…</p></>;
-  if (list === null) {
+  const toBuy = (list?.items ?? []).filter((i) => i.status === "to_buy");
+  const bought = (list?.items ?? []).filter((i) => i.status === "purchased");
+  const total = toBuy.length + bought.length;
+  const pct = total ? Math.round((bought.length / total) * 100) : 0;
+  const allBought = total > 0 && toBuy.length === 0;
+  const pendingEdits = Object.keys(s.toggles).length;
+
+  // No list yet, or a list with nothing in it: one short sentence. The list is only created when « Ajouter / modifier » is used.
+  if (!list || total === 0) {
     return (
       <>
         <PageHead engine={engine} s={s} title="Les courses du jour" subtitle={fmtToday()} />
         <Banners engine={engine} s={s} />
+        {s.me && <NotificationInvite />}
+        {s.conn === "offline" && <p className="banner banner--offline limit" data-testid="offline-limit">Hors connexion : les achats et corrections ne peuvent pas être enregistrés tant que la connexion est coupée.</p>}
         <div className="nolist__body" data-testid="no-list">
           <img className="nolist__logo" src="/icons/icon-192.png" alt="" width="96" height="96" />
-          <h2>Aucune liste en cours</h2>
-          <p className="muted">Créez une nouvelle liste pour que la famille puisse y ajouter des produits.</p>
-          <button className="btn btn--primary btn--big" data-testid="create-list" disabled={busy === "create"} onClick={async () => { setBusy("create"); await engine.createList(); setBusy(null); }}>
-            <Icon name="plus" size={22} /> Créer une nouvelle liste
+          <p className="nolist__text" data-testid="empty-text">Préparez votre liste de courses.</p>
+          <button className="btn btn--primary btn--big" data-testid="edit-list" disabled={busy === "create"} onClick={async () => {
+            if (!list) {
+              setBusy("create");
+              await engine.createList();
+              setBusy(null);
+              if (engine.getState().list?.status !== "active") return;
+            }
+            onEdit();
+          }}>
+            <Icon name="plus" size={22} /> Ajouter / modifier{pendingEdits ? ` (${pendingEdits})` : ""}
           </button>
           <button className="btn" data-testid="open-favorites" onClick={onFavorites}><Icon name="star" size={20} /> Favoris</button>
         </div>
@@ -115,16 +132,17 @@ function Current({ engine, s, onEdit, onFavorites }: { engine: Engine; s: State;
     );
   }
 
-  const toBuy = list.items.filter((i) => i.status === "to_buy");
-  const bought = list.items.filter((i) => i.status === "purchased");
-  const total = toBuy.length + bought.length;
-  const pct = total ? Math.round((bought.length / total) * 100) : 0;
-  const pendingEdits = Object.keys(s.toggles).length;
   // Presentation only: the same lines, grouped by category (catalogue order). The list itself is never changed.
   const cats = s.catalog?.categories ?? [];
   const toBuyGroups = sectionGroups(list, "to_buy", cats);
   const boughtGroups = sectionGroups(list, "purchased", cats);
   const detailItem = detail ? list.items.find((i) => i.id === detail) : undefined;
+
+  const validationsBtn = (list.validations?.length ?? 0) > 0 ? (
+    <button className="btn btn--ghost btn--small" data-testid="open-validations" aria-label={`Historique des validations (${list.validations!.length})`} onClick={() => setValidations(true)}>
+      <Icon name="history" size={20} /> Validations ({list.validations!.length})
+    </button>
+  ) : null;
 
   const buy = async (id: string) => {
     setBusy(id);
@@ -136,12 +154,12 @@ function Current({ engine, s, onEdit, onFavorites }: { engine: Engine; s: State;
     <>
       <PageHead engine={engine} s={s} title="Les courses du jour" subtitle={fmtToday()} />
       <Banners engine={engine} s={s} />
-      {s.me && <NotificationInvite profileId={s.me.id} />}
+      {s.me && <NotificationInvite />}
       {s.conn === "offline" && <p className="banner banner--offline limit" data-testid="offline-limit">Hors connexion : les achats et corrections ne peuvent pas être enregistrés tant que la connexion est coupée.</p>}
       <section className="progresscard" aria-label="Progression" data-testid="progress">
         <div className="progresscard__line">
-          <strong data-testid="progress-text">{total === 0 ? "Aucun produit pour le moment" : `${bought.length} produit${bought.length > 1 ? "s" : ""} sur ${total} acheté${bought.length > 1 ? "s" : ""}`}</strong>
-          {total > 0 && <span>{pct} %</span>}
+          <strong data-testid="progress-text">{`${bought.length} produit${bought.length > 1 ? "s" : ""} sur ${total} acheté${bought.length > 1 ? "s" : ""}`}</strong>
+          <span>{pct} %</span>
         </div>
         <div className="progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label="Produits achetés"><i style={{ width: `${pct}%` }} /></div>
       </section>
@@ -158,16 +176,17 @@ function Current({ engine, s, onEdit, onFavorites }: { engine: Engine; s: State;
         </button>
       </div>
 
-      <section aria-labelledby="h-tobuy">
+      {allBought && (
+        <p className="banner banner--notice" role="status" data-testid="all-bought">
+          Tous les articles sont achetés
+          {validationsBtn}
+        </p>
+      )}
+      {toBuy.length > 0 && <section aria-labelledby="h-tobuy">
         <div className="sectionhead">
           <h2 id="h-tobuy">À acheter <span className="count-pill" data-testid="count-tobuy">{toBuy.length}</span></h2>
-          {(list.validations?.length ?? 0) > 0 && (
-            <button className="btn btn--ghost btn--small" data-testid="open-validations" aria-label={`Historique des validations (${list.validations!.length})`} onClick={() => setValidations(true)}>
-              <Icon name="history" size={20} /> Validations ({list.validations!.length})
-            </button>
-          )}
+          {validationsBtn}
         </div>
-        {toBuy.length === 0 && <p className="empty">{total === 0 ? "Rien à acheter pour le moment." : "Tout est acheté."}</p>}
         <GroupedRows
           groups={toBuyGroups}
           testid="to-buy"
@@ -187,9 +206,9 @@ function Current({ engine, s, onEdit, onFavorites }: { engine: Engine; s: State;
             </li>
           )}
         />
-      </section>
+      </section>}
 
-      <section aria-labelledby="h-bought">
+      {bought.length > 0 && <section aria-labelledby="h-bought">
         <div className="sectionhead">
           <h2 id="h-bought">Déjà achetés <span className="count-pill" data-testid="count-bought">{bought.length}</span></h2>
         </div>
@@ -211,7 +230,7 @@ function Current({ engine, s, onEdit, onFavorites }: { engine: Engine; s: State;
             </li>
           )}
         />
-      </section>
+      </section>}
 
       {detailItem && <ItemDetail list={list} item={detailItem} onClose={() => setDetail(null)} />}
       {validations && <ValidationHistory list={list} onClose={() => setValidations(false)} />}

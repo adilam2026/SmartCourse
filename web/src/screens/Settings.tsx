@@ -8,6 +8,7 @@ import { SyncPrices } from "../components/SyncPrices";
 import { ShareSheet, type ShareTarget } from "../components/ShareAccess";
 import { fmtDateTime } from "../format";
 import { CATEGORY_EMOJI } from "../categories";
+import { CityPicker } from "../components/CityPicker";
 import { Dialog } from "../components/Dialog";
 import { Icon, type IconName } from "../components/Icon";
 import { RecoveryPanel } from "../components/RecoveryPanel";
@@ -15,6 +16,7 @@ import { isAnySecret, isNewSecret, SecretInput } from "../components/SecretInput
 import { NotificationSettings, usePushControl } from "../components/NotificationSettings";
 import { PageHead } from "../components/PageHead";
 import { useBackLayer } from "../useBackLayer";
+import { PriceDialog } from "../components/PriceDialog";
 import { ProductForm } from "../components/ProductForm";
 import { Thumb } from "../components/Thumb";
 import { CatalogBrowser, CatPhoto } from "./CatalogBrowser";
@@ -81,8 +83,8 @@ export function Settings({ engine, s }: { engine: Engine; s: State }) {
       {section === "profiles" && <Profiles me={s.me!.id} familyCode={s.me!.family?.code ?? ""} />}
       {section === "recovery" && <RecoveryPanel />}
       {section === "reset" && <ResetFamily engine={engine} />}
-      {section === "catalog" && <CatalogAdmin engine={engine} />}
-      {section === "prices" && <><PriceDisplaySettings engine={engine} s={s} /><h2 className="sect">Synchroniser les prix</h2><SyncPrices /></>}
+      {section === "catalog" && <CatalogAdmin engine={engine} s={s} />}
+      {section === "prices" && <><PriceDisplaySettings engine={engine} s={s} /><h2 className="sect">Synchroniser les prix</h2><SyncPrices engine={engine} s={s} /></>}
       {section === "notifications" && <div className="menu"><NotificationSettings /></div>}
       {section === "backups" && <BackupCard st={backup} />}
       {section === "about" && <div className="versioninfo--page"><VersionInfo engine={engine} /></div>}
@@ -154,7 +156,7 @@ function Profiles({ me, familyCode }: { me: string; familyCode: string }) {
         ))}
       </ul>
       <button className="btn btn--primary addbtn addbtn--compact" data-testid="add-profile" onClick={() => setAdding(true)}>+ Ajouter un profil</button>
-      {adding && <AddProfile onClose={() => setAdding(false)} onCreated={(r) => { setAdding(false); setDone({ text: `Profil créé : ${r.displayName}.`, ...r }); void load(); }} />}
+      {adding && <AddProfile defaultCity={list?.find((x) => x.primary)?.city ?? ""} onClose={() => setAdding(false)} onCreated={(r) => { setAdding(false); setDone({ text: `Profil créé : ${r.displayName}.`, ...r }); void load(); }} />}
       {changing && <ChangePassword profile={changing} onClose={() => { setChanging(null); setShareAfter(false); }} onDone={(secret) => {
         const r = { id: changing.id, displayName: changing.displayName, login: changing.login, secret };
         setDone({ text: `Code secret de ${changing.displayName} modifié. Ses sessions ont été fermées.`, ...r });
@@ -245,19 +247,20 @@ function ChangePassword({ profile, onClose, onDone }: { profile: Profile; onClos
   );
 }
 
-function AddProfile({ onClose, onCreated }: { onClose(): void; onCreated(r: { id: string; displayName: string; login: string; secret: string }): void }) {
+function AddProfile({ defaultCity, onClose, onCreated }: { defaultCity: string; onClose(): void; onCreated(r: { id: string; displayName: string; login: string; secret: string }): void }) {
   const [displayName, setName] = useState("");
   const [login, setLogin] = useState("");
   const [role, setRole] = useState<Role>("staff");
   const [secret, setSecret] = useState("");
   const [again, setAgain] = useState("");
+  const [city, setCity] = useState(defaultCity);
   const [error, setError] = useState<string | null>(null);
   return (
     <Dialog title="Nouveau profil" onClose={onClose}>
       <form className="form" onSubmit={async (e) => {
         e.preventDefault();
         try {
-          const r = await api.createProfile({ displayName, login: login.trim().toLowerCase(), role, secret, secretConfirm: again });
+          const r = await api.createProfile({ displayName, login: login.trim().toLowerCase(), role, secret, secretConfirm: again, city });
           onCreated({ id: r.profile.id, displayName: r.profile.displayName, login: r.profile.login, secret }); // only after the server confirmed the creation
         } catch (err) {
           setError(errText(err));
@@ -270,10 +273,11 @@ function AddProfile({ onClose, onCreated }: { onClose(): void; onCreated(r: { id
             {(["staff", "parent", "admin"] as Role[]).map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
           </select>
         </label>
+        <CityPicker key={defaultCity} value={city} onChange={setCity} testid="np-city" />
         <PasswordFields secret={secret} again={again} setSecret={setSecret} setAgain={setAgain} prefix="np" />
         <p className="muted">Vous choisissez ce code : 6 chiffres. Rien n'est généré automatiquement.</p>
         {error && <p className="error" role="alert" data-testid="np-error">{error}</p>}
-        <button className="btn btn--primary btn--big" disabled={!isNewSecret(secret) || secret !== again || !displayName.trim() || !login.trim()} data-testid="np-submit">Créer</button>
+        <button className="btn btn--primary btn--big" disabled={!isNewSecret(secret) || secret !== again || !displayName.trim() || !login.trim() || !city} data-testid="np-submit">Créer</button>
         <button type="button" className="btn btn--ghost" onClick={onClose}>Annuler</button>
       </form>
     </Dialog>
@@ -328,7 +332,7 @@ function ResetFamily({ engine }: { engine: Engine }) {
 }
 
 
-function CatalogAdmin({ engine }: { engine: Engine }) {
+function CatalogAdmin({ engine, s }: { engine: Engine; s: State }) {
   const [view, setView] = useState<"mine" | "all">("mine");
   const [cat, setCat] = useState<Catalog | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -336,6 +340,7 @@ function CatalogAdmin({ engine }: { engine: Engine }) {
   const [form, setForm] = useState<{ product?: Product } | null>(null);
   const [audit, setAudit] = useState<Record<string, AuditProduct>>({});
   const [filter, setFilter] = useState<"all" | "check" | "own" | "none">("all");
+  const [priceFor, setPriceFor] = useState<string | null>(null); // id de l'article dont on met le prix à jour
   const [compare, setCompare] = useState<{ product: Product; catalogUrl: string } | null>(null);
   const load = () => Promise.all([
     api.catalogAdmin().then(setCat),
@@ -369,13 +374,17 @@ function CatalogAdmin({ engine }: { engine: Engine }) {
       {view === "mine" && <><button className="btn btn--primary btn--big addbtn" data-testid="add-article" onClick={() => setForm({})}>+ Ajouter un article</button>
       {form && cat && (
         <ProductForm
+          key={form.product?.id ?? "new"}
           product={form.product ? cat.categories.flatMap((c) => c.products).find((x) => x.id === form.product!.id) ?? form.product : undefined}
-          onPriceChanged={() => void act(async () => {})}
           categories={cat.categories.map((c) => ({ key: c.key, label: c.label }))}
           onClose={() => setForm(null)}
           onSaved={() => { setForm(null); void act(async () => {}); }}
         />
       )}
+      {priceFor && cat && (() => {
+        const prod = cat.categories.flatMap((c) => c.products).find((x) => x.id === priceFor);
+        return prod ? <PriceDialog key={prod.id} product={prod} onClose={() => setPriceFor(null)} onChanged={() => void act(async () => {})} /> : null;
+      })()}
       <label className="field search">Chercher dans mes produits
         <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ex. lait, lessive…" data-testid="mine-search" />
       </label>
@@ -399,6 +408,7 @@ function CatalogAdmin({ engine }: { engine: Engine }) {
                   {audit[p.id] && <small data-testid={`photosrc-${p.name}`}>Photo : {audit[p.id]!.photoSource === "famille" ? "de la famille" : audit[p.id]!.photoSource === "catalogue" ? "du catalogue" : "aucune"}{audit[p.id]!.sharedWithOtherNames && <em> · partagée avec un autre article</em>}</small>}</span>
                 <span className="rowbtns">
                   {audit[p.id]?.catalogPhotoUrl && <button className="btn btn--small" data-testid={`usecat-${p.name}`} aria-label={`Comparer la photo de ${p.name} avec celle du catalogue`} onClick={() => setCompare({ product: p, catalogUrl: audit[p.id]!.catalogPhotoUrl! })}>Photo du catalogue</button>}
+                  {s.me?.prefs?.showPrices && <button className="btn btn--small" data-testid={`price-${p.name}`} aria-label={`Mettre à jour le prix de ${p.name}`} onClick={() => setPriceFor(p.id)}>Prix</button>}
                   <button className="btn btn--small" data-testid={`edit-${p.name}`} aria-label={`Modifier ${p.name}`} onClick={() => setForm({ product: p })}>Modifier</button>
                   <button className="btn btn--small btn--ghost" data-testid={`active-${p.name}`} onClick={() => void act(() => api.patchProduct(p.id, { active: !p.active }))}>{p.active ? "Désactiver" : "Réactiver"}</button>
                 </span>

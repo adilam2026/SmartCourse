@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, type Credit } from "../api";
+import { CityPicker } from "./CityPicker";
+import { userMessage } from "../errors";
 import { useBackLayer } from "../useBackLayer";
 import { DeleteAccount } from "./DeleteAccount";
 import { PriceDisplaySettings } from "./PriceDisplaySettings";
@@ -14,6 +16,8 @@ export function UserSheet({ engine, s, onClose }: { engine: Engine; s: State; on
   const [generated, setGenerated] = useState<{ count: number; source: string } | null>(null);
   const [showCredits, setShowCredits] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [city, setCity] = useState(s.me?.city ?? "");
+  const [cityMsg, setCityMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const pending = Object.keys(s.toggles).length + s.batches.length;
   useBackLayer(true, onClose);
   useEffect(() => {
@@ -30,6 +34,12 @@ export function UserSheet({ engine, s, onClose }: { engine: Engine; s: State; on
           </div>
         </div>
         {pending > 0 && <p className="banner banner--pending">Des choix ne sont pas encore enregistrés. Ils resteront sur ce téléphone et seront envoyés à la prochaine connexion.</p>}
+        <section className="sheetsection" aria-label="Ma ville" data-testid="my-city">
+          <h3>Ma ville</h3>
+          <CityPicker key={s.me?.city ?? ""} value={city} onChange={(c) => { setCity(c); setCityMsg(null); }} testid="me-city" label="Ville" />
+          {cityMsg && <p className={cityMsg.ok ? "notice" : "error"} role={cityMsg.ok ? "status" : "alert"} data-testid="me-city-msg">{cityMsg.text}</p>}
+          <button className="btn btn--small" disabled={!city || city === (s.me?.city ?? "")} data-testid="me-city-save" onClick={() => void engine.setCity(city).then(() => setCityMsg({ ok: true, text: "Ville enregistrée." })).catch((e) => setCityMsg({ ok: false, text: userMessage(e) }))}>Enregistrer ma ville</button>
+        </section>
         <PriceDisplaySettings engine={engine} s={s} />
         {s.me && s.me.role !== "staff" && <NotificationSettings />}
         <button className="btn" onClick={() => setShowCredits((v) => !v)}>Crédits photos</button>

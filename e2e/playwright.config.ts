@@ -34,6 +34,7 @@ export default defineConfig({
       BREVO_FROM_EMAIL: "noreply@smartcourse.test",
       BREVO_API_URL: "http://127.0.0.1:3199/v3/smtp/email",
       APP_URL: "http://127.0.0.1:3100",
+      SC_CITY_OPTIONAL: "1",
     },
   },
   ],

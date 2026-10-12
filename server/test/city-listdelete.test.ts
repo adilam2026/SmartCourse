@@ -173,3 +173,10 @@ describe("suppression d'une liste clôturée (administrateur)", () => {
     expect((await db.query("SELECT count(*)::int AS n FROM purchases WHERE list_id = $1", [id])).rows[0].n).toBe(1);
   });
 });
+
+describe("liste des villes", () => {
+  it("est identique côté serveur et côté application", async () => {
+    const { readFileSync } = await import("node:fs");
+    expect(readFileSync("../web/src/cities.ts", "utf8")).toBe(readFileSync("src/cities.ts", "utf8"));
+  });
+});

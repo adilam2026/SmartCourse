@@ -6,7 +6,6 @@ import { prepareImage } from "../image";
 import type { Product, Unit } from "../types";
 import { UNIT_CHOICE, UNITS } from "../units";
 import { Dialog } from "./Dialog";
-import { ProductPrice } from "./ProductPrice";
 
 interface Props {
   /** Absent = « Ajouter un article ». */
@@ -14,14 +13,12 @@ interface Props {
   categories: { key: string; label: string }[];
   onClose(): void;
   onSaved(): void;
-  /** The price changed (the dialog stays open): reload the catalogue. */
-  onPriceChanged?(): void;
 }
 
 const errText = (e: unknown): string => (e instanceof NetworkError ? "Pas de connexion : l'enregistrement d'un article demande le réseau. Réessayez quand il est revenu." : userMessage(e));
 
 /** « Ajouter un article » / « Modifier un article » (administrateur). L'image est vue avant l'enregistrement. */
-export function ProductForm({ product, categories, onClose, onSaved, onPriceChanged }: Props) {
+export function ProductForm({ product, categories, onClose, onSaved }: Props) {
   const [name, setName] = useState(product?.name ?? "");
   const [category, setCategory] = useState(product?.category ?? categories[0]?.key ?? "");
   const [active, setActive] = useState(product?.active ?? true);
@@ -49,7 +46,7 @@ export function ProductForm({ product, categories, onClose, onSaved, onPriceChan
   const title = product ? "Modifier un article" : "Ajouter un article";
 
   return (
-    <Dialog title={title} onClose={onClose} dismissable={!busy && !dirty}>
+    <Dialog title={title} key={product?.id ?? "new"} onClose={onClose} dismissable={!busy && !dirty}>
       <button type="button" className="sheet__close" aria-label="Fermer" data-testid="pf-close" onClick={onClose}>✕</button>
       <form className="form" data-testid="product-form" onSubmit={async (e) => {
         e.preventDefault();
@@ -91,18 +88,13 @@ export function ProductForm({ product, categories, onClose, onSaved, onPriceChan
             {UNITS.map((u) => <option key={u} value={u}>{UNIT_CHOICE[u]}</option>)}
           </select>
         </label>
-        <p className="muted" data-testid="pf-unit-hint">Pour un produit comme le lait, choisissez « brique » ou « bouteille » plutôt que « pièce » : rien n'est converti automatiquement.</p>
-        <p className="muted">Une quantité déjà demandée dans la liste en cours garde son unité ; les achats passés et les statistiques ne changent pas.</p>
         <label className="check"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} data-testid="pf-active" /> Article actif</label>
-        <p className="muted" data-testid="pf-rule">Désactivé : l'article ne peut plus être ajouté à une liste. S'il est déjà dans la liste en cours, il y reste, marqué « désactivé » : il peut encore être acheté ou retiré. Les listes clôturées ne changent jamais.</p>
-        <p className="muted">L'image est réduite automatiquement (512 px, fond blanc, sans rognage).</p>
         {error && <p className="error" role="alert" data-testid="pf-error">{error}</p>}
         <div className="form__actions">
           <button className="btn btn--primary btn--big" disabled={busy || !name.trim()} aria-busy={busy} data-testid="pf-save">{busy ? "Enregistrement…" : "Enregistrer"}</button>
           <button type="button" className="btn btn--ghost" disabled={busy} data-testid="pf-cancel" onClick={onClose}>Annuler</button>
         </div>
       </form>
-      {product && <ProductPrice product={product} onChanged={onPriceChanged ?? onSaved} />}
     </Dialog>
   );
 }

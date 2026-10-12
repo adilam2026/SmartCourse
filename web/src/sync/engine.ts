@@ -27,6 +27,8 @@ export interface State {
   justSynced: boolean;
   notices: Notice[];
   orphan: OrphanRow | null;
+  /** Une liste clôturée a été supprimée (ici ou sur un autre téléphone) : l'historique se relit et ferme cette liste si elle est ouverte. */
+  deleted: { listId: string; n: number } | null;
   loginError: string | null;
   loggingIn: boolean;
   lastLogin: { familyCode: string; login: string } | null;
@@ -73,7 +75,7 @@ const RETRY_MS = [3_000, 8_000, 20_000, 45_000];
 export class Engine {
   private s: State = {
     phase: "boot", me: null, conn: "online", catalog: null, list: undefined, toggles: {}, draftListId: null, batches: [],
-    sending: false, justSynced: false, notices: [], orphan: null, loginError: null, loggingIn: false, lastLogin: null, live: false, welcomeCode: null, prefillInstallToken: null, installFrom: null, installRefused: false, catalogView: "all",
+    sending: false, justSynced: false, notices: [], orphan: null, deleted: null, loginError: null, loggingIn: false, lastLogin: null, live: false, welcomeCode: null, prefillInstallToken: null, installFrom: null, installRefused: false, catalogView: "all",
   };
   private listeners = new Set<() => void>();
   private api: typeof realApi;
@@ -252,13 +254,13 @@ export class Engine {
   }
 
   /** First installation: consumes the one-shot install token, creates the family and its first administrator. */
-  async setup(input: { familyName: string; displayName: string; login: string; secret: string; secretConfirm: string; recoveryEmail: string }): Promise<string | null> {
+  async setup(input: { familyName: string; displayName: string; login: string; secret: string; secretConfirm: string; recoveryEmail: string; city: string }): Promise<string | null> {
     this.set({ loggingIn: true, loginError: null });
     try {
       const r = await this.api.setupFamily({
         installToken: (this.s.prefillInstallToken ?? "").trim(),
         familyName: input.familyName,
-        admin: { displayName: input.displayName, login: input.login.trim().toLowerCase(), secret: input.secret, secretConfirm: input.secretConfirm, recoveryEmail: input.recoveryEmail.trim() },
+        admin: { displayName: input.displayName, login: input.login.trim().toLowerCase(), secret: input.secret, secretConfirm: input.secretConfirm, recoveryEmail: input.recoveryEmail.trim(), city: input.city },
       });
       const lastLogin = { familyCode: r.familyCode, login: input.login.trim().toLowerCase() };
       await this.db.meta.put({ key: "lastLogin", value: lastLogin });
@@ -331,6 +333,15 @@ export class Engine {
       this.scheduleRefresh();
     });
     for (const t of ["list.updated", "list.created", "list.closed", "catalog.updated"]) es.addEventListener(t, () => this.scheduleRefresh());
+    es.addEventListener("list.deleted", (e) => {
+      try {
+        const listId = String(JSON.parse(e.data as string).listId);
+        this.set({ deleted: { listId, n: (this.s.deleted?.n ?? 0) + 1 } });
+      } catch {
+        /* malformed event: the history is read again on the next visit */
+      }
+      this.scheduleRefresh();
+    });
     // Another phone of THIS profile changed the display preferences: read them again (other profiles' changes are ignored).
     es.addEventListener("prefs.updated", (e) => {
       try {
@@ -512,6 +523,14 @@ export class Engine {
     await this.setMe({ ...me, prefs: { showPrices: prices, showTotals: totals, rev: me.prefs?.rev ?? 0 } });
     this.pendingPrefs = { showPrices: prices, showTotals: totals };
     await this.pushPrefs();
+  }
+
+  /** Ville du profil (prix de la ville). Demande le réseau : rien n'est affiché comme enregistré avant la réponse du serveur. */
+  async setCity(city: string): Promise<void> {
+    const me = this.s.me;
+    if (!me) return;
+    const r = await this.api.setCity(city);
+    await this.setMe({ ...this.s.me!, city: r.city });
   }
 
   private async applyServerState(catalog: Catalog, list: ListView | null): Promise<void> {

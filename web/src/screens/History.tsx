@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { afterLayersClosed, BasketChoice } from "../components/Basket";
 import { EstimateTotal, PriceTag } from "../components/PriceTag";
 import { listLines, NO_PREFS, priceIndex, priceOfLine, totalOf } from "../priceView";
-import { api, type HistoryEntry } from "../api";
+import { api, NetworkError, type HistoryEntry } from "../api";
+import { Dialog } from "../components/Dialog";
+import { userMessage } from "../errors";
 import { Thumb } from "../components/Thumb";
 import { fmtDay, fmtTime, fmtWhen } from "../format";
 import { Icon } from "../components/Icon";
@@ -26,9 +28,13 @@ export function History({ engine, s, categories, openId, onOpened, onPrepared }:
   }, [openId, onOpened]);
   useEffect(() => {
     api.history().then((r) => setEntries(r.lists)).catch(() => setError(true));
-  }, []);
+  }, [s.deleted?.n]);
+  // Deleted on another phone while open here: back to the history.
+  useEffect(() => {
+    if (open && s.deleted?.listId === open.id) setOpen(null);
+  }, [s.deleted, open]);
 
-  if (open) return <Archive engine={engine} s={s} list={open} categories={categories} onBack={() => setOpen(null)} onPrepared={() => { setOpen(null); afterLayersClosed(() => onPrepared?.()); }} />;
+  if (open) return <Archive engine={engine} s={s} list={open} categories={categories} onBack={() => setOpen(null)} onDeleted={() => { setOpen(null); setEntries((cur) => cur?.filter((x) => x.id !== open.id) ?? cur); }} onPrepared={() => { setOpen(null); afterLayersClosed(() => onPrepared?.()); }} />;
   return (
     <>
       <PageHead engine={engine} s={s} title="Historique" subtitle="Les listes clôturées, de la plus récente à la plus ancienne" />
@@ -61,11 +67,16 @@ export function History({ engine, s, categories, openId, onOpened, onPrepared }:
   );
 }
 
-function Archive({ engine, s, list, categories, onBack, onPrepared }: { engine: Engine; s: State; list: ListView; categories: { key: string; label: string }[]; onBack(): void; onPrepared(): void }) {
+function Archive({ engine, s, list, categories, onBack, onPrepared, onDeleted }: { engine: Engine; s: State; list: ListView; categories: { key: string; label: string }[]; onBack(): void; onPrepared(): void; onDeleted(): void }) {
   const bought = list.items.filter((i) => i.status === "purchased");
   const left = list.items.filter((i) => i.status === "to_buy");
   const [validations, setValidations] = useState(false);
   const [reorder, setReorder] = useState(false);
+  const [menu, setMenu] = useState(false);
+  const [confirm, setConfirm] = useState(false);
+  const [delError, setDelError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const isAdmin = s.me?.role === "admin";
   const prefs = s.me?.prefs ?? NO_PREFS;
   const prices = useMemo(() => priceIndex(s.catalog), [s.catalog]);
   const lines = [...bought, ...left].map((i) => ({ productId: i.productId, name: i.name, quantity: i.status === "purchased" ? (i.purchase?.quantity ?? i.quantity) : i.quantity, unit: ((i.status === "purchased" ? i.purchase?.unit : null) ?? i.unit) as Unit }));
@@ -76,7 +87,32 @@ function Archive({ engine, s, list, categories, onBack, onPrepared }: { engine: 
       <div className="actions">
         {lines.length > 0 && <button className="btn btn--primary btn--small" data-testid="reorder" onClick={() => setReorder(true)}><Icon name="plus" size={20} /> Recommander</button>}
         {(list.validations?.length ?? 0) > 0 && <button className="btn btn--small" data-testid="archive-validations" onClick={() => setValidations(true)}><Icon name="history" size={20} /> Validations ({list.validations!.length})</button>}
+        {isAdmin && (
+          <span className="morewrap">
+            <button className="btn btn--small btn--ghost" aria-label="Plus d'actions" aria-expanded={menu} data-testid="archive-more" onClick={() => setMenu((v) => !v)}>⋯</button>
+            {menu && <div className="moremenu" role="menu"><button role="menuitem" className="moremenu__item moremenu__item--danger" data-testid="archive-delete" onClick={() => { setMenu(false); setDelError(null); setConfirm(true); }}>Supprimer la liste</button></div>}
+          </span>
+        )}
       </div>
+      {confirm && (
+        <Dialog title="Supprimer la liste" onClose={() => !deleting && setConfirm(false)} dismissable={!deleting}>
+          <p data-testid="archive-delete-text">Supprimer cette liste et ses achats de l'historique ? Cette action est définitive.</p>
+          {delError && <p className="error" role="alert" data-testid="archive-delete-error">{delError}</p>}
+          <button className="btn btn--danger btn--big" disabled={deleting} data-testid="archive-delete-confirm" onClick={async () => {
+            setDeleting(true);
+            setDelError(null);
+            try {
+              await api.deleteList(list.id);
+              setConfirm(false);
+              onDeleted();
+            } catch (e) {
+              setDelError(e instanceof NetworkError ? "Pas de connexion : la suppression demande le réseau. Réessayez quand il est revenu." : userMessage(e));
+              setDeleting(false);
+            }
+          }}>{deleting ? "Suppression…" : "Supprimer"}</button>
+          <button className="btn btn--ghost" disabled={deleting} data-testid="archive-delete-cancel" onClick={() => setConfirm(false)}>Annuler</button>
+        </Dialog>
+      )}
       {reorder && <BasketChoice engine={engine} s={s} items={lines} title={`Commande du ${when}`} onClose={() => setReorder(false)} onDone={() => { setReorder(false); onPrepared(); }} />}
       {prefs.showTotals && <EstimateTotal summary={totalOf(listLines(list, prices))} testid="archive-estimate" />}
       {validations && <ValidationHistory list={list} onClose={() => setValidations(false)} />}

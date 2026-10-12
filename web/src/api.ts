@@ -59,7 +59,7 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
 
 export const api = {
   login: (familyCode: string, login: string, secret: string) => request<{ me: Me }>("POST", "/api/auth/login", { familyCode, login, secret }),
-  setupFamily: (b: { installToken: string; familyName: string; admin: { displayName: string; login: string; secret: string; secretConfirm: string; recoveryEmail: string } }) =>
+  setupFamily: (b: { installToken: string; familyName: string; admin: { displayName: string; login: string; secret: string; secretConfirm: string; recoveryEmail: string; city: string } }) =>
     request<{ familyCode: string; me: Me }>("POST", "/api/setup/family", b),
   logout: () => request<{ ok: true }>("POST", "/api/auth/logout"),
   pushConfig: () => request<{ publicKey: string }>("GET", "/api/push/config"),
@@ -80,12 +80,14 @@ export const api = {
   credits: () => request<{ generated: { count: number; source: string } | null; credits: Credit[] }>("GET", "/api/credits"),
   // administration
   profiles: () => request<{ profiles: Profile[] }>("GET", "/api/profiles"),
-  createProfile: (b: { displayName: string; login: string; role: Role; secret: string; secretConfirm: string }) =>
+  createProfile: (b: { displayName: string; login: string; role: Role; secret: string; secretConfirm: string; city: string }) =>
     request<{ profile: Profile }>("POST", "/api/profiles", b),
   updateProfile: (id: string, b: { displayName?: string; role?: Role; active?: boolean }) => request<{ profile: Profile }>("PATCH", `/api/profiles/${id}`, b),
   deleteProfile: (id: string) => request<{ ok: true }>("DELETE", `/api/profiles/${id}`),
   deleteOwnAccount: (secret: string) => request<{ ok: true }>("POST", "/api/me/delete", { secret }),
   // prix, favoris, préférences d'affichage
+  setCity: (city: string) => request<{ city: string }>("PUT", "/api/me/city", { city }),
+  deleteList: (id: string) => request<{ ok: true }>("DELETE", `/api/lists/${id}`),
   setPrefs: (b: { showPrices: boolean; showTotals: boolean }) => request<{ prefs: Prefs }>("PUT", "/api/me/prefs", b),
   setPrice: (id: string, b: PriceInput) => request<{ price: Price | null }>("PUT", `/api/products/${id}/price`, b),
   resetPrice: (id: string) => request<{ price: Price | null }>("DELETE", `/api/products/${id}/price`),
@@ -95,8 +97,8 @@ export const api = {
   updateTemplate: (id: string, b: { name?: string; items?: { productId: string; quantity: number }[] }) => request<{ template: Template }>("PUT", `/api/templates/${id}`, b),
   deleteTemplate: (id: string) => request<{ ok: true }>("DELETE", `/api/templates/${id}`),
   sharePrice: (b: { productId: string; observedOn?: string; city?: string; store?: string }) => request<{ ok: true }>("POST", "/api/prices/share", b),
-  communityPrices: () => request<{ proposals: PriceProposal[]; minContributors: number }>("GET", "/api/prices/community"),
-  applyCommunityPrice: (b: { productId: string; format: string }) => request<{ price: Price | null }>("POST", "/api/prices/community/apply", b),
+  communityPrices: () => request<{ proposals: PriceProposal[]; city: string; minContributors: number }>("GET", "/api/prices/community"),
+  applyCommunityPrices: (items: { productId: string; format: string }[]) => request<{ applied: number; gone: number }>("POST", "/api/prices/community/apply", { items }),
   reportCommunityPrice: (b: { productId: string; format: string; reason?: string }) => request<{ ok: true }>("POST", "/api/prices/community/report", b),
   resetSecret: (id: string, secret: string, secretConfirm: string) => request<{ ok: true }>("POST", `/api/profiles/${id}/reset-secret`, { secret, secretConfirm }),
   recoveryState: () => request<RecoveryState>("GET", "/api/recovery-email"),
@@ -268,6 +270,7 @@ export interface Profile {
   active: boolean;
   /** Administrateur principal : rôle figé, jamais désactivé. */
   primary: boolean;
+  city?: string | null;
 }
 
 export interface RecoveryState {

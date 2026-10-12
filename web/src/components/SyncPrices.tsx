@@ -1,28 +1,56 @@
 import { useEffect, useState } from "react";
-import { api, type PriceProposal } from "../api";
+import { api, ApiError, type PriceProposal } from "../api";
 import { userMessage } from "../errors";
 import { fmtPrice } from "../pricing";
+import { CityPrompt } from "./CityPicker";
+import type { Engine, State } from "../sync/engine";
 
-const SOURCE: Record<string, string> = { base: "prix initial", family: "prix de votre famille", community: "prix communautaire" };
+const key = (p: PriceProposal) => `${p.productId}|${p.format}`;
 
 /**
- * « Synchroniser les prix » : propositions de la communauté compatibles avec vos produits. Rien n'est appliqué tout seul :
- * l'administrateur choisit chaque prix. Une proposition est la médiane de plusieurs familles pour UN format précis.
+ * « Synchroniser les prix » : prix partagés par d'autres familles de VOTRE ville, pour vos produits et le même format.
+ * Rien n'est appliqué tout seul : l'administrateur coche les prix voulus. Un prix personnel n'est jamais coché d'office.
  */
-export function SyncPrices() {
+export function SyncPrices({ engine, s }: { engine: Engine; s: State }) {
   const [list, setList] = useState<PriceProposal[] | null>(null);
-  const [min, setMin] = useState(3);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [city, setCity] = useState<string | null>(null);
+  const [needCity, setNeedCity] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
-  const [asking, setAsking] = useState<PriceProposal | null>(null);
-  const load = () => api.communityPrices().then((r) => { setList(r.proposals); setMin(r.minContributors); setError(null); }).catch((e) => setError(userMessage(e)));
-  useEffect(() => void load(), []);
-  const act = async (fn: () => Promise<unknown>, ok: string) => {
+  const [busy, setBusy] = useState(false);
+  const load = () => api.communityPrices().then((r) => {
+    setList(r.proposals);
+    setCity(r.city);
+    setPicked(new Set(r.proposals.filter((p) => p.current?.source !== "family").map(key)));
+    setNeedCity(false);
+    setError(null);
+  }).catch((e) => {
+    if (e instanceof ApiError && e.code === "city_required") { setNeedCity(true); setError(null); } else setError(userMessage(e));
+  });
+  useEffect(() => void load(), [s.me?.city]); // eslint-disable-line react-hooks/exhaustive-deps
+  const toggle = (k: string) => setPicked((cur) => { const n = new Set(cur); if (n.has(k)) n.delete(k); else n.add(k); return n; });
+  const apply = async () => {
+    const items = (list ?? []).filter((p) => picked.has(key(p))).map((p) => ({ productId: p.productId, format: p.format }));
+    if (!items.length) return;
+    setBusy(true);
     setError(null);
     setMsg(null);
     try {
-      await fn();
-      setMsg(ok);
+      const r = await api.applyCommunityPrices(items);
+      setMsg(r.applied === 1 ? "1 prix appliqué." : `${r.applied} prix appliqués.`);
+      await load();
+    } catch (e) {
+      setError(userMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const report = async (p: PriceProposal) => {
+    setError(null);
+    try {
+      await api.reportCommunityPrice({ productId: p.productId, format: p.format });
+      setMsg("Merci, la proposition est signalée et masquée pour votre famille.");
       await load();
     } catch (e) {
       setError(userMessage(e));
@@ -30,33 +58,42 @@ export function SyncPrices() {
   };
   return (
     <section data-testid="sync-prices">
-      <p className="muted">Prix partagés par d'autres familles pour vos produits, quand au moins {min} familles différentes ont partagé un prix du même format. Rien n'est changé sans votre choix.</p>
+      {needCity && (
+        <div className="panel" data-testid="sync-need-city">
+          <p>Indiquez votre ville pour voir les prix proposés autour de vous.</p>
+          <CityAsk engine={engine} />
+        </div>
+      )}
+      {city && <p className="muted" data-testid="sync-city">Prix de votre ville : {city}</p>}
       {error && <p className="error" role="alert" data-testid="sync-error">{error}</p>}
       {msg && <p className="notice" role="status" data-testid="sync-msg">{msg}</p>}
-      {list?.length === 0 && <p className="empty" data-testid="sync-empty">Aucune proposition pour le moment.</p>}
-      <ul className="rows rows--tight">
-        {list?.map((p) => (
-          <li key={`${p.productId}|${p.format}`} className="row row--stack row--compact" data-testid={`proposal-${p.productId}`}>
-            <span className="row__name">
-              <span className="row__title">{p.name}</span>
-              <small>Actuel : {p.current ? `${fmtPrice(p.current)} (${SOURCE[p.current.source]})` : "aucun prix"}</small>
-              <small>Proposé : <b>{fmtPrice(p.price)}</b></small>
-              <small>{p.contributors} familles · de {p.min.replace(".", ",")} à {p.max.replace(".", ",")} DH · dernier relevé {p.latestObservedOn.split("-").reverse().join("/")}</small>
-            </span>
-            <span className="row__actions">
-              <button className="btn btn--small btn--primary" data-testid={`apply-${p.productId}`} onClick={() => (p.current?.source === "family" ? setAsking(p) : void act(() => api.applyCommunityPrice({ productId: p.productId, format: p.format }), `Prix appliqué : ${p.name}.`))}>Appliquer</button>
-              <button className="btn btn--small btn--ghost" data-testid={`report-${p.productId}`} onClick={() => void act(() => api.reportCommunityPrice({ productId: p.productId, format: p.format }), "Merci, la proposition est signalée et masquée pour votre famille.")}>Signaler</button>
-            </span>
-          </li>
-        ))}
-      </ul>
-      {asking && (
-        <div className="panel danger" role="alertdialog" data-testid="sync-confirm">
-          <p>Remplacer votre prix actuel de « {asking.name} » ({asking.current ? fmtPrice(asking.current) : ""}) par {fmtPrice(asking.price)} ? Les commandes déjà validées gardent leur prix.</p>
-          <button className="btn btn--danger" data-testid="sync-confirm-apply" onClick={() => { const a = asking; setAsking(null); void act(() => api.applyCommunityPrice({ productId: a.productId, format: a.format }), `Prix appliqué : ${a.name}.`); }}>Oui, remplacer</button>
-          <button className="btn btn--ghost" onClick={() => setAsking(null)}>Non, garder le mien</button>
-        </div>
+      {list?.length === 0 && <p className="empty" data-testid="sync-empty">Aucun nouveau prix disponible dans votre ville.</p>}
+      {!!list?.length && (
+        <>
+          <ul className="rows rows--tight">
+            {list.map((p) => (
+              <li key={key(p)} className="row row--stack row--compact" data-testid={`proposal-${p.productId}`}>
+                <label className="check">
+                  <input type="checkbox" checked={picked.has(key(p))} onChange={() => toggle(key(p))} data-testid={`pick-${p.productId}`} />
+                  <span className="row__name">
+                    <span className="row__title">{p.name}</span>
+                    <small>Actuel : {p.current ? fmtPrice(p.current) : "aucun prix"}</small>
+                    <small>Proposé : <b>{fmtPrice(p.price)}</b></small>
+                  </span>
+                </label>
+                <button className="linkbtn" data-testid={`report-${p.productId}`} onClick={() => void report(p)}>Signaler</button>
+              </li>
+            ))}
+          </ul>
+          <button className="btn btn--primary btn--big" disabled={busy || picked.size === 0} data-testid="sync-apply" onClick={() => void apply()}>Appliquer les prix sélectionnés</button>
+        </>
       )}
     </section>
   );
+}
+
+function CityAsk({ engine }: { engine: Engine }) {
+  const [open, setOpen] = useState(true);
+  if (!open) return <button className="btn btn--small" data-testid="sync-city-open" onClick={() => setOpen(true)}>Choisir ma ville</button>;
+  return <CityPrompt onDone={(c) => { void engine.setCity(c); setOpen(false); }} onClose={() => setOpen(false)} />;
 }

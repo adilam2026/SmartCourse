@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError, NetworkError, type RecoveryState } from "../api";
+import { CityPicker } from "../components/CityPicker";
 import { MAIL_FAILED } from "../mailText";
 import { digits6, isAnySecret, isNewSecret, SecretInput } from "../components/SecretInput";
 import type { Engine, State } from "../sync/engine";
@@ -79,7 +80,7 @@ function Login({ engine, s, onMode }: { engine: Engine; s: State; onMode(m: Mode
 }
 
 function Setup({ engine, s, onBack }: { engine: Engine; s: State; onBack(): void }) {
-  const [f, setF] = useState({ familyName: "", displayName: "", login: "", secret: "", again: "", email: "" });
+  const [f, setF] = useState({ familyName: "", displayName: "", login: "", secret: "", again: "", email: "", city: "" });
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
   const mismatch = f.again.length > 0 && f.secret !== f.again;
   if (!s.prefillInstallToken) {
@@ -98,17 +99,18 @@ function Setup({ engine, s, onBack }: { engine: Engine; s: State; onBack(): void
     <main className="auth">
       <Logo title="Première installation" text="Créer ma famille" />
       {s.installFrom === "reset" && <p className="notice" role="status" data-testid="reset-banner">Votre famille a été supprimée. Vous pouvez maintenant créer une nouvelle famille.</p>}
-      <form onSubmit={async (e) => { e.preventDefault(); await engine.setup({ familyName: f.familyName, displayName: f.displayName, login: f.login, secret: f.secret, secretConfirm: f.again, recoveryEmail: f.email }); }}>
+      <form onSubmit={async (e) => { e.preventDefault(); await engine.setup({ familyName: f.familyName, displayName: f.displayName, login: f.login, secret: f.secret, secretConfirm: f.again, recoveryEmail: f.email, city: f.city }); }}>
         <label>Nom de la famille<input value={f.familyName} onChange={set("familyName")} required maxLength={60} data-testid="setup-family" /></label>
         <label>Votre nom affiché<input value={f.displayName} onChange={set("displayName")} required maxLength={40} data-testid="setup-name" /></label>
         <label>Votre identifiant<input value={f.login} onChange={set("login")} required autoCapitalize="none" pattern="[a-zA-Z0-9._-]{2,30}" data-testid="setup-login" /></label>
         <label>Code secret — 6 chiffres<SecretInput kind="new" value={f.secret} onChange={(v) => setF({ ...f, secret: v })} testid="setup-secret" /></label>
         <label>Confirmer le code secret<SecretInput kind="new" value={f.again} onChange={(v) => setF({ ...f, again: v })} testid="setup-again" /></label>
         {mismatch && <p className="error">Les deux codes secrets ne sont pas identiques.</p>}
+        <CityPicker value={f.city} onChange={(city) => setF((x) => ({ ...x, city }))} testid="setup-city" />
         <label>E-mail de récupération (obligatoire)<input value={f.email} onChange={set("email")} type="email" autoComplete="email" maxLength={254} required data-testid="setup-email" /></label>
         <p className="muted">Un lien de confirmation y est envoyé. Il permet aussi de retrouver le code famille ou de changer un mot de passe oublié.</p>
         {s.loginError && <p className="error" role="alert" data-testid="setup-error">{s.loginError}</p>}
-        <button className="btn btn--primary btn--big" disabled={s.loggingIn || !isNewSecret(f.secret) || f.secret !== f.again || !f.email.includes("@")} data-testid="setup-submit">{s.loggingIn ? "Création…" : "Créer ma famille"}</button>
+        <button className="btn btn--primary btn--big" disabled={s.loggingIn || !isNewSecret(f.secret) || f.secret !== f.again || !f.email.includes("@") || !f.city} data-testid="setup-submit">{s.loggingIn ? "Création…" : "Créer ma famille"}</button>
       </form>
       <button className="linkbtn" onClick={onBack}>← Retour à la connexion</button>
     </main>
