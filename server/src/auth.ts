@@ -139,7 +139,7 @@ export async function confirmPassword(db: Db, profileId: string, secret: string)
 export interface SetupInput {
   installToken: string;
   familyName: string;
-  admin: { displayName: string; login: string; secret: string; /** Adresse de récupération (non vérifiée) : la famille reste « en attente » jusqu'à sa vérification. Sans adresse (outils d'exploitation), la famille est installée d'emblée. */ recoveryEmail?: string };
+  admin: { displayName: string; login: string; secret: string; city?: string; /** Adresse de récupération (non vérifiée) : la famille reste « en attente » jusqu'à sa vérification. Sans adresse (outils d'exploitation), la famille est installée d'emblée. */ recoveryEmail?: string };
 }
 
 /**
@@ -164,9 +164,9 @@ export async function setupFamily(db: Db, input: SetupInput): Promise<{ token: s
     await c.query("UPDATE install_tokens SET family_id = $2 WHERE id = $1", [consumed.rows[0].id, familyId]);
     if (!input.admin.recoveryEmail) await c.query("UPDATE families SET setup_completed_at = now() WHERE id = $1", [familyId]);
     const prof = await c.query<{ id: string }>(
-      `INSERT INTO profiles (family_id, display_name, login, role, secret_hash, is_primary, recovery_email)
-       VALUES ($1, $2, $3, 'admin', $4, true, $5) RETURNING id`,
-      [familyId, input.admin.displayName, input.admin.login, secretHash, input.admin.recoveryEmail ? input.admin.recoveryEmail.trim().toLowerCase() : null],
+      `INSERT INTO profiles (family_id, display_name, login, role, secret_hash, is_primary, recovery_email, city)
+       VALUES ($1, $2, $3, 'admin', $4, true, $5, $6) RETURNING id`,
+      [familyId, input.admin.displayName, input.admin.login, secretHash, input.admin.recoveryEmail ? input.admin.recoveryEmail.trim().toLowerCase() : null, input.admin.city ?? null],
     );
     const profileId = prof.rows[0]!.id;
     // Catalogue familial de départ : copie des 80 références génériques.

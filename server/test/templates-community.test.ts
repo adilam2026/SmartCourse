@@ -27,6 +27,7 @@ const cookieOf = (res: { cookies: { name: string; value: string }[] }) => ({ sc_
 async function family() {
   const r = await app.inject({ method: "POST", url: "/api/setup/family", payload: { installToken: await generateInstallToken(db), familyName: `F${++n}`, admin: { displayName: "Adil", login: "adil", secret: "482913" } } });
   const admin = cookieOf(r);
+  await app.inject({ method: "PUT", url: "/api/me/city", cookies: admin, payload: { city: "Casablanca" } }); // prix partagés : par ville
   const add = async (login: string, role: string) => {
     await app.inject({ method: "POST", url: "/api/profiles", cookies: admin, payload: { displayName: login, login, role, secret: "573918", secretConfirm: "573918" } });
     return cookieOf(await app.inject({ method: "POST", url: "/api/auth/login", payload: { familyCode: r.json().familyCode, login, secret: "573918" } }));
@@ -152,10 +153,11 @@ describe("partage communautaire des prix", () => {
     expect(cat.categories.flatMap((c: any) => c.products).find((p: any) => p.id === vid).price).toMatchObject({ amount: "7.00", source: "family" });
     // l'administrateur choisit : seul un administrateur peut appliquer
     const parent = await viewer.add("lamiaa", "parent");
-    expect((await app.inject({ method: "POST", url: "/api/prices/community/apply", cookies: parent, payload: { productId: vid, format: "kg" } })).statusCode).toBe(403);
-    const applied = await app.inject({ method: "POST", url: "/api/prices/community/apply", cookies: viewer.admin, payload: { productId: vid, format: "kg" } });
-    expect(applied.json().price).toMatchObject({ amount: "11.50", source: "community" });
-    expect((await app.inject({ method: "POST", url: "/api/prices/community/apply", cookies: viewer.admin, payload: { productId: vid, format: "kg" } })).statusCode).toBe(200);
+    expect((await app.inject({ method: "POST", url: "/api/prices/community/apply", cookies: parent, payload: { items: [{ productId: vid, format: "kg" }] } })).statusCode).toBe(403);
+    const applied = await app.inject({ method: "POST", url: "/api/prices/community/apply", cookies: viewer.admin, payload: { items: [{ productId: vid, format: "kg" }] } });
+    expect(applied.json()).toEqual({ applied: 1, gone: [] });
+    expect((await app.inject({ method: "GET", url: "/api/catalog", cookies: viewer.admin })).json().categories.flatMap((c: any) => c.products).find((p: any) => p.id === vid).price).toMatchObject({ amount: "11.50", source: "community" });
+    expect((await app.inject({ method: "POST", url: "/api/prices/community/apply", cookies: viewer.admin, payload: { items: [{ productId: vid, format: "kg" }] } })).statusCode).toBe(200);
     // signaler : la proposition disparaît pour cette famille
     const rep = await app.inject({ method: "POST", url: "/api/prices/community/report", cookies: viewer.admin, payload: { productId: vid, format: "kg", reason: "incohérent" } });
     expect(rep.statusCode).toBe(200);

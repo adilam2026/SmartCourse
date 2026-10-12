@@ -9,6 +9,7 @@ export default defineConfig({
       NODE_ENV: "test",
       SCRYPT_N: "1024",
       SC_LEGACY_SETUP: "1", // les tests d anciennes règles créent des familles sans e-mail ; les tests d installation exigent l e-mail explicitement
+      SC_CITY_OPTIONAL: "1", // les tests antérieurs créent des profils sans ville ; les tests de la règle l exigent explicitement
     },
   },
 });

@@ -65,13 +65,13 @@ export interface Proposal {
 }
 
 /** Contributions d'un format, privées de celles de la famille qui regarde, des signalées par elle et des valeurs aberrantes. */
-async function groups(db: Pick<Db, "query">, familyId: string, origin: string, key: string) {
+async function groups(db: Pick<Db, "query">, familyId: string, origin: string, key: string, city: string) {
   const me = opaque(familyId);
   const rows = (await db.query(
     `SELECT c.* FROM price_contributions c
-      WHERE c.origin = $1 AND c.key = $2 AND NOT c.excluded AND c.contributor <> $3
+      WHERE c.origin = $1 AND c.key = $2 AND c.city = $4 AND NOT c.excluded AND c.contributor <> $3
         AND NOT EXISTS (SELECT 1 FROM price_reports r WHERE r.contribution_id = c.id AND r.reporter = $3)`,
-    [origin, key, me],
+    [origin, key, me, city],
   )).rows;
   const byFormat = new Map<string, { row: any; value: number }[]>();
   for (const row of rows) {
@@ -89,12 +89,12 @@ async function groups(db: Pick<Db, "query">, familyId: string, origin: string, k
   return out;
 }
 
-async function proposalsFor(db: Db, familyId: string, productId: string): Promise<Proposal[]> {
+async function proposalsFor(db: Db, familyId: string, productId: string, city: string): Promise<Proposal[]> {
   const k = await stableKey(db, familyId, productId);
   if (!k) return [];
   const current = (await loadPrices(db, familyId, [productId])).get(productId) ?? null;
   const out: Proposal[] = [];
-  for (const g of await groups(db, familyId, k.origin, k.key)) {
+  for (const g of await groups(db, familyId, k.origin, k.key, city)) {
     const m = median(g.values);
     const sample = g.rows.sort((a, b) => String(b.observed_on).localeCompare(String(a.observed_on)))[0];
     const first = comparable(refOf(sample))!;
@@ -119,6 +119,13 @@ async function proposalsFor(db: Db, familyId: string, productId: string): Promis
   return out;
 }
 
+/** Ville du profil qui agit : tout se fait dans SA ville. Sans ville, l'application la lui demande (sans bloquer le reste). */
+async function cityOf(db: Pick<Db, "query">, profileId: string): Promise<string> {
+  const c = (await db.query("SELECT city FROM profiles WHERE id = $1", [profileId])).rows[0]?.city as string | null | undefined;
+  if (!c) throw new HttpError(409, "city_required", "Indiquez votre ville pour partager ou synchroniser les prix");
+  return c;
+}
+
 const today = () => new Date().toISOString().slice(0, 10);
 
 export function priceCommunityRoutes(app: FastifyInstance, { db, guard, hub }: Deps): void {
@@ -126,8 +133,9 @@ export function priceCommunityRoutes(app: FastifyInstance, { db, guard, hub }: D
   app.post("/api/prices/share", { preHandler: guard("family.manage") }, async (req, reply) => {
     const a = req.auth!;
     const b = z
-      .object({ productId: z.string().uuid(), observedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), city: z.string().trim().max(60).optional(), store: z.string().trim().max(60).optional() })
+      .object({ productId: z.string().uuid(), observedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), store: z.string().trim().max(60).optional() })
       .parse(req.body);
+    const city = await cityOf(db, a.profileId);
     const k = await stableKey(db, a.familyId, b.productId);
     if (!k) throw new HttpError(409, "not_shareable", "Ce produit n'existe que dans votre famille : il ne peut pas être partagé");
     const fp = (await db.query("SELECT * FROM family_prices WHERE family_id = $1 AND product_id = $2 AND source = 'family'", [a.familyId, b.productId])).rows[0];
@@ -156,7 +164,7 @@ export function priceCommunityRoutes(app: FastifyInstance, { db, guard, hub }: D
       if (ref !== null && (cmp.centsPerBase > ref * REFERENCE_BAND || cmp.centsPerBase < ref / REFERENCE_BAND)) throw new HttpError(422, "price_inconsistent", "Ce prix semble très différent des prix connus : vérifiez le montant et l'unité avant de le partager");
       await c.query(
         `INSERT INTO price_contributions (origin, key, amount, ref_qty, ref_unit, packaging, piece_weight_g, observed_on, city, store, contributor) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-        [k.origin, k.key, fp.amount, fp.ref_qty, fp.ref_unit, fp.packaging, fp.piece_weight_g, observedOn, b.city || null, b.store || null, me],
+        [k.origin, k.key, fp.amount, fp.ref_qty, fp.ref_unit, fp.packaging, fp.piece_weight_g, observedOn, city, b.store || null, me],
       );
       await c.query("INSERT INTO audit_log (family_id, actor_profile_id, action, details) VALUES ($1,$2,'price.shared',$3)", [a.familyId, a.profileId, JSON.stringify({ productId: b.productId })]);
     });
@@ -166,31 +174,42 @@ export function priceCommunityRoutes(app: FastifyInstance, { db, guard, hub }: D
   // « Synchroniser les prix » : propositions compatibles, avec le prix actuel de la famille.
   app.get("/api/prices/community", { preHandler: guard("family.manage") }, async (req) => {
     const a = req.auth!;
+    const city = await cityOf(db, a.profileId);
     const products = (await db.query("SELECT id FROM products WHERE family_id = $1 AND (catalog_key IS NOT NULL OR extended_id IS NOT NULL)", [a.familyId])).rows;
     const proposals: Proposal[] = [];
-    for (const p of products) proposals.push(...(await proposalsFor(db, a.familyId, p.id)));
-    return { proposals, minContributors: MIN_CONTRIBUTORS };
+    for (const p of products) proposals.push(...(await proposalsFor(db, a.familyId, p.id, city)));
+    return { proposals, city, minContributors: MIN_CONTRIBUTORS };
   });
 
   const choose = z.object({ productId: z.string().uuid(), format: z.string().min(1).max(120) });
 
-  // L'administrateur applique UNE proposition : recalculée côté serveur (le client n'impose jamais le prix).
+  // L'administrateur applique les propositions qu'il a SÉLECTIONNÉES : chacune est recalculée côté serveur (le client n'impose jamais un prix).
+  // Les prix appliqués sont communs à la famille ; rien ne s'applique tout seul.
   app.post("/api/prices/community/apply", { preHandler: guard("family.manage") }, async (req) => {
     const a = req.auth!;
-    const b = choose.parse(req.body);
-    const prop = (await proposalsFor(db, a.familyId, b.productId)).find((p) => p.format === b.format);
-    if (!prop) throw new HttpError(409, "proposal_gone", "Cette proposition n'est plus disponible");
-    await withTx(db, async (c) => {
-      await c.query(
-        `INSERT INTO family_prices (family_id, product_id, amount, ref_qty, ref_unit, packaging, source, updated_by, updated_at) VALUES ($1,$2,$3,$4,$5,$6,'community',$7, now())
-         ON CONFLICT (family_id, product_id) DO UPDATE SET amount = $3, ref_qty = $4, ref_unit = $5, packaging = $6, piece_weight_g = NULL, source = 'community', updated_by = $7, updated_at = now()`,
-        [a.familyId, b.productId, prop.price.amount, prop.price.refQty, prop.price.refUnit, prop.price.packaging, a.profileId],
-      );
-      await c.query("INSERT INTO audit_log (family_id, actor_profile_id, action, details) VALUES ($1,$2,'price.community_applied',$3)", [a.familyId, a.profileId, JSON.stringify({ productId: b.productId })]);
-      await bumpCatalogRev(c, a.familyId);
-    });
-    hub.broadcast(a.familyId, "catalog.updated", {});
-    return { price: (await loadPrices(db, a.familyId, [b.productId])).get(b.productId) ?? null };
+    const b = z.object({ items: z.array(choose).min(1).max(100) }).parse(req.body);
+    const city = await cityOf(db, a.profileId);
+    let applied = 0;
+    const gone: string[] = [];
+    for (const it of b.items) {
+      const prop = (await proposalsFor(db, a.familyId, it.productId, city)).find((p) => p.format === it.format);
+      if (!prop) {
+        gone.push(it.productId);
+        continue;
+      }
+      await withTx(db, async (c) => {
+        await c.query(
+          `INSERT INTO family_prices (family_id, product_id, amount, ref_qty, ref_unit, packaging, source, updated_by, updated_at) VALUES ($1,$2,$3,$4,$5,$6,'community',$7, now())
+           ON CONFLICT (family_id, product_id) DO UPDATE SET amount = $3, ref_qty = $4, ref_unit = $5, packaging = $6, piece_weight_g = NULL, source = 'community', updated_by = $7, updated_at = now()`,
+          [a.familyId, it.productId, prop.price.amount, prop.price.refQty, prop.price.refUnit, prop.price.packaging, a.profileId],
+        );
+        await c.query("INSERT INTO audit_log (family_id, actor_profile_id, action, details) VALUES ($1,$2,'price.community_applied',$3)", [a.familyId, a.profileId, JSON.stringify({ productId: it.productId })]);
+        await bumpCatalogRev(c, a.familyId);
+      });
+      applied++;
+    }
+    if (applied) hub.broadcast(a.familyId, "catalog.updated", {});
+    return { applied, gone };
   });
 
   // Signaler une proposition : elle disparaît pour cette famille ; assez de signalements d'autres familles écartent la contribution.
@@ -199,7 +218,7 @@ export function priceCommunityRoutes(app: FastifyInstance, { db, guard, hub }: D
     const b = choose.extend({ reason: z.string().trim().max(200).optional() }).parse(req.body);
     const k = await stableKey(db, a.familyId, b.productId);
     if (!k) throw new HttpError(404, "not_found", "Produit introuvable");
-    const g = (await groups(db, a.familyId, k.origin, k.key)).find((x) => x.format === b.format);
+    const g = (await groups(db, a.familyId, k.origin, k.key, await cityOf(db, a.profileId))).find((x) => x.format === b.format);
     if (!g) throw new HttpError(409, "proposal_gone", "Cette proposition n'est plus disponible");
     const me = opaque(a.familyId);
     await withTx(db, async (c) => {

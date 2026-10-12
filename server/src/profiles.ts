@@ -14,6 +14,8 @@ export interface ProfileView {
   active: boolean;
   /** Administrateur principal : le premier de la famille. Son rôle ne peut pas être changé et il ne peut pas être désactivé. */
   primary: boolean;
+  /** Ville du profil (null : pas encore renseignée, demandée à la première synchronisation des prix). */
+  city: string | null;
 }
 
 const toView = (r: any): ProfileView => ({
@@ -23,6 +25,7 @@ const toView = (r: any): ProfileView => ({
   role: r.role,
   active: r.active,
   primary: r.is_primary,
+  city: r.city ?? null,
 });
 
 export async function listProfiles(db: Db, familyId: string): Promise<ProfileView[]> {
@@ -67,6 +70,7 @@ export interface CreateProfileInput {
   /** Choisi et saisi par l'administrateur : jamais généré automatiquement. */
   secret: string;
   secretConfirm: string;
+  city?: string;
 }
 
 /** Same rules everywhere a code is chosen by a person: exactly 6 digits (leading zeros kept), typed twice, not trivially guessable. */
@@ -83,8 +87,8 @@ export async function createProfile(db: Db, actor: AuthContext, input: CreatePro
     await lockFamily(c, actor.familyId);
     try {
       const r = await c.query(
-        `INSERT INTO profiles (family_id, display_name, login, role, secret_hash) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-        [actor.familyId, input.displayName, input.login, input.role, hash],
+        `INSERT INTO profiles (family_id, display_name, login, role, secret_hash, city) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+        [actor.familyId, input.displayName, input.login, input.role, hash, input.city ?? null],
       );
       await audit(c, actor.familyId, actor.profileId, "profile.created", r.rows[0].id, { role: input.role });
       return { profile: toView(r.rows[0]) };
@@ -168,6 +172,11 @@ export async function deleteOwnAccount(db: Db, hub: SseHub, familyId: string, pr
     await erase(c, familyId, t, profileId, how);
   });
   hub.disconnectProfile(profileId);
+}
+
+/** La personne change SA ville (profil). */
+export async function setOwnCity(db: Db, profileId: string, city: string): Promise<void> {
+  await db.query("UPDATE profiles SET city = $2 WHERE id = $1", [profileId, city]);
 }
 
 /** « Modifier le mot de passe » : l'ancien n'est jamais affiché ni renvoyé ; toutes les sessions du profil sont révoquées. */

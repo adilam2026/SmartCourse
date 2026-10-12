@@ -5,7 +5,7 @@ import { HttpError } from "./errors.js";
 import type { Guard } from "./guard.js";
 import type { SseHub } from "./hub.js";
 import type { PushService } from "./push.js";
-import { applyOps, closeList, createList, getActiveListView, getListView, listHistory, repriceList, type OpIn } from "./lists.js";
+import { applyOps, closeList, createList, deleteArchivedList, getActiveListView, getListView, listHistory, repriceList, type OpIn } from "./lists.js";
 import { can, type Action } from "./permissions.js";
 
 const uuid = z.string().uuid();
@@ -35,6 +35,13 @@ export function listRoutes(app: FastifyInstance, { db, hub, guard, push }: { db:
     const catalogRev = Number((await db.query("SELECT catalog_rev FROM families WHERE id = $1", [req.auth!.familyId])).rows[0]?.catalog_rev ?? 0);
     const prefsRev = Number((await db.query("SELECT prefs_rev FROM profiles WHERE id = $1", [req.auth!.profileId])).rows[0]?.prefs_rev ?? 0);
     return { list, catalogRev, prefsRev };
+  });
+
+  // Supprimer une liste clôturée et ses achats (administrateur, liste de sa famille seulement).
+  app.delete("/api/lists/:id", { preHandler: guard("family.manage") }, async (req) => {
+    const { id } = z.object({ id: uuid }).parse(req.params);
+    const r = await deleteArchivedList(db, hub, req.auth!, id);
+    return { ok: true, ...r };
   });
 
   // Réévaluer une liste en cours avec les prix actuels (action explicite d'un parent ou d'un administrateur).

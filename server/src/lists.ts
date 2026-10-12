@@ -328,6 +328,9 @@ export async function applyOps(db: Db, hub: SseHub, a: AuthContext, listId: stri
   const results: OpResult[] = [];
   const changedItems: string[] = [];
   const changedValidations = new Set<string>();
+  // A list deleted meanwhile (old offline action) is never recreated nor written to.
+  const exists = await db.query("SELECT 1 FROM lists WHERE id = $1 AND family_id = $2", [listId, a.familyId]);
+  if (!exists.rowCount) throw new HttpError(404, "not_found", "Liste introuvable");
   for (const op of ops) {
     const r = await runOp(db, a, listId, op, batch);
     results.push(a.role === "staff" ? stripDetail(r.result) : r.result);
@@ -377,6 +380,32 @@ export async function repriceList(db: Db, hub: SseHub, a: AuthContext, listId: s
   });
   hub.broadcast(a.familyId, "list.updated", { listId, itemIds: [] });
   return n;
+}
+
+/**
+ * Suppression DÉFINITIVE d'une liste clôturée et de ses achats (administrateur). Les archives restent protégées contre les modifications
+ * ordinaires : seule cette transaction, qui désigne CETTE liste (app.list_delete), peut en supprimer les lignes. Le catalogue, les favoris
+ * et les autres listes ne sont pas touchés ; les statistiques se recalculent (elles lisent les achats). Les sauvegardes déjà faites la contiennent encore.
+ */
+export async function deleteArchivedList(db: Db, hub: SseHub, a: AuthContext, listId: string): Promise<{ items: number; purchases: number }> {
+  const out = await withTx(db, async (c) => {
+    const list = (await c.query("SELECT status FROM lists WHERE id = $1 AND family_id = $2 FOR UPDATE", [listId, a.familyId])).rows[0];
+    if (!list) throw new HttpError(404, "not_found", "Liste introuvable");
+    if (list.status !== "archived") throw new HttpError(409, "list_active", "Seule une liste clôturée peut être supprimée");
+    await c.query("SELECT set_config('app.list_delete', $1, true)", [listId]);
+    const counts = (await c.query("SELECT (SELECT count(*) FROM list_items WHERE list_id = $1)::int AS items, (SELECT count(*) FROM purchases WHERE list_id = $1)::int AS purchases", [listId])).rows[0];
+    await c.query("DELETE FROM push_events WHERE list_id = $1", [listId]);
+    await c.query("DELETE FROM list_events WHERE list_id = $1", [listId]);
+    await c.query("DELETE FROM purchases WHERE list_id = $1", [listId]);
+    await c.query("DELETE FROM validations WHERE list_id = $1", [listId]);
+    await c.query("DELETE FROM list_items WHERE list_id = $1", [listId]);
+    await c.query("DELETE FROM op_log WHERE list_id = $1", [listId]);
+    await c.query("DELETE FROM lists WHERE id = $1", [listId]);
+    await c.query("INSERT INTO audit_log (family_id, actor_profile_id, action, details) VALUES ($1,$2,'list.deleted',$3)", [a.familyId, a.profileId, JSON.stringify({ items: counts.items, purchases: counts.purchases })]);
+    return counts as { items: number; purchases: number };
+  });
+  hub.broadcast(a.familyId, "list.deleted", { listId }); // les autres téléphones retirent la liste de leur historique
+  return out;
 }
 
 export interface CloseResult {

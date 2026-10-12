@@ -18,10 +18,11 @@ import type { Db } from "./db.js";
 import { HttpError } from "./errors.js";
 import { SseHub } from "./hub.js";
 import { can, type Action } from "./permissions.js";
+import { canonicalCity } from "./cities.js";
 import { priceRoutes } from "./prices.js";
 import { templateRoutes } from "./templates.js";
 import { priceCommunityRoutes } from "./price-community.js";
-import { createProfile, deleteOwnAccount, deleteProfile, listProfiles, resetSecret, updateProfile } from "./profiles.js";
+import { createProfile, deleteOwnAccount, deleteProfile, listProfiles, resetSecret, setOwnCity, updateProfile } from "./profiles.js";
 import { mailerFromEnv } from "./mail.js";
 import { countFamilyData, identifyFamily, purgeFamily } from "./family-purge.js";
 import { RecoveryService, secretMatches } from "./recovery.js";
@@ -55,6 +56,8 @@ export interface AppDeps {
   recoveryRateLimit?: { max: number; timeWindow: string };
   /** Première installation : adresse de récupération obligatoire et vérifiée (toujours vrai en production ; les tests d'avant cette règle peuvent la lever avec SC_LEGACY_SETUP=1, ignoré hors NODE_ENV=test). */
   requireRecoveryEmail?: boolean;
+  /** Ville obligatoire à la création d'un profil et du premier administrateur (toujours vrai en production ; levée seulement par SC_CITY_OPTIONAL=1 sous NODE_ENV=test). */
+  requireCity?: boolean;
 }
 
 
@@ -70,10 +73,22 @@ const emailField = z.string().trim().toLowerCase().email().max(254);
 const roleField = z.enum(["admin", "parent", "staff"]);
 const nameField = z.string().trim().min(1).max(40);
 
+/** Ville choisie dans la liste (nom canonique) ; absente seulement là où la règle est levée (tests des anciennes règles). */
+const cityIn = z.string().trim().max(60).optional();
+function resolveCity(raw: string | undefined, required: boolean): string | undefined {
+  if (raw === undefined || raw === "") {
+    if (required) throw new HttpError(400, "city_required", "La ville est obligatoire");
+    return undefined;
+  }
+  const c = canonicalCity(raw);
+  if (!c) throw new HttpError(400, "invalid_city", "Choisissez une ville dans la liste");
+  return c;
+}
+
 const setupSchema = z.object({
   installToken: z.string().min(16).max(200),
   familyName: z.string().trim().min(1).max(60),
-  admin: z.object({ displayName: nameField, login: loginField, secret: secretField, secretConfirm: z.string().optional(), recoveryEmail: emailField.optional() }),
+  admin: z.object({ displayName: nameField, login: loginField, secret: secretField, secretConfirm: z.string().optional(), recoveryEmail: emailField.optional(), city: cityIn }),
 });
 
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
@@ -121,11 +136,13 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     }
   });
 
+  const requireCity = deps.requireCity ?? !(process.env.NODE_ENV === "test" && process.env.SC_CITY_OPTIONAL === "1");
   const requireEmail = deps.requireRecoveryEmail ?? !(process.env.NODE_ENV === "test" && process.env.SC_LEGACY_SETUP === "1");
   app.post("/api/setup/family", { config: { rateLimit: limit } }, async (req, reply) => {
     const input = setupSchema.parse(req.body);
     if (input.admin.secretConfirm !== undefined && input.admin.secretConfirm !== input.admin.secret) throw new HttpError(400, "secret_mismatch", "Les deux codes secrets ne sont pas identiques");
-    const { recoveryEmail, secretConfirm: _c, ...admin } = input.admin;
+    const { recoveryEmail, secretConfirm: _c, city: rawCity, ...admin } = input.admin;
+    const city = resolveCity(rawCity, requireCity); // avant toute création : le jeton n'est pas consommé en cas de refus
     if (requireEmail) {
       // Avant toute création (et sans consommer le jeton) : une installation ne doit jamais laisser un compte inutilisable.
       if (!recoveryEmail) throw new HttpError(400, "email_required", "Une adresse e-mail de récupération est obligatoire");
@@ -134,7 +151,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
         throw new HttpError(503, "mail_unavailable", "L'e-mail n'a pas pu être envoyé. Veuillez réessayer dans quelques instants.");
       }
     }
-    const r = await setupFamily(db, { ...input, admin: { ...admin, ...(recoveryEmail ? { recoveryEmail } : {}) } });
+    const r = await setupFamily(db, { ...input, admin: { ...admin, ...(city ? { city } : {}), ...(recoveryEmail ? { recoveryEmail } : {}) } });
     setSessionCookie(reply, r.token);
     // La famille existe, en attente de vérification. Un échec d'envoi n'annule rien : l'écran de vérification permet de réessayer.
     let state: Awaited<ReturnType<RecoveryService["state"]>> | null = null;
@@ -161,7 +178,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.get("/api/me", { preHandler: guard(undefined, { allowPending: true }) }, async (req) => {
     const a = req.auth!;
     const me: Record<string, unknown> = publicMe(a);
-    const pr = (await db.query("SELECT show_prices, show_totals, prefs_rev FROM profiles WHERE id = $1", [a.profileId])).rows[0];
+    const pr = (await db.query("SELECT show_prices, show_totals, prefs_rev, city FROM profiles WHERE id = $1", [a.profileId])).rows[0];
+    me.city = pr?.city ?? null;
     me.prefs = { showPrices: !!pr?.show_prices, showTotals: !!pr?.show_totals, rev: Number(pr?.prefs_rev ?? 0) };
     if (can(a.role, "family.manage")) {
       const f = await db.query("SELECT code, name FROM families WHERE id = $1", [a.familyId]);
@@ -178,15 +196,24 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
   app.post("/api/profiles", { preHandler: guard("family.manage") }, async (req, reply) => {
     const body = z
-      .object({ displayName: nameField, login: loginField, role: roleField, secret: secretField, secretConfirm: z.string() })
+      .object({ displayName: nameField, login: loginField, role: roleField, secret: secretField, secretConfirm: z.string(), city: cityIn })
       .parse(req.body);
-    return reply.code(201).send(await createProfile(db, req.auth!, body)); // le mot de passe est choisi par l'administrateur : il n'est jamais renvoyé
+    const city = resolveCity(body.city, requireCity);
+    return reply.code(201).send(await createProfile(db, req.auth!, { ...body, city })); // le mot de passe est choisi par l'administrateur : il n'est jamais renvoyé
   });
 
   app.patch("/api/profiles/:id", { preHandler: guard("family.manage") }, async (req) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
     const body = z.object({ displayName: nameField.optional(), role: roleField.optional(), active: z.boolean().optional() }).parse(req.body);
     return { profile: await updateProfile(db, hub, req.auth!, id, body) };
+  });
+
+  // Ma ville : choisie dans la liste, modifiable à tout moment.
+  app.put("/api/me/city", { preHandler: guard() }, async (req) => {
+    const b = z.object({ city: z.string().trim().max(60) }).parse(req.body);
+    const city = resolveCity(b.city, true)!;
+    await setOwnCity(db, req.auth!.profileId, city);
+    return { city };
   });
 
   // Suppression d'un profil (jamais celui d'un administrateur : il faut d'abord lui retirer ce rôle) ; la famille reste intacte.

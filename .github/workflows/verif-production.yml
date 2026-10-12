@@ -11,7 +11,7 @@ on:
         default: "https://smartcourse-production-c7ce.up.railway.app"
       schema_attendu:
         description: "Dernière migration attendue"
-        default: "019_base_prices_initial.sql"
+        default: "020_city_list_delete.sql"
 permissions:
   contents: read
 jobs:
