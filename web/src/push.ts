@@ -8,6 +8,14 @@ import { api } from "./api";
  */
 export type PushStatus = "unsupported" | "denied" | "off" | "on";
 
+/** Où l'activation a échoué : permet de dire la vraie raison à la personne (jamais « connexion nécessaire » pour autre chose). */
+export type PushStep = "server" | "phone" | "register" | "verify";
+export class PushError extends Error {
+  constructor(readonly step: PushStep, readonly cause?: unknown) {
+    super(`push:${step}`);
+  }
+}
+
 export const pushSupported = (): boolean =>
   typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
 
@@ -38,16 +46,30 @@ export async function enablePush(): Promise<PushStatus> {
   if (!pushSupported()) return "unsupported";
   const permission = await Notification.requestPermission();
   if (permission !== "granted") return permission === "denied" ? "denied" : "off";
-  const { publicKey } = await api.pushConfig();
-  const key = keyBytes(publicKey);
-  const reg = await registration();
-  let sub = await reg.pushManager.getSubscription();
-  if (sub && !sameKey(sub, key)) {
-    await sub.unsubscribe(); // subscribed with another server key (never expected: the key is kept in the database)
-    sub = null;
+  let key: Uint8Array<ArrayBuffer>;
+  try {
+    key = keyBytes((await api.pushConfig()).publicKey);
+  } catch (e) {
+    throw new PushError("server", e);
   }
-  sub ??= await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
-  await api.pushSubscribe({ ...(sub.toJSON() as { endpoint: string; keys: { p256dh: string; auth: string } }), userAgent: navigator.userAgent.slice(0, 200) });
+  let sub: PushSubscription;
+  try {
+    const reg = await registration();
+    let cur = await reg.pushManager.getSubscription();
+    if (cur && !sameKey(cur, key)) {
+      await cur.unsubscribe(); // subscribed with another server key (never expected: the key is kept in the database)
+      cur = null;
+    }
+    sub = cur ?? (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key }));
+  } catch (e) {
+    throw new PushError("phone", e);
+  }
+  try {
+    await api.pushSubscribe({ ...(sub.toJSON() as { endpoint: string; keys: { p256dh: string; auth: string } }), userAgent: navigator.userAgent.slice(0, 200) });
+  } catch (e) {
+    await sub.unsubscribe().catch(() => {}); // not registered with the server: keep nothing on the phone either
+    throw new PushError("register", e);
+  }
   return "on";
 }
 

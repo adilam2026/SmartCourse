@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { Icon } from "./Icon";
-import { disablePush, enablePush, pushStatus, type PushStatus } from "../push";
+import { disablePush, enablePush, PushError, pushStatus, type PushStatus, type PushStep } from "../push";
+
+const FAILED: Record<PushStep, string> = {
+  server: "Les notifications ne peuvent pas être préparées pour le moment (connexion nécessaire). Réessayez.",
+  phone: "Ce téléphone n'a pas pu enregistrer les notifications. Vérifiez que les notifications de Courses sont autorisées dans les paramètres du téléphone, puis réessayez.",
+  register: "Les notifications n'ont pas pu être enregistrées pour ce téléphone. Réessayez dans un instant.",
+  verify: "L'activation n'a pas pu être confirmée sur ce téléphone. Elle n'est donc pas considérée comme activée.",
+};
 
 const LABEL: Record<PushStatus, string> = {
   on: "Activées sur cet appareil",
@@ -37,11 +44,11 @@ export function usePushControl() {
     try {
       const asked = await fn();
       const real = await pushStatus(); // the permission and the subscription as the phone really holds them
-      if (asked === "on" && real !== "on") throw new Error("not subscribed");
+      if (asked === "on" && real !== "on") throw new PushError("verify");
       setShared(real);
       return real;
-    } catch {
-      setError("Impossible pour le moment (connexion nécessaire). Réessayez.");
+    } catch (e) {
+      setError(FAILED[e instanceof PushError ? e.step : "server"]);
       refresh();
       return null;
     } finally {

@@ -360,6 +360,17 @@ for (const s of SIZES) {
       expect(await sql("SELECT 1 FROM push_subscriptions s JOIN families fa ON fa.id = s.family_id WHERE fa.code = $1", [f.code])).toEqual([]);
       await c.ctx.close();
 
+      // activation qui échoue sur le téléphone : message vrai, jamais annoncée comme réussie, invitation conservée, rien d'enregistré
+      const e = await phone(browser, baseURL, s, FAKE_PUSH("default", "granted") + `;PushManager.prototype.subscribe = async () => { throw new DOMException("push service error", "AbortError"); };`);
+      await uiLogin(e.page, f, "lamiaa", "573918");
+      await e.page.getByTestId("notif-invite-enable").click();
+      await expect(e.page.getByTestId("notif-invite-error")).toContainText("Ce téléphone n'a pas pu enregistrer les notifications");
+      await expect(e.page.getByTestId("notif-invite-error")).not.toContainText("connexion");
+      await expect(e.page.getByTestId("notif-invite")).toBeVisible();
+      expect(await sql("SELECT 1 FROM push_subscriptions s JOIN families fa ON fa.id = s.family_id WHERE fa.code = $1", [f.code])).toEqual([]);
+      await e.page.screenshot({ path: `${OUT}/notifications-echec-${s.name}.png` });
+      await e.ctx.close();
+
       // accord : état réel « activées », plus de bandeau, abonnement enregistré pour cet appareil seulement
       const d = await phone(browser, baseURL, s, FAKE_PUSH("default", "granted"));
       await uiLogin(d.page, f, "lamiaa", "573918");
