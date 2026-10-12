@@ -25,6 +25,11 @@ class Session(val storage: SessionStorage, val api: ApiClient, private val scope
     var serverAddress: String? by mutableStateOf(storage.server)
         private set
 
+    init {
+        // Toute requête authentifiée refusée en 401 (session révoquée, profil désactivé) ramène à la connexion.
+        api.onSessionExpired = { scope.launch { if (state is AuthState.SignedIn) endSession(Failure.SESSION_EXPIRED) } }
+    }
+
     fun setServer(address: String) {
         if (address != storage.server) {
             // Changer de serveur invalide la session conservée : un cookie n'a de sens que pour son serveur.

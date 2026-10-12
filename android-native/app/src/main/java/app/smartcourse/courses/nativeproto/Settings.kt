@@ -131,6 +131,12 @@ private fun SwitchRow(title: String, sub: String, checked: Boolean, enabled: Boo
 
 @Composable
 fun ProfilesScreen(onBack: () -> Unit) {
+    val session = LocalSession.current
+    if (session != null) ProfilesScreenReal(session, onBack) else ProfilesScreenSim(onBack)
+}
+
+@Composable
+fun ProfilesScreenSim(onBack: () -> Unit) {
     val demo = LocalDemo.current
     var menuFor by remember { mutableStateOf(Launch.strOnce("pmenu")?.toIntOrNull()) }
     var deleteFor by remember { mutableStateOf(Launch.strOnce("pdelete")?.toIntOrNull()) }

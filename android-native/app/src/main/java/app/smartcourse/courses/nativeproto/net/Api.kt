@@ -41,11 +41,12 @@ data class Me(
 enum class Failure {
     INVALID_CREDENTIALS, RATE_LIMITED, SETUP_INCOMPLETE, SESSION_EXPIRED,
     NETWORK, TIMEOUT, TLS, CLEARTEXT, SERVER_ERROR, NOT_COURSES_SERVER, BAD_REQUEST, BAD_ADDRESS, UNKNOWN,
+    FORBIDDEN, NOT_FOUND, CONFLICT,
 }
 
 sealed interface Outcome<out T> {
     data class Ok<T>(val value: T) : Outcome<T>
-    data class Fail(val failure: Failure, val status: Int? = null) : Outcome<Nothing>
+    data class Fail(val failure: Failure, val status: Int? = null, val code: String? = null) : Outcome<Nothing>
 }
 
 val json = Json { ignoreUnknownKeys = true }
@@ -83,6 +84,46 @@ class ApiClient(private val store: SessionStorage, client: OkHttpClient? = null)
         .build()
 
     private val media = "application/json; charset=utf-8".toMediaType()
+
+    /** Appelé quand le serveur répond 401 à une requête authentifiée : la session n'existe plus. */
+    var onSessionExpired: (() -> Unit)? = null
+
+    /** Client pour le chargement des photos (Coil) : mêmes réglages, avec le cookie de session sur chaque requête. */
+    fun imageClient(): OkHttpClient = http.newBuilder().addInterceptor { chain ->
+        val b = chain.request().newBuilder()
+        store.cookie?.let { b.header("Cookie", "$COOKIE_NAME=$it") }
+        chain.proceed(b.build())
+    }.build()
+
+    /**
+     * Requête authentifiée générique vers l'API existante. 2xx : le corps JSON ; sinon la cause, avec le code d'erreur du serveur
+     * (par exemple « last_admin », « login_taken ») que l'écran traduit en message clair.
+     */
+    suspend fun call(method: String, path: String, body: JsonObject? = null): Outcome<JsonObject> {
+        val base = store.server ?: return Outcome.Fail(Failure.BAD_ADDRESS)
+        if (store.cookie == null) return Outcome.Fail(Failure.SESSION_EXPIRED)
+        val rb = body?.toString()?.toRequestBody(media) ?: if (method == "GET" || method == "DELETE") null else "{}".toRequestBody(media)
+        val req = builder(base, path, true).method(method, rb).build()
+        val out = exec(req) { r, text ->
+            val code = errorCode(text)
+            when {
+                r.code in 200..299 -> {
+                    val obj = try { if (text.isBlank()) JsonObject(emptyMap()) else json.parseToJsonElement(text).jsonObject } catch (_: Exception) { null }
+                    if (obj == null) Outcome.Fail(Failure.NOT_COURSES_SERVER, r.code) else Outcome.Ok(obj)
+                }
+                r.code == 401 -> Outcome.Fail(Failure.SESSION_EXPIRED, r.code, code)
+                r.code == 403 -> Outcome.Fail(if (code == "setup_incomplete") Failure.SETUP_INCOMPLETE else Failure.FORBIDDEN, r.code, code)
+                r.code == 404 -> Outcome.Fail(Failure.NOT_FOUND, r.code, code)
+                r.code == 409 -> Outcome.Fail(Failure.CONFLICT, r.code, code)
+                r.code == 429 -> Outcome.Fail(Failure.RATE_LIMITED, r.code, code)
+                r.code in 400..499 -> Outcome.Fail(Failure.BAD_REQUEST, r.code, code)
+                r.code in 500..599 -> Outcome.Fail(Failure.SERVER_ERROR, r.code, code)
+                else -> Outcome.Fail(Failure.UNKNOWN, r.code, code)
+            }
+        }
+        if (out is Outcome.Fail && out.failure == Failure.SESSION_EXPIRED) onSessionExpired?.invoke()
+        return out
+    }
 
     private fun map(e: Exception): Failure = when {
         e is SocketTimeoutException -> Failure.TIMEOUT

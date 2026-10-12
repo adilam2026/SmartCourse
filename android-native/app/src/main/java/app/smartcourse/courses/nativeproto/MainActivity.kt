@@ -59,6 +59,13 @@ import app.smartcourse.courses.nativeproto.net.ApiClient
 import app.smartcourse.courses.nativeproto.net.AuthState
 import app.smartcourse.courses.nativeproto.net.EncryptedStorage
 import app.smartcourse.courses.nativeproto.net.Me
+import app.smartcourse.courses.nativeproto.net.Outcome
+import app.smartcourse.courses.nativeproto.net.ProfilesRepo
+import coil.ImageLoader
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.wrapContentHeight
+import kotlinx.coroutines.launch
 import app.smartcourse.courses.nativeproto.net.Session
 
 class MainActivity : ComponentActivity() {
@@ -80,7 +87,8 @@ class MainActivity : ComponentActivity() {
         val demoMode = Launch.str("screen") != null || Launch.str("path") != null || Launch.flag("hub")
         if (!demoMode) s.start()
         splash.setKeepOnScreenCondition { !demoMode && s.state == AuthState.Booting }
-        setContent { CoursesTheme { Root(s, demoMode) } }
+        val loader = ImageLoader.Builder(applicationContext).okHttpClient(s.api.imageClient()).crossfade(true).build()
+        setContent { CoursesTheme { CompositionLocalProvider(LocalImageLoader provides loader) { Root(s, demoMode) } } }
     }
 
     override fun onStart() { super.onStart(); session?.verify() }
@@ -140,6 +148,9 @@ fun App(session: Session, me: Me?) {
     var hub by remember { mutableStateOf(Launch.once("hub")) }
     var account by remember { mutableStateOf(false) }
     var confirmLogout by remember { mutableStateOf(false) }
+    var cityPicker by remember { mutableStateOf(false) }
+    val scopeUi = rememberCoroutineScope()
+    val profilesRepo = remember { ProfilesRepo(session.api) }
     val path = remember { Launch.str("path")?.split(",")?.filter { it.isNotBlank() } }
     val start = remember { if (me != null) (if (uiRole == Role.STAFF) "v03" else "v02") else path?.firstOrNull() ?: startRoute() }
 
@@ -154,10 +165,10 @@ fun App(session: Session, me: Me?) {
     val showBar = route != null && route != "v01" && route != "v04" &&
         (demo.role == Role.ADMIN || route == "v03")
 
-    CompositionLocalProvider(LocalDemo provides demo, LocalCompact provides (demo.role == Role.ADMIN && route != "v01")) {
+    CompositionLocalProvider(LocalDemo provides demo, LocalSession provides (if (me != null) session else null), LocalCompact provides (demo.role == Role.ADMIN && route != "v01")) {
         Box(Modifier.fillMaxSize().background(C.Bg)) {
             Column(Modifier.fillMaxSize()) {
-                if (me != null) TopStrip("RECETTE · connexion réelle · listes simulées", "Compte") { account = true }
+                if (me != null) TopStrip("RECETTE · réel : compte, profils, catalogue", "Compte") { account = true }
                 else TopStrip("PROTOTYPE · données fictives", "Écrans de démo") { hub = true }
                 if (me != null && !session.online) Box(Modifier.fillMaxWidth().background(C.AmberSoft).padding(horizontal = 14.dp, vertical = 6.dp)) {
                     Text("Hors connexion : session conservée sur ce téléphone.", color = C.Ink, style = MaterialTheme.typography.labelMedium)
@@ -194,7 +205,16 @@ fun App(session: Session, me: Me?) {
             demo.pendingSheet = if (r.startsWith("v04?sheet=")) r.substringAfter("=") else null
             nav.navigate(r.substringBefore("?")) { launchSingleTop = true }
         }
-        if (account && me != null) AccountSheet(me, session, { account = false }, { account = false; hub = true }, { account = false; confirmLogout = true })
+        if (account && me != null) AccountSheet(me, session, { account = false }, { account = false; hub = true }, { account = false; confirmLogout = true }, { account = false; cityPicker = true })
+        if (cityPicker && me != null) CityPickerSheet(me.city, { city ->
+            cityPicker = false
+            scopeUi.launch {
+                when (val r = profilesRepo.setMyCity(city)) {
+                    is Outcome.Ok -> { session.verify(); demo.say("Ville : $city.") }
+                    is Outcome.Fail -> demo.say(explain(r))
+                }
+            }
+        }, { cityPicker = false })
         if (confirmLogout) ConfirmDialog(
             "Se déconnecter ?", "Vous devrez saisir à nouveau votre code d'accès pour rouvrir l'application.",
             "Se déconnecter", { confirmLogout = false; session.signOut() }, { confirmLogout = false }, danger = true,
@@ -203,7 +223,7 @@ fun App(session: Session, me: Me?) {
 }
 
 @Composable
-private fun AccountSheet(me: Me, session: Session, onDismiss: () -> Unit, onDemo: () -> Unit, onLogout: () -> Unit) {
+private fun AccountSheet(me: Me, session: Session, onDismiss: () -> Unit, onDemo: () -> Unit, onLogout: () -> Unit, onCity: () -> Unit) {
     val roleLabel = when (me.role) { "admin" -> if (me.primary == true) "Administrateur principal" else "Administrateur"; "parent" -> "Parent"; else -> "Personnel" }
     AppSheet(onDismiss) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -215,7 +235,10 @@ private fun AccountSheet(me: Me, session: Session, onDismiss: () -> Unit, onDemo
         }
         Spacer(Modifier.height(14.dp))
         me.family?.let { Text("Famille : ${it.name} (${it.code})", style = MaterialTheme.typography.bodyMedium) }
-        me.city?.let { Text("Ville : $it", style = MaterialTheme.typography.bodyMedium) }
+        Text(
+            "Ville : ${me.city ?: "à choisir"} · Modifier", style = MaterialTheme.typography.bodyMedium, color = C.TealDark,
+            modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onCity).heightIn(min = 48.dp).wrapContentHeight(Alignment.CenterVertically),
+        )
         Text("Serveur : ${session.serverAddress?.substringAfter("://") ?: "—"}", style = MaterialTheme.typography.bodyMedium)
         Text(if (session.online) "État : connecté" else "État : hors connexion, session conservée", style = MaterialTheme.typography.bodyMedium, color = if (session.online) C.TealDark else C.Amber)
         Spacer(Modifier.height(16.dp))

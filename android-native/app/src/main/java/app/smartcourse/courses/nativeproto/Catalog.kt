@@ -46,6 +46,12 @@ fun CategoryPicker(selected: String?, categories: List<String>, onSelect: (Strin
 
 @Composable
 fun CatalogScreen(onBack: () -> Unit) {
+    val session = LocalSession.current
+    if (session != null) CatalogScreenReal(session, onBack) else CatalogScreenSim(onBack)
+}
+
+@Composable
+fun CatalogScreenSim(onBack: () -> Unit) {
     val demo = LocalDemo.current
     var tab by remember { mutableIntStateOf(when (Launch.str("tab")) { "in" -> 1; "out" -> 2; else -> 0 }) }
     var query by remember { mutableStateOf("") }
