@@ -1,0 +1,193 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
+package app.smartcourse.courses.nativeproto
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+
+/* ───────────── V07 — Administration ───────────── */
+
+private data class Entry(val label: String, val icon: ImageVector, val route: String)
+
+@Composable
+fun AdminHubScreen(nav: (String) -> Unit) {
+    val demo = LocalDemo.current
+    var reset by remember { mutableStateOf(Launch.once("confirm")) }
+    val groups = listOf(
+        "Produits et prix" to listOf(Entry("Catalogue", Icons.Rounded.Inventory2, "v09"), Entry("Gestion des prix", Icons.Rounded.LocalOffer, "v10")),
+        "Famille et accès" to listOf(Entry("Profils", Icons.Rounded.Groups, "v08"), Entry("Récupération", Icons.Rounded.Key, "stub/Récupération")),
+        "Préférences" to listOf(Entry("Affichage", Icons.Rounded.Palette, "v11"), Entry("Notifications", Icons.Rounded.Notifications, "stub/Notifications")),
+        "Application" to listOf(Entry("Sauvegarde", Icons.Rounded.Cloud, "stub/Sauvegarde"), Entry("À propos", Icons.Rounded.Info, "stub/À propos")),
+    )
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        TopBar("Réglages")
+        Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            groups.forEach { (title, entries) ->
+                Text(title, style = MaterialTheme.typography.titleSmall, color = C.Muted, modifier = Modifier.padding(start = 4.dp, top = 8.dp))
+                SCard {
+                    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+                        entries.forEachIndexed { i, e ->
+                            if (i > 0) Box(Modifier.width(1.dp).fillMaxHeight().padding(vertical = 10.dp).background(C.Line))
+                            Row(
+                                Modifier.weight(1f).heightIn(min = 60.dp).clickable { nav(e.route) }.padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Icon(e.icon, null, tint = C.TealDark, modifier = Modifier.size(24.dp))
+                                Text(e.label, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                Icon(Icons.Rounded.ChevronRight, null, tint = C.Muted, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(18.dp))
+            Row(
+                Modifier.align(Alignment.CenterHorizontally).clip(RoundedCornerShape(12.dp)).clickable { reset = true }.padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(Icons.Rounded.PowerSettingsNew, null, tint = C.Danger, modifier = Modifier.size(20.dp))
+                Text("Réinitialiser la famille", color = C.Danger, style = MaterialTheme.typography.labelLarge)
+            }
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+    if (reset) ConfirmDialog(
+        "Réinitialiser la famille ?", "Les listes et l'historique de la famille seront effacés. Cette action est définitive.",
+        "Réinitialiser", { reset = false; demo.simulated("réinitialisation (rien n'est effacé dans ce prototype)") }, { reset = false }, danger = true,
+    )
+}
+
+@Composable
+fun StubScreen(title: String, onBack: () -> Unit) {
+    Column(Modifier.fillMaxSize()) {
+        TopBar(title, onBack = onBack)
+        Column(Modifier.weight(1f).fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            Pill("Hors du périmètre visuel", C.Amber, C.AmberSoft)
+            Spacer(Modifier.height(12.dp))
+            Text("Cet écran sera conçu à une étape ultérieure.", style = MaterialTheme.typography.bodyMedium, color = C.Muted, textAlign = TextAlign.Center)
+        }
+    }
+}
+
+/* ───────────── V11 — Affichage ───────────── */
+
+@Composable
+fun DisplayScreen(onBack: () -> Unit) {
+    val demo = LocalDemo.current
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        TopBar("Affichage", "Réglages propres à ce profil", onBack = onBack)
+        Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            SCard(padding = PaddingValues(vertical = 4.dp)) {
+                SwitchRow("Prix indicatifs", "Affiche le prix unitaire dans les listes et le panneau de quantité.", demo.showPrices) {
+                    demo.showPrices = it; if (!it) demo.showTotals = false
+                }
+                HorizontalDivider(color = C.Line.copy(alpha = 0.6f), modifier = Modifier.padding(horizontal = 16.dp))
+                SwitchRow(
+                    "Total estimé", if (demo.showPrices) "Affiche une estimation du montant de la liste." else "Nécessite les prix indicatifs.",
+                    demo.showTotals, enabled = demo.showPrices,
+                ) { demo.showTotals = it }
+            }
+            SCard(padding = PaddingValues(16.dp)) {
+                Text("Mode de sélection préféré", style = MaterialTheme.typography.titleSmall)
+                Spacer(Modifier.height(10.dp))
+                SegTabs(SelMode.entries.map { it.label }, demo.selMode.ordinal, { demo.selMode = SelMode.entries[it] })
+            }
+            Row(Modifier.padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Rounded.Info, null, tint = C.Muted, modifier = Modifier.size(18.dp))
+                Text("Changer l'affichage ne modifie jamais les quantités.", style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SwitchRow(title: String, sub: String, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, color = if (enabled) C.Ink else C.Muted)
+            Text(sub, style = MaterialTheme.typography.bodySmall)
+        }
+        TealSwitch(checked, onChange, enabled)
+    }
+}
+
+/* ───────────── V08 — Profils ───────────── */
+
+@Composable
+fun ProfilesScreen(onBack: () -> Unit) {
+    val demo = LocalDemo.current
+    var menuFor by remember { mutableStateOf(Launch.strOnce("pmenu")?.toIntOrNull()) }
+    var deleteFor by remember { mutableStateOf(Launch.strOnce("pdelete")?.toIntOrNull()) }
+    val activeAdmins = demo.profiles.count { it.role == ProfRole.ADMIN && it.active }
+    Column(Modifier.fillMaxSize()) {
+        TopBar("Profils", "${demo.profiles.size} profils", onBack = onBack, actions = {
+            IconButton({ demo.simulated("création d'un profil") }) { Icon(Icons.Rounded.PersonAdd, "Ajouter un profil", tint = C.TealDark) }
+        })
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 4.dp)) {
+            SCard {
+                demo.profiles.forEachIndexed { i, pr ->
+                    if (i > 0) HorizontalDivider(color = C.Line.copy(alpha = 0.6f), modifier = Modifier.padding(start = 64.dp))
+                    val protected = pr.primary || (pr.role == ProfRole.ADMIN && pr.active && activeAdmins <= 1)
+                    Row(Modifier.fillMaxWidth().padding(start = 12.dp, top = 8.dp, bottom = 8.dp, end = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Avatar(pr.name.take(1).uppercase(), pr.color, 40.dp, dim = !pr.active)
+                        Column(Modifier.weight(1f)) {
+                            Text(pr.name, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis, color = if (pr.active) C.Ink else C.Muted)
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 3.dp)) {
+                                Pill(if (pr.primary) "Administrateur principal" else pr.role.label, C.TealDark, C.TealSoft)
+                                if (!pr.active) Pill("Désactivé", C.Muted, Color(0xFFE4EDF5))
+                            }
+                        }
+                        Box {
+                            IconButton({ menuFor = i }) { Icon(Icons.Rounded.MoreVert, "Actions pour ${pr.name}", tint = C.Ink) }
+                            DropdownMenu(menuFor == i, { menuFor = null }, containerColor = Color.White, shape = RoundedCornerShape(16.dp)) {
+                                DropdownMenuItem(text = { Text("Modifier le code d'accès") }, leadingIcon = { Icon(Icons.Rounded.Key, null, tint = C.Ink) },
+                                    onClick = { menuFor = null; demo.simulated("nouveau code pour ${pr.name}") })
+                                DropdownMenuItem(
+                                    text = { Text(if (pr.active) "Désactiver" else "Réactiver") },
+                                    leadingIcon = { Icon(if (pr.active) Icons.Rounded.Block else Icons.Rounded.CheckCircle, null, tint = C.Ink) },
+                                    enabled = !protected || !pr.active,
+                                    onClick = { menuFor = null; demo.profiles[i] = pr.copy(active = !pr.active); demo.simulated(if (pr.active) "profil désactivé (historique conservé)" else "profil réactivé") },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(if (protected) "Suppression impossible" else "Supprimer le profil", color = if (protected) C.Muted else C.Danger) },
+                                    leadingIcon = { Icon(Icons.Rounded.Delete, null, tint = if (protected) C.Muted else C.Danger) },
+                                    enabled = !protected, onClick = { menuFor = null; deleteFor = i },
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(Modifier.padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Rounded.Shield, null, tint = C.Muted, modifier = Modifier.size(18.dp))
+                Text("L'administrateur principal et le dernier administrateur actif sont protégés. Désactiver un profil n'est pas le supprimer.", style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+    deleteFor?.let { i ->
+        val pr = demo.profiles.getOrNull(i)
+        if (pr != null) ConfirmDialog(
+            "Supprimer ${pr.name} ?",
+            "Ses achats restent dans les listes et l'historique partagés ; ils s'afficheront sous « ${pr.name} (ancien profil) ».",
+            "Supprimer", { deleteFor = null; demo.profiles.removeAt(i); demo.simulated("profil supprimé") }, { deleteFor = null }, danger = true,
+        )
+    }
+}
