@@ -10,6 +10,7 @@ import { fmtDateTime } from "../format";
 import { CATEGORY_EMOJI } from "../categories";
 import { CityPicker } from "../components/CityPicker";
 import { Dialog } from "../components/Dialog";
+import { Menu, MenuItem } from "../components/Menu";
 import { Icon, type IconName } from "../components/Icon";
 import { RecoveryPanel } from "../components/RecoveryPanel";
 import { isAnySecret, isNewSecret, SecretInput } from "../components/SecretInput";
@@ -295,13 +296,10 @@ function ResetFamily({ engine }: { engine: Engine }) {
   useEffect(() => void api.resetPreview().then(setPv).catch((e) => setError(errText(e))), []);
   if (!pv) return <p className="empty">{error ?? "Chargement…"}</p>;
   const ready = pv.ready.recoveryEmailVerified;
-  const c = pv.counts;
   return (
     <div className="panel danger" data-testid="reset-panel">
-      <p><b>Famille « {pv.family.name} »</b> — code <b data-testid="reset-code">{pv.family.code}</b></p>
-      <p className="muted">{pv.family.profiles.map((p) => `${p.displayName} (${ROLE_LABEL[p.role as Role]}${p.primary ? ", principal" : ""})`).join(" · ")}</p>
-      <p data-testid="reset-counts">Sera supprimé : {c.profiles} profil(s), {c.lists} liste(s) et leurs achats et historiques, {c.products} article(s) de la famille, {c.ownedPhotos} photo(s) propre(s), {c.pushSubscriptions} abonnement(s) aux notifications, l'adresse de récupération et les liens associés. Les accès de tous les profils sont fermés.</p>
-      <p className="muted">Conservés : le catalogue partagé (243 produits et leurs photos) et toutes les autres familles. Les sauvegardes déjà faites contiennent encore cette famille jusqu'à leur expiration.</p>
+      <p data-testid="reset-family"><b>Famille « {pv.family.name} »</b></p>
+      <p data-testid="reset-counts">Tous les profils, listes, achats et articles de cette famille seront supprimés. Cette action est définitive.</p>
       {!ready && (
         <p className="error" role="alert" data-testid="reset-notready">
           La suppression n'est possible qu'une fois votre adresse e-mail de récupération vérifiée (Réglages → Adresse de récupération).
@@ -322,8 +320,8 @@ function ResetFamily({ engine }: { engine: Engine }) {
         }
       }}>
         <label className="field">Votre mot de passe actuel<SecretInput kind="current" value={password} onChange={setPassword} testid="reset-password" /></label>
-        <label className="field">Retapez le code famille ({pv.family.code})<input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} autoCapitalize="characters" autoComplete="off" required data-testid="reset-confirm-code" /></label>
-        <label className="check"><input type="checkbox" checked={sure} onChange={(e) => setSure(e.target.checked)} data-testid="reset-sure" /> Je comprends que c'est définitif et irréversible.</label>
+        <label className="field"><span>Retapez le code famille (<b data-testid="reset-code">{pv.family.code}</b>)</span><input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} autoCapitalize="characters" autoComplete="off" required data-testid="reset-confirm-code" /></label>
+        <label className="check"><input type="checkbox" checked={sure} onChange={(e) => setSure(e.target.checked)} data-testid="reset-sure" /> Je confirme la suppression de la famille.</label>
         {error && <p className="error" role="alert" data-testid="reset-error">{error}</p>}
         <button className="btn btn--danger btn--big" disabled={busy || !ready || !sure || !isAnySecret(password) || code.trim().toUpperCase() !== pv.family.code} data-testid="reset-submit">{busy ? "Suppression…" : "Supprimer définitivement la famille"}</button>
       </form>
@@ -371,7 +369,7 @@ function CatalogAdmin({ engine, s }: { engine: Engine; s: State }) {
         <button role="tab" aria-selected={view === "all"} className={view === "all" ? "on" : ""} data-testid="cat-view-all" onClick={() => setView("all")}>Tous les produits</button>
       </div>
       {view === "all" && cat && <CatalogBrowser categories={cat.categories.map((c) => ({ key: c.key, label: c.label }))} onChanged={() => Promise.all([load(), engine.refresh()])} />}
-      {view === "mine" && <><button className="btn btn--primary btn--big addbtn" data-testid="add-article" onClick={() => setForm({})}>+ Ajouter un article</button>
+      {view === "mine" && <>
       {form && cat && (
         <ProductForm
           key={form.product?.id ?? "new"}
@@ -385,9 +383,10 @@ function CatalogAdmin({ engine, s }: { engine: Engine; s: State }) {
         const prod = cat.categories.flatMap((c) => c.products).find((x) => x.id === priceFor);
         return prod ? <PriceDialog key={prod.id} product={prod} onClose={() => setPriceFor(null)} onChanged={() => void act(async () => {})} /> : null;
       })()}
-      <label className="field search">Chercher dans mes produits
-        <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ex. lait, lessive…" data-testid="mine-search" />
-      </label>
+      <div className="catbar">
+        <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Chercher un produit" aria-label="Chercher dans mes produits" data-testid="mine-search" />
+        <button className="btn btn--primary btn--small" data-testid="add-article" onClick={() => setForm({})}>+ Article</button>
+      </div>
       <div className="catchips" role="tablist" aria-label="Contrôle des photos" data-testid="photo-filters">
         {([["all", "Tous"], ["check", `À vérifier (${count((a) => a.sharedWithOtherNames || !!a.catalogPhotoUrl)})`], ["own", `Photos de la famille (${count((a) => a.photoSource === "famille")})`], ["none", `Sans photo (${count((a) => a.photoSource === "none")})`]] as const).map(([k, label]) => (
           <button key={k} role="tab" aria-selected={filter === k} className={`catchip ${filter === k ? "on" : ""}`} data-testid={`pf-${k}`} onClick={() => setFilter(k)}>{label}</button>
@@ -402,15 +401,20 @@ function CatalogAdmin({ engine, s }: { engine: Engine; s: State }) {
           <h2 className="sect">{CATEGORY_EMOJI[c.key]} {c.label}</h2>
           <ul className="rows">
             {prods.map((p) => (
-              <li key={p.id} className={`row row--cat ${p.active ? "" : "row--off"}`} data-testid={`prod-${p.name}`}>
+              <li key={p.id} className={`row row--cat row--line ${p.active ? "" : "row--off"}`} data-testid={`prod-${p.name}`}>
                 <Thumb photoUrl={p.photoUrl} category={c.key} />
-                <span className="row__name">{p.name}{p.brand && <small>{p.brand}</small>}<small>Unité : {unitLabel(p.unit)}</small>{!p.active && <small>désactivé</small>}
-                  {audit[p.id] && <small data-testid={`photosrc-${p.name}`}>Photo : {audit[p.id]!.photoSource === "famille" ? "de la famille" : audit[p.id]!.photoSource === "catalogue" ? "du catalogue" : "aucune"}{audit[p.id]!.sharedWithOtherNames && <em> · partagée avec un autre article</em>}</small>}</span>
+                <span className="row__name">{p.name}<small>{[p.brand, unitLabel(p.unit), p.active ? null : "désactivé"].filter(Boolean).join(" · ")}</small></span>
                 <span className="rowbtns">
-                  {audit[p.id]?.catalogPhotoUrl && <button className="btn btn--small" data-testid={`usecat-${p.name}`} aria-label={`Comparer la photo de ${p.name} avec celle du catalogue`} onClick={() => setCompare({ product: p, catalogUrl: audit[p.id]!.catalogPhotoUrl! })}>Photo du catalogue</button>}
-                  {s.me?.prefs?.showPrices && <button className="btn btn--small" data-testid={`price-${p.name}`} aria-label={`Mettre à jour le prix de ${p.name}`} onClick={() => setPriceFor(p.id)}>Prix</button>}
                   <button className="btn btn--small" data-testid={`edit-${p.name}`} aria-label={`Modifier ${p.name}`} onClick={() => setForm({ product: p })}>Modifier</button>
-                  <button className="btn btn--small btn--ghost" data-testid={`active-${p.name}`} onClick={() => void act(() => api.patchProduct(p.id, { active: !p.active }))}>{p.active ? "Désactiver" : "Réactiver"}</button>
+                  {s.me?.prefs?.showPrices && <button className="btn btn--small" data-testid={`price-${p.name}`} aria-label={`Mettre à jour le prix de ${p.name}`} onClick={() => setPriceFor(p.id)}>Prix</button>}
+                  <Menu label={`Autres actions pour ${p.name}`} testid={`more-${p.name}`}>
+                    {(close) => (
+                      <>
+                        {audit[p.id]?.catalogPhotoUrl && <MenuItem testid={`usecat-${p.name}`} onClick={() => { close(); setCompare({ product: p, catalogUrl: audit[p.id]!.catalogPhotoUrl! }); }}>Photo du catalogue</MenuItem>}
+                        <MenuItem testid={`active-${p.name}`} onClick={() => { close(); void act(() => api.patchProduct(p.id, { active: !p.active })); }}>{p.active ? "Désactiver" : "Réactiver"}</MenuItem>
+                      </>
+                    )}
+                  </Menu>
                 </span>
               </li>
             ))}

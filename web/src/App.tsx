@@ -73,6 +73,11 @@ function Screens({ engine }: { engine: Engine }) {
     if (meId && role) void reconcilePush(role);
     if (role === "staff") clearOpenTarget(); // lists are for parents and administrators
   }, [meId, role]);
+  // Deux présentations : compacte pour les administrateurs, grande (photos, gros boutons) pour les autres profils.
+  // Elle suit le profil connecté : changement de profil et déconnexion remettent la bonne présentation tout de suite.
+  useEffect(() => {
+    document.documentElement.dataset.ui = s.me?.role === "admin" ? "compact" : "comfort";
+  }, [s.me?.role]);
   if (link && s.phase !== "boot") return <LinkScreen key={link.token} kind={link.kind} token={link.token} onDone={leaveLink} />;
   if (s.phase === "boot") return <main className="nolist"><div className="nolist__body"><img className="nolist__logo" src="/icons/icon-192.png" alt="" width="96" height="96" /></div></main>;
   if (s.phase === "loggedOut" || !s.me) return <LoginScreen engine={engine} s={s} />;

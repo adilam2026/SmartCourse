@@ -109,8 +109,8 @@ export function RecoveryPanel() {
         </form>
       ) : st.verified ? (
         <div className="actions2">
-          <button className="btn" disabled={busy !== null} data-testid="recovery-edit" onClick={() => { setEmail(st.email ?? ""); setEditing(true); setTestSent(false); setTestFailed(false); }}>Modifier l'adresse</button>
-          <button className="btn" disabled={busy !== null} aria-busy={busy === "test"} data-testid="recovery-test" onClick={() => void run("test", () => api.testRecovery())}>{busy === "test" ? "Envoi en cours…" : testFailed ? "Réessayer" : "Envoyer un e-mail de test"}</button>
+          <button className="btn btn--small" disabled={busy !== null} data-testid="recovery-edit" onClick={() => { setEmail(st.email ?? ""); setEditing(true); setTestSent(false); setTestFailed(false); }}>Modifier l'adresse</button>
+          <button className="btn btn--small" disabled={busy !== null} aria-busy={busy === "test"} data-testid="recovery-test" onClick={() => void run("test", () => api.testRecovery())}>{busy === "test" ? "Envoi en cours…" : testFailed ? "Réessayer" : "Envoyer un e-mail de test"}</button>
         </div>
       ) : (
         <div className="actions2">
@@ -125,7 +125,7 @@ export function RecoveryPanel() {
         </div>
       )}
 
-      <p className="muted" data-testid="recovery-sentence">Cette adresse permet de récupérer votre code famille et de réinitialiser votre mot de passe.</p>
+      <p className="muted" data-testid="recovery-sentence">Pour récupérer l'accès à votre famille.</p>
     </div>
   );
 }

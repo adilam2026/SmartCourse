@@ -487,3 +487,168 @@ h3 { font-size: 1.05rem; font-weight: 800; }
 .moremenu { position: absolute; right: 0; top: calc(100% + 0.25rem); z-index: 20; min-width: 12rem; background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--radius-sm); box-shadow: var(--shadow); padding: 0.2rem; }
 .moremenu__item { width: 100%; min-height: var(--tap); text-align: left; padding: 0 0.85rem; background: transparent; border: 0; font: inherit; font-weight: 600; border-radius: var(--radius-sm); }
 .moremenu__item--danger { color: var(--danger, #b3261e); }
+
+/* ---------- menu « … » ancré ---------- */
+.menuwrap { display: inline-flex; }
+.menubtn { min-width: var(--tap); padding: 0 0.5rem; font-size: 1.3rem; line-height: 1; }
+.menuveil { position: fixed; inset: 0; z-index: 44; background: transparent; }
+.popmenu { position: fixed; z-index: 45; left: 0; top: 0; min-width: 11rem; max-width: calc(100vw - 16px); display: grid; padding: 0.25rem; background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--radius-sm); box-shadow: 0 6px 20px rgb(30 40 30 / 0.2); }
+.popmenu__item { min-height: var(--tap); padding: 0 0.85rem; text-align: left; background: transparent; border: 0; border-radius: 10px; font: inherit; font-weight: 600; color: inherit; cursor: pointer; }
+.popmenu__item:hover, .popmenu__item:focus-visible { background: var(--surface-2); }
+.popmenu__item--danger { color: var(--red); }
+.popmenu__item:disabled { opacity: 0.5; }
+.listhead__tools { display: inline-flex; align-items: center; gap: 0.3rem; }
+.helpbtn { min-width: var(--tap); font-weight: 800; border: 1.5px solid var(--line-strong); border-radius: 50%; padding: 0; }
+
+/* ---------- catalogue administrateur : lignes compactes ---------- */
+.catbar { display: flex; gap: 0.5rem; margin: 0.5rem 1rem; align-items: center; }
+.catbar input { flex: 1; min-width: 0; min-height: var(--tap); padding: 0 0.85rem; border-radius: var(--radius-sm); border: 1.5px solid var(--line-strong); background: var(--surface); }
+.catbar .btn { flex: none; white-space: nowrap; }
+.row--line { flex-wrap: nowrap; gap: 0.5rem; }
+.row--line .rowbtns { flex: none; display: inline-flex; align-items: center; gap: 0.25rem; }
+.row--line .rowbtns .btn--small { padding: 0.2rem 0.6rem; font-size: 0.92rem; }
+.row--line .menubtn { min-width: 2.5rem; }
+.catchips { flex-wrap: wrap; overflow-x: visible; }
+@media (max-width: 400px) { .row--line { flex-wrap: wrap; } .row--line .rowbtns { margin-left: auto; } }
+.recovery .actions2 { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+
+/* ==========================================================================================================
+   Présentation compacte (administrateurs) : <html data-ui="compact">. Le personnel et les non connectés gardent la présentation
+   large (photos, gros boutons). Mêmes écrans, mêmes fonctions ; seules les tailles, marges, ombres et regroupements changent.
+   Les zones tactiles restent à 44 px au moins.
+   ========================================================================================================== */
+html[data-ui="compact"] {
+  --tap: 2.75rem;
+  --radius: 12px;
+  --radius-sm: 10px;
+  --shadow: 0 1px 2px rgb(40 50 40 / 0.05);
+  --shadow-up: 0 -2px 8px rgb(40 50 40 / 0.06);
+  --nav-h: 3.75rem;
+  --bar-h: 4.25rem;
+}
+html[data-ui="compact"] body { font-size: 1rem; line-height: 1.35; }
+html[data-ui="compact"] h1 { font-size: 1.3rem; }
+html[data-ui="compact"] h2 { font-size: 1.05rem; }
+html[data-ui="compact"] h3 { font-size: 0.98rem; }
+html[data-ui="compact"] .muted { font-size: 0.85rem; }
+/* en-tête */
+html[data-ui="compact"] .pagehead { padding-top: calc(0.25rem + var(--safe-top)); padding-bottom: 0.25rem; gap: 0.1rem; }
+html[data-ui="compact"] .pagehead__bar { min-height: var(--tap); }
+html[data-ui="compact"] .pagehead__title { margin-top: 0.1rem; }
+html[data-ui="compact"] .pagehead__sub { font-size: 0.85rem; }
+html[data-ui="compact"] .brand { font-size: 1rem; }
+html[data-ui="compact"] .brand img { width: 24px; height: 24px; }
+html[data-ui="compact"] .avatar { width: 2.5rem; height: 2.5rem; min-width: 2.5rem; min-height: 2.5rem; font-size: 0.95rem; }
+html[data-ui="compact"] .backbtn { min-height: 2.5rem; font-size: 0.95rem; border-radius: 10px; }
+/* boutons */
+html[data-ui="compact"] .btn { min-height: var(--tap); padding: 0.25rem 0.85rem; font-size: 0.95rem; border-radius: 10px; }
+html[data-ui="compact"] .btn--primary { box-shadow: none; }
+html[data-ui="compact"] .btn--small { padding: 0.2rem 0.7rem; font-size: 0.9rem; }
+html[data-ui="compact"] .btn--big { min-height: 3rem; font-size: 1rem; width: auto; }
+html[data-ui="compact"] .sheet .btn--big, html[data-ui="compact"] .form > .btn--big, html[data-ui="compact"] .panel .btn--big { width: 100%; }
+html[data-ui="compact"] .linkbtn { margin-top: 0.4rem; }
+/* navigation */
+html[data-ui="compact"] .tabbar { padding-top: 0.2rem; gap: 0.15rem; }
+html[data-ui="compact"] .tabbar button { min-height: 3.1rem; border-radius: 10px; }
+html[data-ui="compact"] .tabbar button span { font-size: 0.72rem; }
+/* liste */
+html[data-ui="compact"] .progresscard { margin: 0.4rem 1rem 0; padding: 0.5rem 0.75rem; gap: 0.3rem; }
+html[data-ui="compact"] .progresscard__line strong { font-size: 0.95rem; }
+html[data-ui="compact"] .progress { height: 0.45rem; }
+html[data-ui="compact"] .actions { gap: 0.4rem; padding: 0.5rem 1rem 0; }
+html[data-ui="compact"] .actions .btn { font-size: 0.92rem; padding: 0.2rem 0.7rem; }
+html[data-ui="compact"] .actions .btn--primary { flex: 0 0 auto; }
+html[data-ui="compact"] .actions--bar { align-items: center; }
+html[data-ui="compact"] .sectionhead, html[data-ui="compact"] .sect { margin: 0.7rem 1rem 0.15rem; }
+html[data-ui="compact"] .count-pill { font-size: 0.8rem; min-width: 1.5rem; padding: 0 0.45rem; }
+html[data-ui="compact"] .catgroup { margin: 0.2rem 0 0.3rem; }
+html[data-ui="compact"] .catgroup__title { margin: 0.3rem 1rem 0.2rem; font-size: 0.9rem; color: var(--muted); }
+html[data-ui="compact"] .rows { gap: 0.3rem; }
+html[data-ui="compact"] .row { padding: 0.35rem 0.55rem; gap: 0.5rem; border-radius: var(--radius); }
+html[data-ui="compact"] .row__main { min-height: 2.5rem; }
+html[data-ui="compact"] .row__main b, html[data-ui="compact"] .statrow .row__name b { font-size: 0.98rem; }
+html[data-ui="compact"] .row__main small, html[data-ui="compact"] .row__name small { font-size: 0.78rem; }
+html[data-ui="compact"] .rowqty { font-size: 0.9rem; }
+html[data-ui="compact"] .thumb { width: 2.5rem; height: 2.5rem; border-radius: 8px; }
+html[data-ui="compact"] .thumb--empty { font-size: 1.3rem; }
+html[data-ui="compact"] .buybtn { padding: 0.2rem 0.6rem; }
+html[data-ui="compact"] .banner { padding: 0.35rem 0.6rem; font-size: 0.85rem; }
+html[data-ui="compact"] .estimate { margin: 0.35rem 1rem; padding: 0.4rem 0.7rem; }
+/* historique */
+html[data-ui="compact"] .hcard { padding: 0.55rem 0.75rem; gap: 0.35rem; box-shadow: none; }
+html[data-ui="compact"] .hcard__date { font-size: 0.98rem; }
+html[data-ui="compact"] .hcard__time { font-size: 0.82rem; }
+html[data-ui="compact"] .thumbs .thumb, html[data-ui="compact"] .thumbs__more { width: 2.2rem; height: 2.2rem; }
+/* statistiques */
+html[data-ui="compact"] .monthnav { margin: 0.4rem 1rem 0.15rem; padding: 0.2rem; }
+html[data-ui="compact"] .monthnav .btn { min-width: 2.5rem; min-height: 2.5rem; }
+html[data-ui="compact"] .monthnav__title { min-height: 2.5rem; font-size: 0.98rem; }
+html[data-ui="compact"] .statnote { margin: 0.2rem 1rem; font-size: 0.8rem; }
+html[data-ui="compact"] .statsum { margin: 0.4rem 1rem 0; gap: 0.4rem; }
+html[data-ui="compact"] .statsum__card { padding: 0.4rem 0.6rem; gap: 0.5rem; box-shadow: none; }
+html[data-ui="compact"] .statsum__icon { width: 2rem; height: 2rem; }
+html[data-ui="compact"] .statsum__num { display: inline; font-size: 1.2rem; margin-right: 0.3rem; }
+html[data-ui="compact"] .statsum__lbl { font-size: 0.82rem; }
+html[data-ui="compact"] .listhead { margin: 0.6rem 1rem 0.3rem; }
+html[data-ui="compact"] .statsearch { margin: 0 1rem 0.4rem; }
+html[data-ui="compact"] .searchbox input { min-height: 2.5rem; border-radius: 10px; }
+html[data-ui="compact"] .statbar { height: 0.35rem; margin-top: 0.15rem; }
+html[data-ui="compact"] .statrow__line { font-size: 0.88rem; }
+/* réglages */
+html[data-ui="compact"] .menu { gap: 0.35rem; padding: 0.35rem 1rem; }
+html[data-ui="compact"] .menuitem { min-height: 3.25rem; padding: 0.4rem 0.7rem; gap: 0.7rem; box-shadow: none; }
+html[data-ui="compact"] .menuitem__icon { width: 2.25rem; height: 2.25rem; border-radius: 10px; }
+html[data-ui="compact"] .menuitem__text b { font-size: 0.98rem; }
+html[data-ui="compact"] .menuitem__text small { font-size: 0.8rem; }
+html[data-ui="compact"] .panel { padding: 0.7rem 0.8rem; }
+html[data-ui="compact"] .seg button { min-height: 2.5rem; }
+html[data-ui="compact"] .recovery .verified { font-size: 1rem; }
+html[data-ui="compact"] .recovery .addr { font-size: 0.95rem; color: var(--muted); }
+/* fenêtres et formulaires */
+html[data-ui="compact"] .sheet { padding: 1.1rem 0.9rem calc(0.9rem + var(--safe-bottom)); gap: 0.55rem; border-radius: 18px 18px 0 0; }
+html[data-ui="compact"] .sheet h2 { font-size: 1.1rem; }
+html[data-ui="compact"] .sheetsection { padding: 0.55rem 0.7rem; gap: 0.35rem; }
+html[data-ui="compact"] .form { gap: 0.55rem; }
+html[data-ui="compact"] .field { gap: 0.25rem; font-size: 0.95rem; }
+html[data-ui="compact"] .preview { width: 6.5rem; height: 6.5rem; }
+html[data-ui="compact"] .check { min-height: 2.5rem; }
+html[data-ui="compact"] .form__actions { bottom: calc(-0.9rem - var(--safe-bottom)); }
+/* choix des produits (écran « Ajouter / modifier ») : cartes plus basses */
+html[data-ui="compact"] .grid { gap: 0.5rem; }
+html[data-ui="compact"] .card__photo { aspect-ratio: 4 / 3; }
+html[data-ui="compact"] .card__name { padding: 0.3rem 0.3rem 0.4rem; font-size: 0.92rem; }
+html[data-ui="compact"] .catblock { padding: 0.4rem; gap: 0.25rem; }
+html[data-ui="compact"] .qty__btn { height: 2.5rem; width: 2.5rem; }
+html[data-ui="compact"] .qty { grid-template-columns: 2.5rem minmax(0, 1fr) 2.5rem; margin-bottom: 0.2rem; }
+html[data-ui="compact"] .actionbar { padding-top: 0.4rem; padding-bottom: calc(0.4rem + var(--safe-bottom)); }
+html[data-ui="compact"] .actionbar .btn { min-height: 3rem; box-shadow: none; }
+/* états vides */
+html[data-ui="compact"] .nolist__body { gap: 0.6rem; padding: 1rem; }
+html[data-ui="compact"] .nolist__logo { width: 64px; height: 64px; box-shadow: none; }
+html[data-ui="compact"] .statrow .row__name { gap: 0; line-height: 1.2; }
+html[data-ui="compact"] .statrow .row__name small, html[data-ui="compact"] .statrow__line { line-height: 1.2; }
+html[data-ui="compact"] .actions--bar { flex-wrap: nowrap; gap: 0.3rem; }
+html[data-ui="compact"] .actions--bar .btn { padding: 0.2rem 0.5rem; font-size: 0.88rem; gap: 0.3rem; min-width: 0; }
+html[data-ui="compact"] .actions--bar .menuwrap { margin-left: auto; }
+/* ligne de liste : nom et quantité sur la même ligne, détails dessous */
+html[data-ui="compact"] .row__main { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 0.5rem; row-gap: 0; align-content: center; }
+html[data-ui="compact"] .row__main > small, html[data-ui="compact"] .row__main > .price, html[data-ui="compact"] .row__main > .rowmeta { flex: 1 0 100%; }
+html[data-ui="compact"] .actions:not(.actions--bar) { flex-wrap: nowrap; gap: 0.3rem; }
+html[data-ui="compact"] .actions:not(.actions--bar) .btn { padding: 0.2rem 0.45rem; font-size: 0.86rem; gap: 0.25rem; min-width: 0; flex: 0 1 auto; white-space: nowrap; }
+html[data-ui="compact"] .actions:not(.actions--bar) .btn .icon { width: 17px; height: 17px; }
+html[data-ui="compact"] .banner--info { flex-wrap: wrap; row-gap: 0.2rem; }
+html[data-ui="compact"] .actions:not(.actions--bar) { padding-left: 0.75rem; padding-right: 0.75rem; }
+html[data-ui="compact"] .actions:not(.actions--bar) .btn { font-size: 0.82rem; padding: 0.15rem 0.35rem; }
+html[data-ui="compact"] .row--line .row__name { flex: 1 1 6.5rem; }
+html[data-ui="compact"] .catchip { min-height: 2.25rem; padding: 0 0.65rem; font-size: 0.85rem; }
+html[data-ui="compact"] .catchips { gap: 0.3rem; padding-bottom: 0.3rem; }
+html[data-ui="compact"] .seg button { font-size: 0.9rem; }
+html[data-ui="compact"] .catbar input { min-height: 2.5rem; }
+html[data-ui="compact"] .catbar .btn { min-height: 2.5rem; }
+.panel.danger, .panel.recovery { margin: 0.5rem 1rem; display: grid; gap: 0.6rem; }
+.panel.danger p, .panel.recovery p { margin: 0; }
+html[data-ui="compact"] .row--line .row__name { flex: 1 1 5rem; }
+html[data-ui="compact"] .row--line .rowbtns { gap: 0.2rem; }
+html[data-ui="compact"] .row--line .rowbtns .btn--small { padding: 0.15rem 0.5rem; font-size: 0.85rem; }
+html[data-ui="compact"] .row--line .menubtn { min-width: 2.25rem; padding: 0 0.3rem; }
+@media (max-width: 400px) { html[data-ui="compact"] .row--line { flex-wrap: nowrap; } }

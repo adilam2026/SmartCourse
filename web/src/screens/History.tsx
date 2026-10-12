@@ -4,6 +4,7 @@ import { EstimateTotal, PriceTag } from "../components/PriceTag";
 import { listLines, NO_PREFS, priceIndex, priceOfLine, totalOf } from "../priceView";
 import { api, NetworkError, type HistoryEntry } from "../api";
 import { Dialog } from "../components/Dialog";
+import { Menu, MenuItem } from "../components/Menu";
 import { userMessage } from "../errors";
 import { Thumb } from "../components/Thumb";
 import { fmtDay, fmtTime, fmtWhen } from "../format";
@@ -72,7 +73,6 @@ function Archive({ engine, s, list, categories, onBack, onPrepared, onDeleted }:
   const left = list.items.filter((i) => i.status === "to_buy");
   const [validations, setValidations] = useState(false);
   const [reorder, setReorder] = useState(false);
-  const [menu, setMenu] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const [delError, setDelError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -84,14 +84,13 @@ function Archive({ engine, s, list, categories, onBack, onPrepared, onDeleted }:
   return (
     <div data-testid="archive">
       <PageHead engine={engine} s={s} onBack={onBack} backLabel="Historique" backTestId="archive-back" title={list.closedAt ? fmtDay(list.closedAt) : "Liste"} subtitle={list.closedAt ? `Clôturée à ${fmtTime(list.closedAt)} par ${list.closedBy?.displayName} · lecture seule` : "Lecture seule"} />
-      <div className="actions">
+      <div className="actions actions--bar" data-testid="archive-actions">
         {lines.length > 0 && <button className="btn btn--primary btn--small" data-testid="reorder" onClick={() => setReorder(true)}><Icon name="plus" size={20} /> Recommander</button>}
         {(list.validations?.length ?? 0) > 0 && <button className="btn btn--small" data-testid="archive-validations" onClick={() => setValidations(true)}><Icon name="history" size={20} /> Validations ({list.validations!.length})</button>}
         {isAdmin && (
-          <span className="morewrap">
-            <button className="btn btn--small btn--ghost" aria-label="Plus d'actions" aria-expanded={menu} data-testid="archive-more" onClick={() => setMenu((v) => !v)}>⋯</button>
-            {menu && <div className="moremenu" role="menu"><button role="menuitem" className="moremenu__item moremenu__item--danger" data-testid="archive-delete" onClick={() => { setMenu(false); setDelError(null); setConfirm(true); }}>Supprimer la liste</button></div>}
-          </span>
+          <Menu label="Plus d'actions" testid="archive-more">
+            {(close) => <MenuItem danger testid="archive-delete" onClick={() => { close(); setDelError(null); setConfirm(true); }}>Supprimer la liste</MenuItem>}
+          </Menu>
         )}
       </div>
       {confirm && (
@@ -116,7 +115,7 @@ function Archive({ engine, s, list, categories, onBack, onPrepared, onDeleted }:
       {reorder && <BasketChoice engine={engine} s={s} items={lines} title={`Commande du ${when}`} onClose={() => setReorder(false)} onDone={() => { setReorder(false); onPrepared(); }} />}
       {prefs.showTotals && <EstimateTotal summary={totalOf(listLines(list, prices))} testid="archive-estimate" />}
       {validations && <ValidationHistory list={list} onClose={() => setValidations(false)} />}
-      <h2 className="sect">Achetés <span className="count-pill">{bought.length}</span></h2>
+      {bought.length > 0 && <><h2 className="sect">Achetés <span className="count-pill">{bought.length}</span></h2>
       <GroupedRows
         groups={sectionGroups(list, "purchased", categories)}
         testid="archive-bought"
@@ -126,8 +125,8 @@ function Archive({ engine, s, list, categories, onBack, onPrepared, onDeleted }:
             <span className="row__name">{i.name}<span className="rowqty">{fmtQty(i.purchase?.quantity ?? i.quantity, i.purchase?.unit ?? i.unit)}</span>{i.brand && <small>{i.brand}</small>}<PriceTag price={priceOfLine(i, i.productId, prices, false)} qty={i.purchase?.quantity ?? i.quantity} unit={i.purchase?.unit ?? i.unit} prefs={prefs} testid={`price-${i.productId}`} showMissing={i.priceFrozen} /><small>Acheté par {i.purchase?.by.displayName} · {i.purchase ? fmtWhen(i.purchase.at) : ""}</small></span>
           </li>
         )}
-      />
-      <h2 className="sect">Non achetés à la clôture <span className="count-pill" data-testid="archive-left">{left.length}</span></h2>
+      /></>}
+      {left.length > 0 && <><h2 className="sect">Non achetés à la clôture <span className="count-pill" data-testid="archive-left">{left.length}</span></h2>
       <GroupedRows
         groups={sectionGroups(list, "to_buy", categories)}
         testid="archive-left-list"
@@ -137,7 +136,7 @@ function Archive({ engine, s, list, categories, onBack, onPrepared, onDeleted }:
             <span className="row__name">{i.name}<span className="rowqty">{fmtQty(i.quantity, i.unit)}</span>{i.brand && <small>{i.brand}</small>}<PriceTag price={priceOfLine(i, i.productId, prices, false)} qty={i.quantity} unit={i.unit} prefs={prefs} testid={`price-${i.productId}`} showMissing={i.priceFrozen} /><RowMeta item={i} /></span>
           </li>
         )}
-      />
+      /></>}
     </div>
   );
 }

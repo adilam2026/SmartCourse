@@ -70,7 +70,7 @@ export function Stats({ engine, s, onOpenList }: { engine: Engine; s: State; onO
 
   return (
     <>
-      <PageHead engine={engine} s={s} title="Vos achats" subtitle="Ce qui a été acheté, pas ce qui a été consommé" />
+      <PageHead engine={engine} s={s} title="Vos achats" />
       {error && <p className="empty" data-testid="stats-error">{error}</p>}
       {data && (
         <>
@@ -99,9 +99,12 @@ export function Stats({ engine, s, onOpenList }: { engine: Engine; s: State; onO
 
           <div className="listhead">
             <h2>Les plus achetés</h2>
-            <button className="btn btn--small" data-testid="stats-filters" aria-haspopup="dialog" onClick={() => setFilters(true)}>
-              <Icon name="filter" size={20} /> Filtres{activeCount ? ` (${activeCount})` : ""}
-            </button>
+            <span className="listhead__tools">
+              <button className="btn btn--small" data-testid="stats-filters" aria-haspopup="dialog" onClick={() => setFilters(true)}>
+                <Icon name="filter" size={20} /> Filtres{activeCount ? ` (${activeCount})` : ""}
+              </button>
+              <button className="btn btn--small btn--ghost helpbtn" data-testid="stats-help" aria-label="Aide : comment sont comptés les achats ?" aria-haspopup="dialog" onClick={() => setHelp(true)}>?</button>
+            </span>
           </div>
           {(!defaultPeriod || text) && (
             <div className="activefilters" data-testid="active-filters">
@@ -115,9 +118,6 @@ export function Stats({ engine, s, onOpenList }: { engine: Engine; s: State; onO
             <Icon name="search" size={20} />
             <input type="search" value={text} onChange={(e) => setText(e.target.value)} placeholder="Rechercher un produit…" aria-label="Chercher un produit dans les statistiques" data-testid="stats-search" />
           </div>
-          <p className="barlegend" data-testid="legend-bars">Les barres comparent le nombre d'achats de chaque produit sur la période.{" "}
-            <button className="linkbtn linkbtn--inline" data-testid="stats-help" onClick={() => setHelp(true)}>Qu'est-ce qu'un achat ?</button>
-          </p>
           {data.rows.length === 0 && <p className="empty" data-testid="stats-empty">{query || category ? "Aucun produit ne correspond." : period === "last3" ? "Aucun achat confirmé sur ces trois mois." : "Aucun achat confirmé sur cette période."}</p>}
           <ul className="rows" data-testid="stats-rows">
             {data.rows.map((r) => (
@@ -138,8 +138,6 @@ export function Stats({ engine, s, onOpenList }: { engine: Engine; s: State; onO
               </li>
             ))}
           </ul>
-          <p className="statnote" data-testid="stats-no-spending">Aucun prix n'est saisi dans SmartCourse : il n'y a donc pas de statistiques de dépenses.</p>
-          {!data.comparison.available && <p className="statnote" data-testid="stats-no-compare">Pas de comparaison : l'historique ne couvre pas encore la période équivalente précédente.</p>}
 
           {picking && <MonthPicker current={data.currentMonth} selected={period === "month" ? data.month : null} withData={data.months} onPick={(m) => { pick("month", m); setPicking(false); }} onClose={() => setPicking(false)} />}
           {openRow && <ProductStatsSheet row={openRow} period={period} month={data.month} onOpenList={onOpenList} onClose={() => setOpenRow(null)} />}
@@ -174,9 +172,12 @@ export function Stats({ engine, s, onOpenList }: { engine: Engine; s: State; onO
           )}
           {help && (
             <Dialog title="Comment sont comptés les achats ?" onClose={() => setHelp(false)}>
+              <p data-testid="legend-bars">Les barres comparent le nombre d'achats de chaque produit sur la période. Ce qui est compté est ce qui a été acheté, pas ce qui a été consommé.</p>
               <p><strong>Un achat</strong> = une ligne de la liste marquée « Acheté » (un produit acheté une fois). Ce n'est pas un nombre de passages en magasin : trois produits achetés au même passage font trois achats.</p>
               <p>La <strong>quantité</strong> additionne ce qui a été acheté, séparément pour chaque unité : les kilos ne sont jamais ajoutés aux briques ni aux pièces. Les achats corrigés ne comptent pas.</p>
               <p>Les achats anciens, faits avant que les quantités existent, sont comptés mais leur quantité reste « non enregistrée ».</p>
+              <p data-testid="stats-no-spending">Aucun prix n'est saisi dans SmartCourse : il n'y a donc pas de statistiques de dépenses.</p>
+              {data.comparison.available === false && <p data-testid="stats-no-compare">Pas de comparaison : l'historique ne couvre pas encore la période équivalente précédente.</p>}
               <p>L'absence d'achat enregistré ne prouve pas qu'un produit est nouveau, et un achat n'est pas une consommation réelle.</p>
               <button className="btn btn--ghost" onClick={() => setHelp(false)}>Fermer</button>
             </Dialog>
