@@ -80,7 +80,7 @@ jobs:
           echo "MINUTES=$M" >> "$GITHUB_ENV"
           URL=$(grep -oE 'Application prête : https://[a-z0-9-]+\.trycloudflare\.com' /tmp/recette.out | awk '{print $4}')
           CODE=$(grep -oE 'Code famille : [A-Z0-9]+' /tmp/recette.out | awk '{print $4}')
-          UTC=$(date -u -d "+$M minutes" +%H:%M); MA=$(TZ=Africa/Casablanca date -d "+$M minutes" +%H:%M)
+          UTC=$(date -u -d "+$M minutes" +%H:%M); MA=$(date -u -d "+$((M + 60)) minutes" +%H:%M) # heure du Maroc = UTC+1 (les fuseaux ne sont pas installés sur le serveur)
           echo "::notice title=RECETTE_ADRESSE::$URL"
           echo "::notice title=RECETTE_CODE_FAMILLE::$CODE"
           echo "::notice title=RECETTE_COMPTES::administrateur adil / 482913 | personnel marie / 573918 | parent lamiaa / 573918"
