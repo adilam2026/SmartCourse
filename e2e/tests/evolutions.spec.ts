@@ -384,7 +384,7 @@ test.describe("vérifications demandées : kg, heures, corrections", () => {
     await expect(page.getByTestId("count-tobuy")).toHaveText("1");
     await page.getByTestId(`correct-${id(f, "Tomates")}`).click();
     await page.getByTestId("correct-confirm").click();
-    await expect(page.getByTestId("count-bought")).toHaveText("0");
+    await expect(page.getByTestId("count-bought")).toHaveCount(0); // plus rien d'acheté : la section disparaît
     const row = page.getByTestId("to-buy").getByTestId(`row-${id(f, "Tomates")}`);
     await expect(row).toContainText("3,5 kg"); // 2 + 1,5 : rien perdu
     await page.getByTestId(`detail-${id(f, "Tomates")}`).click();

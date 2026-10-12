@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import pg from "pg";
 import { expect, test, type Page } from "@playwright/test";
-import { card, createList, linkTokenFor, newFamily, uiLogin } from "./helpers";
+import { card, createList, linkTokenFor, newFamily, uiLogin, pickCity } from "./helpers";
 
 /*
  * Réinitialisation définitive de MA famille : confirmation par mot de passe ET code, suppression de cette seule famille,
@@ -88,6 +88,7 @@ test("réinitialiser ma famille : suppression de cette famille seulement, accès
   await page.getByTestId("setup-login").fill("adil");
   await page.getByTestId("setup-secret").fill("408213");
   await page.getByTestId("setup-again").fill("408213");
+  await pickCity(page, "setup-city", "Marrakech");
   await page.getByTestId("setup-email").fill(email);
   await page.getByTestId("setup-submit").click();
   await expect(page.getByTestId("setup-verify")).toBeVisible();

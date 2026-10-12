@@ -103,6 +103,10 @@ async function proposalsFor(db: Db, familyId: string, productId: string, city: s
     const price = { amount: (Math.round(m) / 100).toFixed(2), refQty: "1", refUnit, packaging: first.format.includes("|") ? (sample.packaging ?? null) : null };
     // Compatible : le montant se calcule pour l'unité de ce produit (sinon : « Prix à compléter », la proposition n'est pas montrée).
     if (!isComputable(price, 1, k.unit)) continue;
+    // Déjà le prix actuel (même format, même montant) : rien de nouveau à proposer.
+    const cur = current ? comparable({ amount: current.amount, refQty: current.refQty, refUnit: current.refUnit, packaging: current.packaging ?? null }) : null;
+    const prop = comparable(price);
+    if (cur && prop && cur.format === prop.format && cur.centsPerBase === prop.centsPerBase) continue;
     // Un prix de la famille dans un format incompatible avec la proposition n'est pas comparé : l'administrateur décide.
     out.push({
       productId,

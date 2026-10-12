@@ -40,14 +40,14 @@ export async function newFamily(playwright: { request: { newContext(o: object): 
 
   const adil = await playwright.request.newContext({ baseURL });
   const email = `adil${randomBytes(6).toString("hex")}@example.org`;
-  const setup = await adil.post("/api/setup/family", { data: { installToken: token, familyName: "Test", admin: { displayName: "Adil", login: "adil", secret: "482913", secretConfirm: "482913", recoveryEmail: email } } });
+  const setup = await adil.post("/api/setup/family", { data: { installToken: token, familyName: "Test", admin: { displayName: "Adil", login: "adil", secret: "482913", secretConfirm: "482913", recoveryEmail: email, city: "Casablanca" } } });
   expect(setup.status()).toBe(201);
   // Installation en deux temps : la famille n'existe pour de bon qu'une fois le lien reçu par e-mail ouvert.
   expect((await adil.post("/api/auth/verify-email", { data: { token: await linkTokenFor(email, "verify") } })).status()).toBe(200);
   const code = (await setup.json()).familyCode as string;
   const staffLogin = `marie${Math.floor(Math.random() * 1e6)}`;
   for (const [login, role, display] of [["lamiaa", "parent", "Lamiaa"], [staffLogin, "staff", "Marie"]] as const) {
-    const r = await adil.post("/api/profiles", { data: { displayName: display, login, role, secret: "573918", secretConfirm: "573918" } });
+    const r = await adil.post("/api/profiles", { data: { displayName: display, login, role, secret: "573918", secretConfirm: "573918", city: "Casablanca" } });
     expect(r.status()).toBe(201);
   }
   const lamiaa = await playwright.request.newContext({ baseURL });
@@ -112,4 +112,12 @@ export async function openInstall(page: Page): Promise<string> {
   await page.goto(path);
   await expect(page.getByTestId("setup-submit")).toBeVisible();
   return token;
+}
+
+/** Choisit une ville dans la liste cherchable (champ « Ville »). */
+export async function pickCity(page: Page, testid: string, city: string) {
+  await page.getByTestId(`${testid}-input`).fill(city);
+  // Un nom saisi en entier est déjà reconnu : la liste de suggestions se referme alors d'elle-même.
+  const opt = page.getByTestId(`${testid}-opt-${city}`);
+  if (await opt.count()) await opt.click();
 }

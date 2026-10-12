@@ -14,7 +14,7 @@ test.describe("politique de confidentialité et suppression de compte (pages pub
     expect((await context.request.get("/suppression-compte")).status()).toBe(200);
     await page.goto("/confidentialite.html");
     const text = await page.locator("main").innerText();
-    for (const part of ["Données enregistrées", "Prestataires techniques", "Conservation et sauvegardes", "Supprimer vos données", "Vos droits", "Railway", "Brevo", "Firebase", "7 jours, 4 semaines, 3 mois", "user agent", "adresse IP", "Supprimer mon compte", "Ancien profil"]) expect(text, part).toContain(part);
+    for (const part of ["Données enregistrées", "Prestataires techniques", "Conservation et sauvegardes", "Supprimer vos données", "Vos droits", "Railway", "Brevo", "Firebase", "7 jours, 4 semaines, 3 mois", "user agent", "adresse IP", "Supprimer mon compte", "Ancien profil", "Supprimer la liste", "3 mois au plus"]) expect(text, part).toContain(part);
     // aucune adresse de contact inventée : tant qu'elle n'est pas renseignée, la page le dit
     expect(text).toContain("pas encore renseigné");
     expect(text).not.toMatch(/@(?!example)[a-z0-9.-]+\.[a-z]{2,}/i);

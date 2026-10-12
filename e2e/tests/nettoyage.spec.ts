@@ -1,5 +1,5 @@
 import { devices, expect, test, type Page } from "@playwright/test";
-import { expectNoInfra, installLink, newFamily, openInstall, uiLogin } from "./helpers";
+import { expectNoInfra, installLink, newFamily, openInstall, uiLogin, pickCity } from "./helpers";
 
 const { defaultBrowserType: _d, ...IPHONE } = devices["iPhone 14"];
 const OUT = "../docs/captures/nettoyage";
@@ -23,8 +23,8 @@ for (const p of profiles) {
 
       // avec un lien : le formulaire, sans champ d'autorisation, chaque champ une seule fois
       await openInstall(page);
-      await expect(page.locator("main label")).toHaveText([/Nom de la famille/, /Votre nom affiché/, /Votre identifiant/, /Code secret — 6 chiffres/, /Confirmer le code secret/, /E-mail de récupération/]);
-      for (const id of ["setup-family", "setup-name", "setup-login", "setup-secret", "setup-again", "setup-email"]) await expect(page.getByTestId(id)).toHaveCount(1);
+      await expect(page.locator("main label")).toHaveText([/Nom de la famille/, /Votre nom affiché/, /Votre identifiant/, /Code secret — 6 chiffres/, /Confirmer le code secret/, /Ville/, /E-mail de récupération/]);
+      for (const id of ["setup-family", "setup-name", "setup-login", "setup-secret", "setup-again", "setup-city-input", "setup-email"]) await expect(page.getByTestId(id)).toHaveCount(1);
       await expectNoInfra(page);
       expect(page.url()).not.toMatch(/install\//);
       await page.screenshot({ path: `${OUT}/installation-${p.name}.png`, fullPage: true });
@@ -41,6 +41,7 @@ for (const p of profiles) {
       await used.getByTestId("setup-login").fill("adilb");
       await used.getByTestId("setup-secret").fill("482913");
       await used.getByTestId("setup-again").fill("482913");
+      await pickCity(used, "setup-city", "Fès");
       await used.getByTestId("setup-email").fill("deux@example.org");
       await used.getByTestId("setup-submit").click();
       await expect(used.getByTestId("setup-blocked")).toContainText("Ce lien d'installation n'est plus valable");

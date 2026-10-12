@@ -8,7 +8,7 @@ test.describe("temps réel (SSE)", () => {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const parent = await ctx.newPage();
     await uiLogin(parent, f, "lamiaa", "573918");
-    await expect(parent.getByTestId("count-tobuy")).toHaveText("0");
+    await expect(parent.getByTestId("empty-text")).toBeVisible(); // liste vide : une seule phrase
     await expect.poll(() => parent.evaluate(() => (window as any).__engine.getState().live)).toBe(true);
 
     await staffAdds(f, id, ["Lait", "Riz"]); // le personnel valide

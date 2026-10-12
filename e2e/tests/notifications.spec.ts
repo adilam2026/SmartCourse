@@ -106,7 +106,9 @@ test.describe("activation, état et arrêt des notifications sur l'appareil", ()
     await profileSheet(page);
     await page.getByTestId("notif-enable").click();
     await expect(page.getByTestId("notif-status")).toHaveAttribute("data-status", "denied");
-    await expect(page.getByTestId("notif-denied-help")).toContainText("Paramètres du téléphone");
+    await expect(page.getByTestId("notif-denied-help")).toHaveCount(0); // l'aide n'apparaît que sur demande
+    await page.getByTestId("notif-howto").click();
+    await expect(page.getByTestId("notif-denied-help")).toContainText("paramètres du téléphone");
     await expect(page.getByTestId("notif-enable")).toHaveCount(0);
     expect(await subsOf(f)).toEqual([]);
     await page.screenshot({ path: `${CAP}/notifications-refusees.png` });

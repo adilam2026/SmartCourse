@@ -110,7 +110,7 @@ export function NotificationInvite() {
       <span className="banner__actions">
         <button className="btn btn--small btn--primary" data-testid="notif-invite-enable" disabled={busy} onClick={async () => { if ((await enable()) !== null) close("answered"); }}>Activer</button>
         <button className="btn btn--small btn--ghost" data-testid="notif-invite-dismiss" onClick={() => close("later")}>Plus tard</button>
-        <button className="btn btn--small btn--ghost" aria-label="Fermer" data-testid="notif-invite-close" onClick={() => close("later")}>✕</button>
+        <button className="btn btn--small btn--ghost" aria-label="Masquer l'invitation" data-testid="notif-invite-close" onClick={() => close("later")}>✕</button>
       </span>
       {error && <small className="error" role="alert" data-testid="notif-invite-error">{error}</small>}
     </div>

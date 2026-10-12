@@ -391,20 +391,25 @@ test.describe("prix de la famille, base initiale, synchronisation", () => {
     const f = await newFamily(playwright, baseURL!);
     const id = f.products["Tomates"]!;
     await setBase(id, "9.90");
+    expect((await f.adil.put("/api/me/prefs", { data: { showPrices: true, showTotals: false } })).status()).toBe(200); // « Prix » n'apparaît que pour un profil qui a activé les prix
     const ctx = await browser.newContext({ ...devices["Pixel 7"], baseURL });
     const page = await ctx.newPage();
     await uiLogin(page, f, "adil", "482913");
     await page.getByTestId("tab-settings").click();
     await page.getByTestId("seg-catalog").click();
-    await page.getByTestId(`edit-Tomates`).click();
-    await expect(page.getByTestId("price-current")).toContainText("9,90 DH / kg");
-    await expect(page.getByTestId("price-current")).toContainText("Prix initial");
+    // fiche article et prix sont séparés : la fiche ne parle pas de prix ; le bouton « Prix » ouvre une petite fenêtre dédiée
+    await page.getByTestId("edit-Tomates").click();
+    await expect(page.getByTestId("product-form")).toBeVisible();
+    await expect(page.getByTestId("price-amount")).toHaveCount(0);
+    await page.getByTestId("pf-cancel").click();
+    await page.getByTestId("price-Tomates").click();
+    await expect(page.getByTestId("price-ref")).toHaveText("Tomates · 1 kg");
+    await expect(page.getByTestId("price-amount")).toHaveValue("9,90"); // prix initial préremplis, jamais écrasé sans action
     await page.getByTestId("price-amount").fill("11,5");
-    await page.getByTestId("price-save").click();
-    await expect(page.getByTestId("price-msg")).toContainText("Prix enregistré pour votre famille");
-    await expect(page.getByTestId("price-current")).toContainText("11,50 DH / kg");
-    await expect(page.getByTestId("price-current")).toContainText("Prix de votre famille");
     await page.screenshot({ path: `${OUT}/prix-produit.png` });
+    await page.getByTestId("price-save").click();
+    await expect(page.getByTestId("price-dialog")).toHaveCount(0);
+    expect(await (await f.adil.get("/api/catalog")).json().then((c: any) => c.categories.flatMap((x: any) => x.products).find((p: any) => p.id === id).price)).toMatchObject({ amount: "11.50", source: "family" });
     // la base initiale est réimportée avec un autre prix : celui de la famille reste
     await setBase(id, "8.00");
     const eff = async () => (await (await f.adil.get("/api/catalog")).json()).categories.flatMap((c: any) => c.products).find((p: any) => p.id === id).price;
@@ -419,9 +424,10 @@ test.describe("prix de la famille, base initiale, synchronisation", () => {
     await page.reload();
     await page.getByTestId("tab-settings").click();
     await page.getByTestId("seg-catalog").click();
-    await page.getByTestId("edit-Tomates").click();
+    await page.getByTestId("price-Tomates").click();
     await page.getByTestId("price-reset").click();
-    await expect(page.getByTestId("price-current")).toContainText("8,00 DH / kg");
+    await expect(page.getByTestId("price-dialog")).toHaveCount(0);
+    expect(await eff()).toMatchObject({ amount: "8.00", source: "base" });
     expect(((await (await f.adil.get(`/api/lists/${listId}`)).json()).list.items[0]).price.amount).toBe("11.50");
     await ctx.close();
   });
@@ -439,33 +445,35 @@ test.describe("prix de la famille, base initiale, synchronisation", () => {
     const ctx = await browser.newContext({ ...devices["Pixel 7"], baseURL });
     const page = await ctx.newPage();
     await uiLogin(page, viewer, "adil", "482913");
-    // « Partager ce prix » depuis la fiche du produit : unité, conditionnement, date ; ville et magasin facultatifs ; aucune identité
+    expect((await viewer.adil.put("/api/me/prefs", { data: { showPrices: true, showTotals: false } })).status()).toBe(200);
+    // « Partager ce prix » depuis la fenêtre Prix : volontaire ; aucune identité ; la ville est celle du profil
+    await page.reload();
     await page.getByTestId("tab-settings").click();
     await page.getByTestId("seg-catalog").click();
-    await page.getByTestId("edit-Pommes").click();
+    await page.getByTestId("price-Pommes").click();
     await page.getByTestId("price-share").click();
     await expect(page.getByTestId("share-summary")).toContainText("7,00 DH / kg");
-    await expect(page.getByRole("dialog", { name: "Partager ce prix" })).toContainText("Jamais : votre nom, votre e-mail, le code famille ni votre historique de courses");
-    await page.getByTestId("share-city").fill("Casablanca");
+    await expect(page.getByRole("dialog", { name: "Partager ce prix" })).toContainText("Jamais votre nom, votre e-mail ni le code famille");
     await page.getByTestId("share-confirm").click();
     await expect(page.getByTestId("price-msg")).toContainText("ce prix est partagé");
-    const row = (await sql("SELECT * FROM price_contributions WHERE city = 'Casablanca'"))[0];
+    const row = (await sql("SELECT * FROM price_contributions WHERE contributor IS NOT NULL ORDER BY created_at DESC LIMIT 1"))[0];
     expect(JSON.stringify(row)).not.toMatch(new RegExp(`${viewer.code}|Adil|${viewer.email}`));
-    await page.getByRole("button", { name: "Fermer" }).first().click().catch(() => void 0);
+    expect(row.city).toBe("Casablanca");
     await page.goto("/");
     await page.getByTestId("tab-settings").click();
     await page.getByTestId("seg-prices").click();
+    await expect(page.getByTestId("sync-city")).toContainText("Casablanca");
     const prop = page.getByTestId(`proposal-${vid}`);
-    await expect(prop).toContainText("Actuel : 7,00 DH / kg (prix de votre famille)");
+    await expect(prop).toContainText("Actuel : 7,00 DH / kg");
     await expect(prop).toContainText("Proposé : 11,00 DH / kg");
-    await expect(prop).toContainText("3 familles");
+    await expect(page.getByTestId(`pick-${vid}`)).not.toBeChecked(); // un prix personnel n'est jamais coché d'office
     await page.screenshot({ path: `${OUT}/synchroniser-prix.png` });
     expect((await (await viewer.adil.get("/api/catalog")).json()).categories.flatMap((c: any) => c.products).find((p: any) => p.id === vid).price.amount).toBe("7.00"); // rien d'automatique
-    await page.getByTestId(`apply-${vid}`).click(); // remplace un prix de la famille : confirmation
-    await expect(page.getByTestId("sync-confirm")).toContainText("Les commandes déjà validées gardent leur prix");
-    await page.getByTestId("sync-confirm-apply").click();
-    await expect(page.getByTestId("sync-msg")).toContainText("Prix appliqué");
+    await page.getByTestId(`pick-${vid}`).check();
+    await page.getByTestId("sync-apply").click();
+    await expect(page.getByTestId("sync-msg")).toContainText("1 prix appliqué");
     expect((await (await viewer.adil.get("/api/catalog")).json()).categories.flatMap((c: any) => c.products).find((p: any) => p.id === vid).price).toMatchObject({ amount: "11.00", source: "community" });
+    await expect(page.getByTestId("sync-empty")).toHaveText("Aucun nouveau prix disponible dans votre ville.");
     await ctx.close();
   });
 });

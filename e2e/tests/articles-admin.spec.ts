@@ -158,7 +158,7 @@ test.describe("administration du catalogue : ajouter et modifier un article", ()
     await expect(page.getByTestId("edit-Tomates")).toBeVisible();
     for (const n of ["Tomates", "Oignons", "Carottes"]) {
       await page.getByTestId(`edit-${n}`).click();
-      await expect(page.getByTestId("pf-rule")).toContainText("ne peut plus être ajouté");
+      await expect(page.getByTestId("pf-rule")).toHaveCount(0); // fiche simplifiée : plus de texte explicatif
       if (n === "Tomates") { await page.getByTestId("pf-active").uncheck(); await page.evaluate(() => document.querySelector(".sheet")!.scrollTo(0, 99999)); await page.waitForTimeout(200); await page.screenshot({ path: "../docs/captures/admin-desactiver-un-article-390x844.png" }); await page.getByTestId("pf-active").check(); }
       await page.getByTestId("pf-active").uncheck();
       await page.getByTestId("pf-save").click();

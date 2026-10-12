@@ -40,7 +40,7 @@ test.describe("parcours des parents", () => {
     await page.screenshot({ path: "shots/parent-correct.png" });
     await page.getByTestId("correct-confirm").click(); // aucun motif saisi
     await expect(page.getByTestId("count-tobuy")).toHaveText("4");
-    await expect(page.getByTestId("count-bought")).toHaveText("0");
+    await expect(page.getByTestId("count-bought")).toHaveCount(0); // rien d'acheté : la section n'est pas affichée
     await page.getByTestId(`buy-${f.products["Riz"]}`).click();
     await page.getByTestId(`buy-${f.products["Tomates"]}`).click();
     await expect(page.getByTestId("count-bought")).toHaveText("2");
@@ -83,8 +83,18 @@ test.describe("parcours des parents", () => {
     await page.screenshot({ path: "shots/parent-close.png" });
     await page.getByTestId("close-confirm").click();
     await expect(page.getByTestId("no-list")).toBeVisible();
-    await page.getByTestId("create-list").click();
-    await expect(page.getByTestId("count-tobuy")).toHaveText("0");
+    // écran sans liste : une phrase, aucun compteur à zéro, aucune barre vide, aucun « Clôturer » ; aucune liste n'est créée par l'ouverture de l'écran
+    await expect(page.getByTestId("empty-text")).toHaveText("Préparez votre liste de courses.");
+    for (const t of ["count-tobuy", "count-bought", "progress", "close-list"]) await expect(page.getByTestId(t)).toHaveCount(0);
+    expect((await (await f.lamiaa.get("/api/lists/active")).json()).list).toBeNull();
+    await expect(page.getByTestId("edit-list")).toBeVisible();
+    await expect(page.getByTestId("open-favorites")).toBeVisible();
+    // « Ajouter / modifier » ouvre la préparation d'une nouvelle liste (créée à ce moment-là)
+    await page.getByTestId("edit-list").click();
+    await expect(page.getByTestId("catalog")).toBeVisible();
+    expect((await (await f.lamiaa.get("/api/lists/active")).json()).list).not.toBeNull();
+    await page.getByRole("button", { name: /Retour à la liste/ }).click();
+    await expect(page.getByTestId("empty-text")).toBeVisible(); // liste vide : même écran, sans « Clôturer »
 
     await page.getByTestId("tab-history").click();
     await expect(page.getByTestId("history-entry")).toHaveCount(1);
@@ -121,7 +131,7 @@ test.describe("parcours des parents", () => {
     await expect(page.getByTestId("notice")).toContainText("Pas de connexion");
     await expect(page.getByTestId("offline-limit")).toBeVisible();
     await expect(page.getByTestId("count-tobuy")).toHaveText("1"); // rien n'est présenté comme acheté
-    await expect(page.getByTestId("count-bought")).toHaveText("0");
+    await expect(page.getByTestId("count-bought")).toHaveCount(0);
     await page.screenshot({ path: "shots/parent-offline.png" });
     await context.setOffline(false);
     const l = (await (await f.lamiaa.get("/api/lists/active")).json()).list;

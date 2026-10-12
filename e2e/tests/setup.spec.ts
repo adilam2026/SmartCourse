@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import pg from "pg";
-import { expectNoInfra, linkTokenFor, MAIL_FAILED, MOCK } from "./helpers";
+import { expectNoInfra, linkTokenFor, MAIL_FAILED, MOCK, pickCity } from "./helpers";
 
 test("première installation : lien d'installation à usage unique → famille créée → connecté en administrateur", async ({ page, playwright, baseURL }) => {
   const token = randomBytes(24).toString("base64url");
@@ -23,6 +23,14 @@ test("première installation : lien d'installation à usage unique → famille c
   const email = `adil${randomBytes(5).toString("hex")}@example.org`;
   await expect(page.getByTestId("setup-submit")).toBeDisabled(); // l'adresse de récupération est obligatoire
   await page.getByTestId("setup-email").fill(email);
+  await expect(page.getByTestId("setup-submit")).toBeDisabled(); // la ville est obligatoire aussi
+  await page.getByTestId("setup-city-input").fill("Casa");
+  await expect(page.getByTestId("setup-city-opt-Casablanca")).toBeVisible(); // liste cherchable
+  await page.getByTestId("setup-city-input").fill("Villeinconnue");
+  await expect(page.getByTestId("setup-city-none")).toBeVisible();
+  await expect(page.getByTestId("setup-submit")).toBeDisabled(); // une ville hors liste n'est pas acceptée
+  await pickCity(page, "setup-city", "Casablanca");
+  await expect(page.getByTestId("setup-submit")).toBeEnabled();
   await page.screenshot({ path: "shots/setup.png" });
   await page.getByTestId("setup-submit").click();
   // installation inachevée : écran d'attente, rien d'autre n'est accessible
@@ -64,6 +72,7 @@ test("installation : échec d'envoi → on réessaie ou on change l'adresse sans
     await page.getByTestId("setup-secret").fill("482913");
     await page.getByTestId("setup-again").fill("482913");
     const typo = `adil${randomBytes(5).toString("hex")}@exmaple.org`;
+    await pickCity(page, "setup-city", "Rabat");
     await page.getByTestId("setup-email").fill(typo);
     await page.getByTestId("setup-submit").click();
     await expect(page.getByTestId("setup-verify")).toBeVisible(); // la famille existe, en attente
