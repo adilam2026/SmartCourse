@@ -19,6 +19,8 @@ import { HttpError } from "./errors.js";
 import { SseHub } from "./hub.js";
 import { can, type Action } from "./permissions.js";
 import { priceRoutes } from "./prices.js";
+import { templateRoutes } from "./templates.js";
+import { priceCommunityRoutes } from "./price-community.js";
 import { createProfile, deleteOwnAccount, deleteProfile, listProfiles, resetSecret, updateProfile } from "./profiles.js";
 import { mailerFromEnv } from "./mail.js";
 import { countFamilyData, identifyFamily, purgeFamily } from "./family-purge.js";
@@ -306,6 +308,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   catalogRoutes(app, { db, store: deps.store, guard, hub });
   listRoutes(app, { db, hub, guard, push });
   priceRoutes(app, { db, guard, hub });
+  templateRoutes(app, { db, guard });
+  priceCommunityRoutes(app, { db, guard, hub });
   statsRoutes(app, { db, guard });
   pushRoutes(app, { db, guard, push });
 
