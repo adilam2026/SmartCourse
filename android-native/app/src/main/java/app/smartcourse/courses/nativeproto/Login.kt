@@ -170,7 +170,7 @@ fun LoginScreen(session: Session?, onSimulated: (Role) -> Unit) {
                 Spacer(Modifier.height(12.dp))
                 Text(
                     "Besoin d'aide ?", color = C.TealDark, style = MaterialTheme.typography.labelLarge, textDecoration = TextDecoration.Underline,
-                    modifier = Modifier.align(Alignment.CenterHorizontally).clip(RoundedCornerShape(8.dp)).clickable { help = true }.padding(horizontal = 12.dp, vertical = 14.dp),
+                    modifier = Modifier.align(Alignment.CenterHorizontally).clip(RoundedCornerShape(8.dp)).clickable { help = true }.padding(horizontal = 12.dp, vertical = 16.dp),
                 )
                 if (session != null) Text(
                     "Serveur : ${session.serverAddress?.substringAfter("://") ?: "à définir"} · Modifier",

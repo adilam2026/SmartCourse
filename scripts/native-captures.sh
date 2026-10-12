@@ -110,6 +110,45 @@ for DP in 360 390; do
   run_all
 done
 
+# ───────── Icône : rendu réel dans le lanceur Android, avec les différents masques ─────────
+launcher_open_drawer() {
+  adb shell input keyevent KEYCODE_HOME; sleep 2
+  adb shell input swipe 540 2100 540 500 250; sleep 2
+  for _ in 1 2 3 4 5 6; do
+    python3 scripts/native-ui.py has "Courses (n" 1 && return 0
+    adb shell input swipe 540 1700 540 700 300; sleep 1
+  done
+  return 1
+}
+adb shell wm size reset; adb shell wm density reset; sleep 2
+adb shell cmd overlay list 2>/dev/null | grep -iE "icon|shape" > "$OUT/overlays-icones.txt" || true
+pkg_for() { grep -oE '[a-zA-Z0-9_.]*(icon|shape)[a-zA-Z0-9_.]*' "$OUT/overlays-icones.txt" | grep -i "$1" | head -1; }
+for shape in circle roundedrect squircle teardrop; do
+  P=$(pkg_for "$shape")
+  if [ -n "$P" ]; then
+    adb shell cmd overlay enable-exclusive --category "$P" >/dev/null 2>&1 || adb shell cmd overlay enable "$P" >/dev/null 2>&1
+    echo "MASQUE_$shape=$P" >> "$OUT/controles.txt"
+  else
+    echo "MASQUE_$shape=indisponible" >> "$OUT/controles.txt"
+  fi
+  adb shell am force-stop com.google.android.apps.nexuslauncher; sleep 3
+  if launcher_open_drawer; then echo "TIROIR_$shape=OK" >> "$OUT/controles.txt"; else echo "TIROIR_$shape=icone-introuvable" >> "$OUT/controles.txt"; fi
+  adb exec-out screencap -p > "$OUT/launcher-$shape.png"
+done
+# Icônes thématiques (Android 13+) : active l'option et recharge le lanceur
+adb shell settings put secure themed_icon_enabled 1 >/dev/null 2>&1
+adb shell am force-stop com.google.android.apps.nexuslauncher; sleep 3
+launcher_open_drawer && echo "TIROIR_themed=OK" >> "$OUT/controles.txt" || echo "TIROIR_themed=icone-introuvable" >> "$OUT/controles.txt"
+adb exec-out screencap -p > "$OUT/launcher-themed.png"
+adb shell settings put secure themed_icon_enabled 0 >/dev/null 2>&1
+adb shell input keyevent KEYCODE_HOME
+# Écran de démarrage (démarrage à froid, capture au plus tôt : non garantie)
+for d in 0.15 0.4 0.8; do
+  adb shell am force-stop $PKG; sleep 1
+  adb shell am start -n "$PKG/.MainActivity" >/dev/null 2>&1; sleep $d
+  adb exec-out screencap -p > "$OUT/demarrage-$d.png"
+done
+
 # Retour Android : V07 → V08 puis touche retour = retour à V07 ; clavier ouvert : un premier retour ferme le clavier seulement.
 W=360
 adb shell wm size 1080x2340; adb shell wm density 480; sleep 2

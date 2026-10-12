@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -67,6 +68,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         // Paramètres de lancement : réservés au build de recette (captures automatiques d'écrans simulés).
         Launch.extras = if (BuildConfig.RECETTE_HOOKS) intent?.extras else null
+        val splash = installSplashScreen()
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(C.Navy.toArgb()),
             navigationBarStyle = SystemBarStyle.light(Color.White.toArgb(), Color.White.toArgb()),
@@ -77,6 +79,7 @@ class MainActivity : ComponentActivity() {
         session = s
         val demoMode = Launch.str("screen") != null || Launch.str("path") != null || Launch.flag("hub")
         if (!demoMode) s.start()
+        splash.setKeepOnScreenCondition { !demoMode && s.state == AuthState.Booting }
         setContent { CoursesTheme { Root(s, demoMode) } }
     }
 
