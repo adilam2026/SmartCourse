@@ -98,7 +98,7 @@ Légende : **R** réalisé · **P** partiel · **N** non réalisé. « Capture �
 | L6 | Aucun accès/écriture aux données réelles | R | aucune permission réseau | — |
 | L7 | Actions simulées identifiées | R | messages « Action simulée : … » | Les actions locales (catalogue) sont signalées « (simulation) » |
 | L8 | Captures issues du prototype exécuté | R | `adb screencap` sur émulateur | Pas de téléphone réel |
-| L9 | Largeurs 360 et 390 dp | R | 54 captures à chaque largeur ; 360 relues en entier, 390 relues par échantillon | — |
+| L9 | Largeurs 360 et 390 dp | R | 51 écrans ou états capturés à chaque largeur (+ 3 captures du contrôle du retour Android à 360) ; 360 relues en entier, 390 relues par échantillon | — |
 | L10 | Textes longs | P | variantes V02, V03, V04, V08 | V12 : pas de texte long à tester |
 | L11 | Clavier | R | V01, V05 | — |
 | L12 | Retour Android | R | `controles.txt` : retour à l'écran précédent OK ; retour = fermeture du clavier sans quitter OK | — |
