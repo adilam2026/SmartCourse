@@ -79,6 +79,9 @@ fun failureMessage(f: Failure): String = when (f) {
     Failure.NOT_COURSES_SERVER -> "Cette adresse ne correspond pas à un serveur Courses."
     Failure.BAD_REQUEST -> "Les informations saisies ne sont pas valides. Vérifiez-les."
     Failure.BAD_ADDRESS -> "Aucun serveur n'est configuré. Renseignez l'adresse du serveur."
+    Failure.FORBIDDEN -> "Action réservée aux administrateurs."
+    Failure.NOT_FOUND -> "Élément introuvable : il a peut-être été supprimé. Actualisez l'écran."
+    Failure.CONFLICT -> "Action impossible dans l'état actuel. Actualisez l'écran."
     Failure.UNKNOWN -> "Une erreur inattendue est survenue. Réessayez."
 }
 
