@@ -8,6 +8,9 @@ import { PageHead } from "../components/PageHead";
 import { CATEGORY_EMOJI } from "../categories";
 import { boughtItem, effectiveQty, openItem, projectedPresence, projectedQty } from "../sync/logic";
 import { useBackLayer } from "../useBackLayer";
+import { useV3 } from "../v3";
+import { SelectionV3 } from "../components/v3/SelectionV3";
+import { V3Boundary } from "../components/v3/Boundary";
 import type { Engine, State } from "../sync/engine";
 import type { Unit } from "../types";
 
@@ -96,7 +99,8 @@ export function StaffScreen({ engine, s, onBack }: { engine: Engine; s: State; o
   const [query, setQuery] = useState("");
   const [openCat, setOpenCat] = useState<string | null>(null);
   const searching = norm(query).length > 0;
-  const view = s.catalogView;
+  const v3 = useV3(); // aperçu V3 : activé sur cet appareil par l'administrateur principal (Réglages → Aperçu V3)
+  const view = v3 ? "all" : s.catalogView;
   const prefs = s.me?.prefs ?? NO_PREFS;
   const prices = useMemo(() => priceIndex(catalog), [catalog]);
   // Android Back: leaves the opened category (before leaving the screen).
@@ -215,6 +219,23 @@ export function StaffScreen({ engine, s, onBack }: { engine: Engine; s: State; o
       </div>
       <main className="catalog" data-testid="catalog">
         {!noList && prefs.showTotals && <EstimateTotal summary={totalOf(lines)} />}
+        {v3 ? (
+          <V3Boundary>
+            <SelectionV3
+              engine={engine}
+              s={s}
+              groups={searching ? found : sections}
+              searching={searching}
+              query={query}
+              setQuery={setQuery}
+              stateOf={stateOf}
+              priceOf={(id) => prices.get(id) ?? null}
+              boughtOf={(id) => { const b = list ? boughtItem(list, id) : undefined; return b ? { qty: b.purchase?.quantity ?? b.quantity, unit: (b.purchase?.unit ?? b.unit) as Unit } : undefined; }}
+              registerRef={(key, el) => void (refs.current[key] = el)}
+              noList={noList}
+            />
+          </V3Boundary>
+        ) : (<>
         <div className="viewbar">
           <div className="seg" role="tablist" aria-label="Affichage du catalogue">
             <button role="tab" aria-selected={view === "all"} className={view === "all" ? "on" : ""} data-testid="view-all" onClick={() => void engine.setCatalogView("all")}>Tous les produits</button>
@@ -270,6 +291,7 @@ export function StaffScreen({ engine, s, onBack }: { engine: Engine; s: State; o
             })}
           </div>
         )}
+        </>)}
       </main>
       {!noList && <ValidateBar engine={engine} s={s} />}
     </div>

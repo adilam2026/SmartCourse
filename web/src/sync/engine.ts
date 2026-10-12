@@ -44,9 +44,12 @@ export interface State {
   installRefused: boolean;
   /** How this person likes the catalogue shown (kept per profile on this phone). */
   catalogView: CatalogView;
+  v3Mode: V3Mode;
 }
 
 export type CatalogView = "all" | "categories";
+/** V3 : trois présentations des articles à choisir (mémorisée par utilisateur sur cet appareil). */
+export type V3Mode = "list" | "squares" | "cards";
 
 /** The subset of EventSource the engine uses (so tests can fake it). */
 export interface EventSourceLike {
@@ -75,7 +78,7 @@ const RETRY_MS = [3_000, 8_000, 20_000, 45_000];
 export class Engine {
   private s: State = {
     phase: "boot", me: null, conn: "online", catalog: null, list: undefined, toggles: {}, draftListId: null, batches: [],
-    sending: false, justSynced: false, notices: [], orphan: null, deleted: null, loginError: null, loggingIn: false, lastLogin: null, live: false, welcomeCode: null, prefillInstallToken: null, installFrom: null, installRefused: false, catalogView: "all",
+    sending: false, justSynced: false, notices: [], orphan: null, deleted: null, loginError: null, loggingIn: false, lastLogin: null, live: false, welcomeCode: null, prefillInstallToken: null, installFrom: null, installRefused: false, catalogView: "all", v3Mode: "squares",
   };
   private listeners = new Set<() => void>();
   private api: typeof realApi;
@@ -393,8 +396,10 @@ export class Engine {
       }
     }
     const pref = (await this.db.meta.get(`catalogView:${me.familyId}:${me.id}`))?.value;
+    const v3 = (await this.db.meta.get(`v3Mode:${me.familyId}:${me.id}`))?.value;
     this.set({
       catalogView: pref === "categories" ? "categories" : "all",
+      v3Mode: v3 === "list" || v3 === "cards" ? v3 : "squares",
       catalog: cache?.catalog ?? null,
       list: cache ? cache.list : undefined,
       batches: batches.map(({ familyId: _f, profileId: _p, ...b }) => b),
@@ -641,6 +646,13 @@ export class Engine {
     const me = this.s.me;
     this.set({ catalogView: view });
     if (me) await this.db.meta.put({ key: `catalogView:${me.familyId}:${me.id}`, value: view });
+  }
+
+  /** V3 : change d'affichage tout de suite ; le choix est gardé pour ce profil sur cet appareil (aucune donnée de la famille n'est touchée). */
+  async setV3Mode(mode: V3Mode): Promise<void> {
+    const me = this.s.me;
+    this.set({ v3Mode: mode });
+    if (me) await this.db.meta.put({ key: `v3Mode:${me.familyId}:${me.id}`, value: mode });
   }
 
   /** "Valider": move the pending choices into the outbox (persisted first), then try to send. */

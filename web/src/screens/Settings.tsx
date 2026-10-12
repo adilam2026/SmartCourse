@@ -18,6 +18,7 @@ import { NotificationSettings, usePushControl } from "../components/Notification
 import { PageHead } from "../components/PageHead";
 import { useBackLayer } from "../useBackLayer";
 import { PriceDialog } from "../components/PriceDialog";
+import { setV3On, useV3 } from "../v3";
 import { ProductForm } from "../components/ProductForm";
 import { Thumb } from "../components/Thumb";
 import { CatalogBrowser, CatPhoto } from "./CatalogBrowser";
@@ -31,7 +32,7 @@ const ROLE_LABEL: Record<Role, string> = { admin: "Administrateur", parent: "Par
 
 const errText = userMessage;
 
-type Section = "profiles" | "recovery" | "reset" | "catalog" | "prices" | "notifications" | "backups" | "about";
+type Section = "v3" | "profiles" | "recovery" | "reset" | "catalog" | "prices" | "notifications" | "backups" | "about";
 
 /** Backup state in one sentence: what matters to the family. How it works stays on the operator side (server logs). */
 function backupSummary(st: BackupStatus | null): { ok: boolean; text: string } {
@@ -46,6 +47,7 @@ export function Settings({ engine, s }: { engine: Engine; s: State }) {
   const [section, setSection] = useState<Section | null>(null);
   const [backup, setBackup] = useState<BackupStatus | null>(null);
   const push = usePushControl();
+  const v3on = useV3();
   useEffect(() => void api.backupStatus().then(setBackup).catch(() => {}), []);
   useBackLayer(section !== null, () => setSection(null)); // Android Back: from a section to the list of settings
   const bs = backupSummary(backup);
@@ -59,6 +61,7 @@ export function Settings({ engine, s }: { engine: Engine; s: State }) {
       { key: "prices", icon: "info", title: "Prix", text: s.me?.prefs?.showTotals ? "Prix et total estimé" : s.me?.prefs?.showPrices ? "Prix indicatifs" : "Affichage simple, sans prix", testid: "seg-prices" },
       { key: "notifications", icon: "bell", title: "Notifications", text: pushText, testid: "seg-notifications" },
       { key: "backups", icon: "shield", title: "Sauvegarde", text: bs.text, testid: "seg-backups" },
+      ...(s.me?.primary ? [{ key: "v3" as Section, icon: "grid" as IconName, title: "Aperçu V3", text: v3on ? "Activé sur cet appareil" : "Essai de la nouvelle interface", testid: "seg-v3" }] : []),
       ...(s.me?.primary ? [{ key: "reset" as Section, icon: "shield" as IconName, title: "Réinitialiser la famille", text: "Suppression définitive, pour recommencer", testid: "seg-reset" }] : []),
       { key: "about", icon: "info", title: "À propos", text: "Mises à jour de l'application", testid: "seg-about" },
     ];
@@ -77,10 +80,11 @@ export function Settings({ engine, s }: { engine: Engine; s: State }) {
       </>
     );
   }
-  const titles: Record<Section, string> = { profiles: "Famille et profils", recovery: "Adresse de récupération", reset: "Réinitialiser la famille", catalog: "Catalogue", prices: "Prix", notifications: "Notifications", backups: "Sauvegarde", about: "À propos" };
+  const titles: Record<Section, string> = { v3: "Aperçu V3", profiles: "Famille et profils", recovery: "Adresse de récupération", reset: "Réinitialiser la famille", catalog: "Catalogue", prices: "Prix", notifications: "Notifications", backups: "Sauvegarde", about: "À propos" };
   return (
     <>
       <PageHead engine={engine} s={s} title={titles[section]} onBack={() => setSection(null)} backLabel="Réglages" backTestId="settings-back" subtitle={section === "profiles" && s.me?.family ? <>Code de la famille : <b data-testid="family-code">{s.me.family.code}</b></> : undefined} />
+      {section === "v3" && s.me?.primary && <PreviewV3 />}
       {section === "profiles" && <Profiles me={s.me!.id} familyCode={s.me!.family?.code ?? ""} />}
       {section === "recovery" && <RecoveryPanel />}
       {section === "reset" && <ResetFamily engine={engine} />}
@@ -90,6 +94,19 @@ export function Settings({ engine, s }: { engine: Engine; s: State }) {
       {section === "backups" && <BackupCard st={backup} />}
       {section === "about" && <div className="versioninfo--page"><VersionInfo engine={engine} /></div>}
     </>
+  );
+}
+
+/** Aperçu V3 : active (ou coupe) la nouvelle interface de choix des articles sur CET appareil seulement. Réservé à l'administrateur principal. */
+function PreviewV3() {
+  const on = useV3();
+  return (
+    <div className="panel" data-testid="v3-panel">
+      <p>Nouvelle interface de choix des articles (trois affichages, panneau de quantité), en essai.</p>
+      <p className="muted" data-testid="v3-scope">Réservé à cet appareil : les autres téléphones et les autres profils ne la voient pas. Aucune donnée n'est modifiée.</p>
+      <label className="check"><input type="checkbox" checked={on} onChange={(e) => setV3On(e.target.checked)} data-testid="v3-toggle" /> Activer la V3 sur cet appareil</label>
+      {on && <button className="btn" data-testid="v3-off" onClick={() => setV3On(false)}>Revenir à la V2</button>}
+    </div>
   );
 }
 
