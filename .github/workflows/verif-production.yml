@@ -39,8 +39,12 @@ jobs:
           JS=$(grep -o '/assets/index-[A-Za-z0-9_-]*\.js' /tmp/index.html | head -1)
           echo "bundle : $JS"
           curl -fsS -m 30 "$U$JS" -o /tmp/app.js
-          for m in "Historique des validations" "Par catégories" "Nouvelle demande" "envoyé plus tard" "autre unité" "Vérifier les mises à jour" "Version de l'application" "Liste à jour" "En attente de connexion" "modification" "Qu'est-ce qu'un achat" "3 derniers mois" "Choisir un mois" "Quantités achetées par mois" "Heures affichées" "Activer les notifications" "Désactiver sur cet appareil" "Les courses du jour" "Préparer les courses" "Vos achats" "Famille et profils" "Détails techniques" "Aucune modification à valider" "Les plus achetés" "Tous les produits" "Photo à venir" "Voir plus" "Photo du catalogue" "À vérifier" "Code famille oublié" "Mot de passe oublié" "Modifier le mot de passe" "Adresse de récupération" "Première installation" "Vérifiez votre e-mail" "Réinitialiser la famille" "Envoyer un e-mail de test"; do
+          for m in "Historique des validations" "Par catégories" "Nouvelle demande" "envoyé plus tard" "autre unité" "Vérifier les mises à jour" "Liste à jour" "En attente de connexion" "modification" "Qu'est-ce qu'un achat" "3 derniers mois" "Choisir un mois" "Quantités achetées par mois" "Activer les notifications" "Désactiver sur cet appareil" "Les courses du jour" "Préparer les courses" "Vos achats" "Famille et profils" "Aucune modification à valider" "Les plus achetés" "Tous les produits" "Photo à venir" "Voir plus" "Photo du catalogue" "À vérifier" "Code famille oublié" "Mot de passe oublié" "Adresse de récupération" "Première installation" "Vérifiez votre e-mail" "Réinitialiser la famille" "Envoyer un e-mail de test" "Application à jour" "Modifier le code" "Supprimer mon compte" "Code secret — 6 chiffres" "Un lien d'installation est nécessaire" "Favoris" "Recommander" "Afficher les prix indicatifs" "Afficher les montants et le total estimé" "Synchroniser les prix" "Partager ce prix" "Prix à compléter" "Estimation incomplète"; do
             grep -q "$m" /tmp/app.js && echo "présent : $m" || { echo "::error::absent du bundle servi : $m"; exit 1; }
+          done
+          # Ce qui ne doit plus jamais s'afficher à un utilisateur
+          for m in "Détails techniques" "Diagnostiquer l'envoi" "Jeton d'installation" "Version de l'application" "Heures affichées"; do
+            grep -q "$m" /tmp/app.js && { echo "::error::texte technique encore présent dans le bundle : $m"; exit 1; } || echo "absent (voulu) : $m"
           done
       - name: Notifications — service worker et clé publique
         run: |
