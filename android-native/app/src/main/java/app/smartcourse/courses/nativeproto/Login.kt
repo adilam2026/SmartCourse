@@ -85,11 +85,11 @@ fun LoginScreen(onLogin: (Role) -> Unit) {
                     Text("Les courses en famille", style = MaterialTheme.typography.bodySmall)
                 }
             }
-            val ring = Modifier.shadow(8.dp, CircleShape, ambientColor = C.Navy, spotColor = C.Navy).clip(CircleShape)
-            Box(Modifier.align(Alignment.TopEnd).padding(end = 16.dp, top = 6.dp)) {
-                Photo(R.drawable.p_tomates, 92.dp, ring.offset(x = (-34).dp, y = 4.dp), radius = 46.dp)
-                Photo(R.drawable.p_carottes, 76.dp, ring.offset(x = (-96).dp, y = 78.dp), radius = 38.dp)
-                Photo(R.drawable.p_pain, 70.dp, ring.offset(x = 0.dp, y = 92.dp), radius = 35.dp)
+            val ring = Modifier.shadow(8.dp, CircleShape, ambientColor = C.Navy, spotColor = C.Navy)
+            Box(Modifier.align(Alignment.TopEnd).padding(end = 14.dp, top = 8.dp).size(width = 196.dp, height = 158.dp)) {
+                Photo(R.drawable.p_tomates, 98.dp, ring.align(Alignment.TopEnd), radius = 49.dp)
+                Photo(R.drawable.p_carottes, 80.dp, ring.align(Alignment.BottomStart), radius = 40.dp)
+                Photo(R.drawable.p_pain, 70.dp, ring.align(Alignment.BottomEnd).padding(end = 10.dp), radius = 35.dp)
             }
         }
         Column(Modifier.padding(horizontal = 20.dp)) {

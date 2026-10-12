@@ -51,7 +51,6 @@ fun AdminHubScreen(nav: (String) -> Unit) {
                             ) {
                                 Icon(e.icon, null, tint = C.TealDark, modifier = Modifier.size(24.dp))
                                 Text(e.label, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                Icon(Icons.Rounded.ChevronRight, null, tint = C.Muted, modifier = Modifier.size(18.dp))
                             }
                         }
                     }

@@ -36,6 +36,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.Image
 import androidx.compose.ui.res.painterResource
 import kotlin.math.roundToInt
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import kotlinx.coroutines.delay
 
 /* ───────────── V04 — Sélection (trois modes) ───────────── */
 
@@ -264,7 +266,8 @@ fun QuantitySheet(
     var big by remember { mutableStateOf(p.unit != UnitKind.COUNT && qty >= 1000) }
     var text by remember { mutableStateOf(display(qty, p, big)) }
     val fr = remember { FocusRequester() }
-    if (focusInput) LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
+    val keyboard = LocalSoftwareKeyboardController.current
+    if (focusInput) LaunchedEffect(Unit) { delay(700); runCatching { fr.requestFocus() }; keyboard?.show() }
     val hasUnits = p.unit != UnitKind.COUNT
     val bigName = p.unit.big ?: ""
     val smallName = if (hasUnits) p.unit.small else p.countLabel
