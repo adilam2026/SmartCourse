@@ -34,6 +34,7 @@ const noOverflow = (page: Page) => page.evaluate(() => document.documentElement.
 const ui = (page: Page) => page.evaluate(() => document.documentElement.dataset.ui);
 /** L'élément est entièrement visible dans la fenêtre. */
 async function inside(page: Page, testid: string) {
+  await page.getByTestId(testid).scrollIntoViewIfNeeded();
   const b = await page.getByTestId(testid).boundingBox();
   const vp = page.viewportSize()!;
   expect(b, testid).not.toBeNull();

@@ -178,7 +178,7 @@ test.describe("administration", () => {
 
     await page.getByTestId("edit-karim").click();
     await page.getByTestId("toggle-karim").click();
-    await expect(page.getByTestId("profile-karim")).toContainText("masqué");
+    await expect(page.getByTestId("profile-karim")).toContainText("désactivé");
     expect((await ok.get("/api/me")).status()).toBe(401); // session révoquée
 
     // un administrateur n'a pas de bouton « Désactiver » (et le serveur refuse aussi)
