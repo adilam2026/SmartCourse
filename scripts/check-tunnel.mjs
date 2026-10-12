@@ -100,7 +100,7 @@ r = await get("/api/me", { headers: { cookie } }); check(r.status === 200, "sess
     const pb = await chromium.launch({ executablePath: process.env.CHROME ?? "/usr/bin/google-chrome", args: ["--no-sandbox"] });
     const ppage = await (await pb.newContext({ viewport: { width: 412, height: 915 }, hasTouch: true, isMobile: true })).newPage();
     await ppage.goto(BASE + "/"); await ppage.getByTestId("login-family").fill(FAMILY); await ppage.getByTestId("login-id").fill("lamiaa"); await ppage.getByTestId("login-secret").fill("573918"); await ppage.getByTestId("login-submit").click();
-    await ppage.getByTestId("to-buy").waitFor({ state: "attached", timeout: 20_000 }); ok("connexion du parent (second profil) via le tunnel");
+    await ppage.getByTestId("edit-list").waitFor({ state: "attached", timeout: 20_000 }); ok("connexion du parent (second profil) via le tunnel");
     await ppage.evaluate(() => { window.__sansRechargement = 1; });
     const nom = `Essai direct ${Date.now() % 100000}`;
     const t1 = Date.now();
