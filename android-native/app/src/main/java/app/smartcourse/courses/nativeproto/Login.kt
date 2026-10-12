@@ -30,6 +30,8 @@ import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Key
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.ShoppingBasket
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
@@ -50,20 +52,48 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import app.smartcourse.courses.nativeproto.net.Failure
+import app.smartcourse.courses.nativeproto.net.Outcome
+import app.smartcourse.courses.nativeproto.net.Session
+import app.smartcourse.courses.nativeproto.net.normalizeServer
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 
+/** Message clair pour chaque cause d'échec réseau ou serveur. */
+fun failureMessage(f: Failure): String = when (f) {
+    Failure.INVALID_CREDENTIALS -> "Identifiants incorrects ou accès temporairement bloqué. Vérifiez le code famille, l'identifiant et le code d'accès."
+    Failure.RATE_LIMITED -> "Trop de tentatives. Patientez une minute avant de réessayer."
+    Failure.SETUP_INCOMPLETE -> "Installation à terminer : l'administrateur doit d'abord vérifier son adresse e-mail de récupération."
+    Failure.SESSION_EXPIRED -> "Votre session a expiré ou a été fermée. Reconnectez-vous."
+    Failure.NETWORK -> "Impossible de joindre le serveur. Vérifiez la connexion Internet et l'adresse du serveur."
+    Failure.TIMEOUT -> "Le serveur met trop de temps à répondre. Réessayez."
+    Failure.TLS -> "Connexion sécurisée refusée par le téléphone (certificat ou date incorrects)."
+    Failure.CLEARTEXT -> "Adresse non sécurisée : utilisez une adresse en https://."
+    Failure.SERVER_ERROR -> "Le serveur rencontre un problème. Réessayez dans quelques instants."
+    Failure.NOT_COURSES_SERVER -> "Cette adresse ne correspond pas à un serveur Courses."
+    Failure.BAD_REQUEST -> "Les informations saisies ne sont pas valides. Vérifiez-les."
+    Failure.BAD_ADDRESS -> "Aucun serveur n'est configuré. Renseignez l'adresse du serveur."
+    Failure.UNKNOWN -> "Une erreur inattendue est survenue. Réessayez."
+}
+
 @Composable
-fun LoginScreen(onLogin: (Role) -> Unit) {
+fun LoginScreen(session: Session?, onSimulated: (Role) -> Unit) {
     val demo = LocalDemo.current
+    val scope = rememberCoroutineScope()
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var serverSheet by remember { mutableStateOf(Launch.once("server")) }
     var tab by remember { mutableIntStateOf(if (Launch.str("tab") == "first") 1 else 0) }
     var sub by remember { mutableIntStateOf(if (Launch.str("sub") == "create") 1 else 0) }
     var help by remember { mutableStateOf(Launch.once("help")) }
-    var family by remember { mutableStateOf("") }
-    var login by remember { mutableStateOf("") }
+    var family by remember { mutableStateOf(session?.storage?.lastFamily ?: "") }
+    var login by remember { mutableStateOf(session?.storage?.lastLogin ?: "") }
     var code by remember { mutableStateOf("") }
     var show by remember { mutableStateOf(false) }
     var famName by remember { mutableStateOf("") }
@@ -101,25 +131,51 @@ fun LoginScreen(onLogin: (Role) -> Unit) {
 
             if (tab == 0) {
                 FormField(family, { family = it }, "Code famille", leading = Icons.Rounded.Group, focus = focus,
-                    keyboard = KeyboardOptions(keyboardType = KeyboardType.Ascii))
+                    keyboard = KeyboardOptions(keyboardType = KeyboardType.Ascii, capitalization = KeyboardCapitalization.Characters))
                 Spacer(Modifier.height(10.dp))
                 FormField(login, { login = it }, "Identifiant", leading = Icons.Rounded.Person)
                 Spacer(Modifier.height(10.dp))
                 FormField(
                     code, { code = it }, "Code d'accès", leading = Icons.Rounded.Lock,
                     visual = if (show) VisualTransformation.None else PasswordVisualTransformation(),
-                    keyboard = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    keyboard = KeyboardOptions(keyboardType = KeyboardType.Password),
                     trailing = { IconButton({ show = !show }) { Icon(if (show) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility, if (show) "Masquer le code" else "Afficher le code", tint = C.Ink) } },
                 )
                 Spacer(Modifier.height(16.dp))
-                PrimaryButton("Se connecter", {
-                    demo.simulated("connexion (aucun serveur contacté)")
-                    onLogin(if (login.trim().lowercase() == "marie") Role.STAFF else Role.ADMIN)
-                }, Modifier.fillMaxWidth(), trailing = Icons.AutoMirrored.Rounded.ArrowForward)
+                val notice = session?.notice
+                if (notice != null && error == null) Banner(failureMessage(notice), info = true)
+                error?.let { Banner(it) }
+                if (error != null || notice != null) Spacer(Modifier.height(10.dp))
+                PrimaryButton(if (busy) "Connexion…" else "Se connecter", {
+                    error = null
+                    session?.clearNotice()
+                    if (session == null) {
+                        demo.simulated("connexion (aucun serveur contacté)")
+                        onSimulated(if (login.trim().lowercase() == "marie") Role.STAFF else Role.ADMIN)
+                    } else if (session.serverAddress == null) {
+                        error = failureMessage(Failure.BAD_ADDRESS); serverSheet = true
+                    } else if (family.isBlank()) error = "Renseignez le code famille."
+                    else if (login.isBlank()) error = "Renseignez votre identifiant."
+                    else if (code.isBlank()) error = "Renseignez votre code d'accès."
+                    else {
+                        busy = true
+                        scope.launch {
+                            val f = session.signIn(family, login, code)
+                            busy = false
+                            code = ""
+                            if (f != null) error = failureMessage(f)
+                        }
+                    }
+                }, Modifier.fillMaxWidth(), trailing = if (busy) null else Icons.AutoMirrored.Rounded.ArrowForward, enabled = !busy)
                 Spacer(Modifier.height(12.dp))
                 Text(
                     "Besoin d'aide ?", color = C.TealDark, style = MaterialTheme.typography.labelLarge, textDecoration = TextDecoration.Underline,
-                    modifier = Modifier.align(Alignment.CenterHorizontally).clip(RoundedCornerShape(8.dp)).clickable { help = true }.padding(horizontal = 12.dp, vertical = 10.dp),
+                    modifier = Modifier.align(Alignment.CenterHorizontally).clip(RoundedCornerShape(8.dp)).clickable { help = true }.padding(horizontal = 12.dp, vertical = 14.dp),
+                )
+                if (session != null) Text(
+                    "Serveur : ${session.serverAddress?.substringAfter("://") ?: "à définir"} · Modifier",
+                    color = C.Muted, style = MaterialTheme.typography.bodySmall, textDecoration = TextDecoration.Underline,
+                    modifier = Modifier.align(Alignment.CenterHorizontally).clip(RoundedCornerShape(8.dp)).clickable { serverSheet = true }.padding(horizontal = 12.dp, vertical = 16.dp),
                 )
             } else {
                 SegTabs(listOf("Rejoindre une famille", "Créer ma famille"), sub, { sub = it })
@@ -152,6 +208,7 @@ fun LoginScreen(onLogin: (Role) -> Unit) {
         }
     }
 
+    if (serverSheet && session != null) ServerSheet(session) { serverSheet = false }
     if (help) {
         AppSheet({ help = false }) {
             Text("Besoin d'aide ?", style = MaterialTheme.typography.titleLarge)
@@ -177,5 +234,54 @@ private fun HelpRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title
             Text(sub, style = MaterialTheme.typography.bodySmall)
         }
         Icon(Icons.Rounded.ChevronRight, null, tint = C.Muted)
+    }
+}
+
+@Composable
+private fun Banner(text: String, info: Boolean = false) {
+    val bg = if (info) C.AmberSoft else C.DangerSoft
+    val fg = if (info) C.Amber else C.Danger
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(bg).padding(12.dp),
+        verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Icon(Icons.Rounded.Info, null, tint = fg, modifier = Modifier.size(20.dp))
+        Text(text, color = C.Ink, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+    }
+}
+
+/** Adresse du serveur de recette : testée (GET /health) avant d'être enregistrée. */
+@Composable
+private fun ServerSheet(session: Session, onDismiss: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    var text by remember { mutableStateOf(session.serverAddress ?: "") }
+    var busy by remember { mutableStateOf(false) }
+    var msg by remember { mutableStateOf<String?>(null) }
+    var ok by remember { mutableStateOf(false) }
+    AppSheet(onDismiss) {
+        Text("Serveur", style = MaterialTheme.typography.titleLarge)
+        Spacer(Modifier.height(4.dp))
+        Text("Adresse du serveur Courses (https://…). Elle est fournie avec l'environnement de recette.", style = MaterialTheme.typography.bodySmall)
+        Spacer(Modifier.height(12.dp))
+        FormField(text, { text = it; msg = null; ok = false }, "https://…", leading = Icons.Rounded.Link,
+            keyboard = KeyboardOptions(keyboardType = KeyboardType.Uri))
+        msg?.let {
+            Spacer(Modifier.height(8.dp))
+            Text(it, color = if (ok) C.TealDark else C.Danger, style = MaterialTheme.typography.bodyMedium)
+        }
+        Spacer(Modifier.height(14.dp))
+        PrimaryButton(if (busy) "Vérification…" else "Tester et enregistrer", {
+            val addr = normalizeServer(text)
+            if (addr == null) { msg = failureMessage(Failure.BAD_ADDRESS).let { "Adresse invalide." }; ok = false }
+            else {
+                busy = true; msg = null
+                scope.launch {
+                    when (val r = session.api.health(addr)) {
+                        is Outcome.Ok -> { session.setServer(addr); ok = true; msg = "Serveur Courses joignable. Adresse enregistrée."; busy = false; onDismiss() }
+                        is Outcome.Fail -> { ok = false; msg = failureMessage(r.failure); busy = false }
+                    }
+                }
+            }
+        }, Modifier.fillMaxWidth(), enabled = !busy && text.isNotBlank())
     }
 }

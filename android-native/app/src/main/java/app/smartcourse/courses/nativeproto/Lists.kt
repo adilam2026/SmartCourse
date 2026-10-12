@@ -243,10 +243,10 @@ fun StaffListScreen(nav: (String) -> Unit) {
                                     qtyText(p, l.qty),
                                     { demo.setLineQty(p.id, (l.qty - stepOf(p, l.qty >= 1000)).coerceAtLeast(stepOf(p, l.qty >= 1000))) },
                                     { demo.setLineQty(p.id, l.qty + stepOf(p, l.qty >= 1000)) },
-                                    size = 44.dp, canMinus = l.qty > stepOf(p, l.qty >= 1000),
+                                    size = 48.dp, canMinus = l.qty > stepOf(p, l.qty >= 1000),
                                 )
                                 Spacer(Modifier.weight(1f))
-                                RoundBtn(Icons.Rounded.Delete, "Retirer ${p.name}", { demo.removeLine(p.id) }, size = 44.dp)
+                                RoundBtn(Icons.Rounded.Delete, "Retirer ${p.name}", { demo.removeLine(p.id) }, size = 48.dp)
                             }
                         }
                     }

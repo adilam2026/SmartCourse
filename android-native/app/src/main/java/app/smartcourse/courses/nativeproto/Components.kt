@@ -147,7 +147,7 @@ fun RowAction(text: String, onClick: () -> Unit, filled: Boolean, modifier: Modi
 @Composable
 fun SegTabs(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
     val cmp = LocalCompact.current
-    val h = if (cmp) 40.dp else 46.dp
+    val h = if (cmp) 40.dp else 48.dp
     Row(
         modifier.fillMaxWidth().height(h + 8.dp).clip(RoundedCornerShape(16.dp)).background(Color(0xFFE4EDF5)).padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
@@ -174,14 +174,18 @@ fun SegTabs(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modif
 
 @Composable
 fun ToggleChip(text: String, selected: Boolean, onClick: () -> Unit) {
+    val cmp = LocalCompact.current
     val shape = RoundedCornerShape(50)
-    Box(
-        Modifier.heightIn(min = 36.dp).clip(shape)
-            .background(if (selected) C.Navy else Color.White)
-            .border(BorderStroke(1.dp, if (selected) C.Navy else C.Line), shape)
-            .clickable(onClick = onClick).padding(horizontal = 14.dp),
-        contentAlignment = Alignment.Center,
-    ) { Text(text, color = if (selected) Color.White else C.Ink, style = MaterialTheme.typography.labelMedium, maxLines = 1) }
+    // Zone tactile : 48 dp au moins pour le personnel ; la pastille garde son aspect (36 dp).
+    Box(Modifier.heightIn(min = if (cmp) 36.dp else 48.dp).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier.heightIn(min = 36.dp).clip(shape)
+                .background(if (selected) C.Navy else Color.White)
+                .border(BorderStroke(1.dp, if (selected) C.Navy else C.Line), shape)
+                .padding(horizontal = 14.dp),
+            contentAlignment = Alignment.Center,
+        ) { Text(text, color = if (selected) Color.White else C.Ink, style = MaterialTheme.typography.labelMedium, maxLines = 1) }
+    }
 }
 
 @Composable

@@ -179,13 +179,16 @@ private fun AddDot() {
 
 @Composable
 private fun QtyChip(text: String, onClick: () -> Unit) {
-    Row(
-        Modifier.heightIn(min = 36.dp).clip(RoundedCornerShape(50)).background(Color.White).border(BorderStroke(1.dp, C.Teal), RoundedCornerShape(50))
-            .clickable(onClick = onClick).padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Text(text, style = MaterialTheme.typography.labelMedium, color = C.TealDark, maxLines = 1)
-        Icon(Icons.Rounded.Edit, "Modifier la quantité", tint = C.TealDark, modifier = Modifier.size(14.dp))
+    val cmp = LocalCompact.current
+    Box(Modifier.heightIn(min = if (cmp) 36.dp else 48.dp).clickable(onClick = onClick), contentAlignment = Alignment.CenterStart) {
+        Row(
+            Modifier.heightIn(min = 36.dp).clip(RoundedCornerShape(50)).background(Color.White).border(BorderStroke(1.dp, C.Teal), RoundedCornerShape(50))
+                .padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(text, style = MaterialTheme.typography.labelMedium, color = C.TealDark, maxLines = 1)
+            Icon(Icons.Rounded.Edit, "Modifier la quantité", tint = C.TealDark, modifier = Modifier.size(14.dp))
+        }
     }
 }
 
@@ -243,7 +246,7 @@ private fun SelBigCard(p: Product, openSheet: () -> Unit) {
                     qtyText(p, q),
                     { demo.selection[p.id] = (q - stepOf(p, big)).coerceAtLeast(stepOf(p, big)) },
                     { demo.selection[p.id] = q + stepOf(p, big) },
-                    size = 44.dp, canMinus = q > stepOf(p, big),
+                    size = if (LocalCompact.current) 44.dp else 48.dp, canMinus = q > stepOf(p, big),
                 )
                 Spacer(Modifier.weight(1f))
                 QtyChip("Quantité", openSheet)

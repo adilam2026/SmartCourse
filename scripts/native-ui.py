@@ -1,0 +1,66 @@
+#!/usr/bin/env python3
+"""Pilote l'interface de l'application native sur l'émulateur (adb + uiautomator), comme le ferait un utilisateur.
+Usage : native-ui.py tap TEXTE [--last|--first] | has TEXTE | wait TEXTE [secondes] | gone TEXTE [secondes]"""
+import re, subprocess, sys, time
+import xml.etree.ElementTree as ET
+
+
+def dump():
+    for _ in range(6):
+        subprocess.run(["adb", "shell", "uiautomator", "dump", "/sdcard/ui.xml"], capture_output=True)
+        r = subprocess.run(["adb", "exec-out", "cat", "/sdcard/ui.xml"], capture_output=True)
+        if r.stdout.strip().startswith(b"<?xml"):
+            return r.stdout.decode("utf-8", "replace")
+        time.sleep(1)
+    return ""
+
+
+def matches(xml, needle):
+    out = []
+    if not xml:
+        return out
+    for n in ET.fromstring(xml).iter("node"):
+        t = (n.get("text") or "") + "\n" + (n.get("content-desc") or "")
+        if needle in t:
+            m = re.findall(r"\d+", n.get("bounds") or "")
+            if len(m) == 4:
+                x1, y1, x2, y2 = map(int, m)
+                out.append(((x1 + x2) // 2, (y1 + y2) // 2, y1))
+    return sorted(out, key=lambda c: c[2])
+
+
+def main():
+    cmd, needle = sys.argv[1], sys.argv[2]
+    if cmd == "tap":
+        last = "--last" in sys.argv
+        deadline = time.time() + 12
+        while time.time() < deadline:
+            found = matches(dump(), needle)
+            if found:
+                x, y, _ = found[-1] if last else found[0]
+                subprocess.run(["adb", "shell", "input", "tap", str(x), str(y)])
+                return 0
+            time.sleep(1)
+        print(f"INTROUVABLE: {needle}")
+        return 1
+    secs = float(sys.argv[3]) if len(sys.argv) > 3 and not sys.argv[3].startswith("--") else 20.0
+    if cmd == "has":
+        return 0 if matches(dump(), needle) else 1
+    if cmd == "wait":
+        deadline = time.time() + secs
+        while time.time() < deadline:
+            if matches(dump(), needle):
+                return 0
+            time.sleep(1)
+        return 1
+    if cmd == "gone":
+        deadline = time.time() + secs
+        while time.time() < deadline:
+            if not matches(dump(), needle):
+                return 0
+            time.sleep(1)
+        return 1
+    return 2
+
+
+sys.exit(main())

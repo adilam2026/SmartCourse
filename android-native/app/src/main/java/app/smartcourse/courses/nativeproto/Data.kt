@@ -81,7 +81,7 @@ data class Profile(val name: String, val role: ProfRole, val primary: Boolean = 
 data class Order(val id: String, val date: String, val lines: List<Pair<String, Int>>)
 data class Toast(val message: String, val undoLabel: String? = null, val undo: (() -> Unit)? = null)
 
-class Demo {
+class Demo(initialRole: Role? = null) {
     private val long = Launch.flag("long")
 
     val products: List<Product> = buildList {
@@ -115,7 +115,7 @@ class Demo {
     }
     val byId: Map<String, Product> = products.associateBy { it.id }
 
-    var role by mutableStateOf(if (Launch.str("role") == "staff") Role.STAFF else Role.ADMIN)
+    var role by mutableStateOf(initialRole ?: if (Launch.str("role") == "staff") Role.STAFF else Role.ADMIN)
     var showPrices by mutableStateOf(Launch.flag("prices"))
     var showTotals by mutableStateOf(false)
     var selMode by mutableStateOf(

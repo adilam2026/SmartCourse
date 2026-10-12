@@ -1,7 +1,7 @@
-name: Prototype Android natif (manuel, sans déploiement)
+name: Android natif (compilation, tests, recette — sans déploiement)
 # Ne se lance que sur demande. Compile le module android-native (Kotlin + Jetpack Compose),
 # l'exécute sur un émulateur Android, capture les écrans réels et publie l'APK d'essai.
-# Aucun secret, aucun accès à Railway, aucune donnée réelle : l'application n'a aucune permission réseau.
+# Aucun secret, aucun accès à Railway, aucune donnée réelle : l'application ne parle qu'au serveur de recette que l'utilisateur saisit.
 on:
   workflow_dispatch:
   push:
@@ -23,12 +23,14 @@ jobs:
         run: |
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0" | tail -2
-      - name: Clé de signature jetable (essai)
-        run: |
-          F="$RUNNER_TEMP/proto.jks"; P=$(openssl rand -hex 16); echo "::add-mask::$P"
-          keytool -genkeypair -noprompt -keystore "$F" -storetype PKCS12 -alias proto -keyalg RSA -keysize 2048 -validity 90 -storepass "$P" -keypass "$P" -dname "CN=Courses natif ESSAI" >/dev/null 2>&1
-          echo "PROTO_KEYSTORE_PATH=$F" >> "$GITHUB_ENV"; echo "PROTO_KEYSTORE_PASSWORD=$P" >> "$GITHUB_ENV"
-          echo "PROTO_KEY_ALIAS=proto" >> "$GITHUB_ENV"; echo "PROTO_KEY_PASSWORD=$P" >> "$GITHUB_ENV"
+      - name: Tests unitaires (client HTTP, session, erreurs)
+        working-directory: android-native
+        run: ./gradlew --no-daemon testDebugUnitTest
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tests-unitaires
+          path: android-native/app/build/reports/tests/testDebugUnitTest/
       - name: Compilation de l'APK (release, R8)
         working-directory: android-native
         run: ./gradlew --no-daemon assembleRelease -PversionCode=${{ github.run_number }} -PversionName="0.1-proto.${{ github.run_number }}"
@@ -41,7 +43,13 @@ jobs:
           "$BT/apksigner" verify --print-certs "$APK" | grep -E "Verifies|SHA-256" | head -3
           grep -E "^package:" /tmp/badging.txt
           echo "--- permissions déclarées :"; grep -c "uses-permission" /tmp/badging.txt || true
-          ! grep -q "uses-permission" /tmp/badging.txt   # aucune permission, donc aucun accès réseau
+          # Seule permission autorisée : INTERNET (joindre le serveur choisi par l'utilisateur)
+          grep "uses-permission" /tmp/badging.txt | grep -v "android.permission.INTERNET" | grep -v "DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" && { echo "::error::permission inattendue"; exit 1; } || true
+          grep -q "android.permission.INTERNET" /tmp/badging.txt
+          # Signature de recette STABLE : toujours la même empreinte, pour mettre à jour sans désinstaller
+          FP=$("$BT/apksigner" verify --print-certs "$APK" | grep -m1 "certificate SHA-256 digest" | sed 's/.*: //')
+          echo "Empreinte de signature : $FP"
+          [ "$FP" = "49802f27bda9539d96401dc6fc7e82cf8788be0eb82da5ada41578e3239940d0" ] || { echo "::error::signature différente de la clé de recette stable"; exit 1; }
           grep -q "name='app.smartcourse.courses.nativeproto'" /tmp/badging.txt
           # Architecture : pas de WebView / TWA / Capacitor dans l'APK
           mkdir -p /tmp/dex && cd /tmp/dex && unzip -qo "$GITHUB_WORKSPACE/$APK" 'classes*.dex'
@@ -59,6 +67,43 @@ jobs:
         with:
           name: apk
           path: dist/
+
+  e2e:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk
+          path: dist
+      - name: Serveur de recette isolé (Docker, base jetable, comptes d'essai)
+        run: |
+          NO_TUNNEL=1 scripts/recette-locale.sh | tee /tmp/recette.out
+          CODE=$(grep -oE 'Code famille : [A-Z0-9]+' /tmp/recette.out | awk '{print $4}')
+          echo "FAMILY_CODE=$CODE" >> "$GITHUB_ENV"
+      - name: KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - name: Parcours de connexion sur émulateur Android
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
+          script: bash scripts/native-e2e.sh dist/CoursesNatif-proto.apk ${{ env.FAMILY_CODE }} native-e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e
+          path: native-e2e/
+      - run: scripts/recette-locale.sh --stop
+        if: always()
 
   captures:
     needs: build
@@ -92,7 +137,7 @@ jobs:
           path: native-captures/
 
   publier:
-    needs: [build, captures]
+    needs: [build, e2e, captures]
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[captures]')
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -110,10 +155,15 @@ jobs:
         with:
           name: captures
           path: native-captures
+      - uses: actions/download-artifact@v4
+        with:
+          name: e2e
+          path: native-e2e
       - name: Captures dans le dépôt (branche android-native uniquement)
         run: |
           rm -rf docs/native/captures && mkdir -p docs/native/captures
           cp native-captures/* docs/native/captures/
+          rm -rf docs/native/e2e && mkdir -p docs/native/e2e && cp native-e2e/* docs/native/e2e/
           mkdir -p docs/native/preuves && cp dist/badging.txt dist/webview.txt dist/dependances.txt docs/native/preuves/
           git config user.name "github-actions"; git config user.email "actions@users.noreply.github.com"
           git add docs/native
@@ -125,5 +175,5 @@ jobs:
         run: |
           gh release create "native-proto-${{ github.run_number }}" dist/CoursesNatif-proto.apk \
             --prerelease --target "${{ github.sha }}" \
-            --title "Courses natif — prototype visuel ${{ github.run_number }} (données fictives)" \
-            --notes "APK de démonstration du prototype Android natif (Kotlin + Jetpack Compose). Identifiant distinct app.smartcourse.courses.nativeproto : s'installe à côté de l'application actuelle. Données fictives locales, aucune permission réseau, aucune donnée réelle. Signature jetable d'essai : ne pas distribuer."
+            --title "Courses natif — recette ${{ github.run_number }}" \
+            --notes "APK de recette de l'application Android native (Kotlin + Jetpack Compose). Identifiant distinct app.smartcourse.courses.nativeproto : s'installe à côté de l'application actuelle. Signature de recette STABLE : s'installe par-dessus la version précédente, sans désinstaller. Connexion réelle au serveur de recette saisi dans l'application ; les listes restent simulées tant que le lot correspondant n'est pas livré. Ne pas distribuer."

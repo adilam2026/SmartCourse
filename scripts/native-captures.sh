@@ -21,6 +21,15 @@ adb shell wm dismiss-keyguard || true
 sleep 20
 
 W=360
+audit() { # nom : mesure les zones tactiles de l'écran affiché (personnel : 48 dp au moins)
+  local name=$1
+  adb shell uiautomator dump /sdcard/a.xml >/dev/null 2>&1
+  adb exec-out cat /sdcard/a.xml > "$OUT/${name}-${W}.xml"
+  local res
+  res=$(python3 scripts/touch-audit.py "$OUT/${name}-${W}.xml" $((1080 * 160 / W)) 2>&1); local rc=$?
+  echo "TOUCH_${name}_${W}=$([ $rc = 0 ] && echo OK || echo ECHEC) | $(echo "$res" | tr '\n' ' ')" >> "$OUT/controles.txt"
+}
+
 shot() { # nom, extras...
   local name=$1; shift
   adb shell am start -S -W -n "$PKG/.MainActivity" "$@" >/dev/null 2>&1
@@ -31,6 +40,7 @@ shot() { # nom, extras...
     adb shell am start -W -n "$PKG/.MainActivity" "$@" >/dev/null 2>&1; sleep 3
   fi
   adb exec-out screencap -p > "$OUT/${name}-${W}.png"
+  case "$name" in V01-connexion|V03-*|V04-selection-carres-personnel|V04-selection-liste-personnel|V04-selection-cartes-personnel|V05-personnel-*) audit "$name";; esac
 }
 
 run_all() {
@@ -54,6 +64,9 @@ run_all() {
   shot V04-selection-grandes-cartes --es screen v04 --es mode cards --ez preselect true
   shot V04-selection-carres-personnel --es screen v04 --es role staff --es mode grid --ez preselect true
   shot V04-selection-textes-longs --es screen v04 --es mode cards --ez long true
+  shot V04-selection-liste-personnel --es screen v04 --es role staff --es mode list --ez preselect true
+  shot V04-selection-cartes-personnel --es screen v04 --es role staff --es mode cards --ez preselect true
+  shot V05-personnel-quantite --es screen v04 --es role staff --es sheet tomates --ez selected true --es qty 1500
   shot V05-quantite-kg --es screen v04 --es sheet tomates --ez selected true --es qty 1500
   shot V05-quantite-g --es screen v04 --es sheet tomates --ez selected true --es qty 750
   shot V05-quantite-litre --es screen v04 --es sheet lait --ez selected true --es qty 1500

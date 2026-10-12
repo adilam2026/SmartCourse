@@ -33,6 +33,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,17 +49,56 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import app.smartcourse.courses.nativeproto.net.ApiClient
+import app.smartcourse.courses.nativeproto.net.AuthState
+import app.smartcourse.courses.nativeproto.net.EncryptedStorage
+import app.smartcourse.courses.nativeproto.net.Me
+import app.smartcourse.courses.nativeproto.net.Session
 
 class MainActivity : ComponentActivity() {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private var session: Session? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
-        Launch.extras = intent?.extras
+        // Paramètres de lancement : réservés au build de recette (captures automatiques d'écrans simulés).
+        Launch.extras = if (BuildConfig.RECETTE_HOOKS) intent?.extras else null
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(C.Navy.toArgb()),
             navigationBarStyle = SystemBarStyle.light(Color.White.toArgb(), Color.White.toArgb()),
         )
         super.onCreate(savedInstanceState)
-        setContent { CoursesTheme { App() } }
+        val storage = EncryptedStorage(applicationContext)
+        val s = Session(storage, ApiClient(storage), scope)
+        session = s
+        val demoMode = Launch.str("screen") != null || Launch.str("path") != null || Launch.flag("hub")
+        if (!demoMode) s.start()
+        setContent { CoursesTheme { Root(s, demoMode) } }
+    }
+
+    override fun onStart() { super.onStart(); session?.verify() }
+    override fun onDestroy() { super.onDestroy(); scope.cancel() }
+}
+
+@Composable
+private fun Root(session: Session, demoMode: Boolean) {
+    if (demoMode) { App(session, null); return }
+    when (val st = session.state) {
+        AuthState.Booting -> Box(Modifier.fillMaxSize().background(C.Bg))
+        AuthState.SignedOut -> {
+            val demo = remember { Demo() }
+            CompositionLocalProvider(LocalDemo provides demo, LocalCompact provides false) {
+                Column(Modifier.fillMaxSize().background(C.Bg)) {
+                    TopStrip("RECETTE · ${session.serverAddress?.substringAfter("://") ?: "serveur à définir"}", null)
+                    Column(Modifier.weight(1f).fillMaxWidth().imePadding()) { LoginScreen(session) { } }
+                }
+            }
+        }
+        is AuthState.SignedIn -> key(st.me.id) { App(session, st.me) }
     }
 }
 
@@ -88,14 +128,17 @@ private fun startRoute(): String = when (Launch.str("screen")?.lowercase()) {
 }
 
 @Composable
-fun App() {
-    val demo = remember { Demo() }
+fun App(session: Session, me: Me?) {
+    val uiRole = if (me?.role == "staff") Role.STAFF else Role.ADMIN
+    val demo = remember { Demo(if (me != null) uiRole else null) }
     val nav = rememberNavController()
     val entry by nav.currentBackStackEntryAsState()
     val route = entry?.destination?.route
     var hub by remember { mutableStateOf(Launch.once("hub")) }
+    var account by remember { mutableStateOf(false) }
+    var confirmLogout by remember { mutableStateOf(false) }
     val path = remember { Launch.str("path")?.split(",")?.filter { it.isNotBlank() } }
-    val start = remember { path?.firstOrNull() ?: startRoute() }
+    val start = remember { if (me != null) (if (uiRole == Role.STAFF) "v03" else "v02") else path?.firstOrNull() ?: startRoute() }
 
     LaunchedEffect(Unit) { path?.drop(1)?.forEach { nav.navigate(it) } }
 
@@ -104,18 +147,22 @@ fun App() {
         nav.navigate(r) { if (tab) { popUpTo(if (demo.role == Role.ADMIN) "v02" else "v03") { inclusive = false }; launchSingleTop = true } }
     }
     val back: () -> Unit = { nav.popBackStack() }
-    val tabs = if (demo.role == Role.ADMIN) ADMIN_TABS else STAFF_TABS
+    val tabs = if (demo.role == Role.ADMIN) (if (me?.role == "parent") ADMIN_TABS.filter { it.route != "v07" } else ADMIN_TABS) else STAFF_TABS
     val showBar = route != null && route != "v01" && route != "v04" &&
         (demo.role == Role.ADMIN || route == "v03")
 
     CompositionLocalProvider(LocalDemo provides demo, LocalCompact provides (demo.role == Role.ADMIN && route != "v01")) {
         Box(Modifier.fillMaxSize().background(C.Bg)) {
             Column(Modifier.fillMaxSize()) {
-                DemoStrip { hub = true }
+                if (me != null) TopStrip("RECETTE · connexion réelle · listes simulées", "Compte") { account = true }
+                else TopStrip("PROTOTYPE · données fictives", "Écrans de démo") { hub = true }
+                if (me != null && !session.online) Box(Modifier.fillMaxWidth().background(C.AmberSoft).padding(horizontal = 14.dp, vertical = 6.dp)) {
+                    Text("Hors connexion : session conservée sur ce téléphone.", color = C.Ink, style = MaterialTheme.typography.labelMedium)
+                }
                 Column(Modifier.weight(1f).fillMaxWidth().imePadding()) {
                     NavHost(nav, startDestination = start, modifier = Modifier.weight(1f)) {
                         composable("v01") {
-                            LoginScreen { role ->
+                            LoginScreen(null) { role ->
                                 demo.role = role
                                 nav.navigate(if (role == Role.ADMIN) "v02" else "v03") { popUpTo("v01") { inclusive = true } }
                             }
@@ -144,18 +191,46 @@ fun App() {
             demo.pendingSheet = if (r.startsWith("v04?sheet=")) r.substringAfter("=") else null
             nav.navigate(r.substringBefore("?")) { launchSingleTop = true }
         }
+        if (account && me != null) AccountSheet(me, session, { account = false }, { account = false; hub = true }, { account = false; confirmLogout = true })
+        if (confirmLogout) ConfirmDialog(
+            "Se déconnecter ?", "Vous devrez saisir à nouveau votre code d'accès pour rouvrir l'application.",
+            "Se déconnecter", { confirmLogout = false; session.signOut() }, { confirmLogout = false }, danger = true,
+        )
     }
 }
 
 @Composable
-private fun DemoStrip(onHub: () -> Unit) {
+private fun AccountSheet(me: Me, session: Session, onDismiss: () -> Unit, onDemo: () -> Unit, onLogout: () -> Unit) {
+    val roleLabel = when (me.role) { "admin" -> if (me.primary == true) "Administrateur principal" else "Administrateur"; "parent" -> "Parent"; else -> "Personnel" }
+    AppSheet(onDismiss) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Avatar(me.displayName.take(1).uppercase(), C.Teal, 52.dp)
+            Column(Modifier.weight(1f)) {
+                Text(me.displayName, style = MaterialTheme.typography.titleLarge, maxLines = 2)
+                Row(Modifier.padding(top = 4.dp)) { Pill(roleLabel, C.TealDark, C.TealSoft) }
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+        me.family?.let { Text("Famille : ${it.name} (${it.code})", style = MaterialTheme.typography.bodyMedium) }
+        me.city?.let { Text("Ville : $it", style = MaterialTheme.typography.bodyMedium) }
+        Text("Serveur : ${session.serverAddress?.substringAfter("://") ?: "—"}", style = MaterialTheme.typography.bodyMedium)
+        Text(if (session.online) "État : connecté" else "État : hors connexion, session conservée", style = MaterialTheme.typography.bodyMedium, color = if (session.online) C.TealDark else C.Amber)
+        Spacer(Modifier.height(16.dp))
+        SecondaryButton("Écrans de démo (données simulées)", onDemo, Modifier.fillMaxWidth())
+        Spacer(Modifier.height(10.dp))
+        SecondaryButton("Se déconnecter", onLogout, Modifier.fillMaxWidth(), danger = true)
+    }
+}
+
+@Composable
+private fun TopStrip(left: String, action: String?, onAction: () -> Unit = {}) {
     Row(
         Modifier.fillMaxWidth().background(C.Navy).statusBarsPadding().height(26.dp).padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("PROTOTYPE · données fictives", color = Color(0xFF7FE3DE), fontSize = 11.sp, letterSpacing = 0.4.sp, modifier = Modifier.weight(1f), maxLines = 1)
-        Row(Modifier.clip(RoundedCornerShape(50)).clickable(onClick = onHub).padding(horizontal = 8.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("Écrans de démo", color = Color.White, fontSize = 11.sp)
+        Text(left, color = Color(0xFF7FE3DE), fontSize = 11.sp, letterSpacing = 0.4.sp, modifier = Modifier.weight(1f), maxLines = 1)
+        if (action != null) Row(Modifier.clip(RoundedCornerShape(50)).clickable(onClick = onAction).padding(horizontal = 8.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(action, color = Color.White, fontSize = 11.sp)
             Icon(Icons.Rounded.KeyboardArrowDown, null, tint = Color.White, modifier = Modifier.width(16.dp))
         }
     }
