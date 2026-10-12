@@ -33,13 +33,18 @@ def main():
     cmd, needle = sys.argv[1], sys.argv[2]
     if cmd == "tap":
         last = "--last" in sys.argv
+        scroll = "--scroll" in sys.argv
         deadline = time.time() + 12
+        swipes = 0
         while time.time() < deadline:
             found = matches(dump(), needle)
             if found:
                 x, y, _ = found[-1] if last else found[0]
                 subprocess.run(["adb", "shell", "input", "tap", str(x), str(y)])
                 return 0
+            if scroll and swipes < 4:  # élément hors écran dans un panneau défilant : on fait défiler vers le bas
+                subprocess.run(["adb", "shell", "input", "swipe", "540", "1700", "540", "1000", "300"])
+                swipes += 1
             time.sleep(1)
         print(f"INTROUVABLE: {needle}")
         return 1
