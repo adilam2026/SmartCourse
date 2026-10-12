@@ -14,7 +14,10 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 SRC = "android-native/icon/courses-icon-source.png"
 RES = "android-native/app/src/main/res"
 OUTDOCS = "docs/native/icone"
-SAFE_DP = 33.0  # rayon de la zone sûre d'une icône adaptative (66 dp de diamètre sur 108 dp)
+SAFE_DP = 33.0
+FG_SCALE = float(os.environ.get("FG_SCALE", "1.0"))   # réduction du premier plan seul (0.85 = -15 %)
+FG_MODE = os.environ.get("FG_MODE", "image")          # image : image entière à bords fondus ; panier : image exacte, opaque autour du panier seulement
+DRY = os.environ.get("DRY") == "1"                    # DRY=1 : ne touche à aucune ressource, produit seulement la comparaison dans docs/native/icone-comparaison/  # rayon de la zone sûre d'une icône adaptative (66 dp de diamètre sur 108 dp)
 DENS = {"mdpi": (48, 108), "hdpi": (72, 162), "xhdpi": (96, 216), "xxhdpi": (144, 324), "xxxhdpi": (192, 432)}
 
 src = Image.open(SRC).convert("RGB")
@@ -44,7 +47,8 @@ print(f"panier : centre {c.round(1)}, rayon {R:.1f} px sur {N} px")
 
 # 3. Fond sans panier : diffusion lisse dans la zone du panier (grille 128 px), puis prolongement
 G = 128
-mask_d = Image.fromarray((mask * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(31))
+_q = Image.fromarray((mask * 255).astype(np.uint8)).resize((N // 4, N // 4), Image.BILINEAR).filter(ImageFilter.MaxFilter(55))
+mask_d = _q.resize((N, N), Image.BICUBIC).point(lambda v: 255 if v > 40 else 0)
 small_mask = np.asarray(mask_d.resize((G, G), Image.BILINEAR)) > 20
 small = np.asarray(src.resize((G, G), Image.LANCZOS)).astype(np.float32)
 known = ~small_mask
@@ -55,7 +59,7 @@ for _ in range(2500):
     avg = (p[:-2, 1:-1] + p[2:, 1:-1] + p[1:-1, :-2] + p[1:-1, 2:]) / 4
     fill = np.where(small_mask[..., None], avg, small)
 up = np.asarray(Image.fromarray(np.clip(fill, 0, 255).astype(np.uint8)).resize((N, N), Image.BICUBIC)).astype(np.float32)
-soft = np.asarray(mask_d.filter(ImageFilter.GaussianBlur(10))).astype(np.float32)[..., None] / 255.0
+soft = np.asarray(mask_d.filter(ImageFilter.GaussianBlur(26))).astype(np.float32)[..., None] / 255.0
 bg_full = a * (1 - soft) + up * soft          # fond de l'image sans le panier
 
 # 4. Mise à l'échelle : le panier entier dans la zone sûre, centré sur le centre du cercle
@@ -82,24 +86,37 @@ def place(img_arr_rgb, fill_edge_blur=True):
 
 background = place(bg_full)                      # arrière-plan : fond bleu nuit seul, prolongé
 
-# premier plan : l'image exacte, alpha dégradé sur sa marge extérieure uniquement
-fg = Image.new("RGBA", (MASTER, MASTER), (0, 0, 0, 0))
-im_fg = src.resize((size, size), Image.LANCZOS).convert("RGBA")
-fade = int(size * 0.07)
-yy, xx = np.mgrid[0:size, 0:size]
-dist = np.minimum.reduce([xx, yy, size - 1 - xx, size - 1 - yy]).astype(np.float32)
-t = np.clip(dist / fade, 0, 1); alpha = (t * t * (3 - 2 * t) * 255).astype(np.uint8)
-im_fg.putalpha(Image.fromarray(alpha))
-fg.alpha_composite(im_fg, (ox, oy))
+def make_fg(scale, mode):
+    """Premier plan : l'image exacte (jamais redessinée), mise à l'échelle autour du même centre. Le fond bleu nuit (arrière-plan) n'est pas touché."""
+    fsz = int(round(N * f * scale))
+    fox = int(round(MASTER / 2 - c[0] * f * scale)); foy = int(round(MASTER / 2 - c[1] * f * scale))
+    layer = Image.new("RGBA", (MASTER, MASTER), (0, 0, 0, 0))
+    im_fg = src.resize((fsz, fsz), Image.LANCZOS).convert("RGBA")
+    if mode == "image":
+        fade = int(fsz * 0.07)
+        yy, xx = np.mgrid[0:fsz, 0:fsz]
+        dist = np.minimum.reduce([xx, yy, fsz - 1 - xx, fsz - 1 - yy]).astype(np.float32)
+        t = np.clip(dist / fade, 0, 1); alpha = (t * t * (3 - 2 * t) * 255).astype(np.uint8)
+    else:
+        # opaque sur le panier, ses produits, ses anses et l'ombre (zone dilatée), fondu doux au-delà : le reste montre l'arrière-plan
+        q = Image.fromarray((mask * 255).astype(np.uint8)).resize((N // 4, N // 4), Image.BILINEAR).filter(ImageFilter.MaxFilter(47))
+        q = q.filter(ImageFilter.GaussianBlur(11)).resize((N, N), Image.BICUBIC)
+        a_src = np.clip(np.asarray(q).astype(np.float32) / 255.0 * 1.6, 0, 1)
+        alpha = np.asarray(Image.fromarray((a_src * 255).astype(np.uint8)).resize((fsz, fsz), Image.LANCZOS))
+    im_fg.putalpha(Image.fromarray(alpha))
+    layer.alpha_composite(im_fg, (fox, foy))
+    return layer, fsz, fox, foy
+
+fg, fg_size, fg_ox, fg_oy = make_fg(FG_SCALE, FG_MODE)
 
 # monochrome : silhouette du panier (écart au fond), trous des fentes conservés
 diff = np.linalg.norm(a - bg_full, axis=2)
 mono_a = np.clip((diff - 45) / 45.0, 0, 1)
 mono_a = np.asarray(Image.fromarray((mono_a * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(1.2)))
-mono_small = Image.fromarray(mono_a).resize((size, size), Image.LANCZOS)
+mono_small = Image.fromarray(mono_a).resize((fg_size, fg_size), Image.LANCZOS)
 mono = Image.new("RGBA", (MASTER, MASTER), (0, 0, 0, 0))
-white = Image.new("RGBA", (size, size), (255, 255, 255, 255)); white.putalpha(mono_small)
-mono.alpha_composite(white, (ox, oy))
+white = Image.new("RGBA", (fg_size, fg_size), (255, 255, 255, 255)); white.putalpha(mono_small)
+mono.alpha_composite(white, (fg_ox, fg_oy))
 
 def save_layers():
     for d, (leg, lay) in DENS.items():
@@ -114,11 +131,61 @@ def save_layers():
         circ = Image.new("L", big.size, 0); ImageDraw.Draw(circ).ellipse([0, 0, big.width - 1, big.height - 1], fill=255)
         big.putalpha(circ); big.resize((leg, leg), Image.LANCZOS).save(f"{RES}/mipmap-{d}/ic_launcher_round.png", optimize=True)
 
+def composite_layers(bgl, fgl, lay_px):
+    bgp = bgl.resize((lay_px, lay_px), Image.LANCZOS).convert("RGBA")
+    bgp.alpha_composite(fgl.resize((lay_px, lay_px), Image.LANCZOS))
+    k = lay_px / 108.0
+    return bgp.crop((int(18 * k), int(18 * k), int(90 * k), int(90 * k)))
+
+if DRY:
+    cmp_dir = "docs/native/icone-comparaison"; os.makedirs(cmp_dir, exist_ok=True)
+    fg_before, *_ = make_fg(1.0, "image")
+    fg_after, *_ = make_fg(0.85, "basket")
+    try:
+        F = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 15); FB = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 16)
+    except Exception:
+        F = FB = None
+    def msk(kind, s):
+        m = Image.new("L", (s * 4, s * 4), 0); d = ImageDraw.Draw(m); S = s * 4
+        if kind == "rond": d.ellipse([0, 0, S - 1, S - 1], fill=255)
+        else: d.rounded_rectangle([0, 0, S - 1, S - 1], radius=int(S * 0.28), fill=255)
+        return m.resize((s, s), Image.LANCZOS)
+    D = 3  # 3 px par dp (écran xxhdpi) : un icône de 48 dp mesure 144 px, de 64 dp 192 px
+    cols = [("rond", 48), ("rond", 64), ("carré arrondi", 48), ("carré arrondi", 64)]
+    cw, ch = 250, 250
+    Wc = 150 + cw * len(cols); Hc = 90 + 2 * ch + 40
+    sheet = Image.new("RGB", (Wc, Hc), (236, 241, 247)); dr = ImageDraw.Draw(sheet)
+    dr.text((10, 10), "Comparaison avant / après : premier plan réduit de 15 % (fond bleu nuit inchangé), tailles réelles à 3 px/dp", fill=(11, 42, 74), font=FB)
+    for ci, (kd, dp) in enumerate(cols):
+        dr.text((150 + ci * cw + 20, 50), f"{kd} · {dp} dp", fill=(11, 42, 74), font=F)
+    for ri, (name, layer) in enumerate([("AVANT", fg_before), ("APRÈS (−15 %)", fg_after)]):
+        y0 = 80 + ri * (ch + 20)
+        dr.text((10, y0 + 100), name, fill=(11, 42, 74), font=FB)
+        for ci, (kd, dp) in enumerate(cols):
+            px = dp * D
+            ic = composite_layers(background, layer, 432).resize((px, px), Image.LANCZOS)
+            tile = Image.new("RGBA", (px, px), (0, 0, 0, 0)); tile.paste(ic, (0, 0)); tile.putalpha(msk(kd, px))
+            sheet.paste(tile, (150 + ci * cw + (cw - px) // 2, y0 + (ch - px) // 2), tile)
+    sheet.save(f"{cmp_dir}/avant-apres-48-64.png", optimize=True)
+    # grande version pour juger les proportions (192 dp à 3 px/dp = 576 px) + couches
+    big = Image.new("RGB", (576 * 2 + 30, 2 * 0 + 576 + 60), (236, 241, 247)); d2 = ImageDraw.Draw(big)
+    for i, (nm, layer) in enumerate([("AVANT", fg_before), ("APRÈS (−15 %)", fg_after)]):
+        ic = composite_layers(background, layer, 864).resize((576, 576), Image.LANCZOS)
+        t = Image.new("RGBA", (576, 576), (0, 0, 0, 0)); t.paste(ic, (0, 0)); t.putalpha(msk("carré arrondi", 576))
+        big.paste(t, (i * 606, 50), t); d2.text((i * 606 + 10, 15), nm + " · carré arrondi", fill=(11, 42, 74), font=FB)
+    big.save(f"{cmp_dir}/avant-apres-grand.png", optimize=True)
+    # mesures
+    def bbox_ratio(layer):
+        al = np.asarray(layer)[..., 3]
+        return None
+    print("comparaison écrite dans", cmp_dir)
+    raise SystemExit(0)
+
 save_layers()
 
 # écran de démarrage : le panier dans le cercle de 192 dp (toile de 288 dp à 4 px/dp)
 SPL = 1152
-fs = (90.0 * 4.0) / R
+fs = (90.0 * 4.0) / R * FG_SCALE
 ssz = int(round(N * fs))
 sp = src.resize((ssz, ssz), Image.LANCZOS).convert("RGBA")
 fade2 = int(ssz * 0.18)
