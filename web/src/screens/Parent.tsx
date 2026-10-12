@@ -196,7 +196,7 @@ function Current({ engine, s, onEdit, onFavorites }: { engine: Engine; s: State;
               <button className="row__main" data-testid={`detail-${i.productId}`} aria-label={`Détail des modifications de ${i.name}`} onClick={() => setDetail(i.id)}>
                 <b>{i.name}</b>
                 <span className="rowqty" data-testid={`qty-${i.productId}`}>{fmtQty(i.quantity, i.unit)}</span>
-                {(i.brand || !i.productActive) && <small>{[i.brand, i.productActive ? null : "désactivé"].filter(Boolean).join(" · ")}</small>}
+                {(i.brand || !i.productActive) && <small>{[i.brand, i.productActive ? null : "masqué"].filter(Boolean).join(" · ")}</small>}
                 <PriceTag price={priceOfLine(i, i.productId, prices, true)} qty={i.quantity} unit={i.unit} prefs={prefs} testid={`price-${i.productId}`} showMissing />
                 <RowMeta item={i} />
               </button>

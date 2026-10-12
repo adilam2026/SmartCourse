@@ -62,7 +62,7 @@ const Tile = memo(function Tile({ p, mode, state, qty, price, emoji, readOnly, q
       <span className="v3tile__body">
         <span className="v3tile__name" title={p.name}>{p.name}</span>
         {p.brand && <small>{p.brand}</small>}
-        {p.inactive && <small>désactivé</small>}
+        {p.inactive && <small>masqué</small>}
         {selected && qty !== undefined && <span className="v3tile__qty" data-testid={`v3qty-${p.id}`}>{fmtQty(qty, p.unit as Unit)}</span>}
         {selected && <span className={`v3tile__status v3tile__status--${state}`} data-testid={`v3status-${p.id}`}>{status[0]!.toUpperCase() + status.slice(1)}</span>}
         {state === "bought" && <span className="v3tile__qty v3tile__qty--bought">Acheté</span>}

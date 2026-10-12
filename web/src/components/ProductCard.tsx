@@ -81,7 +81,7 @@ export const ProductCard = memo(function ProductCard({ productId, name, brand, p
       <button type="button" className="card__name" tabIndex={-1} aria-hidden="true" onClick={tap}>
         <span className="card__title" title={name}>{name}</span>
         {brand ? <small>{brand}</small> : null}
-        {inactive ? <small>désactivé</small> : null}
+        {inactive ? <small>masqué</small> : null}
         {again ? <small className="card__again">Nouvelle demande</small> : null}
         {priceNode}
         {state === "saved" ? <span className="card__tag" data-testid={`tag-${productId}`}>✓ À acheter</span> : null}

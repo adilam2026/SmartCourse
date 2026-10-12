@@ -772,3 +772,46 @@ html[data-ui="compact"] .v3tile--list .v3tile__photo { width: 4.5rem; height: 4.
 .v3tile__status--unsaved { color: var(--amber); }
 .slbadge--pending { color: var(--slate); background: var(--slate-soft); border-style: dashed; }
 .slrow--pending { border-style: dashed; border-color: var(--slate); background: var(--slate-soft); }
+
+/* ---------- catalogue administrateur : onglets, interrupteur Affiché / Masqué ---------- */
+.cattabs { margin-top: 0.4rem; }
+.cattabs button { font-size: 0.9rem; white-space: nowrap; padding: 0.2rem 0.2rem; }
+.photoslink { margin: 0.2rem 1rem 0 !important; }
+.row--cat3 { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "thumb name switch" "thumb btns btns"; align-items: center; gap: 0.2rem 0.6rem; }
+.row--cat3 > .thumb { grid-area: thumb; align-self: start; }
+.row--cat3 > .row__name { grid-area: name; }
+.row--cat3 > .switch { grid-area: switch; }
+.row--cat3 > .rowbtns { grid-area: btns; display: flex; justify-content: flex-end; gap: 0.3rem; flex-wrap: wrap; }
+.switch { display: inline-flex; align-items: center; gap: 0.45rem; min-height: var(--tap); padding: 0 0.2rem; border: 0; background: transparent; font: inherit; color: var(--muted); font-weight: 700; cursor: pointer; }
+.switch__track { position: relative; width: 2.9rem; height: 1.7rem; border-radius: 999px; background: var(--line-strong); transition: background 0.15s; flex: none; }
+.switch__track i { position: absolute; top: 0.2rem; left: 0.2rem; width: 1.3rem; height: 1.3rem; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / 0.3); transition: transform 0.15s; }
+.switch.on { color: var(--green-ink); }
+.switch.on .switch__track { background: var(--green); }
+.switch.on .switch__track i { transform: translateX(1.2rem); }
+.switch__label { min-width: 4.1rem; text-align: left; font-size: 0.88rem; }
+.row--cat3.row--off { opacity: 0.85; }
+.row--cat3.row--off .row__name { opacity: 0.65; }
+
+/* ---------- Gestion des prix ---------- */
+.pricesadmin { display: grid; grid-template-columns: minmax(0, 1fr); }
+.catchip--todo { margin: 0 1rem 0.3rem; justify-self: start; }
+.catchip--todo.on { border-color: var(--amber); color: var(--amber); background: var(--amber-soft); }
+.pricerow { align-items: center; }
+.pricepill { flex: none; display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.1rem 0.4rem; min-height: var(--tap); max-width: 11rem; padding: 0.25rem 0.7rem; border-radius: 12px; border: 1.5px solid var(--line-strong); background: var(--surface); font: inherit; font-weight: 800; color: var(--ink); cursor: pointer; text-align: right; }
+.pricepill small { flex: 1 0 100%; color: var(--amber); font-weight: 700; }
+.pricepill--missing { border-color: var(--amber); background: var(--amber-soft); color: var(--amber); border-style: dashed; }
+.pricepill--incomplete { border-color: var(--amber-line); }
+.pricepill .naturechip { margin-left: 0; }
+.pricerow .row__name { flex: 1 1 5rem; }
+.pafilters { display: flex; gap: 0.5rem; align-items: center; margin: 0.4rem 1rem; }
+.pafilters select { flex: 1; min-width: 0; }
+.pafilters .catchip--todo { margin: 0; flex: none; }
+.pricerow .row__name { flex: 1 1 5.5rem; overflow-wrap: break-word; }
+.pricepill { flex: 0 1 auto; max-width: 9.5rem; }
+.row--cat4 { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.5rem; }
+.row--cat4 .row__name { flex: 1 1 6rem; min-width: 0; overflow-wrap: break-word; }
+.row--cat4 .rowbtns { flex: none; display: inline-flex; gap: 0.3rem; align-items: center; margin-left: auto; }
+.row--cat4 .switch { padding: 0 0.1rem; }
+.stateon { color: var(--green-ink); }
+.stateoff { color: var(--muted); }
+.row--cat4.row--off .row__name { opacity: 0.7; }

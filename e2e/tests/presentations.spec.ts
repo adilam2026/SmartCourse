@@ -164,10 +164,13 @@ for (const s of SIZES) {
       await expect(page.locator("[data-testid^='photosrc-']")).toHaveCount(0);
       expect(await noOverflow(page)).toBe(true);
       // filtres entiers (retour à la ligne) et boutons dans l'écran
+      for (const t of ["cat-tab-all", "cat-tab-shown", "cat-tab-hidden"]) await inside(page, t); // onglets entiers
+      await page.getByTestId("pf-toggle").click();
       for (const t of ["pf-all", "pf-check", "pf-own", "pf-none"]) await inside(page, t);
+      await page.getByTestId("pf-toggle").click();
       await inside(page, "add-article");
       const row = (await page.getByTestId("prod-Tomates").boundingBox())!;
-      expect(row.height).toBeLessThanOrEqual(84);
+      expect(row.height).toBeLessThanOrEqual(120);
       await page.screenshot({ path: `${OUT}/administrateur-catalogue-${s.name}.png` });
       // Modifier / Prix : toujours le bon article
       await page.getByTestId("edit-Pâtes").click();
@@ -182,12 +185,12 @@ for (const s of SIZES) {
       const cat = Object.fromEntries((await (await f.adil.get("/api/catalog")).json()).categories.flatMap((c: any) => c.products).map((p: any) => [p.name, p]));
       expect(cat["Lentilles"].price).toMatchObject({ amount: "12.00", source: "family" });
       expect(cat["Pâtes"].price?.source).not.toBe("family");
-      // « autres actions » : menu ancré, entièrement visible
-      await page.getByTestId("more-Tomates").click();
-      await inside(page, "more-Tomates-menu");
-      await page.screenshot({ path: `${OUT}/administrateur-catalogue-menu-${s.name}.png` });
+      // interrupteur Affiché / Masqué : réversible, entièrement visible
+      await inside(page, "active-Tomates");
       await page.getByTestId("active-Tomates").click();
+      await expect(page.getByTestId("state-Tomates")).toHaveText("Masqué");
       expect(((await (await f.adil.get("/api/catalog?includeInactive=1")).json()).categories.flatMap((c: any) => c.products).find((p: any) => p.name === "Tomates")).active).toBe(false);
+      await page.screenshot({ path: `${OUT}/administrateur-catalogue-menu-${s.name}.png` });
       // fiche et fenêtre Prix en présentation compacte
       await page.getByTestId("edit-Riz").click();
       await inside(page, "pf-save");

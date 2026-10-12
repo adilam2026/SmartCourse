@@ -88,7 +88,7 @@ export function ProductForm({ product, categories, onClose, onSaved }: Props) {
             {UNITS.map((u) => <option key={u} value={u}>{UNIT_CHOICE[u]}</option>)}
           </select>
         </label>
-        <label className="check"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} data-testid="pf-active" /> Article actif</label>
+        <label className="check"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} data-testid="pf-active" /> Article affiché</label>
         {error && <p className="error" role="alert" data-testid="pf-error">{error}</p>}
         <div className="form__actions">
           <button className="btn btn--primary btn--big" disabled={busy || !name.trim()} aria-busy={busy} data-testid="pf-save">{busy ? "Enregistrement…" : "Enregistrer"}</button>

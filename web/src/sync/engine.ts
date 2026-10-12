@@ -853,7 +853,7 @@ export class Engine {
     ].filter(Boolean);
     this.notice(`« ${title} » préparé : ${parts.length ? parts.join(", ") : "rien à changer"}. Modifiez si besoin puis validez.`);
     const skipped: string[] = [];
-    if (report.inactive.length) skipped.push(`produits désactivés (non réactivés) : ${report.inactive.join(", ")}`);
+    if (report.inactive.length) skipped.push(`produits masqués (non réaffichés) : ${report.inactive.join(", ")}`);
     if (report.unitMismatch.length) skipped.push(`unité différente (non modifiés) : ${report.unitMismatch.join(", ")}`);
     if (report.purchased.length) skipped.push(`déjà achetés dans cette liste : ${report.purchased.join(", ")}`);
     if (skipped.length) this.notice(`Non repris — ${skipped.join(" ; ")}.`);

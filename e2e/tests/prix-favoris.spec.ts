@@ -170,7 +170,7 @@ test.describe("favoris", () => {
     await expect(page.getByTestId(`qty-input-${f.products["Tomates"]}`)).toHaveValue("1,5");
     await expect(page.getByTestId(`qty-input-${f.products["Oignons"]}`)).toHaveValue("3");
     await expect(page.getByTestId(`qty-input-${f.products["Carottes"]}`)).toHaveValue("2");
-    await expect(page.getByTestId("banners")).toContainText("désactivés (non réactivés) : Pommes").catch(async () => expect(page.locator("body")).toContainText("désactivés (non réactivés) : Pommes"));
+    await expect(page.getByTestId("banners")).toContainText("masqués (non réaffichés) : Pommes").catch(async () => expect(page.locator("body")).toContainText("désactivés (non réactivés) : Pommes"));
     expect((await catalog(f))["Pommes"].active).toBe(false);
     await page.getByTestId("validate").click();
     await expect.poll(async () => ((await (await f.adil.get("/api/lists/active")).json()).list.items as any[]).length).toBe(3);

@@ -216,3 +216,24 @@ Branche `claude/v3-selection`, derrière l'aperçu V3 pour la partie personnel ;
 | D1e | Confirmation permettant de rejoindre la liste | ✅ | V3 | Après « Valider » : « Voir la liste du jour » | `v3-personnel` | — |
 | B1b | Trois modes visibles sur l'écran de sélection | ✅ | V3 | Choisir | `v3-personnel`, `v3-selection` | — |
 | B1c | Nombre réel d'articles accessibles | ✅ | V3 | Choisir (« 80 articles ») | `v3-personnel` (égal au catalogue actif) | — |
+
+## Lot 3 et 4 — Gestion des prix et Catalogue (mise à jour)
+Branche `claude/v3-selection` ; aucune fusion, aucun déploiement, aucune donnée réelle touchée. Validation visuelle sur téléphone : **non faite** (captures = Chromium émulé 360/390 px).
+
+| # | Élément | Statut | Accès · rôles | Preuve |
+|---|---|---|---|---|
+| G1 | Écran dédié « Gestion des prix », entrée dans le menu admin | ✅ | Menu admin → Gestion des prix · A, P | `v3-prix-catalogue` · `v3/gestion-prix-{360,390}.png` |
+| G2 | Recherche, filtre par catégorie, bascule « À compléter (n) » | ✅ | idem | `v3/gestion-prix-a-completer-*.png` |
+| G3 | Modification rapide (photo · nom · prix · unité de référence) | ✅ | idem | `v3/gestion-prix-modification-*.png` |
+| G4 | Prix manquants signalés | ✅ | idem | idem |
+| G5 | Synchronisation des prix de la ville | ✅ | idem | `v3/gestion-prix-synchro-390.png` |
+| G6 | Accès Catalogue → Prix, références de conditionnement, prix personnalisés et anciennes listes conservés | ✅ | Catalogue | `prix-favoris`, `articles-admin` |
+| F1 | Catalogue compact, onglets Tous / Affichés / Masqués avec compteurs réels | ✅ | Catalogue · A, P | `v3/catalogue-onglets-*.png` |
+| F2 | Interrupteurs réversibles, libellés Affiché / Masqué, aucun historique modifié ou supprimé | ✅ | idem | `v3/catalogue-masques-*.png` |
+| F3 | Actions courtes Modifier et Prix | ✅ | idem | `v3-prix-catalogue` |
+| B9e | Libellés simples « Sélection en cours », « À acheter », « Acheté » ; hors ligne : « Envoi en attente » | ✅ | Personnel | `v3-personnel` |
+| B9f | Brouillon isolé par famille et par profil, avis en cas de perte au changement de compte | ✅ | Personnel | `v3-personnel-securite` |
+| B9g | Demande hors ligne après clôture/suppression de liste : pas d'ajout à une archive, pas de recréation, pas de perte silencieuse (« Reprendre ») | ✅ | Personnel | `v3-personnel-securite` |
+| D1f | Progression calculée sur les seuls articles enregistrés, état vide propre | ✅ | Personnel | `v3-personnel-securite` |
+
+Toujours différé : note facultative, export (non affiché), étapes 5–7, défaut d'activation des notifications (à diagnostiquer sur téléphone).

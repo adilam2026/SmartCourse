@@ -67,8 +67,7 @@ test("ajout, déjà disponible, réactivation sans recréer ; recherche commune"
   await page.getByTestId("all-search").fill("tomates");
   await expect(page.getByTestId("all-have-Tomates")).toBeVisible();
   await page.getByTestId("cat-view-mine").click();
-  await page.getByTestId("more-Tomates").click();
-  await page.getByTestId("active-Tomates").click();
+  await page.getByTestId("active-Tomates").click(); // interrupteur Affiché / Masqué
   await page.getByTestId("cat-view-all").click();
   await page.getByTestId("all-search").fill("tomates");
   await page.getByTestId("all-react-Tomates").click();
@@ -132,6 +131,7 @@ test("photo erronée d'un article : repérée, comparée, remplacée par la phot
   await uiLogin(page, f, "adil", "482913");
   await page.getByTestId("tab-settings").click();
   await page.getByTestId("seg-catalog").click();
+  await page.getByTestId("pf-toggle").click(); // contrôle des photos (replié par défaut)
   await expect(page.getByTestId("pf-own")).toContainText("(2)"); // les deux photos propres à la famille sont comptées ; plus de mention répétée par ligne
   await expect(page.locator("[data-testid^='photosrc-']")).toHaveCount(0);
   await page.getByTestId("pf-check").click();
