@@ -1,4 +1,4 @@
-{"liste": "bfc21769-0d35-47da-9760-0546b31baa97", "articles": ["Tomates", "Pommes de terre", "Courgettes", "Bananes", "Yaourt nature", "Riz", "Lait", "Œufs", "Pain"], "achetes": ["Lait", "Œufs", "Pain"]}
+{"liste": "98897675-e0df-4091-8daa-2755938c26fc", "articles": ["Tomates", "Pommes de terre", "Courgettes", "Bananes", "Yaourt nature", "Riz", "Lait", "Œufs", "Pain"], "achetes": ["Lait", "Œufs", "Pain"]}
 PASS  S0. données fictives : 3 courses passées, 1 liste en cours
 PASS  S1. liste partagée affichée
 capture play-1-liste-partagee
