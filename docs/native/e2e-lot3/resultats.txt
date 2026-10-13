@@ -25,7 +25,7 @@ PASS  J4. l'ancienne liste archivée n'a pas été modifiée
 PASS  K0. déconnecté
 PASS  K0a. aide à la connexion
 PASS  K0b. récupération du code par e-mail (formulaire réel)
-PASS  K0c. création de famille : lien d'installation exigé (aucun champ technique)
+PASS  K0c. création de famille : formulaire direct, sans lien ni jeton
 PASS  K1. personnel : accueil direct sur « Choisir mes articles »
 PASS  K1b. personnel : aucun onglet en bas (ni Choisir ni Liste du jour)
 PASS  K2. article demandé repéré avec sa quantité enregistrée
@@ -76,16 +76,16 @@ PASS  Q3. sauvegarde : lecture seule, état réel
 PASS  Q4. à propos : version et serveur
 PASS  Q5. notifications activées
 PASS  Q6. tâche périodique programmée par Android
-tâche WorkManager n°1
-10-13 19:29:28.871 25120 25120 I CoursesNotif: déclenchement de la vérification (recette), nouvelle instance
-10-13 19:29:29.537 25120 25143 I CoursesNotif: vérification : réponse du serveur = 4 demande(s) ; repère = 3 déjà vue(s) ; nouvelles d'autres profils = 1 ; autorisé = true
-10-13 19:29:29.539 25120 25143 I CoursesNotif: notification transmise à Android : « Nouvelle demande »
-10-13 19:29:29.540 25120 25143 I CoursesNotif: vérification terminée, réussie=true
+tâche WorkManager n°0
+10-13 20:36:02.769 25104 25104 I CoursesNotif: déclenchement de la vérification (recette), nouvelle instance
+10-13 20:36:03.314 25104 25126 I CoursesNotif: vérification : réponse du serveur = 4 demande(s) ; repère = 3 déjà vue(s) ; nouvelles d'autres profils = 1 ; autorisé = true
+10-13 20:36:03.316 25104 25126 I CoursesNotif: notification transmise à Android : « Nouvelle demande »
+10-13 20:36:03.316 25104 25126 I CoursesNotif: vérification terminée, réussie=true
 --- diagnostic notification ---
-10-13 19:29:28.760 25120 25120 D WM-WrkMgrInitializer: Initializing WorkManager with default configuration.
-10-13 19:29:28.771 25120 25120 D WM-PackageManagerHelper: Skipping component enablement for androidx.work.impl.background.systemjob.SystemJobService
-10-13 19:29:28.771 25120 25120 D WM-Schedulers: Created SystemJobScheduler and enabled SystemJobService
-    NotificationRecord(0x068b8ddc: pkg=app.smartcourse.courses.nativeproto user=UserHandle{0} id=1001 tag=null importance=3 key=0|app.smartcourse.courses.nativeproto|1001|null|10194: Notification(channel=demandes shortcut=null contentView=null vibrate=null sound=null defaults=0x0 flags=0x10 color=0x00000000 vis=PRIVATE))
+10-13 20:36:02.749 25104 25104 D WM-WrkMgrInitializer: Initializing WorkManager with default configuration.
+10-13 20:36:02.751 25104 25104 D WM-PackageManagerHelper: Skipping component enablement for androidx.work.impl.background.systemjob.SystemJobService
+10-13 20:36:02.751 25104 25104 D WM-Schedulers: Created SystemJobScheduler and enabled SystemJobService
+    NotificationRecord(0x0a7cd92b: pkg=app.smartcourse.courses.nativeproto user=UserHandle{0} id=1001 tag=null importance=3 key=0|app.smartcourse.courses.nativeproto|1001|null|10194: Notification(channel=demandes shortcut=null contentView=null vibrate=null sound=null defaults=0x0 flags=0x10 color=0x00000000 vis=PRIVATE))
       icon=Icon(typ=RESOURCE pkg=app.smartcourse.courses.nativeproto id=0x7f050009)
 PASS  R1. notification « Nouvelle demande » affichée
 --- journal de l'application ---
