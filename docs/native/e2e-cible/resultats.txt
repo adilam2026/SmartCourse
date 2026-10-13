@@ -13,6 +13,7 @@ PASS  L3b. liste active vide : « Ajouter des articles »
 PASS  L3c. pas de « Créer une liste »
 PASS  L3d. menu : « Clôturer la liste » disponible
 PASS  L4. articles affichés
+      ordre habituel relevé avant achat : Tomates Carottes
 PASS  L4b. pas de section « Déjà achetés » tant que rien n'est acheté
 PASS  L5. section « Déjà achetés » apparue
 PASS  L5b. Tomates cochée sous « Déjà achetés »
@@ -21,16 +22,15 @@ PASS  L5d. Lait (à acheter) au-dessus de « Déjà achetés »
 PASS  L5e. compteur actualisé : 1 sur 3
 PASS  L5f. serveur : achat enregistré
 PASS  L6. décochée : section « Déjà achetés » retirée (vide)
-FAIL  L6b. Tomates revenue dans sa catégorie, à sa place (après Carottes)
-      écran : "RECETTE · données réelles"|"Compte"|"Ma liste"|"Mardi 13 octobre"|"Plus d'actions"|"0 sur 3 achetés"|"0 %"|"Ajouter des articles"|"Favoris"|"Légumes et herbes"|"Replier"|"Tomates"|"1 kg"|"Acheté : Tomates"|"Carottes"|"1 kg"|"Acheté : Carottes"|"Laitages et œufs"|"Replier"|"Lait"|"1 pièce"|"Acheté : Lait"|"Liste"|"Liste"|"Historique"|"Historique"|"Statistiques"|"Statistiques"|"Réglages"|"Réglages"|
+PASS  L6b. Tomates revenue dans sa catégorie, à sa place habituelle (Tomates Carottes)
+PASS  L6b2. Tomates au-dessus de la catégorie suivante (Lait)
 PASS  L6c. compteur actualisé : 0 sur 3
 PASS  L6d. serveur : de nouveau à acheter
 PASS  L7. liste clôturée sur un autre appareil : « Aucune liste en cours » aussitôt
 PASS  L7b. « Ajouter des articles » retiré
 ═══ Cas D : « Se déconnecter » visible dans Réglages et dans Compte, avertissement si envoi en attente ═══
 PASS  D1. « Se déconnecter » visible en bas des Réglages
-FAIL  D1b. distinct de « Réinitialiser la famille »
-      écran : "Se déconnecter ?"|"Vous devrez saisir à nouveau votre code d'accès pour rouvrir l'application."|"Annuler"|"Se déconnecter"|
+PASS  D1b. distinct de « Réinitialiser la famille » (deux actions séparées, Se déconnecter au-dessus)
 PASS  D1c. confirmation demandée
 PASS  D2. retour à l'écran de connexion
 PASS  D2b. aucune donnée du profil précédent affichée
@@ -42,5 +42,5 @@ PASS  D4c. annulation : toujours connecté, rien supprimé
 PASS  D5. la modification part au retour du réseau
 PASS  D6. personnel déconnecté depuis Compte
 PASS  D6b. aucune donnée du personnel affichée
-ECHECS=2
+ECHECS=0
 CRASH_APPLICATION=0
