@@ -1,6 +1,6 @@
 ═══ F. Version finale : identifiant, nom, serveur fixe ═══
 PASS  F0. identifiant app.smartcourse.courses.natif installé
-PASS  F0b. nom affiché « Courses »
+PASS  F0b. nom affiché « Mes Courses »
 PASS  F1. écran de connexion direct (aucune saisie de serveur)
 PASS  F1b. aucun bandeau ni fonction de démonstration
 PASS  F1c. aucun lien « Serveur … Modifier »
@@ -42,5 +42,27 @@ PASS  P4. reprise : envoi au retour du réseau
 PASS  P4b. serveur : une seule ligne, quantité remplacée (1.500 kg to_buy)
 PASS  P5. personnel : « Se déconnecter » dans Compte
 PASS  P5b. déconnecté
+═══ J. Personnel : minuit, liste ouverte plusieurs jours, clôture par un parent (en ligne et hors connexion) ═══
+PASS  J1. sélection enregistrée sur la liste ouverte (Tomates 1.000 to_buy)
+PASS  J2. l'horloge du téléphone est passée minuit (2026-10-13 → 2026-10-14)
+PASS  J2b. après minuit, application ouverte : sélection toujours affichée (Enregistré · 1 kg)
+PASS  J2c. après minuit, application relancée : toujours sur Choisir, sélection conservée
+PASS  J2d. serveur : même liste, toujours ouverte
+PASS  J3. trois jours plus tard : sélection et quantité conservées
+PASS  J3b. modification enregistrée sur la MÊME liste (Tomates 1.500 to_buy)
+PASS  J3c. serveur : toujours une seule liste ouverte
+PASS  J4. clôture par le parent apprise : sélections de cette liste réinitialisées
+PASS  J4b. reste sur Choisir, articles et photos toujours affichés
+PASS  J4c. historique : liste archivée avec son contenu (Tomates 1.500 to_buy)
+PASS  J5. nouvelle liste : sélection enregistrée (Tomates 1.000 to_buy)
+PASS  J5b. hors connexion : demande non envoyée (« Envoi en attente »)
+PASS  J5c. brouillon non validé (Carottes)
+PASS  J6. retour du réseau : la clôture est appliquée (sélection enregistrée réinitialisée)
+PASS  J6b. la demande non envoyée et le brouillon sont gardés : « Reprendre »
+PASS  J6c. historique non modifié par les demandes tardives (Tomates 1.000 to_buy)
+PASS  J6d. reste sur Choisir
+PASS  J7. reprise : demande (Tomates 1,5 kg) et brouillon (Carottes) repris dans la sélection
+PASS  J7b. serveur : nouvelle liste du jour avec les articles repris (Carottes 1.000 to_buy,Tomates 1.500 to_buy)
+PASS  J7c. les listes archivées restent intactes
 ECHECS=0
 CRASH_APPLICATION=0
