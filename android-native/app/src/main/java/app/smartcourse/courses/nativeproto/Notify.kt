@@ -79,28 +79,31 @@ object Notifier {
 }
 
 class PollWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
-    override suspend fun doWork(): Result {
-        val ctx = applicationContext
-        val storage = EncryptedStorage(ctx)
-        val me = storage.meJson?.let { try { json.decodeFromString(Me.serializer(), it) } catch (_: Exception) { null } } ?: return Result.success()
-        if (storage.cookie == null || me.role == "staff") return Result.success()
-        val scope = "${me.familyId.ifEmpty { "f" }}|${me.id}"
-        val kv = FileKv(File(ctx.filesDir, "store"))
-        if (!Notifier.enabled(kv, scope)) return Result.success()
-        return when (val r = ApiClient(storage).call("GET", "/api/lists/active")) {
-            is Outcome.Ok -> {
-                val list = (r.value["list"] as? JsonObject)?.let { parseList(it) }
-                val all = list?.validations ?: emptyList()
-                val seen = kv.get(Notifier.seenKey(scope))?.split(",")?.filter { it.isNotEmpty() }?.toSet()
-                val fresh = all.filter { v -> seen != null && v.id !in seen && v.by != me.displayName }
-                if (fresh.isNotEmpty()) {
-                    val who = fresh.map { it.by }.distinct()
-                    Notifier.show(ctx, if (fresh.size == 1) "Nouvelle demande" else "${fresh.size} nouvelles demandes", "De la part de ${who.joinToString(", ")}")
-                }
-                kv.put(Notifier.seenKey(scope), all.joinToString(",") { it.id })
-                Result.success()
+    override suspend fun doWork(): Result = if (pollOnce(applicationContext)) Result.success() else Result.retry()
+}
+
+/** Vérifie le serveur et notifie les nouvelles demandes d'autres profils. Renvoie faux si le réseau a manqué (nouvel essai plus tard). */
+suspend fun pollOnce(ctx: Context): Boolean {
+    val storage = EncryptedStorage(ctx)
+    val me = storage.meJson?.let { try { json.decodeFromString(Me.serializer(), it) } catch (_: Exception) { null } } ?: return true
+    if (storage.cookie == null || me.role == "staff") return true
+    val scope = "${me.familyId.ifEmpty { "f" }}|${me.id}"
+    val kv = FileKv(File(ctx.filesDir, "store"))
+    if (!Notifier.enabled(kv, scope)) return true
+    return when (val r = ApiClient(storage).call("GET", "/api/lists/active")) {
+        is Outcome.Ok -> {
+            val list = (r.value["list"] as? JsonObject)?.let { parseList(it) }
+            val all = list?.validations ?: emptyList()
+            val seen = kv.get(Notifier.seenKey(scope))?.split(",")?.filter { it.isNotEmpty() }?.toSet()
+            val fresh = all.filter { v -> seen != null && v.id !in seen && v.by != me.displayName }
+            android.util.Log.i("CoursesNotif", "vérification : ${all.size} demande(s), ${fresh.size} nouvelle(s), repère=${seen != null}, autorisé=${Notifier.canPost(ctx)}")
+            if (fresh.isNotEmpty()) {
+                val who = fresh.map { it.by }.distinct()
+                Notifier.show(ctx, if (fresh.size == 1) "Nouvelle demande" else "${fresh.size} nouvelles demandes", "De la part de ${who.joinToString(", ")}")
             }
-            is Outcome.Fail -> if (r.failure == Failure.NETWORK || r.failure == Failure.TIMEOUT || r.failure == Failure.SERVER_ERROR) Result.retry() else Result.success()
+            kv.put(Notifier.seenKey(scope), all.joinToString(",") { it.id })
+            true
         }
+        is Outcome.Fail -> !(r.failure == Failure.NETWORK || r.failure == Failure.TIMEOUT || r.failure == Failure.SERVER_ERROR)
     }
 }

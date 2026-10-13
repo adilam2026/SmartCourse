@@ -77,6 +77,12 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         // Paramètres de lancement : réservés au build de recette (captures automatiques d'écrans simulés).
         Launch.extras = if (BuildConfig.RECETTE_HOOKS) intent?.extras else null
+        // Recette seulement : exécute la vérification des notifications tout de suite (sans attendre Android), sans ouvrir l'application.
+        if (BuildConfig.RECETTE_HOOKS && intent?.getBooleanExtra("poll", false) == true) {
+            super.onCreate(savedInstanceState)
+            CoroutineScope(Dispatchers.IO).launch { pollOnce(applicationContext); runOnUiThread { finish() } }
+            return
+        }
         val splash = installSplashScreen()
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(C.Navy.toArgb()),

@@ -11,7 +11,7 @@ UI="python3 $HERE/native-ui.py"
 mkdir -p "$OUT"; : > "$OUT/resultats.txt"
 FAILS=0
 ok()   { echo "PASS  $1" | tee -a "$OUT/resultats.txt"; }
-ko()   { echo "FAIL  $1" | tee -a "$OUT/resultats.txt"; FAILS=$((FAILS+1)); adb shell uiautomator dump /sdcard/g.xml >/dev/null 2>&1; echo "      écran : $(adb exec-out cat /sdcard/g.xml 2>/dev/null | grep -oE '(text|content-desc)="[^"]+"' | sed -E 's/^(text|content-desc)=//' | head -40 | tr '\n' '|')"; local n; n=$(echo "$1" | tr -c 'a-zA-Z0-9' '_' | cut -c1-40); adb exec-out screencap -p > "$OUT/echec-$n.png" || true; adb shell uiautomator dump /sdcard/f.xml >/dev/null 2>&1; adb exec-out cat /sdcard/f.xml > "$OUT/echec-$n.xml" 2>/dev/null || true; }
+ko()   { echo "FAIL  $1" | tee -a "$OUT/resultats.txt"; FAILS=$((FAILS+1)); adb shell uiautomator dump /sdcard/g.xml >/dev/null 2>&1; echo "      écran : $(adb exec-out cat /sdcard/g.xml 2>/dev/null | grep -oE '(text|content-desc)="[^"]+"' | sed -E 's/^(text|content-desc)=//' | head -40 | tr '\n' '|')" | tee -a "$OUT/resultats.txt"; local n; n=$(echo "$1" | tr -c 'a-zA-Z0-9' '_' | cut -c1-40); adb exec-out screencap -p > "$OUT/echec-$n.png" || true; adb shell uiautomator dump /sdcard/f.xml >/dev/null 2>&1; adb exec-out cat /sdcard/f.xml > "$OUT/echec-$n.xml" 2>/dev/null || true; }
 expect() { local label=$1; shift; if "$@"; then ok "$label"; else ko "$label"; fi; }
 shot() { adb exec-out screencap -p > "$OUT/$1.png"; }
 sql() { docker exec sc-recette-pg psql -U smart -d smartcourse -tAc "$1"; }
@@ -131,19 +131,6 @@ tapt "Retirer Tomates"; sleep 4
 expect "K7. serveur : article retiré (« $(item Tomates) »)" test "$(item Tomates)" = "2.000 kg removed"
 expect "K8. écran : liste vide pour le personnel" $UI wait "Aucun article" 12
 
-# ═══ Écrans supplémentaires (captures pour validation) ═══
-adb shell input keyevent KEYCODE_BACK; sleep 1
-logout; signin "$FAMILY" adil 482913
-$UI wait "Ma liste" 25 >/dev/null
-shot lot3-liste-admin
-tapt "Favoris"; shot lot3-favoris; adb shell input keyevent KEYCODE_BACK; sleep 1
-tapt "Réglages"; tapt "Réinitialiser la famille"
-expect "K9. réinitialisation : confirmation par mot de passe et code famille" $UI wait "Réinitialiser définitivement" 15 || true
-shot lot3-reinitialiser
-adb shell input keyevent KEYCODE_BACK; sleep 1
-logout; signin "$FAMILY" marie 573918
-$UI wait "Liste du jour" 25 >/dev/null
-
 # ═══ L. Hors connexion : file « Envoi en attente », envoi unique au retour ═══
 tapt "Choisir des articles"
 fill "Rechercher un produit" "Oignons"; hide_kb
@@ -196,6 +183,13 @@ shot lot3-brouillon-isole
 logout
 signin "$FAMILY" adil 482913
 $UI wait "Ma liste" 25 >/dev/null
+# ═══ Écrans supplémentaires (captures pour validation) ═══
+shot lot3-liste-admin
+tapt "Favoris"; shot lot3-favoris; adb shell input keyevent KEYCODE_BACK; sleep 1
+tapt "Réglages"; $UI tap "Réinitialiser la famille" --scroll >/dev/null; sleep 3
+expect "K9. réinitialisation : confirmation par mot de passe et code famille" $UI wait "Réinitialiser définitivement" 15
+shot lot3-reinitialiser
+adb shell input keyevent KEYCODE_BACK; sleep 1
 tapt "Réglages"; tapt "Affichage"
 tapt "Prix indicatifs"
 expect "O1. serveur : préférence « prix » enregistrée pour ce profil" test "$(sql "SELECT show_prices FROM profiles WHERE login='adil'")" = t
@@ -252,7 +246,7 @@ api GET /api/catalog >/dev/null; PID=$(jq -r '[.categories[].products[] | select
 api POST /api/lists/active/ops -d "{\"ops\":[{\"opId\":\"$(cat /proc/sys/kernel/random/uuid)\",\"type\":\"add\",\"productId\":\"$PID\",\"quantity\":1}]}" >/dev/null
 JOB=$(adb shell dumpsys jobscheduler | tr -d '\r' | grep -oE "#u0a[0-9]+/[0-9]+: [0-9a-f]+ $PKG" | head -1 | sed -E 's#.*/([0-9]+):.*#\1#')
 echo "tâche WorkManager n°${JOB:-?}" | tee -a "$OUT/resultats.txt"
-sleep 3; adb shell cmd jobscheduler run -u 0 -f $PKG "${JOB:-1}" 2>&1 | tee -a "$OUT/resultats.txt"; sleep 12
+sleep 3; adb logcat -c; adb shell am start -n "$PKG/.MainActivity" --ez poll true >/dev/null 2>&1; sleep 10; adb logcat -d | grep CoursesNotif | tee -a "$OUT/resultats.txt"
 echo "--- diagnostic notification ---" | tee -a "$OUT/resultats.txt"
 
 adb logcat -d | grep -E "WM-|PollWorker|SystemJobService" | tail -12 | tee -a "$OUT/resultats.txt"
@@ -264,5 +258,5 @@ echo "--- journal de l'application ---" | tee -a "$OUT/resultats.txt"; adb logca
 echo "ECHECS=$FAILS" | tee -a "$OUT/resultats.txt"
 adb logcat -d -b crash > "$OUT/logcat-crash.txt" 2>&1 || true
 echo "CRASH_APPLICATION=$(grep -c app.smartcourse "$OUT/logcat-crash.txt")" | tee -a "$OUT/resultats.txt"
-echo "--- échecs (résumé) ---"; grep -E "^FAIL" "$OUT/resultats.txt" || true
+echo "--- échecs (résumé) ---"; grep -A1 -E "^FAIL" "$OUT/resultats.txt" | cut -c1-400 || true
 [ "$FAILS" = 0 ]
