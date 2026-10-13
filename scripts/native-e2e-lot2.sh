@@ -23,7 +23,7 @@ tapt() { $UI tap "$@" >/dev/null; sleep 2; }
 # ── appels directs au serveur (preuve que les règles viennent du serveur) ──
 COOKIE=""
 login_api() { COOKIE=$(curl -s -D - -o /dev/null -X POST "$BASE/api/auth/login" -H 'content-type: application/json' -d "{\"familyCode\":\"$FAMILY\",\"login\":\"$1\",\"secret\":\"$2\"}" | tr -d '\r' | grep -i '^set-cookie: sc_session=' | sed -E 's/.*sc_session=([^;]*);.*/\1/'); }
-api() { local m=$1 p=$2; shift 2; curl -s -o /tmp/api.out -w '%{http_code}' -X "$m" "$BASE$p" -H "Cookie: sc_session=$COOKIE" -H 'content-type: application/json' "$@"; }
+api() { local m=$1 p=$2; shift 2; local ct=(); [ "$m" = POST ] || [ "$m" = PUT ] || [ "$m" = PATCH ] && ct=(-H 'content-type: application/json'); curl -s -o /tmp/api.out -w '%{http_code}' -X "$m" "$BASE$p" -H "Cookie: sc_session=$COOKIE" "${ct[@]}" "$@"; }
 errcode() { jq -r '.error // empty' /tmp/api.out; }
 pid() { sql "SELECT p.id FROM profiles p JOIN families f ON f.id=p.family_id WHERE f.code='$FAMILY' AND p.login='$1'"; }
 
@@ -39,7 +39,7 @@ ADIL=$(pid adil)
 expect "A0. connexion administrateur auprès du serveur" test -n "$COOKIE"
 S=$(api PATCH "/api/profiles/$ADIL" -d '{"role":"parent"}'); expect "A1. rôle de l'administrateur principal : refusé (409 $(errcode))" test "$S" = 409
 S=$(api PATCH "/api/profiles/$ADIL" -d '{"active":false}'); expect "A2. désactivation de l'administrateur principal : refusée (409 $(errcode))" test "$S" = 409
-S=$(api DELETE "/api/profiles/$ADIL"); expect "A3. suppression de soi-même : refusée ($S $(errcode))" test "$S" = 400
+S=$(api DELETE "/api/profiles/$ADIL"); expect "A3. suppression de soi-même : refusée ($S $(errcode))" test "$S" = 400 -a "$(errcode)" = use_own_deletion
 S=$(api POST /api/profiles -d '{"displayName":"Boss","login":"boss","role":"admin","secret":"135790","secretConfirm":"135790","city":"Casablanca"}'); expect "A4. création d'un second administrateur ($S)" test "$S" = 201
 BOSS=$(pid boss)
 S=$(api PATCH "/api/profiles/$BOSS" -d '{"active":false}'); expect "A5. un administrateur ne se désactive pas (409 $(errcode))" test "$S" = 409 -a "$(errcode)" = admin_cannot_deactivate
@@ -131,7 +131,7 @@ expect "C18. profil supprimé : anonymisé côté serveur" test "$(sql "SELECT d
 expect "C19. profil retiré de la liste" $UI gone "Karim" 12
 
 # ═══ D. Ville ═══
-adb shell input keyevent KEYCODE_BACK; sleep 1; adb shell input keyevent KEYCODE_BACK; sleep 1
+launch; $UI wait "Ma liste" 25 >/dev/null   # nouvel état de départ : l'échec éventuel d'un bloc ne se propage pas au suivant
 tapt "Compte"
 expect "D1. ville réelle dans le compte" $UI wait "Ville : Casablanca" 10
 tapt "Ville : "
@@ -147,6 +147,7 @@ tapt "Ville : "; fill "Rechercher une ville" "casablanca"; hide_kb; $UI tap "Cas
 expect "D6. ville rétablie" test "$(sql "SELECT city FROM profiles WHERE login='adil'")" = Casablanca
 
 # ═══ E. Catalogue ═══
+launch; $UI wait "Ma liste" 25 >/dev/null
 login_api adil 482913
 api GET "/api/catalog/all?counts=1&limit=1" >/dev/null; A=$(jq -r .counts.active /tmp/api.out); I=$(jq -r .counts.inactive /tmp/api.out); Z=$(jq -r .counts.absent /tmp/api.out)
 tapt "Réglages"; tapt "Catalogue"

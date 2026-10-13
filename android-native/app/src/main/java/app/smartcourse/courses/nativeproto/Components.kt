@@ -202,7 +202,9 @@ fun SearchBox(value: String, onChange: (String) -> Unit, placeholder: String, mo
             if (value.isEmpty()) Text(placeholder, color = C.Muted, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
             BasicTextField(
                 value = value, onValueChange = onChange, singleLine = true,
-                textStyle = MaterialTheme.typography.bodyLarge, cursorBrush = SolidColor(C.Teal), modifier = Modifier.fillMaxWidth(),
+                textStyle = MaterialTheme.typography.bodyLarge, cursorBrush = SolidColor(C.Teal),
+                // Le texte indicatif est annoncé par les lecteurs d'écran (TalkBack) même quand le champ est rempli.
+                modifier = Modifier.fillMaxWidth().semantics { contentDescription = placeholder },
             )
         }
         if (value.isNotEmpty()) {
