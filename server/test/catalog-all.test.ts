@@ -56,6 +56,35 @@ describe("catalogue complet (Tous les produits)", () => {
     expect((await all(f.admin, "?q=%25%25")).total).toBe(0);
   });
 
+  it("filtre par état, compteurs réels et « présents d'abord » (application Android)", async () => {
+    const f = await newFamily();
+    const c0 = (await all(f.admin, "?counts=1&limit=1")).counts;
+    expect(c0.active + c0.inactive + c0.absent).toBe((await all(f.admin, "?limit=1")).total);
+    expect(c0.active).toBeGreaterThanOrEqual(80);       // le catalogue de départ est copié à l'installation
+    expect(c0.absent).toBeGreaterThan(50);              // le catalogue étendu reste à ajouter
+    const todo = await all(f.admin, "?status=todo&limit=60&counts=1");
+    expect(todo.total).toBe(c0.inactive + c0.absent);
+    expect(todo.items.every((i: any) => i.status !== "active")).toBe(true);
+    expect((await all(f.admin, "?status=active&limit=60")).items.every((i: any) => i.status === "active")).toBe(true);
+    // Retirer (désactiver) : l'article passe de « dans mon catalogue » à « à ajouter », et le compteur suit.
+    const first = (await all(f.admin, "?status=active&limit=1")).items[0];
+    expect((await app.inject({ method: "PATCH", url: `/api/products/${first.productId}`, cookies: f.admin, payload: { active: false } })).statusCode).toBe(200);
+    const c1 = (await all(f.admin, "?counts=1&limit=1")).counts;
+    expect(c1).toEqual({ active: c0.active - 1, inactive: c0.inactive + 1, absent: c0.absent });
+    expect((await all(f.admin, "?status=inactive&limit=60")).items.map((i: any) => i.productId)).toEqual([first.productId]);
+    // « Tous » : les articles présents d'abord, puis les absents ; les compteurs suivent la recherche et la catégorie.
+    const page = (await all(f.admin, "?presentFirst=1&offset=50&limit=60")).items.map((i: any) => i.status === "active");
+    expect(page.indexOf(false)).toBeGreaterThan(-1);
+    expect(page.slice(page.indexOf(false)).every((x: boolean) => x === false)).toBe(true);
+    const peches = (await all(f.admin, "?q=peches&counts=1&limit=5")).counts;
+    expect(peches.active + peches.inactive + peches.absent).toBe((await all(f.admin, "?q=peches")).total);
+    // Réversible : on le remet, rien n'est détruit.
+    await app.inject({ method: "PATCH", url: `/api/products/${first.productId}`, cookies: f.admin, payload: { active: true } });
+    expect((await all(f.admin, "?counts=1&limit=1")).counts).toEqual(c0);
+    // Droits : réservé à l'administrateur.
+    expect((await app.inject({ method: "GET", url: "/api/catalog/all?counts=1", cookies: f.staff })).statusCode).toBe(403);
+  });
+
   it("états absent / actif / désactivé ; réactive au lieu de recréer ; un article saisi à la main n'est jamais doublé", async () => {
     const f = await newFamily();
     const find = async (q: string) => (await all(f.admin, `?q=${encodeURIComponent(q)}`)).items.find((i: any) => i.name === q);

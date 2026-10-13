@@ -5,7 +5,7 @@ import { HttpError } from "./errors.js";
 import type { Guard } from "./guard.js";
 import type { SseHub } from "./hub.js";
 import type { PushService } from "./push.js";
-import { applyOps, closeList, createList, deleteArchivedList, getActiveListView, getListView, listHistory, repriceList, type OpIn } from "./lists.js";
+import { applyOps, closeList, createList, deleteArchivedList, ensureActiveList, getActiveListView, getListView, listHistory, repriceList, type OpIn } from "./lists.js";
 import { can, type Action } from "./permissions.js";
 
 const uuid = z.string().uuid();
@@ -64,6 +64,17 @@ export function listRoutes(app: FastifyInstance, { db, hub, guard, push }: { db:
   app.get("/api/lists/:id", { preHandler: guard("history.read") }, async (req) => {
     const { id } = z.object({ id: uuid }).parse(req.params);
     return { list: await getListView(db, req.auth!, id) };
+  });
+
+  // Demandes sur « la liste en cours », sans en connaître l'identifiant : la liste est créée si elle n'existe pas encore (personnel compris).
+  // Seules des demandes d'articles peuvent la créer ; les droits de chaque opération restent vérifiés comme partout ailleurs.
+  app.post("/api/lists/active/ops", { preHandler: guard() }, async (req) => {
+    const { ops, batch } = z.object({ ops: z.array(opSchema).min(1).max(200), batch: z.object({ id: uuid, at: z.string().datetime({ offset: true }).optional() }).optional() }).parse(req.body);
+    for (const op of ops) if (!can(req.auth!.role, REQUIRED[op.type])) throw new HttpError(403, "forbidden", "Action non autorisée");
+    const current = (await getActiveListView(db, req.auth!)) as { id: string } | null;
+    if (!current && !ops.some((o) => o.type === "add" || o.type === "request_again")) throw new HttpError(404, "not_found", "Liste introuvable");
+    const id = current?.id ?? (await ensureActiveList(db, hub, req.auth!));
+    return applyOps(db, hub, req.auth!, id, ops, batch, push);
   });
 
   app.post("/api/lists/:id/ops", { preHandler: guard() }, async (req) => {

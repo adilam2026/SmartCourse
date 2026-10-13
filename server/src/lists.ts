@@ -354,6 +354,28 @@ const stripDetail = (r: OpResult): OpResult => {
 
 // ------------------------------------------------------------------------------------------------
 
+/**
+ * Liste en cours de la famille, créée au besoin. Réservé au circuit des demandes : quelqu'un qui demande des articles (même le personnel,
+ * qui n'a ni le droit de créer ni celui de clôturer une liste) obtient la liste du jour. Deux appareils qui valident en même temps ne créent
+ * jamais deux listes en cours (l'index unique de la base les départage) et aucune demande n'est perdue : les deux lots s'appliquent à la même liste.
+ */
+export async function ensureActiveList(db: Db, hub: SseHub, a: AuthContext): Promise<string> {
+  const find = async () => (await db.query<{ id: string }>("SELECT id FROM lists WHERE family_id = $1 AND status = 'active'", [a.familyId])).rows[0]?.id;
+  const cur = await find();
+  if (cur) return cur;
+  try {
+    const r = await db.query<{ id: string }>("INSERT INTO lists (family_id, created_by) VALUES ($1,$2) RETURNING id", [a.familyId, a.profileId]);
+    hub.broadcast(a.familyId, "list.created", { listId: r.rows[0]!.id });
+    return r.rows[0]!.id;
+  } catch (e: any) {
+    if (e.code === "23505") {
+      const other = await find(); // un autre appareil vient de la créer
+      if (other) return other;
+    }
+    throw e;
+  }
+}
+
 export async function createList(db: Db, hub: SseHub, a: AuthContext): Promise<{ id: string }> {
   try {
     const r = await db.query<{ id: string }>("INSERT INTO lists (family_id, created_by) VALUES ($1,$2) RETURNING id", [a.familyId, a.profileId]);

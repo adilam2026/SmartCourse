@@ -207,6 +207,10 @@ export function catalogRoutes(app: FastifyInstance, { db, store, guard, hub }: D
         q: z.string().trim().max(60).optional(),
         offset: z.coerce.number().int().min(0).max(5000).default(0),
         limit: z.coerce.number().int().min(1).max(60).default(24),
+        // Filtre par état chez la famille : « todo » = à ajouter (absent ou retiré). Options de l'application Android : compteurs réels et « présents d'abord ».
+        status: z.enum(["active", "inactive", "absent", "todo"]).optional(),
+        counts: z.enum(["0", "1"]).optional(),
+        presentFirst: z.enum(["0", "1"]).optional(),
       })
       .parse(req.query);
     const needle = qs.q ? normalizeSearch(qs.q).replace(/[\\%_]/g, (c) => `\\${c}`) : null;
@@ -252,14 +256,25 @@ export function catalogRoutes(app: FastifyInstance, { db, store, guard, hub }: D
        WHERE ($2::text IS NULL OR r.category = $2)
          AND ($3::text IS NULL OR r.stext LIKE '%' || $3 || '%')`;
     const params = [familyId, qs.category ?? null, needle];
-    const total = Number((await db.query(`SELECT count(*) AS n FROM (${base}) t`, params)).rows[0].n);
+    const stateOf = `(CASE WHEN t.product_id IS NULL THEN 'absent' WHEN t.product_active THEN 'active' ELSE 'inactive' END)`;
+    const stateWhere = !qs.status ? "TRUE" : qs.status === "todo" ? `${stateOf} <> 'active'` : `${stateOf} = '${qs.status}'`; // valeurs d'une énumération : aucune injection possible
+    const presentFirst = qs.presentFirst === "1" ? `(t.product_id IS NOT NULL AND t.product_active) DESC NULLS LAST, ` : "";
+    const total = Number((await db.query(`SELECT count(*) AS n FROM (${base}) t WHERE ${stateWhere}`, params)).rows[0].n);
     const r = await db.query(
       `SELECT t.* FROM (${base}) t JOIN categories c ON c.key = t.category
-        ORDER BY c.position, (t.origin = 'initial') DESC, t.pos, lower(t.name) LIMIT $4 OFFSET $5`,
+        WHERE ${stateWhere}
+        ORDER BY ${presentFirst}c.position, (t.origin = 'initial') DESC, t.pos, lower(t.name) LIMIT $4 OFFSET $5`,
       [...params, qs.limit, qs.offset],
     );
+    let counts: { active: number; inactive: number; absent: number } | undefined;
+    if (qs.counts === "1") {
+      const cr = await db.query(`SELECT ${stateOf} AS st, count(*)::int AS n FROM (${base}) t GROUP BY 1`, params);
+      counts = { active: 0, inactive: 0, absent: 0 };
+      for (const x of cr.rows) counts[x.st as "active" | "inactive" | "absent"] = x.n;
+    }
     return {
       total,
+      ...(counts ? { counts } : {}),
       offset: qs.offset,
       items: r.rows.map((x) => ({
         key: x.key as string,
