@@ -168,8 +168,63 @@ describe("création de famille autonome (sans jeton d'installation)", () => {
     expect((await start(body(), paused)).json().error).toBe("signups_paused");
     await paused.close();
     const fam = await mk({ ...OPEN, familiesPerDay: 0 });
-    expect((await start(body(), fam)).json().error).toBe("signups_paused");
+    expect((await start(body(), fam)).json().error).toBe("families_limit");
     await fam.close();
+  });
+
+  it("plafond quotidien de familles : seules les familles créées comptent (pas les demandes ni les renvois), jamais dépassé en simultané", async () => {
+    await db.query("UPDATE family_signups SET completed_at = completed_at - interval '2 days' WHERE completed_at IS NOT NULL"); // compteur à zéro
+    const capped = await mk({ ...OPEN, familiesPerDay: 2 });
+    // Beaucoup de demandes et de renvois : aucun ne compte dans le plafond
+    const pending: { id: string; code: string }[] = [];
+    for (let i = 0; i < 5; i++) {
+      const b = body();
+      const id = (await start(b, capped)).json().signupId;
+      await db.query("UPDATE family_signups SET last_sent_at = now() - interval '2 minutes' WHERE id = $1", [id]);
+      expect((await capped.inject({ method: "POST", url: "/api/signup/resend", payload: { signupId: id } })).statusCode).toBe(200);
+      pending.push({ id, code: codeTo(b.email) });
+    }
+    const before = await families();
+    // Cinq validations simultanées pour un plafond de 2 : exactement 2 familles
+    const res = await Promise.all(pending.map((p) => verify(p.id, p.code, capped)));
+    const ok = res.filter((r) => r.statusCode === 201);
+    const refused = res.filter((r) => r.statusCode === 429);
+    expect(ok).toHaveLength(2);
+    expect(refused).toHaveLength(3);
+    for (const r of refused) {
+      expect(r.json().error).toBe("families_limit");
+      expect(r.json().message).toContain("maximal de nouvelles familles");
+    }
+    expect(await families()).toBe(before + 2);
+    // Plafond atteint : une nouvelle demande est refusée d'emblée (aucun code envoyé), avec le même message clair
+    const sent = mailer.sent.length;
+    const late = await start(body(), capped);
+    expect(late.statusCode).toBe(429);
+    expect(late.json().error).toBe("families_limit");
+    expect(mailer.sent.length).toBe(sent);
+    // Les demandes refusées restent ouvertes : elles aboutiront quand le plafond le permettra
+    await db.query("UPDATE family_signups SET completed_at = completed_at - interval '2 days' WHERE completed_at IS NOT NULL");
+    const retry = pending[res.findIndex((r) => r.statusCode === 429)]!;
+    expect((await verify(retry.id, retry.code, capped)).statusCode).toBe(201);
+    await capped.close();
+  });
+
+  it("plafonds réglables par variables d'environnement du serveur (sans reconstruire l'application)", async () => {
+    process.env.SIGNUP_MAX_FAMILIES_PER_DAY = "0";
+    try {
+      const a = await buildApp({ db, store: testStore(), recovery, signupRateLimit: { max: 1000, timeWindow: "1 minute" }, signupLimits: { perIpPerHour: 1000, globalPerHour: 1000 } });
+      await a.ready();
+      expect((await start(body(), a)).json().error).toBe("families_limit");
+      await a.close();
+    } finally {
+      delete process.env.SIGNUP_MAX_FAMILIES_PER_DAY;
+    }
+    const { signupLimitsFromEnv, DEFAULT_SIGNUP_LIMITS } = await import("../src/signup.js");
+    expect(DEFAULT_SIGNUP_LIMITS.familiesPerDay).toBe(100);
+    expect(signupLimitsFromEnv({ SIGNUP_MAX_FAMILIES_PER_DAY: "250", SIGNUP_MAX_REQUESTS_PER_HOUR: "600" })).toEqual({ familiesPerDay: 250, globalPerHour: 600 });
+    const warns: string[] = [];
+    expect(signupLimitsFromEnv({ SIGNUP_MAX_FAMILIES_PER_DAY: "beaucoup" }, (m) => warns.push(m))).toEqual({});
+    expect(warns).toHaveLength(1);
   });
 
   it("e-mail refusé par le service d'envoi : rien n'est gardé, la même demande peut être relancée", async () => {

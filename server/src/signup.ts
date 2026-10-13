@@ -28,8 +28,11 @@ export interface SignupLimits {
 export const DEFAULT_SIGNUP_LIMITS: SignupLimits = {
   perEmailPerDay: 3,
   perIpPerHour: 5,
-  globalPerHour: 30,
-  familiesPerDay: 20,
+  // Demandes (envois de code) toutes adresses confondues : large devant le plafond de familles, pour ne jamais bloquer des
+  // inscriptions normales aux heures chargées ; il protège seulement le quota d'envoi d'e-mails contre une rafale.
+  globalPerHour: 300,
+  // Familles réellement créées (code vérifié) sur 24 heures glissantes, toutes adresses confondues.
+  familiesPerDay: 100,
   maxAttempts: 5,
   codeMinutes: 30,
   resendSeconds: 60,
@@ -75,6 +78,26 @@ function view(row: { id: string; email: string; expires_at: Date; last_sent_at: 
   };
 }
 
+/** Limites lues dans l'environnement du serveur (modifiables sans reconstruire l'application) : valeurs entières ≥ 0. */
+export function signupLimitsFromEnv(env: NodeJS.ProcessEnv, warn: (msg: string) => void = () => {}): Partial<SignupLimits> {
+  const out: Partial<SignupLimits> = {};
+  const read = (name: string, key: keyof SignupLimits) => {
+    const raw = env[name];
+    if (raw === undefined || raw === "") return;
+    const v = Number(raw);
+    if (Number.isInteger(v) && v >= 0) out[key] = v;
+    else warn(`${name} ignoré (entier positif attendu) : valeur par défaut ${DEFAULT_SIGNUP_LIMITS[key]}`);
+  };
+  read("SIGNUP_MAX_FAMILIES_PER_DAY", "familiesPerDay");
+  read("SIGNUP_MAX_REQUESTS_PER_HOUR", "globalPerHour");
+  read("SIGNUP_MAX_PER_EMAIL_PER_DAY", "perEmailPerDay");
+  read("SIGNUP_MAX_PER_IP_PER_HOUR", "perIpPerHour");
+  return out;
+}
+
+const FAMILIES_LIMIT = () => new HttpError(429, "families_limit", "Le nombre maximal de nouvelles familles est atteint pour aujourd'hui. Réessayez demain : aucune donnée n'a été perdue.");
+const familiesToday = async (q: Pick<Db, "query">) => Number((await q.query("SELECT count(*)::int AS n FROM family_signups WHERE completed_at > now() - interval '1 day'")).rows[0].n);
+
 /** Le service d'envoi a refusé (ou n'est pas configuré) : la demande est retirée, rien n'est créé, l'application peut réessayer. */
 function mailRefused(status: string): boolean {
   return status === "failed" || status === "not_configured";
@@ -103,9 +126,10 @@ export async function startSignup(db: Db, recovery: RecoveryService, input: Sign
     throw new HttpError(429, "too_many_signups", "Trop de demandes pour cette adresse : réessayez demain");
   if (ipHash && (await n("SELECT count(*)::int AS n FROM family_signups WHERE ip_hash = $1 AND created_at > now() - interval '1 hour'", [ipHash])) >= limits.perIpPerHour)
     throw new HttpError(429, "too_many_signups", "Trop de demandes depuis cette connexion : réessayez dans une heure");
-  if ((await n("SELECT count(*)::int AS n FROM family_signups WHERE created_at > now() - interval '1 hour'", [])) >= limits.globalPerHour ||
-      (await n("SELECT count(*)::int AS n FROM family_signups WHERE completed_at > now() - interval '1 day'", [])) >= limits.familiesPerDay)
-    throw new HttpError(429, "signups_paused", "Les créations de famille sont momentanément suspendues : réessayez plus tard");
+  // Plafond de familles déjà atteint : inutile d'envoyer un code (seules les familles créées comptent, jamais les demandes).
+  if ((await familiesToday(db)) >= limits.familiesPerDay) throw FAMILIES_LIMIT();
+  if ((await n("SELECT count(*)::int AS n FROM family_signups WHERE created_at > now() - interval '1 hour'", [])) >= limits.globalPerHour)
+    throw new HttpError(429, "signups_paused", "Beaucoup de demandes en ce moment : réessayez dans quelques minutes");
 
   const code = newCode();
   const secretHash = await hashSecret(input.secret);
@@ -196,6 +220,10 @@ export async function verifySignup(db: Db, signupId: string, code: string, limit
       await c.query("UPDATE family_signups SET attempts = $2 WHERE id = $1", [r.id, a]);
       return { error: new HttpError(400, "invalid_code", a >= limits.maxAttempts ? "Code incorrect. Trop d'essais : demandez un nouveau code" : `Code incorrect (${limits.maxAttempts - a} essai${limits.maxAttempts - a > 1 ? "s" : ""} restant${limits.maxAttempts - a > 1 ? "s" : ""})`) };
     }
+    // Plafond quotidien, contrôlé au moment de créer, sous un verrou commun : des validations simultanées ne le dépassent jamais.
+    // La demande reste ouverte : elle pourra aboutir quand le plafond le permettra (tant que le code est valable).
+    await c.query("SELECT pg_advisory_xact_lock(hashtext('family_signup_daily_cap'))");
+    if ((await familiesToday(c)) >= limits.familiesPerDay) return { error: FAMILIES_LIMIT() };
     // Dernier contrôle des doublons, au moment de créer (une autre demande a pu aboutir entre-temps).
     if (await emailAdministersFamily(c, r.email)) return { error: new HttpError(409, "email_in_use", "Cette adresse gère déjà une famille. Utilisez « J'ai oublié mon code » ou « Récupérer ma famille ».") };
     const created = await createFamilyRecords(c, {

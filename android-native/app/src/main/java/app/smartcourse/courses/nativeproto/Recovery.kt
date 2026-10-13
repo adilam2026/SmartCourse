@@ -125,7 +125,9 @@ fun CreateFamilyForm(session: Session) {
     fun startMessage(f: Outcome.Fail): String = when (f.code) {
         "email_in_use" -> "Cette adresse gère déjà une famille. Utilisez « Besoin d'aide ? » puis « Récupérer ma famille »."
         "too_many_signups" -> "Trop de demandes : réessayez plus tard."
-        "signups_paused", "signups_closed" -> "La création de famille est momentanément suspendue : réessayez plus tard."
+        "families_limit" -> "Le nombre maximal de nouvelles familles est atteint pour aujourd'hui. Réessayez demain."
+        "signups_paused" -> "Beaucoup de demandes en ce moment : réessayez dans quelques minutes."
+        "signups_closed" -> "La création de famille est momentanément fermée : réessayez plus tard."
         "mail_unavailable", "mail_failed" -> "L'e-mail n'a pas pu être envoyé : vérifiez l'adresse ou réessayez dans quelques instants."
         "too_many_mails" -> "Trop d'e-mails envoyés à cette adresse : réessayez dans une heure."
         "weak_secret" -> "Code d'accès trop simple (évitez 123456, 111111…)."
@@ -137,6 +139,7 @@ fun CreateFamilyForm(session: Session) {
     }
     fun verifyMessage(f: Outcome.Fail): String = when (f.code) {
         "invalid_code" -> "Code incorrect : vérifiez l'e-mail reçu."
+        "families_limit" -> "Le nombre maximal de nouvelles familles est atteint pour aujourd'hui. Votre demande est conservée : réessayez plus tard avec le même code tant qu'il est valable, ou demain avec un nouveau code."
         "too_many_attempts" -> "Trop d'essais : demandez un nouveau code."
         "code_expired" -> "Code expiré : demandez un nouveau code."
         "signup_expired", "signup_not_found" -> "Demande expirée : recommencez."

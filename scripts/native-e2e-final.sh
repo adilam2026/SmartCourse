@@ -82,6 +82,19 @@ fill "${PREV_FAMILY:-Code famille}" "$NEWCODE"; fill "${PREV_LOGIN:-Identifiant}
 $UI tap "Se connecter" --last >/dev/null; sleep 4; PREV_FAMILY="$NEWCODE"; PREV_LOGIN="$NEWLOGIN"
 expect "C10b. connecté à la nouvelle famille avec ses accès" $UI wait "Ma liste" 20
 logout
+# Plafond quotidien (100 familles par défaut) atteint : base de recette JETABLE remplie de 100 créations fictives du jour
+sql "INSERT INTO family_signups (request_id, email, email_hash, family_name, display_name, login, city, secret_hash, code_hash, expires_at, completed_at)
+     SELECT gen_random_uuid(), 'plafond'||g||'@example.org', md5('plafond'||g), 'P', 'P', 'p', 'Casablanca', 'x', 'x', now(), now() FROM generate_series(1, 100) g" >/dev/null
+CAPMAIL="plafond.$(date +%s)@example.org"
+$UI tap "Première connexion" >/dev/null; sleep 1; $UI tap "Créer ma famille" >/dev/null; sleep 2
+fill "Nom de la famille" "Famille Plafond" --scroll; hide_kb; fill "Votre prénom" "Nadia" --scroll; hide_kb; fill "Votre identifiant" "nadia" --scroll; hide_kb
+$UI tap "Ville : " --scroll >/dev/null; sleep 2; fill "Rechercher une ville" "rabat"; hide_kb; $UI tap "Rabat" --last >/dev/null; sleep 2
+fill "E-mail de récupération" "$CAPMAIL" --scroll; hide_kb; fill "Code d'accès (6" 583014 --scroll; hide_kb; fill "Confirmez le code" 583014 --scroll; hide_kb
+$UI tap "Recevoir le code par e-mail" --scroll >/dev/null; sleep 4
+expect "C11. plafond quotidien atteint : message clair, aucun code envoyé" bash -c "$UI wait 'maximal de nouvelles familles' 10 && [ \"\$(docker exec sc-recette-app node -e \"fetch('http://127.0.0.1:3199/__sent?to=$CAPMAIL').then(r=>r.json()).then(j=>console.log(j.length))\")\" = 0 ]"
+shot final-c5-plafond
+sql "DELETE FROM family_signups WHERE email LIKE 'plafond%@example.org'" >/dev/null
+$UI tap "Se connecter" --first >/dev/null; sleep 1
 
 echo "═══ G. Administrateur : connexion, sélection, achat, historique ═══" | tee -a "$OUT/resultats.txt"
 signin "$FAMILY" adil 482913

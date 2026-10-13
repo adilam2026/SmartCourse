@@ -1,5 +1,5 @@
 import cookie from "@fastify/cookie";
-import { DEFAULT_SIGNUP_LIMITS, ipKey, resendSignupCode, startSignup, verifySignup, type SignupLimits } from "./signup.js";
+import { DEFAULT_SIGNUP_LIMITS, ipKey, resendSignupCode, signupLimitsFromEnv, startSignup, verifySignup, type SignupLimits } from "./signup.js";
 import fastifyStatic from "@fastify/static";
 import path from "node:path";
 import { readFile } from "node:fs/promises";
@@ -169,7 +169,9 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
   // ---- Création de famille autonome depuis l'application (sans jeton) : adresse vérifiée par code AVANT toute création. ----
   // L'installation par jeton (/api/setup/family) reste inchangée et protégée.
-  const signupLimits = { ...DEFAULT_SIGNUP_LIMITS, ...(deps.signupLimits ?? {}) };
+  // Plafonds modifiables par les variables du service (SIGNUP_MAX_FAMILIES_PER_DAY…), sans reconstruire l'application.
+  const signupLimits = { ...DEFAULT_SIGNUP_LIMITS, ...signupLimitsFromEnv(process.env, (m) => app.log.warn({ event: "signup.config" }, m)), ...(deps.signupLimits ?? {}) };
+  app.log.info({ event: "signup.limits", familiesPerDay: signupLimits.familiesPerDay, requestsPerHour: signupLimits.globalPerHour }, "création de famille : plafonds");
   const signupOpen = () => {
     if (process.env.SIGNUP_DISABLED === "1") throw new HttpError(503, "signups_closed", "La création de famille est momentanément fermée : réessayez plus tard");
   };
