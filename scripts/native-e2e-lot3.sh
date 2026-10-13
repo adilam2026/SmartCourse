@@ -24,8 +24,8 @@ show() { for _ in 1 2 3 4 5 6; do adb shell input swipe 540 700 540 1900 120; do
   for _ in $(seq 1 25); do $UI has "$1" && return 0; adb shell input swipe 540 1500 540 1000 300; sleep 1; done; return 1; }
 tapt() { $UI tap "$@" >/dev/null; sleep 2; }
 COOKIE=""
-login_api() { COOKIE=$(curl -s -D - -o /dev/null -X POST "$BASE/api/auth/login" -H 'content-type: application/json' -d "{\"familyCode\":\"$FAMILY\",\"login\":\"$1\",\"secret\":\"$2\"}" | tr -d '\r' | grep -i '^set-cookie: sc_session=' | sed -E 's/.*sc_session=([^;]*);.*/\1/'); }
-api() { local m=$1 p=$2; shift 2; local ct=(); { [ "$m" = POST ] || [ "$m" = PUT ] || [ "$m" = PATCH ]; } && ct=(-H 'content-type: application/json'); curl -s -o /tmp/api.out -w '%{http_code}' -X "$m" "$BASE$p" -H "Cookie: sc_session=$COOKIE" "${ct[@]}" "$@"; }
+login_api() { COOKIE=$(curl -s --max-time 20 -D - -o /dev/null -X POST "$BASE/api/auth/login" -H 'content-type: application/json' -d "{\"familyCode\":\"$FAMILY\",\"login\":\"$1\",\"secret\":\"$2\"}" | tr -d '\r' | grep -i '^set-cookie: sc_session=' | sed -E 's/.*sc_session=([^;]*);.*/\1/'); }
+api() { local m=$1 p=$2; shift 2; local ct=(); { [ "$m" = POST ] || [ "$m" = PUT ] || [ "$m" = PATCH ]; } && ct=(-H 'content-type: application/json'); curl -s --max-time 30 -o /tmp/api.out -w '%{http_code}' -X "$m" "$BASE$p" -H "Cookie: sc_session=$COOKIE" "${ct[@]}" "$@"; }
 FAMID() { sql "SELECT id FROM families WHERE code='$FAMILY'"; }
 item() { sql "SELECT i.quantity||' '||i.unit||' '||i.status FROM list_items i JOIN products p ON p.id=i.product_id JOIN lists l ON l.id=i.list_id JOIN families f ON f.id=l.family_id WHERE f.code='$FAMILY' AND l.status='active' AND p.name='$1' ORDER BY i.added_at DESC LIMIT 1"; }
 signin() { # le formulaire garde les dernières valeurs : on les retrouve par leur contenu

@@ -7,8 +7,13 @@ import xml.etree.ElementTree as ET
 
 def dump():
     for _ in range(6):
-        subprocess.run(["adb", "shell", "uiautomator", "dump", "/sdcard/ui.xml"], capture_output=True)
-        r = subprocess.run(["adb", "exec-out", "cat", "/sdcard/ui.xml"], capture_output=True)
+        try:  # une lecture d'écran qui ne rend jamais la main échoue au bout de 20 s au lieu de bloquer tout le parcours
+            subprocess.run(["adb", "shell", "uiautomator", "dump", "/sdcard/ui.xml"], capture_output=True, timeout=20)
+            r = subprocess.run(["adb", "exec-out", "cat", "/sdcard/ui.xml"], capture_output=True, timeout=10)
+        except subprocess.TimeoutExpired:
+            print("LECTURE D'ÉCRAN BLOQUÉE (délai dépassé)", file=sys.stderr)
+            time.sleep(1)
+            continue
         if r.stdout.strip().startswith(b"<?xml"):
             return r.stdout.decode("utf-8", "replace")
         time.sleep(1)
