@@ -13,6 +13,12 @@ PASS  M4a. quantité conservée : Carottes 1,5 kg
 PASS  M4b. quantité conservée : Tomates 2 kg
 PASS  M5. serveur : nouvelle liste, Carottes 1.500 kg (1.500 kg)
 PASS  M5b. serveur : Tomates 2.000 kg (2.000 kg)
+═══ Cas M2 : brouillon NON validé quand la liste est terminée par quelqu'un d'autre ═══
+PASS  M2a. brouillon : Oignons 1,5 kg, sans validation
+PASS  M2b. la clôture par un parent est apprise en direct : brouillon gardé, « Reprendre » proposé
+PASS  M2c. serveur : rien n'a été écrit pour le brouillon
+PASS  M2d. brouillon repris
+PASS  M2e. quantité conservée : 1,5 kg
 ═══ Cas D : « Se déconnecter » visible dans Réglages et dans Compte, avertissement si envoi en attente ═══
 PASS  D1. « Se déconnecter » visible en bas des Réglages
 PASS  D1b. distinct de « Réinitialiser la famille » (deux actions séparées, Se déconnecter au-dessus)
@@ -28,55 +34,3 @@ PASS  D5. la modification part au retour du réseau
 PASS  D6. personnel déconnecté depuis Compte
 PASS  D6b. aucune donnée du personnel affichée
 ═══ Cas P : personnel — accueil sur Choisir, enregistrement sans quitter l'écran, modification sans doublon ═══
-PASS  P1. connexion : « Choisir mes articles » affiché directement
-PASS  P1b. pas de flèche de retour vers la liste
-PASS  P1c. aucun onglet en bas (ni Choisir ni Liste du jour)
-PASS  P1d. « Terminer » désactivé sans modification
-PASS  P2. « Terminer » activé après une modification
-PASS  P3. confirmation « Sélection enregistrée »
-PASS  P3b. reste sur Choisir (aucune redirection)
-PASS  P3c. recherche conservée (Tomates affichées)
-PASS  P3d. article repéré comme enregistré, avec sa quantité
-PASS  P3e. « Terminer » de nouveau désactivé
-PASS  P3f. serveur : Tomates 1.500 kg (1.500 kg to_buy)
-PASS  P4. modification repérée (enregistré : 1,5 kg)
-PASS  P4b. confirmation
-PASS  P4c. serveur : une seule ligne, quantité remplacée 2.000 kg (2.000 kg to_buy)
-PASS  P4d. toujours sur Choisir
-PASS  P5. hors connexion : « Envoi en attente »
-PASS  P5b. reste sur Choisir hors connexion
-PASS  P5c. envoi au retour du réseau
-PASS  P5d. serveur : une seule ligne, 2.500 kg (2.500 kg to_buy)
-PASS  P6. quantité enregistrée affichée sur Choisir
-═══ Cas W : personnel — sans barre d'onglets, bouton fixe en bas ; 360 / 390 dp, gestes / trois boutons, clavier ═══
-PASS  W-360dp-gestes a. écran Choisir, aucun onglet (ni « Liste du jour » ni « Choisir » en bas)
-PASS  W-360dp-gestes b. Compte accessible en haut
-PASS  W-360dp-gestes c. trois modes en haut
-      W-360dp-gestes : écran 2340px, densité 480, bas du libellé du bouton y=2187 → 51 dp jusqu'au bord (libellé → bord : moitié du bouton + marge + zone système)
-PASS  W-360dp-gestes d. bouton juste au-dessus de la zone système (51 dp, attendu 20–70)
-      W-360dp-gestes clavier : bas du libellé y=1350
-PASS  W-360dp-gestes e. clavier ouvert : bouton toujours visible et remonté au-dessus du clavier
-PASS  W-360dp-boutons a. écran Choisir, aucun onglet (ni « Liste du jour » ni « Choisir » en bas)
-PASS  W-360dp-boutons b. Compte accessible en haut
-PASS  W-360dp-boutons c. trois modes en haut
-      W-360dp-boutons : écran 2340px, densité 480, bas du libellé du bouton y=2115 → 75 dp jusqu'au bord (libellé → bord : moitié du bouton + marge + zone système)
-PASS  W-360dp-boutons d. bouton juste au-dessus de la zone système (75 dp, attendu 50–95)
-      W-360dp-boutons clavier : bas du libellé y=1350
-PASS  W-360dp-boutons e. clavier ouvert : bouton toujours visible et remonté au-dessus du clavier
-PASS  W-390dp-gestes a. écran Choisir, aucun onglet (ni « Liste du jour » ni « Choisir » en bas)
-PASS  W-390dp-gestes b. Compte accessible en haut
-PASS  W-390dp-gestes c. trois modes en haut
-      W-390dp-gestes : écran 2340px, densité 443, bas du libellé du bouton y=2199 → 50 dp jusqu'au bord (libellé → bord : moitié du bouton + marge + zone système)
-PASS  W-390dp-gestes d. bouton juste au-dessus de la zone système (50 dp, attendu 20–70)
-      W-390dp-gestes clavier : bas du libellé y=1426
-PASS  W-390dp-gestes e. clavier ouvert : bouton toujours visible et remonté au-dessus du clavier
-PASS  W-390dp-boutons a. écran Choisir, aucun onglet (ni « Liste du jour » ni « Choisir » en bas)
-PASS  W-390dp-boutons b. Compte accessible en haut
-PASS  W-390dp-boutons c. trois modes en haut
-      W-390dp-boutons : écran 2340px, densité 443, bas du libellé du bouton y=2132 → 75 dp jusqu'au bord (libellé → bord : moitié du bouton + marge + zone système)
-PASS  W-390dp-boutons d. bouton juste au-dessus de la zone système (75 dp, attendu 50–95)
-      W-390dp-boutons clavier : bas du libellé y=1426
-PASS  W-390dp-boutons e. clavier ouvert : bouton toujours visible et remonté au-dessus du clavier
-PASS  W-fin. bouton fixe après défilement complet
-ECHECS=0
-CRASH_APPLICATION=0
