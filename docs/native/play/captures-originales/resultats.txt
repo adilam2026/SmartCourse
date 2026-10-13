@@ -1,15 +1,15 @@
-{"liste": "4b02f85a-0403-4d98-b383-0b004a69311f", "articles": ["Tomates", "Pommes de terre", "Courgettes", "Bananes", "Yaourt nature", "Riz", "Lait", "Œufs", "Pain"], "achetes": ["Lait", "Œufs", "Pain"]}
+{"liste": "bfc21769-0d35-47da-9760-0546b31baa97", "articles": ["Tomates", "Pommes de terre", "Courgettes", "Bananes", "Yaourt nature", "Riz", "Lait", "Œufs", "Pain"], "achetes": ["Lait", "Œufs", "Pain"]}
 PASS  S0. données fictives : 3 courses passées, 1 liste en cours
-FAIL  S1. liste partagée affichée
+PASS  S1. liste partagée affichée
 capture play-1-liste-partagee
-FAIL  S4. articles achetés visibles (« Acheté par Karim »)
+PASS  S4. articles achetés visibles (« Acheté par Karim »)
 capture play-4-articles-achetes
-FAIL  S3. panneau de quantité
+PASS  S3. panneau de quantité
 capture play-3-quantite
-FAIL  S5. historique des courses
+PASS  S5. historique des courses
 capture play-5-historique
-FAIL  S6. profils de la famille
+PASS  S6. profils de la famille
 capture play-6-profils
-FAIL  S2. sélection avec photos
+PASS  S2. sélection avec photos
 capture play-2-selection-photos
-Captures : 6 / 6 ; échecs : 6
+Captures : 6 / 6 ; échecs : 0
