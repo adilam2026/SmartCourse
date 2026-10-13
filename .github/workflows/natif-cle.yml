@@ -1,0 +1,104 @@
+name: Android natif — création UNIQUE de la clé de signature durable
+# Lancement manuel uniquement. Crée la clé de la version finale (app.smartcourse.courses.natif) sur un runner temporaire :
+#   1. vérifie d'abord le stockage : jetons présents, dépôt de sauvegarde PRIVÉ accessible, phrase de sauvegarde définie,
+#      et AUCUNE clé déjà enregistrée (la même clé sert à toutes les mises à jour : jamais de remplacement silencieux) ;
+#   2. génère la clé et son mot de passe (jamais affichés : masqués dans les journaux, aucun fichier publié) ;
+#   3. dépose une sauvegarde CHIFFRÉE (7z AES-256, noms de fichiers chiffrés) dans le dépôt privé, puis la relit et la déchiffre pour la vérifier ;
+#   4. seulement ensuite, enregistre les cinq secrets NATIF_* du dépôt SmartCourse.
+# Ce dépôt est public : rien de secret n'est écrit dans les journaux, le dépôt, les releases ni les artifacts.
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: "Écrire CRÉER pour confirmer la création unique de la clé"
+        required: true
+permissions:
+  contents: read
+jobs:
+  cle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      REPO: ${{ github.repository }}
+      BACKUP_REPO: ${{ github.repository_owner }}/smartcourse-cles
+      ALIAS: courses-natif
+    steps:
+      - name: 1. Vérifications AVANT toute génération
+        env:
+          CONFIRM: ${{ inputs.confirmation }}
+          SECRETS_TOKEN: ${{ secrets.NATIF_SECRETS_TOKEN }}
+          BACKUP_TOKEN: ${{ secrets.NATIF_BACKUP_TOKEN }}
+          PASSPHRASE: ${{ secrets.NATIF_BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          [ "$CONFIRM" = "CRÉER" ] || { echo "::error::Confirmation absente (écrire CRÉER)."; exit 1; }
+          for v in SECRETS_TOKEN BACKUP_TOKEN PASSPHRASE; do [ -n "${!v}" ] || { echo "::error::Secret manquant : NATIF_${v/PASSPHRASE/BACKUP_PASSPHRASE}"; exit 1; }; done
+          [ ${#PASSPHRASE} -ge 16 ] || { echo "::error::NATIF_BACKUP_PASSPHRASE doit faire au moins 16 caractères."; exit 1; }
+          # Jeton des secrets : il doit pouvoir lister les secrets de SmartCourse (et donc en écrire)
+          GH_TOKEN="$SECRETS_TOKEN" gh api "repos/$REPO/actions/secrets" --jq '.secrets[].name' > /tmp/existants || { echo "::error::NATIF_SECRETS_TOKEN ne donne pas accès aux secrets de $REPO (permission « Secrets : Read and write »)."; exit 1; }
+          if grep -qx "NATIF_KEYSTORE_B64" /tmp/existants; then echo "::error::Une clé est DÉJÀ enregistrée (NATIF_KEYSTORE_B64) : elle doit être conservée pour toutes les mises à jour. Rien n'est créé."; exit 1; fi
+          # Dépôt de sauvegarde : doit exister, être PRIVÉ, et accepter l'écriture avec le jeton de sauvegarde
+          INFO=$(GH_TOKEN="$BACKUP_TOKEN" gh api "repos/$BACKUP_REPO") || { echo "::error::Dépôt $BACKUP_REPO introuvable avec NATIF_BACKUP_TOKEN."; exit 1; }
+          [ "$(echo "$INFO" | jq -r .private)" = true ] || { echo "::error::$BACKUP_REPO n'est pas privé : sauvegarde refusée."; exit 1; }
+          [ "$(echo "$INFO" | jq -r .permissions.push)" = true ] || { echo "::error::NATIF_BACKUP_TOKEN ne peut pas écrire dans $BACKUP_REPO (permission « Contents : Read and write »)."; exit 1; }
+          command -v 7z >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq p7zip-full >/dev/null; }
+          echo "Vérifications réussies : stockage prêt, aucune clé existante."
+
+      - name: 2. Génération de la clé (rien n'est affiché)
+        run: |
+          set -euo pipefail
+          umask 077; W="$RUNNER_TEMP/cle"; mkdir -p "$W"
+          P=$(openssl rand -base64 36 | tr -dc 'A-Za-z0-9' | head -c 32)
+          echo "::add-mask::$P"
+          printf '%s' "$P" > "$W/motdepasse"
+          keytool -genkeypair -noprompt -keystore "$W/courses-natif.keystore" -storetype PKCS12 -alias "$ALIAS" \
+            -keyalg RSA -keysize 4096 -validity 10000 -storepass "$P" -keypass "$P" -dname "CN=Courses, O=SmartCourse, C=MA" >/dev/null 2>&1
+          keytool -list -v -keystore "$W/courses-natif.keystore" -alias "$ALIAS" -storepass "$P" 2>/dev/null | grep -m1 "SHA256:" | sed 's/.*SHA256: *//' > "$W/empreinte"
+          echo "Empreinte SHA-256 du certificat (publique) : $(cat "$W/empreinte")"
+
+      - name: 3. Sauvegarde chiffrée dans le dépôt privé, relue et vérifiée
+        env:
+          BACKUP_TOKEN: ${{ secrets.NATIF_BACKUP_TOKEN }}
+          PASSPHRASE: ${{ secrets.NATIF_BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          umask 077; W="$RUNNER_TEMP/cle"; D="$W/sauvegarde"; mkdir -p "$D"
+          cp "$W/courses-natif.keystore" "$D/"
+          { echo "Courses — clé de signature Android (version native)"
+            echo "Identifiant de l'application : app.smartcourse.courses.natif"
+            echo "Fichier : courses-natif.keystore (PKCS12)"
+            echo "Alias : $ALIAS"
+            echo "Mot de passe (fichier et clé) : $(cat "$W/motdepasse")"
+            echo "Empreinte SHA-256 : $(cat "$W/empreinte")"
+            echo "Créée le : $(date -u +%Y-%m-%dT%H:%MZ)"
+            echo "Sans ce fichier ET ce mot de passe, aucune mise à jour de l'application n'est possible."; } > "$D/LISEZ-MOI-informations-cle.txt"
+          NAME="courses-natif-cle-$(date -u +%Y%m%d).7z"
+          (cd "$D" && 7z a -t7z -mhe=on -mx=9 -p"$PASSPHRASE" "$W/$NAME" courses-natif.keystore LISEZ-MOI-informations-cle.txt >/dev/null)
+          # Dépôt dans le dépôt privé (API contenus), sans jamais afficher le fichier
+          base64 -w0 "$W/$NAME" > "$W/archive.b64"
+          jq -n --rawfile c "$W/archive.b64" --arg m "Sauvegarde chiffrée de la clé Courses natif" '{message:$m, content:$c}' > "$W/req.json"
+          GH_TOKEN="$BACKUP_TOKEN" gh api -X PUT "repos/$BACKUP_REPO/contents/$NAME" --input "$W/req.json" --jq .content.path >/dev/null
+          # Relecture depuis le dépôt privé et déchiffrement de contrôle
+          GH_TOKEN="$BACKUP_TOKEN" gh api "repos/$BACKUP_REPO/contents/$NAME" -H "Accept: application/vnd.github.raw" > "$W/relu.7z"
+          mkdir -p "$W/controle" && (cd "$W/controle" && 7z x -p"$PASSPHRASE" "$W/relu.7z" >/dev/null)
+          cmp -s "$W/controle/courses-natif.keystore" "$W/courses-natif.keystore" || { echo "::error::La sauvegarde relue ne correspond pas : aucun secret n'est enregistré."; exit 1; }
+          keytool -list -keystore "$W/controle/courses-natif.keystore" -storepass "$(cat "$W/motdepasse")" >/dev/null 2>&1 || { echo "::error::La sauvegarde relue ne s'ouvre pas : aucun secret n'est enregistré."; exit 1; }
+          echo "Sauvegarde déposée dans $BACKUP_REPO ($NAME), relue et déchiffrée avec succès."
+
+      - name: 4. Enregistrement des cinq secrets NATIF_* (après la sauvegarde vérifiée)
+        env:
+          SECRETS_TOKEN: ${{ secrets.NATIF_SECRETS_TOKEN }}
+        run: |
+          set -euo pipefail
+          W="$RUNNER_TEMP/cle"; export GH_TOKEN="$SECRETS_TOKEN"
+          base64 -w0 "$W/courses-natif.keystore" | gh secret set NATIF_KEYSTORE_B64 --repo "$REPO"
+          gh secret set NATIF_KEYSTORE_PASSWORD --repo "$REPO" < "$W/motdepasse"
+          gh secret set NATIF_KEY_PASSWORD --repo "$REPO" < "$W/motdepasse"
+          printf '%s' "$ALIAS" | gh secret set NATIF_KEY_ALIAS --repo "$REPO"
+          gh secret set NATIF_CERT_SHA256 --repo "$REPO" < "$W/empreinte"
+          gh api "repos/$REPO/actions/secrets" --jq '[.secrets[].name | select(startswith("NATIF_"))] | join(", ")'
+
+      - name: Effacement des fichiers du runner
+        if: always()
+        run: |
+          [ -d "$RUNNER_TEMP/cle" ] && find "$RUNNER_TEMP/cle" -type f -exec shred -u {} + 2>/dev/null; rm -rf "$RUNNER_TEMP/cle"; echo "Fichiers temporaires effacés."
