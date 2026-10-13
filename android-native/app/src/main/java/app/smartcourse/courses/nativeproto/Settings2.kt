@@ -43,11 +43,11 @@ import java.time.Instant
 /** Les écrans « Récupération », « Notifications », « Sauvegarde » et « À propos » (démonstration : exemples ; connecté : données réelles). */
 @Composable
 fun StubScreen(title: String, onBack: () -> Unit) {
-    when (title) {
-        "Récupération" -> RecoveryScreen(onBack)
-        "Notifications" -> NotificationsScreen(onBack)
-        "Sauvegarde" -> BackupScreen(onBack)
-        "À propos" -> AboutScreen(onBack)
+    when (title.lowercase().replace("é", "e").replace("à", "a").replace(" ", "")) {
+        "recuperation" -> RecoveryScreen(onBack)
+        "notifications" -> NotificationsScreen(onBack)
+        "sauvegarde" -> BackupScreen(onBack)
+        "apropos" -> AboutScreen(onBack)
         else -> Column(Modifier.fillMaxSize()) {
             TopBar(title, onBack = onBack)
             Text("Cet écran n'existe pas.", color = C.Muted, modifier = Modifier.padding(24.dp))

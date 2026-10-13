@@ -80,6 +80,10 @@ run_all() {
   shot V06-suppression-confirmation --es screen v06d --ez confirm true
   shot V07-administration --es screen v07
   shot V07-reinitialiser --es screen v07 --ez confirm true
+  shot V13-recuperation --es path v07,stub/recuperation
+  shot V14-notifications --es path v07,stub/notifications
+  shot V15-sauvegarde --es path v07,stub/sauvegarde
+  shot V16-apropos --es path v07,stub/apropos
   shot V08-profils --es screen v08
   shot V08-menu-profil --es screen v08 --es pmenu 1
   shot V08-menu-protege --es screen v08 --es pmenu 0

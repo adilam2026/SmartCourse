@@ -106,6 +106,17 @@ ACTIVE=$(sql "SELECT l.id FROM lists l JOIN families f ON f.id=l.family_id WHERE
 # ═══ K. Personnel : demandes, quantité, retrait, règles du serveur ═══
 logout
 expect "K0. déconnecté" $UI wait "Bienvenue" 20
+$UI tap "Besoin d'aide" >/dev/null; sleep 2
+expect "K0a. aide à la connexion" $UI wait "J'ai oublié mon code" 10
+shot lot3-aide-connexion
+$UI tap "J'ai oublié mon code" >/dev/null; sleep 2
+expect "K0b. récupération du code par e-mail (formulaire réel)" $UI wait "Envoyer le lien" 10
+shot lot3-aide-code-oublie
+adb shell input keyevent KEYCODE_BACK; sleep 1; hide_kb; adb shell input keyevent KEYCODE_BACK; sleep 1
+$UI tap "Première connexion" >/dev/null; sleep 1; $UI tap "Créer ma famille" >/dev/null; sleep 2
+expect "K0c. création de famille : jeton d'installation exigé" $UI wait "Jeton d'installation" 10
+shot lot3-creer-famille
+$UI tap "Se connecter" --first >/dev/null; sleep 1
 signin "$FAMILY" marie 573918
 expect "K1. personnel : liste du jour" $UI wait "Liste du jour" 25
 expect "K2. article demandé visible" $UI wait "Tomates" 15
@@ -119,6 +130,19 @@ S=$(api GET /api/stats/purchases); expect "K6. serveur : pas de statistiques pou
 tapt "Retirer Tomates"; sleep 4
 expect "K7. serveur : article retiré (« $(item Tomates) »)" test "$(item Tomates)" = "2.000 kg removed"
 expect "K8. écran : liste vide pour le personnel" $UI wait "Aucun article" 12
+
+# ═══ Écrans supplémentaires (captures pour validation) ═══
+adb shell input keyevent KEYCODE_BACK; sleep 1
+logout; signin "$FAMILY" adil 482913
+$UI wait "Ma liste" 25 >/dev/null
+shot lot3-liste-admin
+tapt "Favoris"; shot lot3-favoris; adb shell input keyevent KEYCODE_BACK; sleep 1
+tapt "Réglages"; tapt "Réinitialiser la famille"
+expect "K9. réinitialisation : confirmation par mot de passe et code famille" $UI wait "Réinitialiser définitivement" 15 || true
+shot lot3-reinitialiser
+adb shell input keyevent KEYCODE_BACK; sleep 1
+logout; signin "$FAMILY" marie 573918
+$UI wait "Liste du jour" 25 >/dev/null
 
 # ═══ L. Hors connexion : file « Envoi en attente », envoi unique au retour ═══
 tapt "Choisir des articles"
