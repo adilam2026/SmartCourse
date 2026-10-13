@@ -31,7 +31,9 @@ item() { sql "SELECT i.quantity||' '||i.unit||' '||i.status FROM list_items i JO
 signin() { # le formulaire garde les dernières valeurs : on les retrouve par leur contenu
   fill "${PREV_FAMILY:-Code famille}" "$1"; fill "${PREV_LOGIN:-Identifiant}" "$2"; fill "Code d'accès" "$3"; hide_kb
   $UI tap "Se connecter" --last >/dev/null; sleep 3; PREV_FAMILY="$1"; PREV_LOGIN="$2"; }
-logout() { tapt "Compte"; $UI tap "Se déconnecter" >/dev/null; sleep 2; $UI tap "Se déconnecter" --last >/dev/null; sleep 3; }
+# « Compte » est dans l'en-tête des écrans principaux : on y revient d'abord (Retour) si l'on est sur un écran secondaire.
+logout() { for _ in 1 2 3 4; do $UI has "Compte" && break; adb shell input keyevent KEYCODE_BACK; sleep 2; done
+  tapt "Compte"; $UI tap "Se déconnecter" >/dev/null; sleep 2; $UI tap "Se déconnecter" --last >/dev/null; sleep 3; }
 server_wait() { for _ in $(seq 1 60); do curl -fsS --max-time 3 $BASE/health >/dev/null 2>&1 && return 0; sleep 2; done; return 1; }
 
 adb shell settings put global hide_error_dialogs 1 >/dev/null 2>&1 || true
@@ -186,6 +188,7 @@ shot lot3-brouillon-isole
 logout
 signin "$FAMILY" adil 482913
 $UI wait "Ma liste" 25 >/dev/null
+expect "O0. administrateur reconnecté (onglet Réglages présent)" $UI wait "Réglages" 15
 # ═══ Écrans supplémentaires (captures pour validation) ═══
 shot lot3-liste-admin
 tapt "Favoris"; shot lot3-favoris; adb shell input keyevent KEYCODE_BACK; sleep 1
