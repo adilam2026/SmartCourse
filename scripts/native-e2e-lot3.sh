@@ -157,8 +157,8 @@ expect "M5. serveur : une nouvelle liste en cours contient Persil" test "$(sql "
 
 # ═══ N. Brouillons isolés par profil ═══
 tapt "Choisir"
-fill "Rechercher un produit" "Lait"; hide_kb
-$UI tap "Lait" --last >/dev/null; sleep 2
+fill "Rechercher un produit" "Carottes"; hide_kb
+$UI tap "Carottes" --last >/dev/null; sleep 2
 expect "N1. brouillon du personnel" $UI wait "Terminer ma sélection (1)" 8
 launch
 logout
@@ -185,12 +185,12 @@ shot lot3-prix-liste
 tapt "Réglages"; tapt "Gestion des prix"
 expect "O4. gestion des prix : catalogue réel" $UI wait "Sans prix" 20
 shot lot3-gestion-prix
-fill "Rechercher un produit" "Lait"; hide_kb
-$UI tap "Ajouter un prix" >/dev/null || $UI tap "DH" >/dev/null; sleep 2
+fill "Rechercher un produit" "Carottes"; hide_kb
+$UI tap "Ajouter un prix" >/dev/null || $UI tap "DH" --last >/dev/null; sleep 2
 expect "O5. panneau de prix" $UI wait "Enregistrer" 10
-adb shell input text "7,50"; hide_kb
+sleep 1; clear_field; adb shell input text "7,50"; hide_kb
 $UI tap "Enregistrer" >/dev/null; sleep 4
-expect "O6. serveur : prix de la famille enregistré (7.50)" test "$(sql "SELECT amount FROM family_prices fp JOIN products p ON p.id=fp.product_id JOIN families f ON f.id=fp.family_id WHERE f.code='$FAMILY' AND p.name='Lait'")" = 7.50
+expect "O6. serveur : prix de la famille enregistré (7.50)" test "$(sql "SELECT amount FROM family_prices fp JOIN products p ON p.id=fp.product_id JOIN families f ON f.id=fp.family_id WHERE f.code='$FAMILY' AND p.name='Carottes'")" = 7.50
 expect "O7. prix affiché dans la gestion des prix" $UI wait "7,50 DH" 10
 
 # ═══ P. Statistiques ═══
@@ -215,7 +215,7 @@ expect "Q4. à propos : version et serveur" $UI wait "10.0.2.2:3000" 10
 shot lot3-apropos
 adb shell input keyevent KEYCODE_BACK; sleep 1
 tapt "Notifications"
-tapt "Nouvelles demandes"
+$UI tap "Nouvelles demandes" >/dev/null
 expect "Q5. notifications activées" $UI wait "Notifications activées" 10
 shot lot3-notifications
 expect "Q6. tâche périodique programmée par Android" bash -c "adb shell dumpsys jobscheduler | grep -q $PKG"
@@ -228,9 +228,14 @@ api GET /api/catalog >/dev/null; PID=$(jq -r '[.categories[].products[] | select
 api POST /api/lists/active/ops -d "{\"ops\":[{\"opId\":\"$(cat /proc/sys/kernel/random/uuid)\",\"type\":\"add\",\"productId\":\"$PID\",\"quantity\":1}]}" >/dev/null
 JOB=$(adb shell dumpsys jobscheduler | grep -E "JOB #.*$PKG" | head -1 | sed -E 's/.*#[^/]*\/([0-9]+).*/\1/')
 adb shell cmd jobscheduler run -f $PKG "${JOB:-1}" >/dev/null 2>&1; sleep 12
+echo "--- diagnostic notification ---" | tee -a "$OUT/resultats.txt"
+adb shell dumpsys jobscheduler | grep -B1 -A6 "$PKG" | head -40 | tee -a "$OUT/resultats.txt"
+adb logcat -d | grep -E "CoursesData|WM-|PollWorker|SystemJobService" | tail -25 | tee -a "$OUT/resultats.txt"
+adb shell dumpsys notification | grep -E "pkg=$PKG|Nouvelle" | head | tee -a "$OUT/resultats.txt"
 expect "R1. notification « Nouvelle demande » affichée" bash -c "adb shell dumpsys notification --noredact | grep -q 'Nouvelle demande'"
 adb exec-out screencap -p > "$OUT/lot3-notification-fond.png"
 
+echo "--- journal de l'application ---" | tee -a "$OUT/resultats.txt"; adb logcat -d | grep CoursesData | tail -40 | tee -a "$OUT/resultats.txt"
 echo "ECHECS=$FAILS" | tee -a "$OUT/resultats.txt"
 adb logcat -d -b crash > "$OUT/logcat-crash.txt" 2>&1 || true
 echo "CRASH_APPLICATION=$(grep -c app.smartcourse "$OUT/logcat-crash.txt")" | tee -a "$OUT/resultats.txt"

@@ -241,6 +241,7 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
         val rep = engine.flush()
         if (rep.messages.isNotEmpty()) demo.say(rep.messages.joinToString(" "))
         if (!rep.networkDown) engine.refresh()
+        android.util.Log.i("CoursesData", "flush envoyées=${rep.sent} gardées=${rep.orphaned} réseau=${rep.networkDown} messages=${rep.messages} | à reprendre=${engine.orphans.size} en attente=${engine.pendingOps} liste=${engine.list?.id} en ligne=${engine.online}")
         demo.listLoaded = true
         if (engine.catalogRev != catalogRevLoaded && engine.online) refreshCatalog()
         render(); syncDraft()
