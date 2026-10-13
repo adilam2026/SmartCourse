@@ -27,7 +27,7 @@ Présentation validée conservée (aucun écran web). Branche `claude/android-na
 Liste administrateur et personnel, sélection, quantités, historique, gestion des prix, affichage, statistiques ; « Première connexion » (rejoindre / créer une famille), « Besoin d'aide » ; Récupération, Notifications, Sauvegarde, À propos (écrans à concevoir) ; création et modification d'un article du catalogue, photo d'article, « Supprimer mon compte » (non conçus dans la présentation validée).
 
 ## Tests
-- 17 + 21 tests unitaires Android (client, session, règles de protection, villes, API) ; 296 tests serveur.
+- 32 tests unitaires Android (17 du lot 1 + 15 nouveaux : règles de protection, villes, API profils et catalogue) ; 296 tests serveur.
 - Parcours de bout en bout sur émulateur Android 14 : lot 1 : 28/28 ; lot 2 : 58/58 (`docs/native/e2e-lot2/resultats.txt`) ; 0 plantage de l'application ; zones tactiles du personnel ≥ 48 dp sur 18 écrans.
 
 ## Limites connues
