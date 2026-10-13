@@ -68,6 +68,17 @@ def main():
             time.sleep(1)
         print(f"INTROUVABLE: {needle}")
         return 1
+    if cmd == "bounds":  # bounds TEXTE : « x1 y1 x2 y2 » du dernier élément portant ce texte
+        if not (xml := dump()):
+            return 1
+        last = None
+        for n in ET.fromstring(xml).iter("node"):
+            if needle in (n.get("text") or "") + "\n" + (n.get("content-desc") or ""):
+                last = n
+        if last is None:
+            return 1
+        print(" ".join(re.findall(r"\d+", last.get("bounds") or "")))
+        return 0
     if cmd == "above":  # above A B : le premier A est affiché plus haut que le premier B (les deux visibles)
         xml = dump(); a, b = matches(xml, needle), matches(xml, sys.argv[3])
         if not a or not b:

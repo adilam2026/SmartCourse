@@ -94,7 +94,7 @@ expect "7c. session révoquée : reste déconnecté au lancement suivant" $UI wa
 # 8. Personnel : mêmes écrans de connexion, présentation personnelle
 PREV_FAMILY="$FAMILY"; PREV_LOGIN="adil"
 signin "$FAMILY" marie 573918
-expect "8a. personnel : liste du jour" $UI wait "Liste du jour" 25
+expect "8a. personnel : écran « Choisir mes articles »" $UI wait "Choisir mes articles" 25
 $UI tap "Compte" >/dev/null; sleep 2
 expect "8b. personnel : rôle réel" $UI wait "Personnel" 10
 shot e2e-8-personnel

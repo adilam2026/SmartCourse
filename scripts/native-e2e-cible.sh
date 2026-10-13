@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Tests CIBLÉS : reproduisent un par un les échecs du parcours des lots 3 à 6, sans rejouer toute la suite.
-# Chaque cas part d'un état propre. Usage : native-e2e-cible.sh APK CODE_FAMILLE SORTIE [cas…]  (cas : M | M2 | K9 | R | RW | I | L | D | P ; tous par défaut)
+# Chaque cas part d'un état propre. Usage : native-e2e-cible.sh APK CODE_FAMILLE SORTIE [cas…]  (cas : M | M2 | K9 | R | RW | I | L | D | P | W ; tous par défaut)
 set -uo pipefail
-CASES=("${@:4}"); [ ${#CASES[@]} -eq 0 ] && CASES=(M M2 K9 R RW I L D P)
+CASES=("${@:4}"); [ ${#CASES[@]} -eq 0 ] && CASES=(M M2 K9 R RW I L D P W)
 # Fonctions et installation communes, reprises telles quelles du parcours complet (lignes 4 à l'installation de l'APK).
 source <(sed -n '/^PKG=/,/^adb shell pm grant/p' "$(dirname "$0")/native-e2e-lot3.sh")
 want() { for c in "${CASES[@]}"; do [ "$c" = "$1" ] && return 0; done; return 1; }
@@ -21,8 +21,7 @@ if want M; then
   echo "═══ Cas M : liste terminée pendant l'attente → articles ET quantités conservés, « Reprendre » ═══" | tee -a "$OUT/resultats.txt"
   ACTIVE=$(fresh_list)
   first_login marie 573918
-  expect "M0. personnel connecté" $UI wait "Liste du jour" 25
-  tapt "Choisir"
+  expect "M0. personnel connecté" $UI wait "Choisir mes articles" 25
   select_qty Carottes 1                                  # 1 kg → 1,5 kg
   expect "M0a. quantité choisie : Carottes 1,5 kg" $UI wait "1,5 kg" 8
   select_qty Tomates 2                                   # 1 kg → 2 kg
@@ -36,7 +35,6 @@ if want M; then
   docker start sc-recette-app >/dev/null; server_wait
   expect "M1. la demande part au retour du réseau puis est refusée proprement" $UI gone "Envoi en attente" 90
   expect "M2. serveur : rien n'a été ajouté à la liste archivée" test "$(sql "SELECT count(*) FROM list_items WHERE list_id='$ACTIVE' AND status IN ('to_buy','purchased')")" = 0
-  tapt "Choisir"
   expect "M3. « Reprendre » proposé pour les articles gardés" $UI wait "Reprendre" 30
   expect "M3b. le nombre d'articles gardés est annoncé (2)" $UI has "2 articles"
   shot cible-reprendre
@@ -57,8 +55,7 @@ if want M2; then
   echo "═══ Cas M2 : brouillon NON validé quand la liste est terminée par quelqu'un d'autre ═══" | tee -a "$OUT/resultats.txt"
   ACTIVE=$(fresh_list)
   first_login marie 573918
-  $UI wait "Liste du jour" 25 >/dev/null
-  tapt "Choisir"
+  $UI wait "Choisir mes articles" 25 >/dev/null
   select_qty Oignons 1
   expect "M2a. brouillon : Oignons 1,5 kg, sans validation" $UI wait "Terminer ma sélection (1)" 8
   login_api adil 482913; api POST "/api/lists/$ACTIVE/close" -d '{}' >/dev/null
@@ -256,8 +253,8 @@ if want D; then
   expect "D2b. aucune donnée du profil précédent affichée" $UI gone "Ma liste" 3
   shot cible-apres-deconnexion
   signin "$FAMILY" marie 573918
-  expect "D3. personnel connecté" $UI wait "Liste du jour" 25
-  tapt "Choisir"; select_qty Oignons 0
+  expect "D3. personnel connecté" $UI wait "Choisir mes articles" 25
+  select_qty Oignons 0
   docker stop sc-recette-app >/dev/null
   $UI tap "Terminer ma sélection" >/dev/null; sleep 5
   expect "D3b. hors connexion : envoi en attente" $UI wait "Envoi en attente" 20
@@ -272,7 +269,7 @@ if want D; then
   expect "D5. la modification part au retour du réseau" $UI gone "Envoi en attente" 90
   logout
   expect "D6. personnel déconnecté depuis Compte" $UI wait "Bienvenue" 20
-  expect "D6b. aucune donnée du personnel affichée" $UI gone "Liste du jour" 3
+  expect "D6b. aucune donnée du personnel affichée" $UI gone "Choisir mes articles" 3
 fi
 
 if want P; then
@@ -282,7 +279,7 @@ if want P; then
   first_login marie 573918
   expect "P1. connexion : « Choisir mes articles » affiché directement" $UI wait "Choisir mes articles" 25
   expect "P1b. pas de flèche de retour vers la liste" $UI gone "Retour" 3
-  expect "P1c. Liste du jour reste accessible (onglet)" $UI has "Liste du jour"
+  expect "P1c. aucun onglet en bas (ni Choisir ni Liste du jour)" $UI gone "Liste du jour" 3
   expect "P1d. « Terminer » désactivé sans modification" bash -c "! $UI enabled 'Terminer ma sélection'"
   shot cible-personnel-accueil
   select_qty Tomates 1                                 # 1 kg → 1,5 kg
@@ -311,10 +308,47 @@ if want P; then
   docker start sc-recette-app >/dev/null; server_wait
   expect "P5c. envoi au retour du réseau" $UI gone "Envoi en attente" 90
   expect "P5d. serveur : une seule ligne, 2.500 kg ($(TQ))" test "$(TQ)" = "2.500 kg to_buy"
-  tapt "Liste du jour"
-  expect "P6. Liste du jour accessible volontairement" $UI wait "2,5 kg" 10
-  tapt "Choisir"
-  expect "P6b. retour sur Choisir : recherche conservée" $UI wait "Enregistré · 2,5 kg" 10
+  expect "P6. quantité enregistrée affichée sur Choisir" $UI wait "Enregistré · 2,5 kg" 10
+fi
+
+if want W; then
+  echo "═══ Cas W : personnel — sans barre d'onglets, bouton fixe en bas ; 360 / 390 dp, gestes / trois boutons, clavier ═══" | tee -a "$OUT/resultats.txt"
+  fresh_list >/dev/null
+  add_api marie 573918 Tomates "Pommes de terre"
+  first_login marie 573918
+  $UI wait "Choisir mes articles" 25 >/dev/null
+  H=$(adb shell wm size | grep -oE '[0-9]+x[0-9]+' | tail -1 | cut -dx -f2); WPX=$(adb shell wm size | grep -oE '[0-9]+x[0-9]+' | tail -1 | cut -dx -f1)
+  for DP in 360 390; do
+    DENS=$((WPX * 160 / DP))
+    for NAVM in gestes boutons; do
+      ov=$([ $NAVM = gestes ] && echo gestural || echo threebutton)
+      adb shell wm density $DENS >/dev/null
+      adb shell cmd overlay enable-exclusive --category com.android.internal.systemui.navbar.$ov >/dev/null 2>&1; sleep 5
+      launch; $UI wait "Choisir mes articles" 25 >/dev/null; sleep 2
+      T="W-${DP}dp-$NAVM"
+      expect "$T a. écran Choisir, aucun onglet (ni « Liste du jour » ni « Choisir » en bas)" $UI gone "Liste du jour" 3
+      expect "$T b. Compte accessible en haut" $UI has "Compte"
+      expect "$T c. trois modes en haut" $UI has "Grandes cartes"
+      read -r X1 Y1 X2 Y2 <<<"$($UI bounds 'Terminer ma sélection')"
+      GAP=$(( (H - ${Y2:-0}) * 160 / DENS ))
+      echo "      $T : écran ${H}px, densité $DENS, bas du libellé du bouton y=$Y2 → $GAP dp jusqu'au bord (libellé → bord : moitié du bouton + marge + zone système)" | tee -a "$OUT/resultats.txt"
+      if [ $NAVM = gestes ]; then MIN=20; MAX=70; else MIN=50; MAX=95; fi
+      expect "$T d. bouton juste au-dessus de la zone système ($GAP dp, attendu $MIN–$MAX)" test "$GAP" -ge $MIN -a "$GAP" -le $MAX
+      shot cible-$T
+      $UI tap "Rechercher un produit" >/dev/null; sleep 3
+      read -r K1 KY1 K2 KY2 <<<"$($UI bounds 'Terminer ma sélection')"
+      echo "      $T clavier : bas du libellé y=${KY2:-absent}" | tee -a "$OUT/resultats.txt"
+      expect "$T e. clavier ouvert : bouton toujours visible et remonté au-dessus du clavier" test -n "$KY2" -a "${KY2:-$H}" -lt $((H * 70 / 100))
+      shot cible-$T-clavier
+      hide_kb
+    done
+  done
+  adb shell wm density reset >/dev/null; adb shell cmd overlay enable-exclusive --category com.android.internal.systemui.navbar.gestural >/dev/null 2>&1
+  # Défilement jusqu'au dernier article : il reste au-dessus du bouton (le bouton est hors de la zone défilante)
+  launch; $UI wait "Choisir mes articles" 25 >/dev/null
+  for _ in $(seq 1 40); do adb shell input swipe 540 1700 540 400 150; done; sleep 2
+  shot cible-W-fin-de-liste
+  expect "W-fin. bouton fixe après défilement complet" $UI has "Terminer ma sélection"
 fi
 
 echo "ECHECS=$FAILS" | tee -a "$OUT/resultats.txt"

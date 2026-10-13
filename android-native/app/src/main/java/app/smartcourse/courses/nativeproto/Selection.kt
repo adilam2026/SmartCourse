@@ -104,7 +104,7 @@ fun SelectionScreen(nav: (String) -> Unit, onBack: () -> Unit) {
         // Une seule action finale
         Column(
             Modifier.fillMaxWidth().shadow(10.dp, ambientColor = C.Navy.copy(alpha = 0.12f), spotColor = C.Navy.copy(alpha = 0.25f))
-                .background(Color.White).navigationBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp),
+                .background(Color.White).navigationBarsPadding().padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 8.dp),
         ) {
             PrimaryButton(
                 if (count == 0) "Terminer ma sélection" else "Terminer ma sélection ($count)",

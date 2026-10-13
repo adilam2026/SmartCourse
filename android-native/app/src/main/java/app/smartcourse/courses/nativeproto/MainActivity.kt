@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
@@ -209,7 +210,8 @@ fun App(session: Session, me: Me?) {
     val back: () -> Unit = { nav.popBackStack() }
     val tabs = if (demo.role == Role.ADMIN) (if (me?.role == "parent") ADMIN_TABS.filter { it.route != "v07" } else ADMIN_TABS) else STAFF_TABS
     val showBar = route != null && route != "v01" &&
-        (if (demo.role == Role.ADMIN) route != "v04" else route == "v03" || route == "v04")
+        // Personnel : aucune barre d'onglets (ni son conteneur ni son espace) ; « Choisir mes articles » est l'unique écran principal.
+        demo.role == Role.ADMIN && route != "v04"
 
     CompositionLocalProvider(LocalDemo provides demo, LocalSession provides (if (me != null) session else null), LocalCompact provides (demo.role == Role.ADMIN && route != "v01"), LocalLogout provides (if (me != null) ({ confirmLogout = true }) else null)) {
         Box(Modifier.fillMaxSize().background(C.Bg)) {
@@ -324,7 +326,7 @@ private fun ToastHost(demo: Demo) {
     val t = demo.toast
     LaunchedEffect(t) { if (t != null) { delay(if (t.undoLabel != null) 8000 else 3200); if (demo.toast === t) demo.toast = null } }
     // imePadding : le message (et son bouton « Annuler ») reste visible et touchable au-dessus du clavier
-    if (t != null) Box(Modifier.fillMaxSize().imePadding().padding(bottom = 96.dp, start = 16.dp, end = 16.dp), contentAlignment = Alignment.BottomCenter) {
+    if (t != null) Box(Modifier.fillMaxSize().imePadding().navigationBarsPadding().padding(bottom = 96.dp, start = 16.dp, end = 16.dp), contentAlignment = Alignment.BottomCenter) {
         Row(
             Modifier.clip(RoundedCornerShape(16.dp)).background(C.Navy).padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),

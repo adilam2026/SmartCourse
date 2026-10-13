@@ -119,21 +119,23 @@ shot lot3-creer-famille
 $UI tap "Se connecter" --first >/dev/null; sleep 1
 signin "$FAMILY" marie 573918
 expect "K1. personnel : accueil direct sur « Choisir mes articles »" $UI wait "Choisir mes articles" 25
-tapt "Liste du jour"   # accès secondaire volontaire
-expect "K2. article demandé visible" $UI wait "Tomates" 15
-tapt "Augmenter"; sleep 4
+expect "K1b. personnel : aucun onglet en bas (ni Choisir ni Liste du jour)" $UI gone "Liste du jour" 3
+fill "Rechercher un produit" "Tomates"; hide_kb
+expect "K2. article demandé repéré avec sa quantité enregistrée" $UI wait "Enregistré · 1,5 kg" 15
+$UI tap "Modifier la quantité" >/dev/null; sleep 2; $UI tap "Augmenter" >/dev/null; sleep 1; $UI tap "Mettre à jour" >/dev/null; sleep 2
+$UI tap "Terminer ma sélection" >/dev/null; sleep 5
 expect "K3. serveur : quantité du personnel enregistrée ($(item Tomates))" test "$(item Tomates)" = "2.000 kg to_buy"
 login_api marie 573918
 S=$(api GET /api/lists); expect "K4. serveur : le personnel n'a pas l'historique (403, $S)" test "$S" = 403
 api GET /api/lists/active >/dev/null; IT=$(jq -r '.list.items[0].id' /tmp/api.out)
 S=$(api POST "/api/lists/$ACTIVE/ops" -d "{\"ops\":[{\"opId\":\"$(cat /proc/sys/kernel/random/uuid)\",\"type\":\"purchase\",\"itemId\":\"$IT\"}]}"); expect "K5. serveur : le personnel ne peut pas marquer un achat (403, $S)" test "$S" = 403
 S=$(api GET /api/stats/purchases); expect "K6. serveur : pas de statistiques pour le personnel (403, $S)" test "$S" = 403
-tapt "Retirer Tomates"; sleep 4
+$UI tap "Modifier la quantité" >/dev/null; sleep 2; $UI tap "Retirer de la liste" >/dev/null; sleep 2
+$UI tap "Terminer ma sélection" >/dev/null; sleep 5
 expect "K7. serveur : article retiré (« $(item Tomates) »)" test "$(item Tomates)" = "2.000 kg removed"
-expect "K8. écran : liste vide pour le personnel" $UI wait "Aucun article" 12
+expect "K8. écran : Tomates n'est plus enregistrée" $UI gone "Enregistré ·" 12
 
 # ═══ L. Hors connexion : file « Envoi en attente », envoi unique au retour ═══
-tapt "Choisir des articles"
 fill "Rechercher un produit" "Oignons"; hide_kb
 docker stop sc-recette-app >/dev/null
 $UI tap "Oignons" --last >/dev/null; sleep 2
@@ -147,7 +149,6 @@ expect "L3. retour du réseau : la demande part toute seule" $UI gone "Envoi en 
 expect "L4. serveur : demande reçue une seule fois (« $(item Oignons) »)" test "$(sql "SELECT count(*) FROM list_items i JOIN products p ON p.id=i.product_id WHERE i.list_id='$ACTIVE' AND p.name='Oignons'")" = 1
 
 # ═══ M. Liste terminée pendant l'attente : rien n'est ajouté à l'archive, « Reprendre » ═══
-tapt "Choisir"   # onglet du bas : le bouton « Choisir des articles » n'existe que sur une liste vide (ici elle contient déjà l'article du bloc L)
 fill "Rechercher un produit" "Carottes"; hide_kb
 docker stop sc-recette-app >/dev/null
 $UI tap "Carottes" --last >/dev/null; sleep 2
@@ -158,7 +159,6 @@ sql "UPDATE lists SET status='archived', closed_by='$ADIL', closed_at=now() WHER
 docker start sc-recette-app >/dev/null; server_wait
 expect "M1. liste terminée entre-temps : la demande est refusée proprement" $UI gone "Envoi en attente" 60
 expect "M2. serveur : rien n'a été ajouté à la liste archivée" test "$(sql "SELECT count(*) FROM list_items i JOIN products p ON p.id=i.product_id WHERE i.list_id='$ACTIVE' AND p.name='Carottes'")" = 0
-tapt "Choisir"
 expect "M3. « Reprendre » proposé pour les articles gardés" $UI wait "Reprendre" 20
 shot lot3-reprendre
 $UI tap "Reprendre" >/dev/null; sleep 2
@@ -168,7 +168,6 @@ ACTIVE2=$(sql "SELECT l.id FROM lists l JOIN families f ON f.id=l.family_id WHER
 expect "M5. serveur : une nouvelle liste en cours contient Carottes" test "$(sql "SELECT count(*) FROM list_items i JOIN products p ON p.id=i.product_id WHERE i.list_id='$ACTIVE2' AND p.name='Carottes'")" = 1
 
 # ═══ N. Brouillons isolés par profil ═══
-tapt "Choisir"
 fill "Rechercher un produit" "Tomates"; hide_kb
 $UI tap "Tomates" --last >/dev/null; sleep 2
 expect "N1. brouillon du personnel" $UI wait "Terminer ma sélection (1)" 8
