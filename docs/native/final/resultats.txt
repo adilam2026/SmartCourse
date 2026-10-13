@@ -1,0 +1,46 @@
+═══ F. Version finale : identifiant, nom, serveur fixe ═══
+PASS  F0. identifiant app.smartcourse.courses.natif installé
+PASS  F0b. nom affiché « Courses »
+PASS  F1. écran de connexion direct (aucune saisie de serveur)
+PASS  F1b. aucun bandeau ni fonction de démonstration
+PASS  F1c. aucun lien « Serveur … Modifier »
+PASS  F1d. accès de recette désactivés (écran simulé refusé)
+PASS  F1e. pas d'écrans de démonstration
+═══ G. Administrateur : connexion, sélection, achat, historique ═══
+PASS  G1. administrateur connecté
+PASS  G1b. aucun bandeau
+PASS  G1c. Compte dans l'en-tête
+PASS  G1d. aucune liste : « Créer une liste »
+PASS  G2. sélection (recherche pour l'administrateur)
+PASS  G3. liste créée avec Tomates
+PASS  G3b. serveur : Tomates à acheter (1.000 kg to_buy)
+PASS  G4. achat enregistré par le serveur (1.000 kg purchased)
+PASS  G4b. article dans « Déjà achetés »
+PASS  G5. liste archivée par le serveur
+PASS  G5b. historique affiché
+PASS  G6. Réglages : « Se déconnecter » visible
+PASS  G6b. aucune fonction technique dans Réglages
+PASS  G7. Compte : profil réel, sans serveur ni démonstration
+PASS  G8. déconnecté : retour à la connexion
+═══ H. Parent : rôle ═══
+PASS  H1. parent connecté
+PASS  H2. parent : pas d'onglet Réglages
+PASS  H3. parent : Historique accessible
+═══ P. Personnel : Choisir mes articles, enregistrement, hors connexion ═══
+PASS  P1. personnel : « Choisir mes articles » directement
+PASS  P1b. aucun onglet en bas
+PASS  P1c. aucune recherche
+PASS  P1d. aucun bandeau
+PASS  P1e. Compte dans l'en-tête
+PASS  P2. « Sélection enregistrée »
+PASS  P2b. reste sur Choisir
+PASS  P2c. serveur : liste du jour créée par la demande (1.000 kg to_buy)
+PASS  P2d. quantité enregistrée affichée
+PASS  P3. hors connexion : « Envoi en attente »
+PASS  P3b. la demande survit à la fermeture de l'application
+PASS  P4. reprise : envoi au retour du réseau
+PASS  P4b. serveur : une seule ligne, quantité remplacée (1.500 kg to_buy)
+PASS  P5. personnel : « Se déconnecter » dans Compte
+PASS  P5b. déconnecté
+ECHECS=0
+CRASH_APPLICATION=0
