@@ -1,4 +1,4 @@
-package: name='app.smartcourse.courses.nativeproto' versionCode='42' versionName='0.1-proto.42' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'
+package: name='app.smartcourse.courses.nativeproto' versionCode='45' versionName='0.1-proto.45' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'
 minSdkVersion:'26'
 targetSdkVersion:'35'
 uses-permission: name='android.permission.INTERNET'

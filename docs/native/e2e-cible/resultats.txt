@@ -1,33 +1,18 @@
-═══ Cas L : aucune liste en cours ≠ liste vide ; articles achetés en bas ═══
-PASS  L0. serveur : aucune liste en cours au départ
-PASS  L1. « Aucune liste en cours » affiché
-PASS  L1b. action principale « Créer une liste »
-PASS  L1c. pas de « Ajouter des articles »
-PASS  L1d. menu sans action utile : trois points masqués (ni Clôturer, ni Terminer)
-PASS  L1e. pas de « Terminer les courses »
-PASS  L1f. serveur : consulter l'écran n'a créé aucune liste
-PASS  L2. « Créer une liste » ouvre le parcours de sélection
-PASS  L2b. serveur : toujours aucune liste tant que rien n'est validé
-PASS  L3. liste créée sur un autre appareil : « La liste est vide » en direct
-PASS  L3b. liste active vide : « Ajouter des articles »
-PASS  L3c. pas de « Créer une liste »
-PASS  L3d. menu : « Clôturer la liste » disponible
-PASS  L4. articles affichés
-      ordre habituel relevé avant achat : Tomates Carottes
-PASS  L4b. pas de section « Déjà achetés » tant que rien n'est acheté
-PASS  L5. section « Déjà achetés » apparue
-PASS  L5b. Tomates cochée sous « Déjà achetés »
-PASS  L5c. Carottes (à acheter) au-dessus de « Déjà achetés »
-PASS  L5d. Lait (à acheter) au-dessus de « Déjà achetés »
-PASS  L5e. compteur actualisé : 1 sur 3
-PASS  L5f. serveur : achat enregistré
-PASS  L6. décochée : section « Déjà achetés » retirée (vide)
-PASS  L6b. Tomates revenue dans sa catégorie, à sa place habituelle (Tomates Carottes)
-PASS  L6b2. Tomates au-dessus de la catégorie suivante (Lait)
-PASS  L6c. compteur actualisé : 0 sur 3
-PASS  L6d. serveur : de nouveau à acheter
-PASS  L7. liste clôturée sur un autre appareil : « Aucune liste en cours » aussitôt
-PASS  L7b. « Ajouter des articles » retiré
+═══ Cas M : liste terminée pendant l'attente → articles ET quantités conservés, « Reprendre » ═══
+PASS  M0. personnel connecté
+PASS  M0a. quantité choisie : Carottes 1,5 kg
+PASS  M0b. quantité choisie : Tomates 2 kg
+PASS  M0c. deux articles dans la sélection
+PASS  M0d. hors connexion : « Envoi en attente » affiché
+PASS  M1. la demande part au retour du réseau puis est refusée proprement
+PASS  M2. serveur : rien n'a été ajouté à la liste archivée
+PASS  M3. « Reprendre » proposé pour les articles gardés
+PASS  M3b. le nombre d'articles gardés est annoncé (2)
+PASS  M4. les deux articles sont repris dans la sélection
+PASS  M4a. quantité conservée : Carottes 1,5 kg
+PASS  M4b. quantité conservée : Tomates 2 kg
+PASS  M5. serveur : nouvelle liste, Carottes 1.500 kg (1.500 kg)
+PASS  M5b. serveur : Tomates 2.000 kg (2.000 kg)
 ═══ Cas D : « Se déconnecter » visible dans Réglages et dans Compte, avertissement si envoi en attente ═══
 PASS  D1. « Se déconnecter » visible en bas des Réglages
 PASS  D1b. distinct de « Réinitialiser la famille » (deux actions séparées, Se déconnecter au-dessus)
@@ -42,5 +27,27 @@ PASS  D4c. annulation : toujours connecté, rien supprimé
 PASS  D5. la modification part au retour du réseau
 PASS  D6. personnel déconnecté depuis Compte
 PASS  D6b. aucune donnée du personnel affichée
+═══ Cas P : personnel — accueil sur Choisir, enregistrement sans quitter l'écran, modification sans doublon ═══
+PASS  P1. connexion : « Choisir mes articles » affiché directement
+PASS  P1b. pas de flèche de retour vers la liste
+PASS  P1c. Liste du jour reste accessible (onglet)
+PASS  P1d. « Terminer » désactivé sans modification
+PASS  P2. « Terminer » activé après une modification
+PASS  P3. confirmation « Sélection enregistrée »
+PASS  P3b. reste sur Choisir (aucune redirection)
+PASS  P3c. recherche conservée (Tomates affichées)
+PASS  P3d. article repéré comme enregistré, avec sa quantité
+PASS  P3e. « Terminer » de nouveau désactivé
+PASS  P3f. serveur : Tomates 1.500 kg (1.500 kg to_buy)
+PASS  P4. modification repérée (enregistré : 1,5 kg)
+PASS  P4b. confirmation
+PASS  P4c. serveur : une seule ligne, quantité remplacée 2.000 kg (2.000 kg to_buy)
+PASS  P4d. toujours sur Choisir
+PASS  P5. hors connexion : « Envoi en attente »
+PASS  P5b. reste sur Choisir hors connexion
+PASS  P5c. envoi au retour du réseau
+PASS  P5d. serveur : une seule ligne, 2.500 kg (2.500 kg to_buy)
+PASS  P6. Liste du jour accessible volontairement
+PASS  P6b. retour sur Choisir : recherche conservée
 ECHECS=0
 CRASH_APPLICATION=0
