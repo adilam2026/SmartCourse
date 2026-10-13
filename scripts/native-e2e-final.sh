@@ -15,6 +15,9 @@ nodemo() { # aucun bandeau ni fonction de démonstration / technique visible
 }
 st() { sql "SELECT string_agg(i.quantity||' '||i.unit||' '||i.status, ',') FROM list_items i JOIN products p ON p.id=i.product_id JOIN lists l ON l.id=i.list_id JOIN families f ON f.id=l.family_id WHERE f.code='$FAMILY' AND l.status='active' AND p.name='$1' AND i.status<>'removed'"; }
 
+# Sections à jouer (variable SECTIONS, ex. « C » ou « C,G ») ; vide = toutes. Chaque section part de l'écran de connexion.
+want_s() { [ -z "${SECTIONS:-}" ] || [[ ",${SECTIONS// /}," == *",$1,"* ]]; }
+if want_s F; then
 echo "═══ F. Version finale : identifiant, nom, serveur fixe ═══" | tee -a "$OUT/resultats.txt"
 expect "F0. identifiant app.smartcourse.courses.natif installé" bash -c "adb shell pm list packages | grep -qx 'package:app.smartcourse.courses.natif'"
 expect "F0b. nom affiché « Mes Courses »" bash -c "\"\$ANDROID_HOME/build-tools/35.0.0/aapt2\" dump badging '$APK' | grep -q \"application-label:'Mes Courses'\""
@@ -32,6 +35,9 @@ adb shell am force-stop $PKG; adb shell am start -W -n "$ACT" --es screen v02 --
 expect "F1d. accès de recette désactivés (écran simulé refusé)" $UI wait "Bienvenue" 15
 expect "F1e. pas d'écrans de démonstration" $UI gone "Écrans de démonstration" 2
 
+fi
+want_s F || { launch; $UI wait "Bienvenue" 25 >/dev/null; }   # section F sautée : écran de connexion quand même
+if want_s C; then
 echo "═══ C. Première connexion → Créer ma famille (autonome : sans lien, jeton ni serveur) ═══" | tee -a "$OUT/resultats.txt"
 NEWMAIL="famille.$(date +%s)@example.org"; NEWLOGIN="karim"
 mails() { docker exec sc-recette-app node -e "fetch('http://127.0.0.1:3199/__sent?to=$NEWMAIL').then(r=>r.json()).then(j=>console.log(j.length))"; }
@@ -116,6 +122,8 @@ shot final-c6-envoi-echoue
 docker exec sc-recette-app node -e "fetch('http://127.0.0.1:3199/__fail?on=0',{method:'POST'})" >/dev/null
 $UI tap "Se connecter" --first >/dev/null; sleep 1
 
+fi
+if want_s G; then
 echo "═══ G. Administrateur : connexion, sélection, achat, historique ═══" | tee -a "$OUT/resultats.txt"
 signin "$FAMILY" adil 482913
 expect "G1. administrateur connecté" $UI wait "Ma liste" 25
@@ -152,6 +160,8 @@ adb shell input keyevent KEYCODE_BACK; sleep 1
 logout
 expect "G8. déconnecté : retour à la connexion" $UI wait "Bienvenue" 15
 
+fi
+if want_s H; then
 echo "═══ H. Parent : rôle ═══" | tee -a "$OUT/resultats.txt"
 signin "$FAMILY" lamiaa 573918
 expect "H1. parent connecté" $UI wait "Ma liste" 25
@@ -160,6 +170,8 @@ expect "H3. parent : Historique accessible" $UI has "Historique"
 shot final-08-parent
 logout
 
+fi
+if want_s P; then
 echo "═══ P. Personnel : Choisir mes articles, enregistrement, hors connexion ═══" | tee -a "$OUT/resultats.txt"
 signin "$FAMILY" marie 573918
 expect "P1. personnel : « Choisir mes articles » directement" $UI wait "Choisir mes articles" 25
@@ -191,6 +203,8 @@ adb shell input keyevent KEYCODE_BACK; sleep 1
 logout
 expect "P5b. déconnecté" $UI wait "Bienvenue" 15
 
+fi
+if want_s J; then
 echo "═══ J. Personnel : minuit, liste ouverte plusieurs jours, clôture par un parent (en ligne et hors connexion) ═══" | tee -a "$OUT/resultats.txt"
 # Horloge du téléphone pilotée (émulateur, accès root) ; la liste est identifiée par son identifiant et son statut, jamais par sa date.
 adb root >/dev/null 2>&1; sleep 3; adb wait-for-device; adb shell settings put global auto_time 0 >/dev/null 2>&1
@@ -256,6 +270,7 @@ expect "J7b. serveur : nouvelle liste du jour avec les articles repris ($(items_
 expect "J7c. les listes archivées restent intactes" test "$(items_of $LJ)" = "Tomates 1.500 to_buy" -a "$(items_of $LK)" = "Tomates 1.000 to_buy"
 adb shell settings put global auto_time 1 >/dev/null 2>&1; setclock "$(date -u +%s)"
 
+fi
 echo "ECHECS=$FAILS" | tee -a "$OUT/resultats.txt"
 adb logcat -d -b crash > "$OUT/logcat-crash.txt" 2>&1 || true
 echo "CRASH_APPLICATION=$(grep -c app.smartcourse "$OUT/logcat-crash.txt")" | tee -a "$OUT/resultats.txt"
