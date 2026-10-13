@@ -120,12 +120,16 @@ fun CreateFamilyForm(session: Session) {
     var masked by remember { mutableStateOf("") }
     var otp by remember { mutableStateOf("") }
     var wait by remember { mutableIntStateOf(0) }
+    // Code expiré (ou trop d'essais) : l'action principale devient « Recevoir un nouveau code », sans rien ressaisir.
+    var needNew by remember { mutableStateOf(false) }
+    // Le service d'envoi n'a pas répondu dans le délai : l'envoi n'est pas confirmé (jamais présenté comme « envoyé »).
+    var uncertain by remember { mutableStateOf(false) }
     LaunchedEffect(wait) { if (wait > 0) { kotlinx.coroutines.delay(1000); wait -= 1 } }
 
     fun startMessage(f: Outcome.Fail): String = when (f.code) {
         "email_in_use" -> "Cette adresse gère déjà une famille. Utilisez « Besoin d'aide ? » puis « Récupérer ma famille »."
         "too_many_signups" -> "Trop de demandes : réessayez plus tard."
-        "families_limit" -> "Le nombre maximal de nouvelles familles est atteint pour aujourd'hui. Réessayez demain."
+        "families_limit" -> "La limite temporaire de créations est atteinte. Réessayez plus tard."
         "signups_paused" -> "Beaucoup de demandes en ce moment : réessayez dans quelques minutes."
         "signups_closed" -> "La création de famille est momentanément fermée : réessayez plus tard."
         "mail_unavailable", "mail_failed" -> "L'e-mail n'a pas pu être envoyé : vérifiez l'adresse ou réessayez dans quelques instants."
@@ -139,9 +143,9 @@ fun CreateFamilyForm(session: Session) {
     }
     fun verifyMessage(f: Outcome.Fail): String = when (f.code) {
         "invalid_code" -> "Code incorrect : vérifiez l'e-mail reçu."
-        "families_limit" -> "Le nombre maximal de nouvelles familles est atteint pour aujourd'hui. Votre demande est conservée : réessayez plus tard avec le même code tant qu'il est valable, ou demain avec un nouveau code."
-        "too_many_attempts" -> "Trop d'essais : demandez un nouveau code."
-        "code_expired" -> "Code expiré : demandez un nouveau code."
+        "families_limit" -> "La limite temporaire de créations est atteinte. Réessayez plus tard."
+        "too_many_attempts" -> "Trop d'essais avec ce code : recevez un nouveau code, vos informations sont conservées."
+        "code_expired" -> "Ce code a expiré (il est valable 30 minutes) : recevez un nouveau code, vos informations sont conservées."
         "signup_expired", "signup_not_found" -> "Demande expirée : recommencez."
         "already_completed" -> "Cette famille est déjà créée : connectez-vous avec son code famille."
         "email_in_use" -> "Cette adresse gère déjà une famille. Utilisez « Récupérer ma famille »."
@@ -156,35 +160,46 @@ fun CreateFamilyForm(session: Session) {
         SCard(padding = PaddingValues(16.dp)) {
             Text("Vérifiez votre adresse", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(6.dp))
-            Text("Un code à 6 chiffres vient d'être envoyé à $masked. Saisissez-le pour créer votre famille.", style = MaterialTheme.typography.bodyMedium)
+            Text(
+                if (uncertain) "L'envoi du code à $masked n'est pas confirmé. S'il n'arrive pas d'ici quelques minutes, recevez un nouveau code."
+                else "Un code à 6 chiffres a été envoyé à $masked. Saisissez-le pour créer votre famille.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
         }
         Spacer(Modifier.height(12.dp))
         FormField(otp, { otp = it.filter { ch -> ch.isDigit() }.take(6) }, "Code reçu par e-mail", leading = Icons.Rounded.Email, keyboard = KeyboardOptions(keyboardType = KeyboardType.NumberPassword))
         error?.let { Spacer(Modifier.height(8.dp)); Text(it, color = C.Danger, style = MaterialTheme.typography.bodyMedium) }
         Spacer(Modifier.height(16.dp))
-        PrimaryButton(if (busy) "Création de la famille…" else "Créer ma famille", {
+        val resend: () -> Unit = {
+            if (wait == 0 && !busy) {
+                busy = true; error = null
+                scope.launch {
+                    when (val r = session.api.callPublic("POST", "/api/signup/resend", buildJsonObject { put("signupId", sid) })) {
+                        is Outcome.Ok -> {
+                            wait = r.value["resendInSeconds"]?.jsonPrimitive?.intOrNull ?: 60; otp = ""; needNew = false
+                            uncertain = r.value["delivery"]?.jsonPrimitive?.contentOrNull == "uncertain"
+                        }
+                        is Outcome.Fail -> error = verifyMessage(r)
+                    }
+                    busy = false
+                }
+            }
+        }
+        if (needNew) PrimaryButton(if (busy) "Envoi du code…" else if (wait > 0) "Recevoir un nouveau code (${wait} s)" else "Recevoir un nouveau code", resend, Modifier.fillMaxWidth(), enabled = wait == 0 && !busy)
+        else PrimaryButton(if (busy) "Création de la famille…" else "Créer ma famille", {
             busy = true; error = null
             scope.launch {
                 val f = session.completeSignup(sid, otp)
                 if (f != null) {
                     error = verifyMessage(f)
+                    if (f.code == "code_expired" || f.code == "too_many_attempts") needNew = true
                     if (f.code == "signup_expired" || f.code == "signup_not_found") { signupId = null; requestId = java.util.UUID.randomUUID().toString() }
                 }
                 busy = false
             }
         }, Modifier.fillMaxWidth(), enabled = otp.length == 6 && !busy)
         Spacer(Modifier.height(10.dp))
-        SecondaryButton(if (wait > 0) "Renvoyer le code (${wait} s)" else "Renvoyer le code", {
-            if (wait > 0 || busy) return@SecondaryButton
-            busy = true; error = null
-            scope.launch {
-                when (val r = session.api.callPublic("POST", "/api/signup/resend", buildJsonObject { put("signupId", sid) })) {
-                    is Outcome.Ok -> { wait = r.value["resendInSeconds"]?.jsonPrimitive?.intOrNull ?: 60; otp = "" }
-                    is Outcome.Fail -> error = verifyMessage(r)
-                }
-                busy = false
-            }
-        }, Modifier.fillMaxWidth())
+        if (!needNew) SecondaryButton(if (wait > 0) "Renvoyer le code (${wait} s)" else "Renvoyer le code", resend, Modifier.fillMaxWidth())
         Spacer(Modifier.height(4.dp))
         Text(
             "Modifier mes informations", color = C.TealDark, style = MaterialTheme.typography.labelLarge, textDecoration = TextDecoration.Underline, textAlign = TextAlign.Center,
@@ -222,6 +237,7 @@ fun CreateFamilyForm(session: Session) {
                     signupId = r.value["signupId"]?.jsonPrimitive?.contentOrNull
                     masked = r.value["email"]?.jsonPrimitive?.contentOrNull ?: email
                     wait = r.value["resendInSeconds"]?.jsonPrimitive?.intOrNull ?: 60
+                    uncertain = r.value["delivery"]?.jsonPrimitive?.contentOrNull == "uncertain"; needNew = false
                 }
                 is Outcome.Fail -> { error = startMessage(r); requestId = java.util.UUID.randomUUID().toString() }
             }

@@ -59,6 +59,15 @@ fill "Code reçu par e-mail" 000000; hide_kb
 [ "$(lastcode)" = 000000 ] && fill "Code reçu par e-mail" 111111 && hide_kb
 $UI tap "Créer ma famille" --last >/dev/null; sleep 3
 expect "C4. code faux refusé avec un message clair" $UI wait "Code incorrect" 10
+# Code expiré (30 minutes) : nouveau code SANS ressaisir les informations
+sql "UPDATE family_signups SET expires_at = now() - interval '1 minute', last_sent_at = now() - interval '31 minutes' WHERE email='$NEWMAIL'" >/dev/null
+fill "Code reçu par e-mail" "$(lastcode)"; hide_kb
+$UI tap "Créer ma famille" --last >/dev/null; sleep 3
+expect "C4b. code expiré : message clair, proposition d'un nouveau code" bash -c "$UI wait 'Ce code a expiré' 10 && $UI has 'Recevoir un nouveau code' && ! $UI has 'Nom de la famille'"
+shot final-c2b-code-expire
+for _ in $(seq 1 40); do $UI enabled "Recevoir un nouveau code" && break; sleep 2; done
+$UI tap "Recevoir un nouveau code" >/dev/null; sleep 5
+expect "C4c. nouveau code envoyé ($(mails) e-mails au total)" test "$(mails)" = 2
 fill "Code reçu par e-mail" "$(lastcode)"; hide_kb
 $UI tap "Créer ma famille" --last >/dev/null; sleep 6
 expect "C5. famille créée et utilisateur connecté : code famille affiché" $UI wait "Votre famille est créée" 20
@@ -91,9 +100,15 @@ fill "Nom de la famille" "Famille Plafond" --scroll; hide_kb; fill "Votre préno
 $UI tap "Ville : " --scroll >/dev/null; sleep 2; fill "Rechercher une ville" "rabat"; hide_kb; $UI tap "Rabat" --last >/dev/null; sleep 2
 fill "E-mail de récupération" "$CAPMAIL" --scroll; hide_kb; fill "Code d'accès (6" 583014 --scroll; hide_kb; fill "Confirmez le code" 583014 --scroll; hide_kb
 $UI tap "Recevoir le code par e-mail" --scroll >/dev/null; sleep 4
-expect "C11. plafond quotidien atteint : message clair, aucun code envoyé" bash -c "$UI wait 'maximal de nouvelles familles' 10 && [ \"\$(docker exec sc-recette-app node -e \"fetch('http://127.0.0.1:3199/__sent?to=$CAPMAIL').then(r=>r.json()).then(j=>console.log(j.length))\")\" = 0 ]"
+expect "C11. plafond atteint : « limite temporaire de créations », aucun code envoyé" bash -c "$UI wait 'La limite temporaire de créations est atteinte' 10 && [ \"\$(docker exec sc-recette-app node -e \"fetch('http://127.0.0.1:3199/__sent?to=$CAPMAIL').then(r=>r.json()).then(j=>console.log(j.length))\")\" = 0 ]"
 shot final-c5-plafond
 sql "DELETE FROM family_signups WHERE email LIKE 'plafond%@example.org'" >/dev/null
+# Quota Brevo atteint (refus HTTP 402 simulé par le faux service d'envoi) : échec clair, jamais « code envoyé »
+docker exec sc-recette-app node -e "fetch('http://127.0.0.1:3199/__fail?on=1&status=402&code=quota_exceeded&msg=quota',{method:'POST'})" >/dev/null
+$UI tap "Recevoir le code par e-mail" --scroll >/dev/null; sleep 5
+expect "C12. quota d'envoi atteint : message d'échec, pas d'écran « code envoyé »" bash -c "$UI wait \"L'e-mail n'a pas pu être envoyé\" 10 && ! $UI has 'Vérifiez votre adresse' && ! $UI has 'a été envoyé'"
+shot final-c6-envoi-echoue
+docker exec sc-recette-app node -e "fetch('http://127.0.0.1:3199/__fail?on=0',{method:'POST'})" >/dev/null
 $UI tap "Se connecter" --first >/dev/null; sleep 1
 
 echo "═══ G. Administrateur : connexion, sélection, achat, historique ═══" | tee -a "$OUT/resultats.txt"

@@ -55,6 +55,8 @@ export interface SignupView {
   email: string;
   expiresInMinutes: number;
   resendInSeconds: number;
+  /** « sent » : pris en charge par le service d'envoi ; « uncertain » : pas de réponse dans le délai (peut-être parti, à confirmer). */
+  delivery?: "sent" | "uncertain";
 }
 
 const sha = (s: string) => createHash("sha256").update(s).digest("hex");
@@ -95,7 +97,7 @@ export function signupLimitsFromEnv(env: NodeJS.ProcessEnv, warn: (msg: string) 
   return out;
 }
 
-const FAMILIES_LIMIT = () => new HttpError(429, "families_limit", "Le nombre maximal de nouvelles familles est atteint pour aujourd'hui. Réessayez demain : aucune donnée n'a été perdue.");
+const FAMILIES_LIMIT = () => new HttpError(429, "families_limit", "La limite temporaire de créations est atteinte. Réessayez plus tard.");
 const familiesToday = async (q: Pick<Db, "query">) => Number((await q.query("SELECT count(*)::int AS n FROM family_signups WHERE completed_at > now() - interval '1 day'")).rows[0].n);
 
 /** Le service d'envoi a refusé (ou n'est pas configuré) : la demande est retirée, rien n'est créé, l'application peut réessayer. */
@@ -162,7 +164,7 @@ export async function startSignup(db: Db, recovery: RecoveryService, input: Sign
     await db.query("DELETE FROM family_signups WHERE id = $1", [row.id]);
     throw new HttpError(502, "mail_failed", "L'e-mail n'a pas pu être envoyé. Vérifiez l'adresse ou réessayez dans quelques instants.");
   }
-  return view(row, limits);
+  return { ...view(row, limits), delivery: status === "accepted" ? "sent" : "uncertain" };
 }
 
 export async function resendSignupCode(db: Db, recovery: RecoveryService, signupId: string, limits: SignupLimits): Promise<SignupView> {
@@ -184,7 +186,7 @@ export async function resendSignupCode(db: Db, recovery: RecoveryService, signup
   if (!upd) throw new HttpError(410, "signup_expired", "Demande expirée : recommencez");
   const status = await recovery.sendSignupCode(r.email, code);
   if (mailRefused(status)) throw new HttpError(502, "mail_failed", "L'e-mail n'a pas pu être envoyé : réessayez dans quelques instants.");
-  return view(upd, limits);
+  return { ...view(upd, limits), delivery: status === "accepted" ? "sent" : "uncertain" };
 }
 
 export interface SignupResult {
@@ -213,7 +215,7 @@ export async function verifySignup(db: Db, signupId: string, code: string, limit
       return { ok: { token: s.token, familyCode: fam.code, auth: authOf(s, r) } };
     }
     if (r.superseded_at) return { error: new HttpError(410, "signup_expired", "Demande expirée : recommencez") };
-    if ((r.expires_at as Date).getTime() < Date.now()) return { error: new HttpError(410, "code_expired", "Code expiré : demandez un nouveau code") };
+    if ((r.expires_at as Date).getTime() < Date.now()) return { error: new HttpError(410, "code_expired", "Ce code a expiré : recevez un nouveau code (vos informations sont conservées)") };
     if (r.attempts >= limits.maxAttempts) return { error: new HttpError(429, "too_many_attempts", "Trop d'essais : demandez un nouveau code") };
     if (!good) {
       const a = r.attempts + 1;

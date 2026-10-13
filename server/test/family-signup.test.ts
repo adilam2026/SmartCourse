@@ -193,7 +193,7 @@ describe("création de famille autonome (sans jeton d'installation)", () => {
     expect(refused).toHaveLength(3);
     for (const r of refused) {
       expect(r.json().error).toBe("families_limit");
-      expect(r.json().message).toContain("maximal de nouvelles familles");
+      expect(r.json().message).toBe("La limite temporaire de créations est atteinte. Réessayez plus tard.");
     }
     expect(await families()).toBe(before + 2);
     // Plafond atteint : une nouvelle demande est refusée d'emblée (aucun code envoyé), avec le même message clair
@@ -235,6 +235,56 @@ describe("création de famille autonome (sans jeton d'installation)", () => {
     expect(r.statusCode).toBe(502);
     expect(await count("SELECT count(*) AS n FROM family_signups WHERE request_id = $1", [b.requestId])).toBe(0);
     expect((await start(b)).statusCode).toBe(201);
+  });
+
+  it("quota Brevo atteint ou refus d'envoi : échec clair, jamais « code envoyé » (demande et renvoi)", async () => {
+    for (const refus of [{ accepted: false, detail: "refus du service d'envoi (HTTP 402) : quota" }, { accepted: false, detail: "refus du service d'envoi (HTTP 429)" }, { accepted: false, detail: "service d'envoi injoignable" }]) {
+      const b = body();
+      mailer.next = refus;
+      const r = await start(b);
+      mailer.next = null;
+      expect(r.statusCode).toBe(502);
+      expect(r.json().error).toBe("mail_failed");
+      expect(r.json().signupId).toBeUndefined();
+      expect(await count("SELECT count(*) AS n FROM family_signups WHERE request_id = $1", [b.requestId])).toBe(0);
+    }
+    const b = body();
+    const id = (await start(b)).json().signupId;
+    await db.query("UPDATE family_signups SET last_sent_at = now() - interval '2 minutes' WHERE id = $1", [id]);
+    mailer.next = { accepted: false, detail: "refus du service d'envoi (HTTP 402) : quota" };
+    const re = await app.inject({ method: "POST", url: "/api/signup/resend", payload: { signupId: id } });
+    mailer.next = null;
+    expect(re.statusCode).toBe(502);
+    expect(re.json().error).toBe("mail_failed");
+  });
+
+  it("pas de réponse du service d'envoi dans le délai : demande gardée, envoi signalé « non confirmé »", async () => {
+    const b = body();
+    mailer.next = { accepted: false, unknown: true, detail: "pas de réponse dans le délai" };
+    const r = await start(b);
+    mailer.next = null;
+    expect(r.statusCode).toBe(201);
+    expect(r.json().delivery).toBe("uncertain");
+    const ok = await start(body());
+    expect(ok.json().delivery).toBe("sent");
+  });
+
+  it("code expiré : un nouveau code est envoyé SANS ressaisir les informations, puis la famille est créée avec elles", async () => {
+    const b = body({ familyName: "Famille Expirée", login: "sara", displayName: "Sara", city: "Fès" });
+    const id = (await start(b)).json().signupId;
+    const old = codeTo(b.email);
+    await db.query("UPDATE family_signups SET expires_at = now() - interval '1 minute', last_sent_at = now() - interval '31 minutes' WHERE id = $1", [id]);
+    const exp = await verify(id, old);
+    expect(exp.statusCode).toBe(410);
+    expect(exp.json().error).toBe("code_expired");
+    expect(exp.json().message).toContain("nouveau code");
+    const re = await app.inject({ method: "POST", url: "/api/signup/resend", payload: { signupId: id } });
+    expect(re.statusCode).toBe(200);
+    expect(re.json().expiresInMinutes).toBeGreaterThanOrEqual(29);
+    const v = await verify(id, codeTo(b.email));
+    expect(v.statusCode).toBe(201);
+    const p = (await db.query("SELECT f.name, p.login, p.display_name, p.city FROM families f JOIN profiles p ON p.family_id = f.id WHERE f.code = $1", [v.json().familyCode])).rows[0];
+    expect(p).toEqual({ name: "Famille Expirée", login: "sara", display_name: "Sara", city: "Fès" });
   });
 
   it("envoi d'e-mails non configuré : création refusée proprement", async () => {
