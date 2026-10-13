@@ -11,7 +11,7 @@ UI="python3 $HERE/native-ui.py"
 mkdir -p "$OUT"; : > "$OUT/resultats.txt"
 FAILS=0
 ok()   { echo "PASS  $1" | tee -a "$OUT/resultats.txt"; }
-ko()   { echo "FAIL  $1" | tee -a "$OUT/resultats.txt"; FAILS=$((FAILS+1)); local n; n=$(echo "$1" | tr -c 'a-zA-Z0-9' '_' | cut -c1-40); adb exec-out screencap -p > "$OUT/echec-$n.png" || true; adb shell uiautomator dump /sdcard/f.xml >/dev/null 2>&1; adb exec-out cat /sdcard/f.xml > "$OUT/echec-$n.xml" 2>/dev/null || true; }
+ko()   { echo "FAIL  $1" | tee -a "$OUT/resultats.txt"; FAILS=$((FAILS+1)); adb shell uiautomator dump /sdcard/g.xml >/dev/null 2>&1; echo "      écran : $(adb exec-out cat /sdcard/g.xml 2>/dev/null | grep -oE '(text|content-desc)="[^"]+"' | sed -E 's/^(text|content-desc)=//' | head -40 | tr '\n' '|')"; local n; n=$(echo "$1" | tr -c 'a-zA-Z0-9' '_' | cut -c1-40); adb exec-out screencap -p > "$OUT/echec-$n.png" || true; adb shell uiautomator dump /sdcard/f.xml >/dev/null 2>&1; adb exec-out cat /sdcard/f.xml > "$OUT/echec-$n.xml" 2>/dev/null || true; }
 expect() { local label=$1; shift; if "$@"; then ok "$label"; else ko "$label"; fi; }
 shot() { adb exec-out screencap -p > "$OUT/$1.png"; }
 sql() { docker exec sc-recette-pg psql -U smart -d smartcourse -tAc "$1"; }
@@ -25,7 +25,9 @@ login_api() { COOKIE=$(curl -s -D - -o /dev/null -X POST "$BASE/api/auth/login" 
 api() { local m=$1 p=$2; shift 2; local ct=(); { [ "$m" = POST ] || [ "$m" = PUT ] || [ "$m" = PATCH ]; } && ct=(-H 'content-type: application/json'); curl -s -o /tmp/api.out -w '%{http_code}' -X "$m" "$BASE$p" -H "Cookie: sc_session=$COOKIE" "${ct[@]}" "$@"; }
 FAMID() { sql "SELECT id FROM families WHERE code='$FAMILY'"; }
 item() { sql "SELECT i.quantity||' '||i.unit||' '||i.status FROM list_items i JOIN products p ON p.id=i.product_id JOIN lists l ON l.id=i.list_id JOIN families f ON f.id=l.family_id WHERE f.code='$FAMILY' AND l.status='active' AND p.name='$1' ORDER BY i.added_at DESC LIMIT 1"; }
-signin() { fill "Code famille" "$1"; fill "Identifiant" "$2"; fill "Code d'accès" "$3"; hide_kb; $UI tap "Se connecter" --last >/dev/null; }
+signin() { # le formulaire garde les dernières valeurs : on les retrouve par leur contenu
+  fill "${PREV_FAMILY:-Code famille}" "$1"; fill "${PREV_LOGIN:-Identifiant}" "$2"; fill "Code d'accès" "$3"; hide_kb
+  $UI tap "Se connecter" --last >/dev/null; sleep 3; PREV_FAMILY="$1"; PREV_LOGIN="$2"; }
 logout() { tapt "Compte"; $UI tap "Se déconnecter" >/dev/null; sleep 2; $UI tap "Se déconnecter" --last >/dev/null; sleep 3; }
 server_wait() { for _ in $(seq 1 60); do curl -fsS --max-time 3 $BASE/health >/dev/null 2>&1 && return 0; sleep 2; done; return 1; }
 
@@ -68,7 +70,7 @@ expect "H5. article visible dans la liste" $UI wait "Tomates" 20
 expect "H6. serveur : 1 kg à acheter (« $(item Tomates) »)" test "$(item Tomates)" = "1.000 kg to_buy"
 expect "H7. serveur : une validation enregistrée pour Adil" test "$(sql "SELECT count(*) FROM validations v JOIN profiles p ON p.id=v.actor_id WHERE v.list_id='$ACTIVE' AND p.login='adil'")" -ge 1
 # quantité
-$UI tap "Tomates" >/dev/null; sleep 2
+$UI tap "1 kg" >/dev/null; sleep 2
 expect "H8. panneau de quantité" $UI wait "Mettre à jour" 10
 $UI tap "Augmenter" >/dev/null; sleep 1
 shot lot3-quantite
@@ -99,7 +101,7 @@ expect "J2. retour à la liste avec l'article recommandé" $UI wait "Tomates" 20
 sleep 3
 expect "J3. serveur : nouvelle liste en cours contenant Tomates ($(item Tomates))" test -n "$(item Tomates)"
 expect "J4. l'ancienne liste archivée n'a pas été modifiée" test "$(sql "SELECT count(*) FROM list_items WHERE list_id='$ACTIVE' AND status='purchased'")" = 1
-ACTIVE=$(sql "SELECT id FROM lists l JOIN families f ON f.id=l.family_id WHERE f.code='$FAMILY' AND l.status='active'")
+ACTIVE=$(sql "SELECT l.id FROM lists l JOIN families f ON f.id=l.family_id WHERE f.code='$FAMILY' AND l.status='active'")
 
 # ═══ K. Personnel : demandes, quantité, retrait, règles du serveur ═══
 logout
@@ -150,7 +152,7 @@ shot lot3-reprendre
 $UI tap "Reprendre" >/dev/null; sleep 2
 expect "M4. article repris dans la sélection" $UI wait "Terminer ma sélection (1)" 10
 $UI tap "Terminer ma sélection" >/dev/null; sleep 5
-ACTIVE2=$(sql "SELECT id FROM lists l JOIN families f ON f.id=l.family_id WHERE f.code='$FAMILY' AND l.status='active'")
+ACTIVE2=$(sql "SELECT l.id FROM lists l JOIN families f ON f.id=l.family_id WHERE f.code='$FAMILY' AND l.status='active'")
 expect "M5. serveur : une nouvelle liste en cours contient Persil" test "$(sql "SELECT count(*) FROM list_items i JOIN products p ON p.id=i.product_id WHERE i.list_id='$ACTIVE2' AND p.name='Persil'")" = 1
 
 # ═══ N. Brouillons isolés par profil ═══
