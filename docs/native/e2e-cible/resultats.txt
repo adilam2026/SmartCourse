@@ -1,0 +1,46 @@
+═══ Cas L : aucune liste en cours ≠ liste vide ; articles achetés en bas ═══
+PASS  L0. serveur : aucune liste en cours au départ
+PASS  L1. « Aucune liste en cours » affiché
+PASS  L1b. action principale « Créer une liste »
+PASS  L1c. pas de « Ajouter des articles »
+PASS  L1d. menu sans action utile : trois points masqués (ni Clôturer, ni Terminer)
+PASS  L1e. pas de « Terminer les courses »
+PASS  L1f. serveur : consulter l'écran n'a créé aucune liste
+PASS  L2. « Créer une liste » ouvre le parcours de sélection
+PASS  L2b. serveur : toujours aucune liste tant que rien n'est validé
+PASS  L3. liste créée sur un autre appareil : « La liste est vide » en direct
+PASS  L3b. liste active vide : « Ajouter des articles »
+PASS  L3c. pas de « Créer une liste »
+PASS  L3d. menu : « Clôturer la liste » disponible
+PASS  L4. articles affichés
+PASS  L4b. pas de section « Déjà achetés » tant que rien n'est acheté
+PASS  L5. section « Déjà achetés » apparue
+PASS  L5b. Tomates cochée sous « Déjà achetés »
+PASS  L5c. Carottes (à acheter) au-dessus de « Déjà achetés »
+PASS  L5d. Lait (à acheter) au-dessus de « Déjà achetés »
+PASS  L5e. compteur actualisé : 1 sur 3
+PASS  L5f. serveur : achat enregistré
+PASS  L6. décochée : section « Déjà achetés » retirée (vide)
+FAIL  L6b. Tomates revenue dans sa catégorie, à sa place (après Carottes)
+      écran : "RECETTE · données réelles"|"Compte"|"Ma liste"|"Mardi 13 octobre"|"Plus d'actions"|"0 sur 3 achetés"|"0 %"|"Ajouter des articles"|"Favoris"|"Légumes et herbes"|"Replier"|"Tomates"|"1 kg"|"Acheté : Tomates"|"Carottes"|"1 kg"|"Acheté : Carottes"|"Laitages et œufs"|"Replier"|"Lait"|"1 pièce"|"Acheté : Lait"|"Liste"|"Liste"|"Historique"|"Historique"|"Statistiques"|"Statistiques"|"Réglages"|"Réglages"|
+PASS  L6c. compteur actualisé : 0 sur 3
+PASS  L6d. serveur : de nouveau à acheter
+PASS  L7. liste clôturée sur un autre appareil : « Aucune liste en cours » aussitôt
+PASS  L7b. « Ajouter des articles » retiré
+═══ Cas D : « Se déconnecter » visible dans Réglages et dans Compte, avertissement si envoi en attente ═══
+PASS  D1. « Se déconnecter » visible en bas des Réglages
+FAIL  D1b. distinct de « Réinitialiser la famille »
+      écran : "Se déconnecter ?"|"Vous devrez saisir à nouveau votre code d'accès pour rouvrir l'application."|"Annuler"|"Se déconnecter"|
+PASS  D1c. confirmation demandée
+PASS  D2. retour à l'écran de connexion
+PASS  D2b. aucune donnée du profil précédent affichée
+PASS  D3. personnel connecté
+PASS  D3b. hors connexion : envoi en attente
+PASS  D4. personnel : « Se déconnecter » dans Compte
+PASS  D4b. avertissement : modification non envoyée
+PASS  D4c. annulation : toujours connecté, rien supprimé
+PASS  D5. la modification part au retour du réseau
+PASS  D6. personnel déconnecté depuis Compte
+PASS  D6b. aucune donnée du personnel affichée
+ECHECS=2
+CRASH_APPLICATION=0

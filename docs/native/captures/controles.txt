@@ -17,7 +17,7 @@ Physical density: 420
 Override density: 443
 TOUCH_V01-connexion_390=OK | 9 éléments cliquables, 0 sous 48 dp 
 TOUCH_V03-liste-personnel_390=OK | 11 éléments cliquables, 0 sous 48 dp 
-TOUCH_V03-a-acheter_390=OK | 13 éléments cliquables, 0 sous 48 dp 
+TOUCH_V03-a-acheter_390=OK | 11 éléments cliquables, 0 sous 48 dp 
 TOUCH_V03-vide_390=OK | 4 éléments cliquables, 0 sous 48 dp 
 TOUCH_V03-textes-longs_390=OK | 12 éléments cliquables, 0 sous 48 dp 
 TOUCH_V04-selection-carres-personnel_390=OK | 11 éléments cliquables, 0 sous 48 dp 
