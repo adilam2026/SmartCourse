@@ -55,7 +55,7 @@ shot e2e-3-mauvais-code
 fill "Code d'accès" "482913"; hide_kb
 $UI tap "Se connecter" --last >/dev/null
 expect "3b. bon code : liste de l'administrateur" $UI wait "Ma liste" 25
-expect "3c. bandeau : connexion réelle" $UI has "connexion réelle"
+expect "3c. bandeau : parties réelles annoncées" $UI has "réel : compte"
 shot e2e-4-connecte
 
 # 4. Compte

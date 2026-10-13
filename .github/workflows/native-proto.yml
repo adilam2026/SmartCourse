@@ -96,9 +96,7 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
-          script: |
-            bash scripts/native-e2e.sh dist/CoursesNatif-proto.apk ${{ env.FAMILY_CODE }} native-e2e
-            bash scripts/native-e2e-lot2.sh dist/CoursesNatif-proto.apk ${{ env.FAMILY_CODE }} native-e2e-lot2
+          script: bash scripts/native-e2e-all.sh dist/CoursesNatif-proto.apk ${{ env.FAMILY_CODE }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
