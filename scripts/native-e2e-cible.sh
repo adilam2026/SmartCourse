@@ -7,7 +7,7 @@ CASES=("${@:4}"); [ ${#CASES[@]} -eq 0 ] && CASES=(M M2 K9 R I)
 source <(sed -n '/^PKG=/,/^adb shell pm grant/p' "$(dirname "$0")/native-e2e-lot3.sh")
 want() { for c in "${CASES[@]}"; do [ "$c" = "$1" ] && return 0; done; return 1; }
 fresh_list() { login_api adil 482913; api GET /api/lists/active >/dev/null; local l; l=$(jq -r '.list.id // empty' /tmp/api.out); [ -n "$l" ] && api POST "/api/lists/$l/close" -d '{}' >/dev/null; api POST /api/lists -d '{}' >/dev/null; jq -r .list.id /tmp/api.out; }
-first_login() { adb shell pm clear $PKG >/dev/null; adb shell pm grant $PKG android.permission.POST_NOTIFICATIONS >/dev/null 2>&1; launch; $UI wait "Bienvenue" 25 >/dev/null; $UI tap "Se connecter" --last >/dev/null; sleep 2; fill "https://…" "$SERVER" --last; hide_kb; $UI tap "Tester et enregistrer" >/dev/null; $UI wait "10.0.2.2:3000" 20 >/dev/null; signin "$FAMILY" "$1" "$2"; }
+first_login() { unset PREV_FAMILY PREV_LOGIN; adb shell pm clear $PKG >/dev/null; adb shell pm grant $PKG android.permission.POST_NOTIFICATIONS >/dev/null 2>&1; launch; $UI wait "Bienvenue" 25 >/dev/null; $UI tap "Se connecter" --last >/dev/null; sleep 2; fill "https://…" "$SERVER" --last; hide_kb; $UI tap "Tester et enregistrer" >/dev/null; $UI wait "10.0.2.2:3000" 20 >/dev/null; signin "$FAMILY" "$1" "$2"; }
 
 select_qty() { # produit, nombre d'appuis sur « Augmenter » : sélectionne l'article et règle sa quantité par le panneau natif
   fill "Rechercher un produit" "$1"; hide_kb
@@ -130,7 +130,7 @@ if want I; then
   shot cible-creer-famille
   fill "Nom de la famille" "Famille Test"; fill "Votre prénom" "Test"; fill "Votre identifiant" "test"; fill "E-mail de récupération" "test@example.org"
   fill "Code d'accès (6" 135792; fill "Répétez le code" 135792; hide_kb
-  $UI tap "Ville : " --scroll >/dev/null; sleep 2; $UI tap "Casablanca" >/dev/null; sleep 2
+  $UI tap "Ville : " --scroll >/dev/null; sleep 2; fill "Rechercher une ville" "casablanca"; hide_kb; $UI tap "Casablanca" --last >/dev/null; sleep 2
   $UI tap "Créer ma famille" --last --scroll >/dev/null; sleep 4
   expect "I3. le SERVEUR refuse un jeton invalide (protection conservée)" $UI wait "n'est plus valable" 15
   expect "I3b. aucune famille créée" test "$(sql "SELECT count(*) FROM families WHERE name='Famille Test'")" = 0

@@ -101,7 +101,8 @@ jobs:
         env:
           SKIP_LOT1: ${{ (contains(github.event.head_commit.message, '[lot2]') || contains(github.event.head_commit.message, '[lot3]')) && '1' || '' }}
           SKIP_LOT2: ${{ contains(github.event.head_commit.message, '[lot3]') && '1' || '' }}
-          CIBLE: ${{ contains(github.event.head_commit.message, '[cible]') && '1' || '' }}
+          CIBLE: ${{ contains(github.event.head_commit.message, '[cible') && '1' || '' }}
+          MSG: ${{ github.event.head_commit.message }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -192,11 +193,11 @@ jobs:
             --title "Courses natif — recette ${{ github.run_number }}" \
             --notes "APK de recette de l'application Android native (Kotlin + Jetpack Compose). Identifiant distinct app.smartcourse.courses.nativeproto : s'installe à côté de l'application actuelle. Signature de recette STABLE : s'installe par-dessus la version précédente, sans désinstaller. Connexion réelle au serveur de recette saisi dans l'application ; les listes restent simulées tant que le lot correspondant n'est pas livré. Ne pas distribuer."
 
-  brouillon:
-    # APK « brouillon » : compilé et testé en unitaire, mais le parcours de bout en bout n'est pas entièrement vert. Publié seulement sur demande
-    # explicite ([brouillon] dans le message), en préversion, avec la liste des écarts connus. Même signature de recette (mise à jour sans désinstaller).
+  livraison:
+    # APK de recette livré à l'utilisateur : compilé et testé en unitaire ; publié en préversion avec les résultats RÉELS du parcours de bout en bout
+    # (docs/native/livraison-notes.md). Même signature de recette (mise à jour sans désinstaller). Hors production.
     needs: [build]
-    if: ${{ contains(github.event.head_commit.message, '[brouillon]') }}
+    if: ${{ contains(github.event.head_commit.message, '[livraison]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -207,11 +208,31 @@ jobs:
         with:
           name: apk
           path: dist
-      - name: Publication de l'APK brouillon (préversion, hors production)
+      - name: Publication de l'APK de recette (préversion, hors production)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "native-proto-brouillon-${{ github.run_number }}" dist/CoursesNatif-proto.apk \
-            --prerelease --target "${{ github.sha }}" \
-            --title "Courses natif — BROUILLON ${{ github.run_number }} (lots 3 à 6, non validé)" \
-            --notes-file docs/native/brouillon-notes.md
+          TAG="native-proto-recette-${{ github.run_number }}"
+          gh release create "$TAG" dist/CoursesNatif-proto.apk --prerelease --target "${{ github.sha }}" \
+            --title "Courses natif — recette lots 3 à 6 (${{ github.run_number }})" --notes-file docs/native/livraison-notes.md
+          echo "$TAG" > /tmp/tag.txt
+          # L'ancienne préversion « brouillon » renvoyait à un document absent : sa description est remplacée.
+          gh release edit native-proto-brouillon-31 --title "Courses natif — ancien brouillon 31 (remplacé)" \
+            --notes "Remplacé par $TAG. Cette préversion est conservée pour mémoire ; ne pas l'utiliser." || true
+
+  notes:
+    # Met à jour la description d'une préversion avec le texte du dépôt (docs/native/livraison-notes.md), sans recompiler.
+    if: ${{ contains(github.event.head_commit.message, '[notes ') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Description de la préversion
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MSG: ${{ github.event.head_commit.message }}
+        run: |
+          TAG=$(echo "$MSG" | grep -oE '\[notes [a-zA-Z0-9._-]+\]' | head -1 | sed -E 's/\[notes (.*)\]/\1/')
+          [ -n "$TAG" ] && gh release edit "$TAG" --notes-file docs/native/livraison-notes.md

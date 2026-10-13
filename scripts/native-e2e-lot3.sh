@@ -225,6 +225,41 @@ api GET /api/catalog >/dev/null; LAI=$(jq -r '[.categories[].products[] | select
 api POST /api/lists/active/ops -d "{\"ops\":[{\"opId\":\"$(cat /proc/sys/kernel/random/uuid)\",\"type\":\"add\",\"productId\":\"$LAI\",\"quantity\":1}]}" >/dev/null
 expect "S1. mise à jour en direct : la demande de Marie apparaît toute seule" $UI wait "Laitue" 25
 
+# ═══ T. Favoris : enregistrer la liste, l'utiliser, le supprimer ═══
+launch; $UI wait "Ma liste" 25 >/dev/null
+login_api adil 482913
+tapt "Favoris"
+fill "Nom du favori" "Semaine"; hide_kb
+$UI tap "Enregistrer" --last >/dev/null; sleep 4
+api GET /api/templates >/dev/null
+expect "T1. favori enregistré côté serveur ($(jq -r '.templates|length' /tmp/api.out) favori)" test "$(jq -r '.templates|length' /tmp/api.out)" = 1
+expect "T2. favori affiché dans la fenêtre" $UI wait "Semaine" 10
+BEFORE_Q=$(item Laitue)
+$UI tap "Utiliser" >/dev/null; sleep 5
+expect "T3. « Utiliser » ajoute les articles à la liste en cours (Laitue : $BEFORE_Q → $(item Laitue))" test "$(item Laitue)" != "$BEFORE_Q"
+tapt "Favoris"
+$UI tap "Supprimer le favori Semaine" >/dev/null; sleep 2; $UI tap "Supprimer" --last >/dev/null; sleep 3
+api GET /api/templates >/dev/null
+expect "T4. favori supprimé côté serveur" test "$(jq -r '.templates|length' /tmp/api.out)" = 0
+adb shell input keyevent KEYCODE_BACK; sleep 1
+
+# ═══ V. Partage de la liste (fenêtre de partage Android) ═══
+launch; $UI wait "Ma liste" 25 >/dev/null
+tapt "Plus d'actions"; $UI tap "Partager la liste" --last >/dev/null; sleep 4
+expect "V1. fenêtre de partage Android ouverte" bash -c "adb shell dumpsys activity activities | grep -qE 'ChooserActivity|ResolverActivity'"
+adb shell input keyevent KEYCODE_BACK; sleep 2
+
+# ═══ U. Suppression d'une commande archivée (administrateur) ═══
+launch; $UI wait "Ma liste" 25 >/dev/null
+ARCH_BEFORE=$(sql "SELECT count(*) FROM lists l JOIN families f ON f.id=l.family_id WHERE f.code='$FAMILY' AND l.status='archived'")
+tapt "Historique"
+expect "U0. historique affiché ($ARCH_BEFORE commande(s) archivée(s))" $UI wait "Actions de la commande" 20
+$UI tap "Actions de la commande" >/dev/null; sleep 2
+$UI tap "Supprimer" >/dev/null; sleep 2
+shot lot3-suppression-commande
+$UI tap "Supprimer" --last >/dev/null; sleep 4
+expect "U1. commande supprimée côté serveur ($ARCH_BEFORE → $(sql "SELECT count(*) FROM lists l JOIN families f ON f.id=l.family_id WHERE f.code='$FAMILY' AND l.status='archived'"))" test "$(sql "SELECT count(*) FROM lists l JOIN families f ON f.id=l.family_id WHERE f.code='$FAMILY' AND l.status='archived'")" = "$((ARCH_BEFORE - 1))"
+
 # ═══ Q. Réglages : récupération, notifications, sauvegarde, à propos ═══
 tapt "Réglages"; tapt "Récupération"
 expect "Q1. récupération : adresse réelle" $UI wait "recette@example.org" 15
