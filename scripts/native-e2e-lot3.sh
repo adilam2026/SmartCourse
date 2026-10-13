@@ -297,7 +297,7 @@ api GET /api/catalog >/dev/null; PID=$(jq -r '[.categories[].products[] | select
 api POST /api/lists/active/ops -d "{\"ops\":[{\"opId\":\"$(cat /proc/sys/kernel/random/uuid)\",\"type\":\"add\",\"productId\":\"$PID\",\"quantity\":1}]}" >/dev/null
 JOB=$(adb shell dumpsys jobscheduler | tr -d '\r' | grep -oE "#u0a[0-9]+/[0-9]+: [0-9a-f]+ $PKG" | head -1 | sed -E 's#.*/([0-9]+):.*#\1#')
 echo "tâche WorkManager n°${JOB:-?}" | tee -a "$OUT/resultats.txt"
-sleep 3; adb logcat -c; adb shell am start -n "$PKG/.MainActivity" --ez poll true >/dev/null 2>&1; sleep 10; adb logcat -d | grep CoursesNotif | tee -a "$OUT/resultats.txt"
+sleep 3; adb logcat -c; adb shell am start -S -n "$PKG/.MainActivity" --ez poll true >/dev/null 2>&1; sleep 10; adb logcat -d | grep CoursesNotif | tee -a "$OUT/resultats.txt"
 echo "--- diagnostic notification ---" | tee -a "$OUT/resultats.txt"
 
 adb logcat -d | grep -E "WM-|PollWorker|SystemJobService" | tail -12 | tee -a "$OUT/resultats.txt"

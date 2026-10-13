@@ -110,7 +110,7 @@ if want R; then
   login_api marie 573918
   api GET /api/catalog >/dev/null; PID=$(jq -r '[.categories[].products[] | select(.name=="Lait")][0].id' /tmp/api.out)
   api POST /api/lists/active/ops -d "{\"ops\":[{\"opId\":\"$(cat /proc/sys/kernel/random/uuid)\",\"type\":\"add\",\"productId\":\"$PID\",\"quantity\":1}]}" >/dev/null
-  adb logcat -c; adb shell am start -n "$PKG/.MainActivity" --ez poll true >/dev/null 2>&1; sleep 12
+  adb logcat -c; adb shell am start -S -n "$PKG/.MainActivity" --ez poll true >/dev/null 2>&1; sleep 12
   echo "--- journal de la vérification ---" | tee -a "$OUT/resultats.txt"
   adb logcat -d | grep -E "CoursesNotif" | tee -a "$OUT/resultats.txt"
   adb shell dumpsys notification --noredact | grep -E "pkg=$PKG|Nouvelle demande" | head -5 | tee -a "$OUT/resultats.txt"
@@ -128,13 +128,13 @@ if want I; then
   expect "I2. avec le lien : formulaire de création, serveur déjà réglé" $UI wait "Nom de la famille" 15
   expect "I2b. toujours aucun champ « jeton » à saisir" $UI gone "Jeton" 3
   shot cible-creer-famille
-  fill "Nom de la famille" "Famille Test"; fill "Votre prénom" "Test"; fill "Votre identifiant" "test"; fill "E-mail de récupération" "test@example.org"
-  fill "Code d'accès (6" 135792; fill "Répétez le code" 135792; hide_kb
+  fill "Nom de la famille" "Famille_Test" --scroll; hide_kb; fill "Votre prénom" "Test" --scroll; hide_kb; fill "Votre identifiant" "test" --scroll; hide_kb
+  fill "E-mail de récupération" "test@example.org" --scroll; hide_kb; fill "Code d'accès (6" 135792 --scroll; hide_kb; fill "Répétez le code" 135792 --scroll; hide_kb
   $UI tap "Ville : " --scroll >/dev/null; sleep 2; fill "Rechercher une ville" "casablanca"; hide_kb; $UI tap "Casablanca" --last >/dev/null; sleep 2
   adb shell input swipe 540 1800 540 600 300; sleep 1; adb shell input swipe 540 1800 540 600 300; sleep 1
   $UI tap "Créer ma famille" --last >/dev/null; sleep 4
   expect "I3. le SERVEUR refuse un jeton invalide (protection conservée)" $UI wait "n'est plus valable" 15
-  expect "I3b. aucune famille créée" test "$(sql "SELECT count(*) FROM families WHERE name='Famille Test'")" = 0
+  expect "I3b. aucune famille créée" test "$(sql "SELECT count(*) FROM families WHERE name='Famille_Test'")" = 0
 fi
 
 echo "ECHECS=$FAILS" | tee -a "$OUT/resultats.txt"
