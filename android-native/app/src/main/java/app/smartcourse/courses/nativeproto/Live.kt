@@ -85,6 +85,7 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
 
     init {
         demo.data = this
+        engine.trace = { android.util.Log.i("CoursesData", it) }
         kv.get(catKey)?.let { s -> try { parseCatalog(json.parseToJsonElement(s) as JsonObject) } catch (_: Exception) { null } }?.let { catalog = it.products }
         kv.get(modeKey)?.let { m -> SelMode.entries.firstOrNull { it.name == m }?.let { demo.selMode = it } }
         demo.listLoaded = engine.list != null

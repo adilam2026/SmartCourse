@@ -250,18 +250,19 @@ adb shell input keyevent KEYCODE_HOME; sleep 8
 login_api marie 573918
 api GET /api/catalog >/dev/null; PID=$(jq -r '[.categories[].products[] | select(.name=="Lait")][0].id' /tmp/api.out)
 api POST /api/lists/active/ops -d "{\"ops\":[{\"opId\":\"$(cat /proc/sys/kernel/random/uuid)\",\"type\":\"add\",\"productId\":\"$PID\",\"quantity\":1}]}" >/dev/null
-JOB=$(adb shell dumpsys jobscheduler | grep -E "JOB #.*$PKG" | head -1 | sed -E 's/.*#[^/]*\/([0-9]+).*/\1/')
+JOB=$(adb shell dumpsys jobscheduler | tr -d '\r' | grep -oE "#u0a[0-9]+/[0-9]+: [0-9a-f]+ $PKG" | head -1 | sed -E 's#.*/([0-9]+):.*#\1#')
 echo "tâche WorkManager n°${JOB:-?}" | tee -a "$OUT/resultats.txt"
 sleep 3; adb shell cmd jobscheduler run -u 0 -f $PKG "${JOB:-1}" 2>&1 | tee -a "$OUT/resultats.txt"; sleep 12
 echo "--- diagnostic notification ---" | tee -a "$OUT/resultats.txt"
-adb shell dumpsys jobscheduler | grep -B1 -A6 "$PKG" | head -40 | tee -a "$OUT/resultats.txt"
-adb logcat -d | grep -E "CoursesData|WM-|PollWorker|SystemJobService" | tail -25 | tee -a "$OUT/resultats.txt"
+
+adb logcat -d | grep -E "WM-|PollWorker|SystemJobService" | tail -12 | tee -a "$OUT/resultats.txt"
 adb shell dumpsys notification | grep -E "pkg=$PKG|Nouvelle" | head | tee -a "$OUT/resultats.txt"
 expect "R1. notification « Nouvelle demande » affichée" bash -c "adb shell dumpsys notification --noredact | grep -q 'Nouvelle demande'"
 adb exec-out screencap -p > "$OUT/lot3-notification-fond.png"
 
-echo "--- journal de l'application ---" | tee -a "$OUT/resultats.txt"; adb logcat -d | grep CoursesData | tail -40 | tee -a "$OUT/resultats.txt"
+echo "--- journal de l'application ---" | tee -a "$OUT/resultats.txt"; adb logcat -d | grep CoursesData | grep -v "envoyées=0 gardées=0" | tail -40 | tee -a "$OUT/resultats.txt"
 echo "ECHECS=$FAILS" | tee -a "$OUT/resultats.txt"
 adb logcat -d -b crash > "$OUT/logcat-crash.txt" 2>&1 || true
 echo "CRASH_APPLICATION=$(grep -c app.smartcourse "$OUT/logcat-crash.txt")" | tee -a "$OUT/resultats.txt"
+echo "--- échecs (résumé) ---"; grep -E "^FAIL" "$OUT/resultats.txt" || true
 [ "$FAILS" = 0 ]

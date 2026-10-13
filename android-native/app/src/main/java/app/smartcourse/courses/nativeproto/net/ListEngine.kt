@@ -42,6 +42,8 @@ class ListEngine(
     var catalogRev: Long = 0; private set
     var prefsRev: Long = 0; private set
     private val flushLock = Mutex()
+    /** Journal technique facultatif (diagnostic de recette) : jamais de nom d'article ni de donnée personnelle. */
+    var trace: ((String) -> Unit)? = null
 
     private fun key(name: String) = "$name|$scope"
 
@@ -154,7 +156,12 @@ class ListEngine(
         while (outbox.isNotEmpty()) {
             val b = outbox.first()
             val path = if (b.listId != null) "/api/lists/${b.listId}/ops" else "/api/lists/active/ops"
-            when (val r = api.call("POST", path, b.wire())) {
+            val call = api.call("POST", path, b.wire())
+            trace?.invoke("envoi ${b.ops.size} opération(s) vers ${if (b.listId != null) "liste connue" else "liste du jour"} → " + when (call) {
+                is Outcome.Ok -> "reçu " + parseResults(call.value).joinToString { it.status + (it.reason?.let { x -> ":$x" } ?: "") }
+                is Outcome.Fail -> "échec ${call.failure} http=${call.status} code=${call.code}"
+            })
+            when (val r = call) {
                 is Outcome.Ok -> {
                     online = true
                     val results = parseResults(r.value)
