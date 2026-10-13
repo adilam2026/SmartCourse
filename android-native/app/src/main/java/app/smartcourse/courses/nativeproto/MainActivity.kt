@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Checklist
@@ -279,6 +280,7 @@ fun App(session: Session, me: Me?) {
         if (welcome != null) {
             val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
             val ctx = androidx.compose.ui.platform.LocalContext.current
+            var copied by remember { mutableStateOf(false) }
             AppSheet({ session.welcomeFamilyCode = null }) {
                 Text("Votre famille est créée", style = MaterialTheme.typography.titleLarge)
                 Spacer(Modifier.height(6.dp))
@@ -289,12 +291,14 @@ fun App(session: Session, me: Me?) {
                 }
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SecondaryButton("Copier", { clipboard.setText(androidx.compose.ui.text.AnnotatedString(welcome)); demo.say("Code famille copié.") }, Modifier.weight(1f), leading = Icons.Rounded.ContentCopy)
+                    SecondaryButton(if (copied) "Copié" else "Copier", { clipboard.setText(androidx.compose.ui.text.AnnotatedString(welcome)); copied = true }, Modifier.weight(1f), leading = if (copied) Icons.Rounded.Check else Icons.Rounded.ContentCopy)
                     SecondaryButton("Partager", {
                         val send = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, "Rejoignez notre famille sur Mes Courses. Code famille : $welcome. Je vous donnerai votre identifiant et votre code d'accès.") }
                         try { ctx.startActivity(Intent.createChooser(send, "Partager le code famille").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) { demo.say("Aucune application de partage disponible.") }
                     }, Modifier.weight(1f), leading = Icons.Rounded.Share)
                 }
+                // Confirmation visible dans le panneau lui-même (un message en bas d'écran serait masqué par le panneau).
+                if (copied) { Spacer(Modifier.height(8.dp)); Text("Code famille copié dans le presse-papiers.", style = MaterialTheme.typography.bodyMedium, color = C.TealDark) }
                 Spacer(Modifier.height(12.dp))
                 PrimaryButton("Préparer mes courses", { session.welcomeFamilyCode = null; go("v04") }, Modifier.fillMaxWidth(), trailing = Icons.AutoMirrored.Rounded.ArrowForward)
             }

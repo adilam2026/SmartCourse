@@ -74,10 +74,12 @@ $UI tap "Créer ma famille" --last >/dev/null; sleep 6
 expect "C5. famille créée et utilisateur connecté : code famille affiché" $UI wait "Votre famille est créée" 20
 NEWCODE=$(sql "SELECT f.code FROM families f JOIN profiles p ON p.family_id=f.id WHERE p.recovery_email='$NEWMAIL'")
 expect "C5b. code famille généré ($NEWCODE) affiché à l'écran" $UI has "${NEWCODE:-ABSENT}"
-expect "C5c. serveur : une seule famille créée, administrateur principal, adresse vérifiée" test "$(sql "SELECT count(*) FROM families")" = $((FAM_BEFORE + 1)) -a "$(sql "SELECT p.is_primary::text||' '||(p.recovery_email_verified_at IS NOT NULL)::text||' '||p.city||' '||p.login FROM profiles p WHERE p.recovery_email='$NEWMAIL'")" = "true true Casablanca $NEWLOGIN"
+NBF=$(sql "SELECT count(*) FROM families"); PROF=$(sql "SELECT p.is_primary::text||' '||(p.recovery_email_verified_at IS NOT NULL)::text||' '||p.city||' '||p.login FROM profiles p WHERE p.recovery_email='$NEWMAIL'")
+expect "C5c. serveur : une seule famille créée ($FAM_BEFORE → $NBF)" test "$NBF" = "$((FAM_BEFORE + 1))"
+expect "C5d. serveur : administrateur principal, adresse vérifiée, ville, identifiant (« $PROF »)" test "$PROF" = "true true Casablanca $NEWLOGIN"
 shot final-c3-famille-creee
 $UI tap "Copier" >/dev/null
-expect "C6. Copier : confirmation" $UI wait "Code famille copié" 8
+expect "C6. Copier : confirmation visible dans le panneau" $UI wait "Code famille copié" 8
 $UI tap "Partager" >/dev/null; sleep 3
 expect "C7. Partager : fenêtre de partage Android" bash -c "adb shell dumpsys activity activities | grep -qE 'ChooserActivity|ResolverActivity'"
 adb shell input keyevent KEYCODE_BACK; sleep 2
