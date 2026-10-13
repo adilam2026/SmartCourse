@@ -17,6 +17,10 @@ on:
         description: "Sections du parcours final (vide = toutes ; « aucune » = captures seulement)"
         required: false
         default: ""
+  # Le fichier n'existe pas sur la branche par défaut (celle du serveur de production, qu'on ne touche pas) : lancement aussi par
+  # un envoi sur claude/android-native dont le message contient [play] (tests et captures) ou [play-livrer] (plus le bundle).
+  push:
+    branches: [claude/android-native]
 permissions:
   contents: read
 env:
@@ -24,6 +28,7 @@ env:
   VERSION_NAME: "1.0.1"
 jobs:
   test-36:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[play')
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -104,7 +109,7 @@ jobs:
 
   bundle:
     needs: test-36
-    if: inputs.livrer
+    if: inputs.livrer || contains(github.event.head_commit.message, '[play-livrer]')
     runs-on: ubuntu-latest
     timeout-minutes: 40
     permissions: { contents: write }
