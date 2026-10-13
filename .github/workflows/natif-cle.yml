@@ -20,6 +20,10 @@ on:
         description: "Pour creer : CRÉER ; pour reprendre : REPRENDRE ; vide pour essai"
         required: false
         default: ""
+  # Envoi de CE fichier : toujours un essai (aucun champ de mode → « essai » ; jamais de génération).
+  push:
+    branches: [claude/android-native]
+    paths: ['.github/workflows/natif-cle.yml']
 # Une seule exécution à la fois, quel que soit le mode ; une seconde attend la fin de la première (jamais annulée en cours).
 concurrency:
   group: natif-cle-signature
@@ -31,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      MODE: ${{ inputs.mode }}
+      MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'essai' }}
       REPO: ${{ github.repository }}
       BACKUP_REPO: ${{ github.repository_owner }}/smartcourse-cles
       ALIAS: courses-natif
@@ -69,7 +73,7 @@ jobs:
           echo "Vérifications réussies."
 
       - name: "Essai : écritures réelles sans clé (fichier et secret d'essai, supprimés aussitôt)"
-        if: inputs.mode == 'essai'
+        if: env.MODE == 'essai'
         env:
           SECRETS_TOKEN: ${{ secrets.NATIF_SECRETS_TOKEN }}
           BACKUP_TOKEN: ${{ secrets.NATIF_BACKUP_TOKEN }}
@@ -85,7 +89,7 @@ jobs:
           echo "ESSAI RÉUSSI : aucune clé générée, rien d'autre de modifié."
 
       - name: "Création : génération de la clé (rien n'est affiché)"
-        if: inputs.mode == 'creer'
+        if: env.MODE == 'creer'
         run: |
           set -euo pipefail
           umask 077; W="$RUNNER_TEMP/cle"; mkdir -p "$W"
@@ -98,7 +102,7 @@ jobs:
           echo "Empreinte SHA-256 du certificat (publique) : $(cat "$W/empreinte")"
 
       - name: "Création : sauvegarde chiffrée déposée, relue et vérifiée"
-        if: inputs.mode == 'creer'
+        if: env.MODE == 'creer'
         env:
           BACKUP_TOKEN: ${{ secrets.NATIF_BACKUP_TOKEN }}
           PASSPHRASE: ${{ secrets.NATIF_BACKUP_PASSPHRASE }}
@@ -126,7 +130,7 @@ jobs:
           echo "Sauvegarde déposée dans $BACKUP_REPO ($NAME), relue et déchiffrée avec succès."
 
       - name: "Reprise : même clé, lue dans la sauvegarde et vérifiée"
-        if: inputs.mode == 'reprendre'
+        if: env.MODE == 'reprendre'
         env:
           BACKUP_TOKEN: ${{ secrets.NATIF_BACKUP_TOKEN }}
           PASSPHRASE: ${{ secrets.NATIF_BACKUP_PASSPHRASE }}
@@ -147,7 +151,7 @@ jobs:
           echo "Sauvegarde $NAME relue : même clé, empreinte (publique) : $REAL"
 
       - name: "Enregistrement des cinq secrets NATIF_* (création ou reprise, après vérification)"
-        if: inputs.mode != 'essai'
+        if: env.MODE != 'essai'
         env:
           SECRETS_TOKEN: ${{ secrets.NATIF_SECRETS_TOKEN }}
         run: |
