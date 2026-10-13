@@ -1,0 +1,91 @@
+═══ F. Version finale : identifiant, nom, serveur fixe ═══
+PASS  F0. identifiant app.smartcourse.courses.natif installé
+PASS  F0b. nom affiché « Mes Courses »
+PASS  F1. écran de connexion direct (aucune saisie de serveur)
+PASS  F1b. aucun bandeau ni fonction de démonstration
+PASS  F1c. aucun lien « Serveur … Modifier »
+PASS  F1d. accès de recette désactivés (écran simulé refusé)
+PASS  F1e. pas d'écrans de démonstration
+═══ C. Première connexion → Créer ma famille (autonome : sans lien, jeton ni serveur) ═══
+PASS  C1. formulaire direct (aucun lien, jeton ni serveur)
+PASS  C1b. ville choisie affichée dans le formulaire
+PASS  C2. bouton « Recevoir le code par e-mail » activé
+PASS  C3. écran du code (adresse masquée)
+PASS  C3b. double appui : un seul e-mail envoyé (1)
+PASS  C3c. double appui : une seule demande enregistrée
+PASS  C3d. rien n'est créé avant la vérification
+PASS  C4. code faux refusé avec un message clair
+PASS  C4b. code expiré : message clair, proposition d'un nouveau code
+PASS  C4c. nouveau code envoyé (2 e-mails au total)
+PASS  C5. famille créée et utilisateur connecté : code famille affiché
+PASS  C5b. code famille généré (2ZPNHQ2V) affiché à l'écran
+PASS  C5c. serveur : une seule famille créée (1 → 2)
+PASS  C5d. serveur : administrateur principal, adresse vérifiée, ville, identifiant (attendu « true true Casablanca Anfa karim », obtenu « true true Casablanca Anfa karim »)
+PASS  C6. Copier : confirmation visible dans le panneau
+PASS  C7. Partager : fenêtre de partage Android
+PASS  C8. « Préparer mes courses » ouvre la sélection des articles
+PASS  C9. doublon : la même adresse ne crée pas une seconde famille (409 email_in_use)
+PASS  C10. formulaire de connexion prérempli avec le code famille généré
+PASS  C10b. connecté à la nouvelle famille avec ses accès
+PASS  C11. plafond atteint : « limite temporaire de créations », aucun code envoyé
+PASS  C12. quota d'envoi atteint : message d'échec, pas d'écran « code envoyé »
+═══ G. Administrateur : connexion, sélection, achat, historique ═══
+PASS  G1. administrateur connecté
+PASS  G1b. aucun bandeau
+PASS  G1c. Compte dans l'en-tête
+PASS  G1d. aucune liste : « Créer une liste »
+PASS  G2. sélection (recherche pour l'administrateur)
+PASS  G3. liste créée avec Tomates
+PASS  G3b. serveur : Tomates à acheter (1.000 kg to_buy)
+PASS  G4. achat enregistré par le serveur (1.000 kg purchased)
+PASS  G4b. article dans « Déjà achetés »
+PASS  G5. liste archivée par le serveur
+PASS  G5b. historique affiché
+PASS  G6. Réglages : « Se déconnecter » visible
+PASS  G6b. aucune fonction technique dans Réglages
+PASS  G7. Compte : profil réel, sans serveur ni démonstration
+PASS  G8. déconnecté : retour à la connexion
+═══ H. Parent : rôle ═══
+PASS  H1. parent connecté
+PASS  H2. parent : pas d'onglet Réglages
+PASS  H3. parent : Historique accessible
+═══ P. Personnel : Choisir mes articles, enregistrement, hors connexion ═══
+PASS  P1. personnel : « Choisir mes articles » directement
+PASS  P1b. aucun onglet en bas
+PASS  P1c. aucune recherche
+PASS  P1d. aucun bandeau
+PASS  P1e. Compte dans l'en-tête
+PASS  P2. « Sélection enregistrée »
+PASS  P2b. reste sur Choisir
+PASS  P2c. serveur : liste du jour créée par la demande (1.000 kg to_buy)
+PASS  P2d. quantité enregistrée affichée
+PASS  P3. hors connexion : « Envoi en attente »
+PASS  P3b. la demande survit à la fermeture de l'application
+PASS  P4. reprise : envoi au retour du réseau
+PASS  P4b. serveur : une seule ligne, quantité remplacée (1.500 kg to_buy)
+PASS  P5. personnel : « Se déconnecter » dans Compte
+PASS  P5b. déconnecté
+═══ J. Personnel : minuit, liste ouverte plusieurs jours, clôture par un parent (en ligne et hors connexion) ═══
+PASS  J1. sélection enregistrée sur la liste ouverte (Tomates 1.000 to_buy)
+PASS  J2. l'horloge du téléphone est passée minuit (2026-10-13 → 2026-10-14)
+PASS  J2b. après minuit, application ouverte : sélection toujours affichée (Enregistré · 1 kg)
+PASS  J2c. après minuit, application relancée : toujours sur Choisir, sélection conservée
+PASS  J2d. serveur : même liste, toujours ouverte
+PASS  J3. trois jours plus tard : sélection et quantité conservées
+PASS  J3b. modification enregistrée sur la MÊME liste (Tomates 1.500 to_buy)
+PASS  J3c. serveur : toujours une seule liste ouverte
+PASS  J4. clôture par le parent apprise : sélections de cette liste réinitialisées
+PASS  J4b. reste sur Choisir, articles et photos toujours affichés
+PASS  J4c. historique : liste archivée avec son contenu (Tomates 1.500 to_buy)
+PASS  J5. nouvelle liste : sélection enregistrée (Tomates 1.000 to_buy)
+PASS  J5b. hors connexion : demande non envoyée (« Envoi en attente »)
+PASS  J5c. brouillon non validé (Carottes)
+PASS  J6. retour du réseau : la clôture est appliquée (sélection enregistrée réinitialisée)
+PASS  J6b. la demande non envoyée et le brouillon sont gardés : « Reprendre »
+PASS  J6c. historique non modifié par les demandes tardives (Tomates 1.000 to_buy)
+PASS  J6d. reste sur Choisir
+PASS  J7. reprise : demande (Tomates 1,5 kg) et brouillon (Carottes) repris dans la sélection
+PASS  J7b. serveur : nouvelle liste du jour avec les articles repris (Carottes 1.000 to_buy,Tomates 1.500 to_buy)
+PASS  J7c. les listes archivées restent intactes
+ECHECS=0
+CRASH_APPLICATION=0
