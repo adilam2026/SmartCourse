@@ -69,7 +69,7 @@ export class RecoveryService {
   }
 
   /** Records the attempt, hands the message to the mailer and records what the service answered. */
-  private async deliver(kind: "verify_email" | "reset_password" | "family_code" | "test", profileId: string | null, mail: OutgoingMail, token?: string): Promise<void> {
+  private async deliver(kind: "verify_email" | "reset_password" | "family_code" | "test" | "signup_code", profileId: string | null, mail: OutgoingMail, token?: string): Promise<"accepted" | "not_configured" | "unknown" | "failed"> {
     const log = (
       await this.db.query(
         "INSERT INTO email_log (kind, profile_id, recipient_hash, recipient_masked, status) VALUES ($1,$2,$3,$4,'queued') RETURNING id",
@@ -91,6 +91,7 @@ export class RecoveryService {
       r.messageId ? r.messageId.replace(/[<>]/g, "") : null,
       r.detail ?? null,
     ]);
+    return status;
   }
 
   private async recentMails(kind: string, recipientHash: string): Promise<number> {
@@ -112,6 +113,14 @@ export class RecoveryService {
       ]);
     });
     return token;
+  }
+
+  // ---- création de famille depuis l'application : code de vérification de l'adresse ---------------------------------
+
+  /** Envoie le code à 6 chiffres d'une demande de création de famille. « accepted » / « unknown » : le code est peut-être parti. */
+  async sendSignupCode(email: string, code: string): Promise<"accepted" | "not_configured" | "unknown" | "failed"> {
+    if ((await this.recentMails("signup_code", emailHash(email))) >= MAX_MAILS_PER_HOUR) throw new HttpError(429, "too_many_mails", "Trop d'e-mails envoyés à cette adresse : réessayez dans une heure");
+    return this.deliver("signup_code", null, templates.signupCode(email, code));
   }
 
   // ---- adresse de récupération (administrateur principal) -------------------------------------------------------

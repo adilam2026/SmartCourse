@@ -1,4 +1,5 @@
 import cookie from "@fastify/cookie";
+import { DEFAULT_SIGNUP_LIMITS, ipKey, resendSignupCode, startSignup, verifySignup, type SignupLimits } from "./signup.js";
 import fastifyStatic from "@fastify/static";
 import path from "node:path";
 import { readFile } from "node:fs/promises";
@@ -44,6 +45,10 @@ export interface AppDeps {
   backupMode?: "internal" | "external";
   /** Per-IP limits on the unauthenticated routes. */
   loginRateLimit?: { max: number; timeWindow: string };
+  /** Création de famille autonome : limites par adresse IP des routes, et limites métier (adresse, global, essais). */
+  signupRateLimit?: { max: number; timeWindow: string };
+  signupVerifyRateLimit?: { max: number; timeWindow: string };
+  signupLimits?: Partial<SignupLimits>;
   /** How often an open SSE stream re-checks its session (catches out-of-band revocation). */
   sseRevalidateMs?: number;
   /** Notifications service (tests give it a sender that records instead of calling a push service). */
@@ -160,6 +165,43 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       state = await recovery.state(r.auth.profileId);
     }
     return reply.code(201).send({ familyCode: r.familyCode, me: publicMe(r.auth), recovery: state });
+  });
+
+  // ---- Création de famille autonome depuis l'application (sans jeton) : adresse vérifiée par code AVANT toute création. ----
+  // L'installation par jeton (/api/setup/family) reste inchangée et protégée.
+  const signupLimits = { ...DEFAULT_SIGNUP_LIMITS, ...(deps.signupLimits ?? {}) };
+  const signupOpen = () => {
+    if (process.env.SIGNUP_DISABLED === "1") throw new HttpError(503, "signups_closed", "La création de famille est momentanément fermée : réessayez plus tard");
+  };
+  const signupStartSchema = z.object({
+    requestId: z.string().uuid(),
+    familyName: z.string().trim().min(1).max(60),
+    displayName: nameField,
+    login: loginField,
+    city: z.string().trim().min(1).max(60),
+    email: emailField,
+    secret: secretField,
+    secretConfirm: z.string(),
+  });
+  app.post("/api/signup/start", { config: { rateLimit: deps.signupRateLimit ?? { max: 10, timeWindow: "1 hour" } } }, async (req, reply) => {
+    signupOpen();
+    const b = signupStartSchema.parse(req.body);
+    if (b.secretConfirm !== b.secret) throw new HttpError(400, "secret_mismatch", "Les deux codes d'accès ne sont pas identiques");
+    const city = resolveCity(b.city, true)!;
+    const v = await startSignup(db, recovery, { requestId: b.requestId, familyName: b.familyName, displayName: b.displayName, login: b.login, city, email: b.email, secret: b.secret }, ipKey(req.ip), signupLimits);
+    return reply.code(201).send(v);
+  });
+  app.post("/api/signup/resend", { config: { rateLimit: deps.signupRateLimit ?? { max: 10, timeWindow: "1 hour" } } }, async (req) => {
+    signupOpen();
+    const { signupId } = z.object({ signupId: z.string().uuid() }).parse(req.body);
+    return resendSignupCode(db, recovery, signupId, signupLimits);
+  });
+  app.post("/api/signup/verify", { config: { rateLimit: deps.signupVerifyRateLimit ?? { max: 20, timeWindow: "10 minutes" } } }, async (req, reply) => {
+    signupOpen();
+    const { signupId, code } = z.object({ signupId: z.string().uuid(), code: z.string().trim().max(12) }).parse(req.body);
+    const r = await verifySignup(db, signupId, code, signupLimits);
+    setSessionCookie(reply, r.token);
+    return reply.code(201).send({ familyCode: r.familyCode, me: publicMe(r.auth) });
   });
 
   app.post("/api/auth/login", { config: { rateLimit: limit } }, async (req, reply) => {

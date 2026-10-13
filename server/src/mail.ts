@@ -176,6 +176,14 @@ export const templates = {
       html: layout("Nouveau mot de passe", `<p>Vous avez demandé à changer votre mot de passe. Choisissez-en un nouveau :</p>${button(link, "Choisir un nouveau mot de passe")}<p>Lien valable 1 heure, utilisable une seule fois. Votre ancien mot de passe n'est jamais envoyé.</p>`),
     };
   },
+  signupCode(to: string, code: string): OutgoingMail {
+    return {
+      to,
+      subject: `Mes Courses — votre code de vérification : ${code}`,
+      text: `Votre code pour créer votre famille dans Mes Courses : ${code}\n\nSaisissez-le dans l'application. Il est valable 30 minutes. Si vous n'êtes pas à l'origine de cette demande, ignorez ce message : aucune famille ne sera créée.`,
+      html: layout("Votre code de vérification", `<p>Votre code pour créer votre famille dans Mes Courses :</p><p style="font-size:28px;font-weight:700;letter-spacing:6px">${code}</p><p>Saisissez-le dans l'application. Il est valable 30 minutes.</p><p>Si vous n'êtes pas à l'origine de cette demande, ignorez ce message : aucune famille ne sera créée.</p>`),
+    };
+  },
   test(to: string): OutgoingMail {
     return {
       to,
