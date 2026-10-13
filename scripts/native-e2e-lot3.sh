@@ -146,12 +146,12 @@ expect "L3. retour du réseau : la demande part toute seule" $UI gone "Envoi en 
 expect "L4. serveur : demande reçue une seule fois (« $(item Oignons) »)" test "$(sql "SELECT count(*) FROM list_items i JOIN products p ON p.id=i.product_id WHERE i.list_id='$ACTIVE' AND p.name='Oignons'")" = 1
 
 # ═══ M. Liste terminée pendant l'attente : rien n'est ajouté à l'archive, « Reprendre » ═══
-tapt "Choisir des articles"
+tapt "Choisir"   # onglet du bas : le bouton « Choisir des articles » n'existe que sur une liste vide (ici elle contient déjà l'article du bloc L)
 fill "Rechercher un produit" "Carottes"; hide_kb
 docker stop sc-recette-app >/dev/null
 $UI tap "Carottes" --last >/dev/null; sleep 2
 $UI tap "Terminer ma sélection" >/dev/null; sleep 5
-$UI wait "Envoi en attente" 15 >/dev/null
+expect "M0. hors connexion : « Envoi en attente » affiché" $UI wait "Envoi en attente" 15
 ADIL=$(sql "SELECT id FROM profiles WHERE login='adil'")
 sql "UPDATE lists SET status='archived', closed_by='$ADIL', closed_at=now() WHERE id='$ACTIVE'" >/dev/null
 docker start sc-recette-app >/dev/null; server_wait

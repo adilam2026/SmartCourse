@@ -85,11 +85,12 @@ class PollWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, 
 /** Vérifie le serveur et notifie les nouvelles demandes d'autres profils. Renvoie faux si le réseau a manqué (nouvel essai plus tard). */
 suspend fun pollOnce(ctx: Context): Boolean {
     val storage = EncryptedStorage(ctx)
-    val me = storage.meJson?.let { try { json.decodeFromString(Me.serializer(), it) } catch (_: Exception) { null } } ?: return true
-    if (storage.cookie == null || me.role == "staff") return true
+    val me = storage.meJson?.let { try { json.decodeFromString(Me.serializer(), it) } catch (_: Exception) { null } }
+    if (me == null) { android.util.Log.i("CoursesNotif", "arrêt : aucun profil enregistré"); return true }
+    if (storage.cookie == null || me.role == "staff") { android.util.Log.i("CoursesNotif", "arrêt : pas de session ou personnel"); return true }
     val scope = "${me.familyId.ifEmpty { "f" }}|${me.id}"
     val kv = FileKv(File(ctx.filesDir, "store"))
-    if (!Notifier.enabled(kv, scope)) return true
+    if (!Notifier.enabled(kv, scope)) { android.util.Log.i("CoursesNotif", "arrêt : notifications désactivées pour ce profil"); return true }
     return when (val r = ApiClient(storage).call("GET", "/api/lists/active")) {
         is Outcome.Ok -> {
             val list = (r.value["list"] as? JsonObject)?.let { parseList(it) }
@@ -104,6 +105,6 @@ suspend fun pollOnce(ctx: Context): Boolean {
             kv.put(Notifier.seenKey(scope), all.joinToString(",") { it.id })
             true
         }
-        is Outcome.Fail -> !(r.failure == Failure.NETWORK || r.failure == Failure.TIMEOUT || r.failure == Failure.SERVER_ERROR)
+        is Outcome.Fail -> !(android.util.Log.i("CoursesNotif", "échec réseau ${r.failure}").let { false } || r.failure == Failure.NETWORK || r.failure == Failure.TIMEOUT || r.failure == Failure.SERVER_ERROR)
     }
 }

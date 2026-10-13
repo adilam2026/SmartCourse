@@ -101,6 +101,7 @@ jobs:
         env:
           SKIP_LOT1: ${{ (contains(github.event.head_commit.message, '[lot2]') || contains(github.event.head_commit.message, '[lot3]')) && '1' || '' }}
           SKIP_LOT2: ${{ contains(github.event.head_commit.message, '[lot3]') && '1' || '' }}
+          CIBLE: ${{ contains(github.event.head_commit.message, '[cible]') && '1' || '' }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -109,6 +110,7 @@ jobs:
             native-e2e/
             native-e2e-lot2/
             native-e2e-lot3/
+            native-e2e-cible/
       - run: scripts/recette-locale.sh --stop
         if: always()
 
@@ -189,3 +191,27 @@ jobs:
             --prerelease --target "${{ github.sha }}" \
             --title "Courses natif — recette ${{ github.run_number }}" \
             --notes "APK de recette de l'application Android native (Kotlin + Jetpack Compose). Identifiant distinct app.smartcourse.courses.nativeproto : s'installe à côté de l'application actuelle. Signature de recette STABLE : s'installe par-dessus la version précédente, sans désinstaller. Connexion réelle au serveur de recette saisi dans l'application ; les listes restent simulées tant que le lot correspondant n'est pas livré. Ne pas distribuer."
+
+  brouillon:
+    # APK « brouillon » : compilé et testé en unitaire, mais le parcours de bout en bout n'est pas entièrement vert. Publié seulement sur demande
+    # explicite ([brouillon] dans le message), en préversion, avec la liste des écarts connus. Même signature de recette (mise à jour sans désinstaller).
+    needs: [build]
+    if: ${{ contains(github.event.head_commit.message, '[brouillon]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk
+          path: dist
+      - name: Publication de l'APK brouillon (préversion, hors production)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "native-proto-brouillon-${{ github.run_number }}" dist/CoursesNatif-proto.apk \
+            --prerelease --target "${{ github.sha }}" \
+            --title "Courses natif — BROUILLON ${{ github.run_number }} (lots 3 à 6, non validé)" \
+            --notes-file docs/native/brouillon-notes.md

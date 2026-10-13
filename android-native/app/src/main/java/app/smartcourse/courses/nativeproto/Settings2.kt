@@ -332,14 +332,15 @@ fun ResetFamilySheet(onDismiss: () -> Unit) {
         }
     }
     AppSheet(onDismiss) {
+      // Hauteur stable (le contenu arrive après le chargement de l'aperçu) et défilement si l'écran est petit ou le clavier ouvert.
+      Column(Modifier.heightIn(min = 420.dp).verticalScroll(rememberScrollState())) {
         Text("Réinitialiser la famille", style = MaterialTheme.typography.titleLarge)
         Spacer(Modifier.height(6.dp))
         if (data == null) {
             Text("Les listes et l'historique de la famille seront effacés. Cette action est définitive.", style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.height(12.dp))
             PrimaryButton("Réinitialiser (simulation)", { onDismiss(); demo.simulated("réinitialisation (rien n'est effacé dans ce prototype)") }, Modifier.fillMaxWidth())
-            return@AppSheet
-        }
+        } else {
         error?.let { Text(it, color = C.Danger, style = MaterialTheme.typography.bodyMedium) }
         preview?.let { p ->
             val fam = p["family"]?.jsonObject
@@ -356,6 +357,8 @@ fun ResetFamilySheet(onDismiss: () -> Unit) {
                 PrimaryButton("Réinitialiser définitivement", { confirm = true }, Modifier.fillMaxWidth(), enabled = password.isNotBlank() && code.isNotBlank() && !busy)
             }
         }
+        }
+      }
     }
     if (confirm && data != null) ConfirmDialog("Effacer toute la famille ?", "Cette action est définitive et ne peut pas être annulée.", "Effacer", {
         confirm = false; busy = true
