@@ -218,6 +218,13 @@ expect "P1. statistiques réelles : achat de Tomates" $UI wait "Tomates" 20
 expect "P2. dépense payée jamais inventée" $UI has "non saisie"
 shot lot3-statistiques
 
+# ═══ S. Mise à jour en direct (flux SSE) : la demande d'un autre profil apparaît sans rien faire ═══
+launch; $UI wait "Ma liste" 25 >/dev/null; sleep 6
+login_api marie 573918
+api GET /api/catalog >/dev/null; LAI=$(jq -r '[.categories[].products[] | select(.name=="Laitue")][0].id' /tmp/api.out)
+api POST /api/lists/active/ops -d "{\"ops\":[{\"opId\":\"$(cat /proc/sys/kernel/random/uuid)\",\"type\":\"add\",\"productId\":\"$LAI\",\"quantity\":1}]}" >/dev/null
+expect "S1. mise à jour en direct : la demande de Marie apparaît toute seule" $UI wait "Laitue" 25
+
 # ═══ Q. Réglages : récupération, notifications, sauvegarde, à propos ═══
 tapt "Réglages"; tapt "Récupération"
 expect "Q1. récupération : adresse réelle" $UI wait "recette@example.org" 15
