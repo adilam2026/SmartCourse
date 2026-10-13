@@ -12,3 +12,10 @@ Défauts et limites connus : notifications périodiques (environ 15 min, non ins
 - Articles cochés dans « Déjà achetés », après toutes les catégories (admin et personnel) ; décochés, ils reprennent leur place.
 - « Se déconnecter » en bas de Réglages (distinct de « Réinitialiser la famille ») et dans Compte ; avertissement si des modifications ne sont pas encore envoyées.
 - Tests ciblés L et D : 42/42 (run 43), captures dans docs/native/e2e-cible/.
+
+## Parcours du personnel simplifié
+- Connexion / réouverture : « Choisir mes articles » directement (sans flèche de retour) ; « Liste du jour » reste en onglet.
+- « Terminer ma sélection » enregistre sans quitter l'écran (mode, recherche, défilement conservés) et affiche « Sélection enregistrée » ; désactivé sans modification.
+- Articles enregistrés repérés avec leur quantité (« Enregistré · 1,5 kg »), modifiables : la nouvelle quantité remplace l'ancienne, sans doublon.
+- Hors connexion : « Envoi en attente », on reste sur Choisir ; refus : la sélection est rendue pour réessayer.
+- Parcours administrateur et droits inchangés. Cas ciblés P, M, D : 48/48 (run 46).
