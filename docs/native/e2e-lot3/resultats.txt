@@ -1,0 +1,92 @@
+PASS  G0. nouvelle liste vide créée (201)
+PASS  G1. écran de connexion
+PASS  G2. administrateur connecté, liste vide
+PASS  H1. écran de sélection avec le catalogue réel
+PASS  H2. recherche : Tomates
+PASS  H3. sélection comptée
+PASS  H4. brouillon conservé après fermeture de l'application
+PASS  H5. article visible dans la liste
+PASS  H6. serveur : 1 kg à acheter (« 1.000 kg to_buy »)
+PASS  H7. serveur : une validation enregistrée pour Adil
+PASS  H8. panneau de quantité
+PASS  H9. serveur : quantité 1,5 kg (« 1.500 kg to_buy »)
+PASS  H10. quantité affichée
+PASS  I1. serveur : achat enregistré
+PASS  I2. écran : « Acheté par Adil »
+PASS  I3. liste terminée proposée (« Tout est acheté »)
+PASS  I4. correction : article de nouveau à acheter
+PASS  I5. serveur : l'achat corrigé est annulé, pas effacé
+PASS  I6. liste terminée : archivée côté serveur
+PASS  I7. historique affiché
+PASS  J1. détail de la commande
+PASS  J2. retour à la liste avec l'article recommandé
+PASS  J3. serveur : nouvelle liste en cours contenant Tomates (1.500 kg to_buy)
+PASS  J4. l'ancienne liste archivée n'a pas été modifiée
+PASS  K0. déconnecté
+PASS  K0a. aide à la connexion
+PASS  K0b. récupération du code par e-mail (formulaire réel)
+PASS  K0c. création de famille : lien d'installation exigé (aucun champ technique)
+PASS  K1. personnel : liste du jour
+PASS  K2. article demandé visible
+PASS  K3. serveur : quantité du personnel enregistrée (2.000 kg to_buy)
+PASS  K4. serveur : le personnel n'a pas l'historique (403, 403)
+PASS  K5. serveur : le personnel ne peut pas marquer un achat (403, 403)
+PASS  K6. serveur : pas de statistiques pour le personnel (403, 403)
+PASS  K7. serveur : article retiré (« 2.000 kg removed »)
+PASS  K8. écran : liste vide pour le personnel
+PASS  L1. hors connexion : « Envoi en attente » affiché
+PASS  L2. la demande en attente survit à la fermeture de l'application
+PASS  L3. retour du réseau : la demande part toute seule
+PASS  L4. serveur : demande reçue une seule fois (« 1.000 kg to_buy »)
+PASS  M0. hors connexion : « Envoi en attente » affiché
+PASS  M1. liste terminée entre-temps : la demande est refusée proprement
+PASS  M2. serveur : rien n'a été ajouté à la liste archivée
+PASS  M3. « Reprendre » proposé pour les articles gardés
+PASS  M4. article repris dans la sélection
+PASS  M5. serveur : une nouvelle liste en cours contient Carottes
+PASS  N1. brouillon du personnel
+PASS  N2. parent connecté
+PASS  N3. le brouillon d'un autre profil n'apparaît pas
+PASS  K9. réinitialisation : confirmation par mot de passe et code famille
+PASS  O1. serveur : préférence « prix » enregistrée pour ce profil
+PASS  O2. serveur : préférence « total » enregistrée
+PASS  O3. les autres profils ne sont pas touchés
+PASS  O4. gestion des prix : catalogue réel
+PASS  O5. panneau de prix
+PASS  O6. serveur : prix de la famille enregistré (7.50)
+PASS  O7. prix affiché dans la gestion des prix
+PASS  O8. prix partagé avec la ville (contribution enregistrée, sans nom de famille)
+PASS  O9. « Rétablir le prix initial » : prix de la famille retiré côté serveur
+PASS  O10. synchronisation par ville : fenêtre ouverte, aucune proposition tant qu'il manque des familles
+PASS  P1. statistiques réelles : achat de Tomates
+PASS  P2. dépense payée jamais inventée
+PASS  S1. mise à jour en direct : la demande de Marie apparaît toute seule
+PASS  T1. favori enregistré côté serveur (1 favori)
+PASS  T2. favori affiché dans la fenêtre
+PASS  T3. « Utiliser » ajoute les articles à la liste en cours (Laitue : 1.000 piece to_buy → 2.000 piece to_buy)
+PASS  T4. favori supprimé côté serveur
+PASS  V1. fenêtre de partage Android ouverte
+PASS  U0. historique affiché (3 commande(s) archivée(s))
+PASS  U1. commande supprimée côté serveur (3 → 2)
+PASS  Q1. récupération : adresse réelle
+PASS  Q2. adresse vérifiée
+PASS  Q3. sauvegarde : lecture seule, état réel
+PASS  Q4. à propos : version et serveur
+PASS  Q5. notifications activées
+PASS  Q6. tâche périodique programmée par Android
+tâche WorkManager n°1
+10-13 11:06:29.751 25410 25410 I CoursesNotif: déclenchement de la vérification (recette), nouvelle instance
+10-13 11:06:30.363 25410 25431 I CoursesNotif: vérification : réponse du serveur = 4 demande(s) ; repère = 3 déjà vue(s) ; nouvelles d'autres profils = 1 ; autorisé = true
+10-13 11:06:30.365 25410 25431 I CoursesNotif: notification transmise à Android : « Nouvelle demande »
+10-13 11:06:30.366 25410 25431 I CoursesNotif: vérification terminée, réussie=true
+--- diagnostic notification ---
+10-13 11:06:29.738 25410 25410 D WM-WrkMgrInitializer: Initializing WorkManager with default configuration.
+10-13 11:06:29.739 25410 25410 D WM-PackageManagerHelper: Skipping component enablement for androidx.work.impl.background.systemjob.SystemJobService
+10-13 11:06:29.739 25410 25410 D WM-Schedulers: Created SystemJobScheduler and enabled SystemJobService
+10-13 11:06:36.625   519   601 I JobServiceContext: Letting c60991 #u0a131/1008 com.google.android.apps.messaging/androidx.work.impl.background.systemjob.SystemJobService continue to run past min execution time
+    NotificationRecord(0x0a8fa99b: pkg=app.smartcourse.courses.nativeproto user=UserHandle{0} id=1001 tag=null importance=3 key=0|app.smartcourse.courses.nativeproto|1001|null|10194: Notification(channel=demandes shortcut=null contentView=null vibrate=null sound=null defaults=0x0 flags=0x10 color=0x00000000 vis=PRIVATE))
+      icon=Icon(typ=RESOURCE pkg=app.smartcourse.courses.nativeproto id=0x7f050009)
+PASS  R1. notification « Nouvelle demande » affichée
+--- journal de l'application ---
+ECHECS=0
+CRASH_APPLICATION=0
