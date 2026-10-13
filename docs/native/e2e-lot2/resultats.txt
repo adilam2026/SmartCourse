@@ -1,0 +1,60 @@
+PASS  A0. connexion administrateur auprès du serveur
+PASS  A1. rôle de l'administrateur principal : refusé (409 primary_admin_protected)
+PASS  A2. désactivation de l'administrateur principal : refusée (409 admin_cannot_deactivate)
+PASS  A3. suppression de soi-même : refusée (400 bad_request)
+PASS  A4. création d'un second administrateur (201)
+PASS  A5. un administrateur ne se désactive pas (409 admin_cannot_deactivate)
+FAIL  A6. un administrateur ne se supprime pas (409 bad_request)
+FAIL  A7. l'administrateur principal ne se supprime pas, même par un autre administrateur (409 bad_request)
+PASS  A8. idem pour le rôle (409 primary_admin_protected)
+PASS  A9. retirer le rôle administrateur : permis (200)
+FAIL  A10. puis suppression permise (400)
+FAIL  A11. profil supprimé : anonymisé, achats conservés ('Boss')
+PASS  A12. le personnel ne voit pas les profils (403)
+PASS  A13. le personnel ne crée pas de profil (403)
+PASS  A14. le personnel n'accède pas au catalogue complet (403)
+PASS  A15. un parent ne voit pas les profils (403)
+PASS  A16. un parent change SA ville (200)
+PASS  A17. ville hors liste refusée (400 invalid_city)
+PASS  B0. écran de connexion
+PASS  B1. serveur enregistré
+PASS  B2. administrateur connecté
+PASS  C1. liste réelle des profils
+PASS  C2. rôles réels affichés
+PASS  C3. mon profil repéré
+PASS  C4. profil créé et affiché
+PASS  C5. profil créé côté serveur (rôle staff, ville de l'administrateur)
+PASS  C6. identifiant déjà pris : message clair
+PASS  C7. code trop simple : refusé par le serveur
+PASS  C8. aucun profil créé par erreur
+PASS  C9. rôle modifié côté serveur
+PASS  C10. nouveau code accepté par le serveur
+PASS  C11. ancien code refusé
+PASS  C12. profil désactivé côté serveur
+PASS  C13. sa session ouverte est coupée par le serveur (401, 401)
+PASS  C14. étiquette « Désactivé » affichée
+PASS  C15. profil réactivé côté serveur
+PASS  C16. administrateur principal : suppression impossible
+PASS  C17. administrateur principal : désactivation impossible
+PASS  C18. profil supprimé : anonymisé côté serveur
+PASS  C19. profil retiré de la liste
+PASS  D1. ville réelle dans le compte
+FAIL  D2. liste des villes affichée
+FAIL  D3. recherche sans accent : Fès trouvée
+FAIL  D4. ville enregistrée côté serveur
+FAIL  D5. nouvelle ville affichée
+PASS  D6. ville rétablie
+FAIL  E1. compteur « Dans mon catalogue » réel (80)
+FAIL  E2. compteur « À ajouter » réel (163)
+FAIL  E3. compteur « Tous » réel (243)
+FAIL  E4. défilement : l'article n°46 (Concentré de tomates) est chargé
+FAIL  E5. recherche réelle
+FAIL  E6. article retiré côté serveur
+FAIL  E7. message avec « Annuler »
+FAIL  E8. compteur mis à jour (79)
+PASS  E9. retrait annulé : l'article est de retour (réversible)
+PASS  E10. ajout depuis le catalogue complet : un article de plus (80 → 80)
+PASS  E11. compteurs côté serveur cohérents après ajout
+FAIL  E12. filtre par catégorie (Fruits) : compteur réel 31
+ECHECS=17
+CRASH_LIGNES=0
