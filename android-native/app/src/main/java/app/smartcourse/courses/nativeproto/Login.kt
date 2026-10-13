@@ -180,7 +180,7 @@ fun LoginScreen(session: Session?, onSimulated: (Role) -> Unit) {
                     "Besoin d'aide ?", color = C.TealDark, style = MaterialTheme.typography.labelLarge, textDecoration = TextDecoration.Underline,
                     modifier = Modifier.align(Alignment.CenterHorizontally).clip(RoundedCornerShape(8.dp)).clickable { help = true }.padding(horizontal = 12.dp, vertical = 16.dp),
                 )
-                if (session != null) Text(
+                if (session != null && !BuildConfig.FINAL) Text(
                     "Serveur : ${session.serverAddress?.substringAfter("://") ?: "à définir"} · Modifier",
                     color = C.Muted, style = MaterialTheme.typography.bodySmall, textDecoration = TextDecoration.Underline,
                     modifier = Modifier.align(Alignment.CenterHorizontally).clip(RoundedCornerShape(8.dp)).clickable { serverSheet = true }.padding(horizontal = 12.dp, vertical = 16.dp),
@@ -226,7 +226,7 @@ fun LoginScreen(session: Session?, onSimulated: (Role) -> Unit) {
         }
     }
 
-    if (serverSheet && session != null) ServerSheet(session) { serverSheet = false }
+    if (serverSheet && session != null && !BuildConfig.FINAL) ServerSheet(session) { serverSheet = false }
     if (session != null) when (helpKind) {
         1 -> RecoveryHelpSheet(session, true) { helpKind = 0 }
         2 -> RecoveryHelpSheet(session, false) { helpKind = 0 }

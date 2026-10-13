@@ -9,15 +9,25 @@ android {
     namespace = "app.smartcourse.courses.nativeproto"
     compileSdk = 35
 
+    // Version FINALE (-Pfinal=1) : identifiant app.smartcourse.courses.natif (s'installe à côté de l'application actuelle et de la
+    // recette), nom « Courses », serveur fixé à la compilation (aucune saisie), aucun accès de recette, signée par la clé durable
+    // fournie par les secrets du CI (jamais dans le dépôt). Sans -Pfinal : build de recette inchangé.
+    val final = project.findProperty("final") == "1"
+    val serverUrl = (project.findProperty("serverUrl") as String?) ?: ""
+    if (final && !serverUrl.startsWith("https://") && !serverUrl.startsWith("http://10.0.2.2")) throw GradleException("Version finale : -PserverUrl=https://… obligatoire")
+
     defaultConfig {
         // Identifiant de recette distinct : s'installe à côté de l'application actuelle.
-        applicationId = "app.smartcourse.courses.nativeproto"
+        applicationId = if (final) "app.smartcourse.courses.natif" else "app.smartcourse.courses.nativeproto"
         minSdk = 26
         targetSdk = 35
         versionCode = (project.findProperty("versionCode") as String?)?.toInt() ?: 1
         versionName = (project.findProperty("versionName") as String?) ?: "0.2-recette"
         // Build de recette : permet d'ouvrir directement un écran simulé (captures automatiques). À retirer pour une version de production.
-        buildConfigField("boolean", "RECETTE_HOOKS", "true")
+        buildConfigField("boolean", "RECETTE_HOOKS", if (final) "false" else "true")
+        buildConfigField("boolean", "FINAL", if (final) "true" else "false")
+        buildConfigField("String", "SERVER_URL", "\"$serverUrl\"")
+        manifestPlaceholders["appLabel"] = if (final) "Courses" else "Courses (natif)"
     }
 
     signingConfigs {
@@ -29,6 +39,14 @@ android {
             keyAlias = "recette"
             keyPassword = "recette-natif"
         }
+        // Clé durable de la version finale : fichier et mots de passe donnés par l'environnement (secrets GitHub), jamais par le dépôt.
+        if (final) create("final") {
+            val ks = System.getenv("NATIF_KEYSTORE_FILE") ?: throw GradleException("Version finale : NATIF_KEYSTORE_FILE absent (secret NATIF_KEYSTORE_B64)")
+            storeFile = file(ks)
+            storePassword = System.getenv("NATIF_KEYSTORE_PASSWORD") ?: throw GradleException("NATIF_KEYSTORE_PASSWORD absent")
+            keyAlias = System.getenv("NATIF_KEY_ALIAS") ?: throw GradleException("NATIF_KEY_ALIAS absent")
+            keyPassword = System.getenv("NATIF_KEY_PASSWORD") ?: throw GradleException("NATIF_KEY_PASSWORD absent")
+        }
     }
 
     buildTypes {
@@ -36,7 +54,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("recette")
+            signingConfig = signingConfigs.getByName(if (final) "final" else "recette")
         }
     }
 

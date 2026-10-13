@@ -283,7 +283,7 @@ fun AboutScreen(onBack: () -> Unit) {
                 Spacer(Modifier.height(12.dp))
                 AboutLine("Version", BuildConfig.VERSION_NAME)
                 AboutLine("Application", "native (Android)")
-                AboutLine("Serveur", data?.session?.serverAddress?.substringAfter("://") ?: "démonstration")
+                if (!BuildConfig.FINAL) AboutLine("Serveur", data?.session?.serverAddress?.substringAfter("://") ?: "démonstration")
                 data?.me?.let { AboutLine("Profil", it.displayName + " · " + when (it.role) { "admin" -> "administrateur"; "parent" -> "parent"; else -> "personnel" }) }
             }
             SCard {
@@ -291,7 +291,7 @@ fun AboutScreen(onBack: () -> Unit) {
                 HorizontalDivider(color = C.Line.copy(alpha = 0.6f), modifier = Modifier.padding(horizontal = 16.dp))
                 AboutLink("Supprimer mon compte (page web)") { open("/suppression-compte") }
             }
-            InfoRow("Cette version est une version de recette : elle ne remplace pas l'application actuelle. Données stockées sur le téléphone : la dernière liste, le catalogue, vos brouillons et les demandes en attente d'envoi ; jamais votre code d'accès.")
+            InfoRow((if (BuildConfig.FINAL) "Cette application s'installe à côté de l'application web actuelle. " else "Cette version est une version de recette : elle ne remplace pas l'application actuelle. ") + "Données stockées sur le téléphone : la dernière liste, le catalogue, vos brouillons et les demandes en attente d'envoi ; jamais votre code d'accès.")
             Spacer(Modifier.height(12.dp))
         }
     }

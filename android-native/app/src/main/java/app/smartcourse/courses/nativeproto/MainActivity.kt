@@ -97,7 +97,8 @@ class MainActivity : ComponentActivity() {
         }
         val splash = installSplashScreen()
         enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.dark(C.Navy.toArgb()),
+            // Barre d'état claire (icônes sombres) sur le fond de l'application : aucun bandeau ajouté.
+            statusBarStyle = SystemBarStyle.light(C.Bg.toArgb(), C.Bg.toArgb()),
             navigationBarStyle = SystemBarStyle.light(Color.White.toArgb(), Color.White.toArgb()),
         )
         super.onCreate(savedInstanceState)
@@ -106,7 +107,9 @@ class MainActivity : ComponentActivity() {
         val storage = EncryptedStorage(applicationContext)
         val s = Session(storage, ApiClient(storage), scope)
         session = s
-        if (PendingInstall.accept(intent)) PendingInstall.server?.let { s.setServer(it) }
+        // Version finale : serveur permanent fixé à la compilation, jamais demandé à l'utilisateur.
+        if (BuildConfig.FINAL) s.setServer(BuildConfig.SERVER_URL)
+        if (PendingInstall.accept(intent) && !BuildConfig.FINAL) PendingInstall.server?.let { s.setServer(it) }
         val demoMode = Launch.str("screen") != null || Launch.str("path") != null || Launch.flag("hub")
         if (!demoMode) s.start()
         splash.setKeepOnScreenCondition { !demoMode && s.state == AuthState.Booting }
@@ -122,7 +125,7 @@ class MainActivity : ComponentActivity() {
             CoroutineScope(Dispatchers.IO).launch { val ok = pollOnce(applicationContext); android.util.Log.i("CoursesNotif", "vérification terminée, réussie=$ok") }
             return
         }
-        if (PendingInstall.accept(intent)) PendingInstall.server?.let { session?.setServer(it) }
+        if (PendingInstall.accept(intent) && !BuildConfig.FINAL) PendingInstall.server?.let { session?.setServer(it) }
     }
 
     override fun onStart() { super.onStart(); session?.verify(); LiveHolder.current?.onForeground() }
@@ -138,8 +141,7 @@ private fun Root(session: Session, demoMode: Boolean) {
         AuthState.SignedOut -> {
             val demo = remember { Demo() }
             CompositionLocalProvider(LocalDemo provides demo, LocalCompact provides false) {
-                Column(Modifier.fillMaxSize().background(C.Bg)) {
-                    TopStrip("RECETTE · ${session.serverAddress?.substringAfter("://") ?: "serveur à définir"}", null)
+                Column(Modifier.fillMaxSize().background(C.Bg).statusBarsPadding()) {
                     Column(Modifier.weight(1f).fillMaxWidth().imePadding()) { LoginScreen(session) { } }
                 }
             }
@@ -172,6 +174,9 @@ private fun startRoute(): String = when (Launch.str("screen")?.lowercase()) {
     "v07" -> "v07"; "v08" -> "v08"; "v09" -> "v09"; "v10" -> "v10"; "v11" -> "v11"; "v12" -> "v12"
     else -> "v01"
 }
+
+/** Ouvre le panneau Compte depuis l'en-tête des écrans principaux (null hors session réelle). */
+val LocalAccount = androidx.compose.runtime.compositionLocalOf<(() -> Unit)?> { null }
 
 /** Ouvre la confirmation de déconnexion (null hors session réelle). */
 val LocalLogout = androidx.compose.runtime.compositionLocalOf<(() -> Unit)?> { null }
@@ -213,11 +218,11 @@ fun App(session: Session, me: Me?) {
         // Personnel : aucune barre d'onglets (ni son conteneur ni son espace) ; « Choisir mes articles » est l'unique écran principal.
         demo.role == Role.ADMIN && route != "v04"
 
-    CompositionLocalProvider(LocalDemo provides demo, LocalSession provides (if (me != null) session else null), LocalCompact provides (demo.role == Role.ADMIN && route != "v01"), LocalLogout provides (if (me != null) ({ confirmLogout = true }) else null)) {
+    CompositionLocalProvider(LocalDemo provides demo, LocalSession provides (if (me != null) session else null), LocalCompact provides (demo.role == Role.ADMIN && route != "v01"), LocalLogout provides (if (me != null) ({ confirmLogout = true }) else null), LocalAccount provides (if (me != null) ({ account = true }) else null)) {
         Box(Modifier.fillMaxSize().background(C.Bg)) {
             Column(Modifier.fillMaxSize()) {
-                if (me != null) TopStrip("RECETTE · données réelles", "Compte") { account = true }
-                else TopStrip("PROTOTYPE · données fictives", "Écrans de démo") { hub = true }
+                // Aucun bandeau (recette ou prototype) : seule la barre d'état ; « Compte » est dans l'en-tête de chaque écran principal.
+                Spacer(Modifier.statusBarsPadding())
                 if (me != null && (!session.online || data?.online == false)) Box(Modifier.fillMaxWidth().background(C.AmberSoft).padding(horizontal = 14.dp, vertical = 6.dp)) {
                     Text("Hors connexion : session et dernières données conservées sur ce téléphone.", color = C.Ink, style = MaterialTheme.typography.labelMedium)
                 }
@@ -258,7 +263,7 @@ fun App(session: Session, me: Me?) {
             demo.pendingSheet = if (r.startsWith("v04?sheet=")) r.substringAfter("=") else null
             nav.navigate(r.substringBefore("?")) { launchSingleTop = true }
         }
-        if (account && me != null) AccountSheet(me, session, { account = false }, { account = false; hub = true }, { account = false; confirmLogout = true }, { account = false; cityPicker = true })
+        if (account && me != null) AccountSheet(me, session, { account = false }, { account = false; confirmLogout = true }, { account = false; cityPicker = true })
         if (cityPicker && me != null) CityPickerSheet(me.city, { city ->
             cityPicker = false
             scopeUi.launch {
@@ -282,7 +287,7 @@ fun App(session: Session, me: Me?) {
 }
 
 @Composable
-private fun AccountSheet(me: Me, session: Session, onDismiss: () -> Unit, onDemo: () -> Unit, onLogout: () -> Unit, onCity: () -> Unit) {
+private fun AccountSheet(me: Me, session: Session, onDismiss: () -> Unit, onLogout: () -> Unit, onCity: () -> Unit) {
     val roleLabel = when (me.role) { "admin" -> if (me.primary == true) "Administrateur principal" else "Administrateur"; "parent" -> "Parent"; else -> "Personnel" }
     AppSheet(onDismiss) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -298,26 +303,10 @@ private fun AccountSheet(me: Me, session: Session, onDismiss: () -> Unit, onDemo
             "Ville : ${me.city ?: "à choisir"} · Modifier", style = MaterialTheme.typography.bodyMedium, color = C.TealDark,
             modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onCity).heightIn(min = 48.dp).wrapContentHeight(Alignment.CenterVertically),
         )
-        Text("Serveur : ${session.serverAddress?.substringAfter("://") ?: "—"}", style = MaterialTheme.typography.bodyMedium)
+        if (!BuildConfig.FINAL) Text("Serveur : ${session.serverAddress?.substringAfter("://") ?: "—"}", style = MaterialTheme.typography.bodyMedium)
         Text(if (session.online) "État : connecté" else "État : hors connexion, session conservée", style = MaterialTheme.typography.bodyMedium, color = if (session.online) C.TealDark else C.Amber)
         Spacer(Modifier.height(16.dp))
-        SecondaryButton("Écrans de démo (données simulées)", onDemo, Modifier.fillMaxWidth())
-        Spacer(Modifier.height(10.dp))
         SecondaryButton("Se déconnecter", onLogout, Modifier.fillMaxWidth(), danger = true)
-    }
-}
-
-@Composable
-private fun TopStrip(left: String, action: String?, onAction: () -> Unit = {}) {
-    Row(
-        Modifier.fillMaxWidth().background(C.Navy).statusBarsPadding().height(26.dp).padding(horizontal = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(left, color = Color(0xFF7FE3DE), fontSize = 11.sp, letterSpacing = 0.4.sp, modifier = Modifier.weight(1f), maxLines = 1)
-        if (action != null) Row(Modifier.clip(RoundedCornerShape(50)).clickable(onClick = onAction).padding(horizontal = 8.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(action, color = Color.White, fontSize = 11.sp)
-            Icon(Icons.Rounded.KeyboardArrowDown, null, tint = Color.White, modifier = Modifier.width(16.dp))
-        }
     }
 }
 

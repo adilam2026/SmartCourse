@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
@@ -236,6 +237,10 @@ fun TopBar(title: String, subtitle: String? = null, onBack: (() -> Unit)? = null
             if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         actions()
+        // Écran principal (sans retour) : accès au Compte (profil, ville, Se déconnecter) dans l'en-tête normal.
+        if (onBack == null) LocalAccount.current?.let { open ->
+            IconButton(open) { Icon(Icons.Rounded.AccountCircle, "Compte", tint = C.Ink, modifier = Modifier.size(30.dp)) }
+        }
     }
 }
 
