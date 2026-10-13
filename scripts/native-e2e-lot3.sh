@@ -118,7 +118,8 @@ expect "K0c. création de famille : lien d'installation exigé (aucun champ tech
 shot lot3-creer-famille
 $UI tap "Se connecter" --first >/dev/null; sleep 1
 signin "$FAMILY" marie 573918
-expect "K1. personnel : liste du jour" $UI wait "Liste du jour" 25
+expect "K1. personnel : accueil direct sur « Choisir mes articles »" $UI wait "Choisir mes articles" 25
+tapt "Liste du jour"   # accès secondaire volontaire
 expect "K2. article demandé visible" $UI wait "Tomates" 15
 tapt "Augmenter"; sleep 4
 expect "K3. serveur : quantité du personnel enregistrée ($(item Tomates))" test "$(item Tomates)" = "2.000 kg to_buy"

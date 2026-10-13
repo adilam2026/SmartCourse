@@ -154,8 +154,8 @@ private val ADMIN_TABS = listOf(
     NavItem("v07", "Réglages", Icons.Rounded.Settings),
 )
 private val STAFF_TABS = listOf(
-    NavItem("v03", "Liste du jour", Icons.Rounded.Checklist),
     NavItem("v04", "Choisir", Icons.Rounded.GridView),
+    NavItem("v03", "Liste du jour", Icons.Rounded.Checklist),
 )
 
 /** Onglet mis en avant selon l'écran affiché. */
@@ -196,18 +196,20 @@ fun App(session: Session, me: Me?) {
     var cityPicker by remember { mutableStateOf(false) }
     val profilesRepo = remember { ProfilesRepo(session.api) }
     val path = remember { Launch.str("path")?.split(",")?.filter { it.isNotBlank() } }
-    val start = remember { if (me != null) (if (uiRole == Role.STAFF) "v03" else "v02") else path?.firstOrNull() ?: startRoute() }
+    val start = remember { if (me != null) (if (uiRole == Role.STAFF) "v04" else "v02") else path?.firstOrNull() ?: startRoute() }
 
     LaunchedEffect(Unit) { path?.drop(1)?.forEach { nav.navigate(it) } }
 
     val go: (String) -> Unit = { r ->
-        val tab = ADMIN_TABS.any { it.route == r }
-        nav.navigate(r) { if (tab) { popUpTo(if (demo.role == Role.ADMIN) "v02" else "v03") { inclusive = false }; launchSingleTop = true } }
+        val staff = demo.role == Role.STAFF
+        val tab = if (staff) STAFF_TABS.any { it.route == r } else ADMIN_TABS.any { it.route == r }
+        // Personnel : l'écran Choisir (mode, recherche, défilement) est conservé quand on passe par Liste du jour.
+        nav.navigate(r) { if (tab) { if (staff) popUpTo(nav.graph.startDestinationId) { inclusive = false } else popUpTo("v02") { inclusive = false }; launchSingleTop = true } }
     }
     val back: () -> Unit = { nav.popBackStack() }
     val tabs = if (demo.role == Role.ADMIN) (if (me?.role == "parent") ADMIN_TABS.filter { it.route != "v07" } else ADMIN_TABS) else STAFF_TABS
-    val showBar = route != null && route != "v01" && route != "v04" &&
-        (demo.role == Role.ADMIN || route == "v03")
+    val showBar = route != null && route != "v01" &&
+        (if (demo.role == Role.ADMIN) route != "v04" else route == "v03" || route == "v04")
 
     CompositionLocalProvider(LocalDemo provides demo, LocalSession provides (if (me != null) session else null), LocalCompact provides (demo.role == Role.ADMIN && route != "v01"), LocalLogout provides (if (me != null) ({ confirmLogout = true }) else null)) {
         Box(Modifier.fillMaxSize().background(C.Bg)) {
@@ -227,7 +229,7 @@ fun App(session: Session, me: Me?) {
                         composable("v01") {
                             LoginScreen(null) { role ->
                                 demo.role = role
-                                nav.navigate(if (role == Role.ADMIN) "v02" else "v03") { popUpTo("v01") { inclusive = true } }
+                                nav.navigate(if (role == Role.ADMIN) "v02" else "v04") { popUpTo("v01") { inclusive = true } }
                             }
                         }
                         composable("v02") { AdminListScreen(go) }

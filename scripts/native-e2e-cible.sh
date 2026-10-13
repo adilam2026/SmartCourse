@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Tests CIBLÉS : reproduisent un par un les échecs du parcours des lots 3 à 6, sans rejouer toute la suite.
-# Chaque cas part d'un état propre. Usage : native-e2e-cible.sh APK CODE_FAMILLE SORTIE [cas…]  (cas : M | M2 | K9 | R | RW | I | L | D ; tous par défaut)
+# Chaque cas part d'un état propre. Usage : native-e2e-cible.sh APK CODE_FAMILLE SORTIE [cas…]  (cas : M | M2 | K9 | R | RW | I | L | D | P ; tous par défaut)
 set -uo pipefail
-CASES=("${@:4}"); [ ${#CASES[@]} -eq 0 ] && CASES=(M M2 K9 R RW I L D)
+CASES=("${@:4}"); [ ${#CASES[@]} -eq 0 ] && CASES=(M M2 K9 R RW I L D P)
 # Fonctions et installation communes, reprises telles quelles du parcours complet (lignes 4 à l'installation de l'APK).
 source <(sed -n '/^PKG=/,/^adb shell pm grant/p' "$(dirname "$0")/native-e2e-lot3.sh")
 want() { for c in "${CASES[@]}"; do [ "$c" = "$1" ] && return 0; done; return 1; }
@@ -273,6 +273,48 @@ if want D; then
   logout
   expect "D6. personnel déconnecté depuis Compte" $UI wait "Bienvenue" 20
   expect "D6b. aucune donnée du personnel affichée" $UI gone "Liste du jour" 3
+fi
+
+if want P; then
+  echo "═══ Cas P : personnel — accueil sur Choisir, enregistrement sans quitter l'écran, modification sans doublon ═══" | tee -a "$OUT/resultats.txt"
+  ACTIVE=$(fresh_list)
+  TQ() { sql "SELECT string_agg(i.quantity||' '||i.unit||' '||i.status, ',') FROM list_items i JOIN products p ON p.id=i.product_id WHERE i.list_id='$ACTIVE' AND p.name='Tomates' AND i.status='to_buy'"; }
+  first_login marie 573918
+  expect "P1. connexion : « Choisir mes articles » affiché directement" $UI wait "Choisir mes articles" 25
+  expect "P1b. pas de flèche de retour vers la liste" $UI gone "Retour" 3
+  expect "P1c. Liste du jour reste accessible (onglet)" $UI has "Liste du jour"
+  expect "P1d. « Terminer » désactivé sans modification" bash -c "! $UI enabled 'Terminer ma sélection'"
+  shot cible-personnel-accueil
+  select_qty Tomates 1                                 # 1 kg → 1,5 kg
+  expect "P2. « Terminer » activé après une modification" $UI enabled "Terminer ma sélection"
+  $UI tap "Terminer ma sélection" >/dev/null
+  expect "P3. confirmation « Sélection enregistrée »" $UI wait "Sélection enregistrée" 10
+  shot cible-personnel-enregistre
+  expect "P3b. reste sur Choisir (aucune redirection)" $UI has "Choisir mes articles"
+  expect "P3c. recherche conservée (Tomates affichées)" $UI has "Tomates"
+  expect "P3d. article repéré comme enregistré, avec sa quantité" $UI wait "Enregistré · 1,5 kg" 10
+  expect "P3e. « Terminer » de nouveau désactivé" bash -c "! $UI enabled 'Terminer ma sélection'"
+  expect "P3f. serveur : Tomates 1.500 kg ($(TQ))" test "$(TQ)" = "1.500 kg to_buy"
+  $UI tap "Modifier la quantité" >/dev/null; sleep 2; $UI tap "Augmenter" >/dev/null; sleep 1; $UI tap "Mettre à jour" >/dev/null; sleep 2
+  expect "P4. modification repérée (enregistré : 1,5 kg)" $UI wait "Modifié (enregistré : 1,5 kg)" 8
+  shot cible-personnel-modification
+  $UI tap "Terminer ma sélection" >/dev/null
+  expect "P4b. confirmation" $UI wait "Sélection enregistrée" 10
+  expect "P4c. serveur : une seule ligne, quantité remplacée 2.000 kg ($(TQ))" test "$(TQ)" = "2.000 kg to_buy"
+  expect "P4d. toujours sur Choisir" $UI has "Choisir mes articles"
+  docker stop sc-recette-app >/dev/null
+  $UI tap "Modifier la quantité" >/dev/null; sleep 2; $UI tap "Augmenter" >/dev/null; sleep 1; $UI tap "Mettre à jour" >/dev/null; sleep 2
+  $UI tap "Terminer ma sélection" >/dev/null; sleep 4
+  expect "P5. hors connexion : « Envoi en attente »" $UI wait "Envoi en attente" 15
+  expect "P5b. reste sur Choisir hors connexion" $UI has "Choisir mes articles"
+  shot cible-personnel-hors-connexion
+  docker start sc-recette-app >/dev/null; server_wait
+  expect "P5c. envoi au retour du réseau" $UI gone "Envoi en attente" 90
+  expect "P5d. serveur : une seule ligne, 2.500 kg ($(TQ))" test "$(TQ)" = "2.500 kg to_buy"
+  tapt "Liste du jour"
+  expect "P6. Liste du jour accessible volontairement" $UI wait "2,5 kg" 10
+  tapt "Choisir"
+  expect "P6b. retour sur Choisir : recherche conservée" $UI wait "Enregistré · 2,5 kg" 10
 fi
 
 echo "ECHECS=$FAILS" | tee -a "$OUT/resultats.txt"

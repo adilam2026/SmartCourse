@@ -313,6 +313,47 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
     /** « Terminer ma sélection » : un seul lot d'opérations pour toute la sélection. */
     fun submitSelection(after: () -> Unit) = submit(demo.selection.toMap(), clearSelection = true, after = after)
 
+    /**
+     * Personnel : enregistre les modifications de « Choisir mes articles » SANS quitter l'écran. La quantité choisie remplace la quantité
+     * enregistrée (pas de cumul, pas de doublon) ; 0 = retirer. Hors connexion : file « Envoi en attente ». Refus : la sélection est rendue.
+     */
+    fun submitStaffSelection() {
+        val entries = demo.selection.toMap()
+        val lines = engine.effective()
+        val ops = entries.mapNotNull { (pid, q) ->
+            val p = demo.byId[pid] ?: return@mapNotNull null
+            val cur = lines.firstOrNull { it.productId == pid }
+            val sq = toServer(p.serverUnit, q.coerceAtLeast(0)).coerceIn(0.0, 999.0)
+            when {
+                q <= 0 -> if (cur != null && !cur.bought) engine.op("remove", productId = pid, baseRev = if (cur.itemId != null) cur.rev else 1, name = p.name) else null
+                !p.inCatalog -> null
+                cur == null -> engine.op("add", productId = pid, quantity = sq, name = p.name, unit = p.serverUnit, category = p.category, photoUrl = p.photoUrl)
+                cur.bought -> engine.op("request_again", productId = pid, quantity = sq, name = p.name, unit = p.serverUnit, category = p.category, photoUrl = p.photoUrl)
+                cur.quantity == sq -> null
+                else -> engine.op("set_qty", productId = pid, quantity = sq, baseRev = if (cur.itemId != null) cur.rev else 1, name = p.name, unit = p.serverUnit)
+            }
+        }
+        if (ops.isEmpty()) { demo.selection.clear(); render(); return }
+        engine.enqueue(ops)
+        demo.selection.clear()
+        render()
+        scope.launch {
+            val rep = engine.flush()
+            if (!rep.networkDown) engine.refresh()
+            render()
+            when {
+                rep.networkDown -> demo.say("Envoi en attente : la sélection partira au retour du réseau.")
+                rep.messages.isNotEmpty() -> {
+                    // Ce qui n'a pas été appliqué revient dans la sélection : rien n'est perdu, « Terminer » permet de réessayer.
+                    entries.forEach { (pid, q) -> val now = demo.savedQty(pid); if (if (q <= 0) now != null else now != q) demo.selection[pid] = q }
+                    demo.say("Sélection non enregistrée : ${rep.messages.joinToString(" ")} Réessayez.")
+                }
+                else -> demo.say("Sélection enregistrée")
+            }
+            syncDraft()
+        }
+    }
+
     /** Ajoute des produits à la liste (sélection, favori ou « Recommander ») : [entries] = produit → quantité (unités de l'application). */
     fun submit(entries: Map<String, Int>, clearSelection: Boolean, after: () -> Unit = {}) {
         val lines = engine.effective()

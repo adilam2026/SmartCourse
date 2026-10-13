@@ -44,7 +44,7 @@ import kotlinx.coroutines.delay
 @Composable
 fun SelectionScreen(nav: (String) -> Unit, onBack: () -> Unit) {
     val demo = LocalDemo.current
-    var query by remember { mutableStateOf("") }
+    var query by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
     val startSheet = remember { demo.pendingSheet.also { demo.pendingSheet = null } ?: Launch.strOnce("sheet") }
     var sheetFor by remember { mutableStateOf(startSheet) }
     val admin = demo.role == Role.ADMIN
@@ -59,10 +59,11 @@ fun SelectionScreen(nav: (String) -> Unit, onBack: () -> Unit) {
     }
     val items = demo.products.filter { demo.inCatalog[it.id] == true && (query.isBlank() || it.name.contains(query.trim(), ignoreCase = true)) }
     val entries: List<Any> = buildList { items.groupBy { it.category }.forEach { (c, ps) -> add(c); addAll(ps) } }
-    val count = demo.selection.size
+    val count = demo.selChanges
 
     Column(Modifier.fillMaxSize()) {
-        TopBar(if (admin) "Ajouter des articles" else "Choisir mes articles", onBack = onBack)
+        // Personnel : écran principal, sans flèche de retour (Liste du jour reste accessible par l'onglet du bas).
+        TopBar(if (admin) "Ajouter des articles" else "Choisir mes articles", onBack = if (admin) onBack else null)
         Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             SearchBox(query, { query = it }, "Rechercher un produit…")
             SegTabs(SelMode.entries.map { it.label }, demo.selMode.ordinal, { val m = SelMode.entries[it]; demo.data?.setSelMode(m) ?: run { demo.selMode = m } })
@@ -109,16 +110,16 @@ fun SelectionScreen(nav: (String) -> Unit, onBack: () -> Unit) {
                 if (count == 0) "Terminer ma sélection" else "Terminer ma sélection ($count)",
                 {
                     val d = demo.data
-                    if (d != null) d.submitSelection { nav(if (admin) "v02" else "v03") }
+                    if (d != null) { if (admin) d.submitSelection { nav("v02") } else d.submitStaffSelection() }
                     else {
                         demo.selection.forEach { (id, q) ->
                             val i = demo.lines.indexOfFirst { it.productId == id }
-                            if (i >= 0 && !demo.lines[i].bought) demo.lines[i] = demo.lines[i].copy(qty = demo.lines[i].qty + q)
-                            else if (i < 0) demo.lines.add(Line(id, q, false))
+                            if (!admin && i >= 0 && !demo.lines[i].bought) { if (q <= 0) demo.lines.removeAt(i) else demo.lines[i] = demo.lines[i].copy(qty = q) }
+                            else if (i >= 0 && !demo.lines[i].bought) demo.lines[i] = demo.lines[i].copy(qty = demo.lines[i].qty + q)
+                            else if (i < 0 && q > 0) demo.lines.add(Line(id, q, false))
                         }
                         demo.selection.clear()
-                        demo.simulated(if (admin) "articles ajoutés à la liste" else "demande envoyée (hors connexion : « Envoi en attente »)")
-                        nav(if (admin) "v02" else "v03")
+                        if (admin) { demo.simulated("articles ajoutés à la liste"); nav("v02") } else demo.say("Sélection enregistrée")
                     }
                 },
                 Modifier.fillMaxWidth(), enabled = count > 0, trailing = Icons.AutoMirrored.Rounded.ArrowForward,
@@ -129,12 +130,26 @@ fun SelectionScreen(nav: (String) -> Unit, onBack: () -> Unit) {
     sheetFor?.let { id ->
         val p = demo.byId[id]
         if (p != null) QuantitySheet(
-            p, demo.selection[id], demo.showPrices, demo.priceLabel(p), focusInput = remember { Launch.once("keyboard") },
+            p, demo.selQty(id), demo.showPrices, demo.priceLabel(p), focusInput = remember { Launch.once("keyboard") },
             onDismiss = { sheetFor = null },
-            onConfirm = { demo.selection[id] = it; sheetFor = null },
-            onRemove = { demo.selection.remove(id); sheetFor = null },
+            onConfirm = { demo.setSel(id, it); sheetFor = null },
+            onRemove = { demo.selRemove(id); sheetFor = null },
+            removeLabel = if (demo.savedQty(id) != null) "Retirer de la liste" else "Retirer de la sélection",
         )
     }
+}
+
+/** Personnel : repère d'un article déjà enregistré dans la liste du jour (ou de la modification en attente). */
+@Composable private fun SavedTag(p: Product) {
+    val demo = LocalDemo.current
+    val saved = demo.savedQty(p.id) ?: return
+    val s = demo.selection[p.id]
+    val (t, c) = when {
+        s == null -> "Enregistré · ${qtyText(p, saved)}" to C.TealDark
+        s <= 0 -> "Sera retiré à l'enregistrement" to C.Amber
+        else -> "Modifié (enregistré : ${qtyText(p, saved)})" to C.Amber
+    }
+    Text(t, style = MaterialTheme.typography.labelSmall, color = c, maxLines = 1, overflow = TextOverflow.Ellipsis)
 }
 
 @Composable private fun Header(text: String) {
@@ -160,13 +175,13 @@ private fun PriceLine(p: Product) {
 @Composable
 private fun SelListRow(p: Product, openSheet: () -> Unit) {
     val demo = LocalDemo.current
-    val q = demo.selection[p.id]
+    val q = demo.selQty(p.id)
     val shape = RoundedCornerShape(18.dp)
     Row(
         Modifier.fillMaxWidth().shadow(3.dp, shape, ambientColor = C.Navy.copy(alpha = 0.10f), spotColor = C.Navy.copy(alpha = 0.2f)).clip(shape)
             .background(if (q != null) C.TealSoft else Color.White)
             .then(if (q != null) Modifier.border(SelBorder, shape) else Modifier)
-            .clickable { if (q == null) demo.selection[p.id] = defaultQty(p) else demo.selection.remove(p.id) }
+            .clickable { demo.selToggle(p, openSheet) }
             .padding(10.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -174,6 +189,7 @@ private fun SelListRow(p: Product, openSheet: () -> Unit) {
         Column(Modifier.weight(1f)) {
             Text(p.name, style = MaterialTheme.typography.titleSmall.copy(fontSize = 16.sp), maxLines = 2, overflow = TextOverflow.Ellipsis)
             PriceLine(p)
+            SavedTag(p)
         }
         if (q != null) {
             QtyChip(qtyText(p, q), openSheet)
@@ -207,13 +223,13 @@ private fun QtyChip(text: String, onClick: () -> Unit) {
 @Composable
 private fun SelTile(p: Product, openSheet: () -> Unit) {
     val demo = LocalDemo.current
-    val q = demo.selection[p.id]
+    val q = demo.selQty(p.id)
     val shape = RoundedCornerShape(20.dp)
     Column(
         Modifier.fillMaxWidth().shadow(4.dp, shape, ambientColor = C.Navy.copy(alpha = 0.10f), spotColor = C.Navy.copy(alpha = 0.2f)).clip(shape)
             .background(if (q != null) C.TealSoft else Color.White)
             .then(if (q != null) Modifier.border(SelBorder, shape) else Modifier)
-            .clickable { if (q == null) demo.selection[p.id] = defaultQty(p) else demo.selection.remove(p.id) },
+            .clickable { demo.selToggle(p, openSheet) },
     ) {
         Box {
             ProductImage(p, Modifier.fillMaxWidth().aspectRatio(1.15f), contentScale = ContentScale.Crop)
@@ -223,6 +239,7 @@ private fun SelTile(p: Product, openSheet: () -> Unit) {
             Column(Modifier.weight(1f)) {
                 Text(p.name, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 PriceLine(p)
+                SavedTag(p)
             }
             if (q == null) AddDot()
         }
@@ -233,14 +250,14 @@ private fun SelTile(p: Product, openSheet: () -> Unit) {
 @Composable
 private fun SelBigCard(p: Product, openSheet: () -> Unit) {
     val demo = LocalDemo.current
-    val q = demo.selection[p.id]
+    val q = demo.selQty(p.id)
     val shape = RoundedCornerShape(24.dp)
     Column(
         Modifier.fillMaxWidth().shadow(5.dp, shape, ambientColor = C.Navy.copy(alpha = 0.12f), spotColor = C.Navy.copy(alpha = 0.22f)).clip(shape)
             .background(if (q != null) C.TealSoft else Color.White)
             .then(if (q != null) Modifier.border(SelBorder, shape) else Modifier),
     ) {
-        Box(Modifier.clickable { if (q == null) demo.selection[p.id] = defaultQty(p) else demo.selection.remove(p.id) }) {
+        Box(Modifier.clickable { demo.selToggle(p, openSheet) }) {
             ProductImage(p, Modifier.fillMaxWidth().height(190.dp), contentScale = ContentScale.Crop)
             if (q != null) SelBadge(Modifier.align(Alignment.TopEnd).padding(12.dp))
         }
@@ -249,6 +266,7 @@ private fun SelBigCard(p: Product, openSheet: () -> Unit) {
                 Column(Modifier.weight(1f)) {
                     Text(p.name, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     PriceLine(p)
+                    SavedTag(p)
                 }
                 if (q == null) AddDot()
             }
@@ -256,8 +274,8 @@ private fun SelBigCard(p: Product, openSheet: () -> Unit) {
                 val big = q >= 1000 && p.unit != UnitKind.COUNT
                 Stepper(
                     qtyText(p, q),
-                    { demo.selection[p.id] = (q - stepOf(p, big)).coerceAtLeast(stepOf(p, big)) },
-                    { demo.selection[p.id] = q + stepOf(p, big) },
+                    { demo.setSel(p.id, (q - stepOf(p, big)).coerceAtLeast(stepOf(p, big))) },
+                    { demo.setSel(p.id, q + stepOf(p, big)) },
                     size = if (LocalCompact.current) 44.dp else 48.dp, canMinus = q > stepOf(p, big),
                 )
                 Spacer(Modifier.weight(1f))

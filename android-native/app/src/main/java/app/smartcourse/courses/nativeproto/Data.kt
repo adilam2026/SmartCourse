@@ -137,6 +137,26 @@ class Demo(initialRole: Role? = null, val live: Boolean = false) {
     val inCatalog = mutableStateMapOf<String, Boolean>().apply { products.forEach { put(it.id, it.inCatalog) } }
     val prices = mutableStateMapOf<String, Int>().apply { products.forEach { p -> p.basePrice?.let { put(p.id, it) } } }
     val selection = mutableStateMapOf<String, Int>()
+
+    /*
+     * Personnel : l'écran « Choisir mes articles » montre ce qui est déjà enregistré dans la liste du jour (quantité comprise) ;
+     * [selection] ne garde que les MODIFICATIONS (nouvelle quantité, ou 0 = à retirer). Administrateur : rien d'enregistré n'est montré,
+     * la sélection s'ajoute à la liste comme avant.
+     */
+    fun savedQty(pid: String): Int? = if (role == Role.STAFF) lines.firstOrNull { it.productId == pid && !it.bought }?.qty else null
+    fun selQty(pid: String): Int? { val s = selection[pid] ?: return savedQty(pid); return if (s <= 0) null else s }
+    fun setSel(pid: String, q: Int) { if (q == savedQty(pid)) selection.remove(pid) else selection[pid] = q }
+    fun selRemove(pid: String) { if (savedQty(pid) != null) selection[pid] = 0 else selection.remove(pid) }
+    /** Appui sur la carte : ajoute, annule la modification en cours, ou ouvre la quantité d'un article déjà enregistré. */
+    fun selToggle(p: Product, open: () -> Unit) {
+        when {
+            selection[p.id] != null -> selection.remove(p.id)
+            savedQty(p.id) != null -> open()
+            else -> selection[p.id] = defaultQty(p)
+        }
+    }
+    /** Nombre de modifications réelles (le bouton « Terminer » reste désactivé à 0). */
+    val selChanges: Int get() = selection.count { (pid, q) -> val s = savedQty(pid); if (q <= 0) s != null else q != s }
     val lines = mutableStateListOf<Line>().apply {
         val allBought = Launch.str("state") == "allbought"
         val empty = Launch.str("state") == "empty" || live
