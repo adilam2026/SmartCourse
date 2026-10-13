@@ -167,5 +167,6 @@ adb exec-out screencap -p > "$OUT/retour-3-clavier-ferme-$W.png"
 
 # Plantages éventuels
 adb logcat -d -b crash > "$OUT/logcat-crash.txt" 2>&1 || true
-echo "CRASH_LIGNES=$(wc -l < "$OUT/logcat-crash.txt")" >> "$OUT/controles.txt"
+echo "CRASH_APPLICATION=$(grep -c app.smartcourse "$OUT/logcat-crash.txt")" >> "$OUT/controles.txt"
+echo "CRASH_AUTRES_APPLICATIONS_DE_LEMULATEUR=$(grep -c "Cmdline:" "$OUT/logcat-crash.txt")" >> "$OUT/controles.txt"
 ls "$OUT" | wc -l

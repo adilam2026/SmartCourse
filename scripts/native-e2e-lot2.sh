@@ -163,13 +163,11 @@ expect "E4. défilement : l'article n°46 ($LATE) est chargé" $UI has "$LATE"
 fill "Rechercher un produit" "Tomates"
 expect "E5. recherche réelle" $UI wait "Retirer" 15
 $UI tap "Retirer" >/dev/null
-expect "E7. message avec « Annuler »" $UI wait "Annuler" 6
-shot lot2-retire
+expect "E8. compteur de la recherche « Tomates » mis à jour (2 → 1)" $UI wait "Dans mon catalogue (1)" 6
+expect "E7. message avec « Annuler »" $UI has "Annuler"
 expect "E6. article retiré côté serveur" test "$(sql "SELECT active FROM products p JOIN families f ON f.id=p.family_id WHERE f.code='$FAMILY' AND p.name='Tomates'")" = f
-expect "E8. compteur de la recherche « Tomates » mis à jour (2 → 1)" $UI has "Dans mon catalogue (1)"
 $UI tap "Annuler" >/dev/null; sleep 3
 expect "E9. retrait annulé : l'article est de retour (réversible)" test "$(sql "SELECT active FROM products p JOIN families f ON f.id=p.family_id WHERE f.code='$FAMILY' AND p.name='Tomates'")" = t
-# ajouter depuis « À ajouter »
 fill "Tomates" ""; hide_kb
 tapt "À ajouter ("
 BEFORE=$(sql "SELECT count(*) FROM products p JOIN families f ON f.id=p.family_id WHERE f.code='$FAMILY'")
@@ -189,5 +187,5 @@ shot lot2-categorie
 
 echo "ECHECS=$FAILS" | tee -a "$OUT/resultats.txt"
 adb logcat -d -b crash > "$OUT/logcat-crash.txt" 2>&1 || true
-echo "CRASH_LIGNES=$(wc -l < "$OUT/logcat-crash.txt")" | tee -a "$OUT/resultats.txt"
+echo "CRASH_APPLICATION=$(grep -c app.smartcourse "$OUT/logcat-crash.txt")" | tee -a "$OUT/resultats.txt"
 [ "$FAILS" = 0 ]

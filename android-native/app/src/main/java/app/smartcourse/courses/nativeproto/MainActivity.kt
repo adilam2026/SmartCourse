@@ -265,7 +265,7 @@ private fun TopStrip(left: String, action: String?, onAction: () -> Unit = {}) {
 @Composable
 private fun ToastHost(demo: Demo) {
     val t = demo.toast
-    LaunchedEffect(t) { if (t != null) { delay(if (t.undoLabel != null) 6500 else 3200); if (demo.toast === t) demo.toast = null } }
+    LaunchedEffect(t) { if (t != null) { delay(if (t.undoLabel != null) 8000 else 3200); if (demo.toast === t) demo.toast = null } }
     if (t != null) Box(Modifier.fillMaxSize().padding(bottom = 96.dp, start = 16.dp, end = 16.dp), contentAlignment = Alignment.BottomCenter) {
         Row(
             Modifier.clip(RoundedCornerShape(16.dp)).background(C.Navy).padding(horizontal = 16.dp, vertical = 12.dp),

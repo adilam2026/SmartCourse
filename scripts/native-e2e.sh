@@ -134,5 +134,5 @@ shot e2e-11-parent
 
 echo "ECHECS=$FAILS" | tee -a "$OUT/resultats.txt"
 adb logcat -d -b crash > "$OUT/logcat-crash.txt" 2>&1 || true
-echo "CRASH_LIGNES=$(wc -l < "$OUT/logcat-crash.txt")" | tee -a "$OUT/resultats.txt"
+echo "CRASH_APPLICATION=$(grep -c app.smartcourse "$OUT/logcat-crash.txt")" | tee -a "$OUT/resultats.txt"
 [ "$FAILS" = 0 ]
