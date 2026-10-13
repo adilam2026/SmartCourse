@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
   push:
     branches: [claude/android-native]   # la compilation se lance à chaque envoi ; les captures seulement avec « [captures] » dans le message
-    paths: ['android-native/**', 'scripts/native-captures.sh', '.github/workflows/native-proto.yml']
+    paths: ['android-native/**', 'scripts/native-*', 'scripts/touch-audit.py', 'scripts/gen-pricing-vectors.mjs', '.github/workflows/native-proto.yml']
 permissions:
   contents: read
 jobs:
