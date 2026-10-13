@@ -116,6 +116,7 @@ jobs:
     permissions: { contents: write }
     steps:
       - uses: actions/checkout@v4
+        with: { fetch-depth: 2 }   # le commit et son parent : contrôle de la cible de l'étiquette
       - name: Clé durable présente ?
         env:
           KS_B64: ${{ secrets.NATIF_KEYSTORE_B64 }}
@@ -220,6 +221,10 @@ jobs:
       - name: Pré-version GitHub (pas Google Play)
         env: { GH_TOKEN: "${{ github.token }}" }
         run: |
+          # Le jeton du CI ne peut pas poser d'étiquette sur un commit qui modifie un workflow : le lancement de la livraison se fait
+          # par un commit sans modification de workflow (même code de l'application).
+          if git -C "$GITHUB_WORKSPACE" show --name-only --format= "${{ github.sha }}" | grep -q '^.github/workflows/'; then
+            echo "::error::lancer la livraison depuis un commit qui ne modifie aucun workflow"; exit 1; fi
           TAG="courses-natif-play-$VERSION_NAME-${{ github.run_number }}"
           printf '%s\n' "Mes Courses $VERSION_NAME — Android App Bundle pour Google Play. NON publié sur Google Play." "" \
             "- Identifiant : app.smartcourse.courses.natif" "- Serveur : $PROD_URL" "- Code de version : $VC" "- Niveau d'API cible : 36 (Android 16)" \

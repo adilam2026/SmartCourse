@@ -1,0 +1,8 @@
+# Permissions du manifeste fusionné (bundletool dump manifest, bundle 1.0.1)
+android.permission.INTERNET
+android.permission.ACCESS_NETWORK_STATE
+android.permission.POST_NOTIFICATIONS
+android.permission.WAKE_LOCK
+android.permission.RECEIVE_BOOT_COMPLETED
+android.permission.FOREGROUND_SERVICE
+app.smartcourse.courses.natif.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
