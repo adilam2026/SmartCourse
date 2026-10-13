@@ -239,8 +239,8 @@ fun StaffListScreen(nav: (String) -> Unit) {
     val bought = demo.boughtCount
     val noList = demo.live && demo.listLoaded && !demo.hasList && total == 0
     // À acheter groupés par catégorie, puis « Déjà achetés » en bas (ordre habituel conservé : décoché, l'article reprend sa place).
-    val todo = if (filter == 2) emptyList() else demo.lines.filter { !it.bought }.groupBy { demo.byId[it.productId]?.category ?: "" }
-    val done = if (filter == 1) emptyList() else demo.lines.filter { it.bought }
+    val todo: Map<String, List<Line>> = if (filter == 2) emptyMap() else demo.lines.filter { !it.bought }.groupBy { demo.byId[it.productId]?.category ?: "" }
+    val done: List<Line> = if (filter == 1) emptyList() else demo.lines.filter { it.bought }
     val shownEmpty = todo.isEmpty() && done.isEmpty()
 
     Column(Modifier.fillMaxSize()) {
