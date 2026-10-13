@@ -48,7 +48,10 @@ expect "C1. formulaire direct (aucun lien, jeton ni serveur)" bash -c "$UI wait 
 fill "Nom de la famille" "Famille Benali" --scroll; hide_kb
 fill "Votre prénom" "Karim" --scroll; hide_kb
 fill "Votre identifiant" "$NEWLOGIN" --scroll; hide_kb
-$UI tap "Ville : " --scroll >/dev/null; sleep 2; fill "Rechercher une ville" "casablanca"; hide_kb; $UI tap "Casablanca" --last >/dev/null; sleep 2
+# Ville choisie sans ambiguïté (la liste contient « Casablanca » et « Casablanca Anfa ») : la valeur attendue en base est exactement celle-ci.
+NEWCITY="Casablanca Anfa"
+$UI tap "Ville : " --scroll >/dev/null; sleep 2; fill "Rechercher une ville" "anfa"; hide_kb; $UI tap "$NEWCITY" --last >/dev/null; sleep 2
+expect "C1b. ville choisie affichée dans le formulaire" $UI has "Ville : $NEWCITY"
 fill "E-mail de récupération" "$NEWMAIL" --scroll; hide_kb
 fill "Code d'accès (6" 274915 --scroll; hide_kb
 fill "Confirmez le code" 274915 --scroll; hide_kb
@@ -82,7 +85,7 @@ NEWCODE=$(sql "SELECT f.code FROM families f JOIN profiles p ON p.family_id=f.id
 expect "C5b. code famille généré ($NEWCODE) affiché à l'écran" $UI has "${NEWCODE:-ABSENT}"
 NBF=$(sql "SELECT count(*) FROM families"); PROF=$(sql "SELECT p.is_primary::text||' '||(p.recovery_email_verified_at IS NOT NULL)::text||' '||p.city||' '||p.login FROM profiles p WHERE p.recovery_email='$NEWMAIL'")
 expect "C5c. serveur : une seule famille créée ($FAM_BEFORE → $NBF)" test "$NBF" = "$((FAM_BEFORE + 1))"
-expect "C5d. serveur : administrateur principal, adresse vérifiée, ville, identifiant (« $PROF »)" test "$PROF" = "true true Casablanca $NEWLOGIN"
+expect "C5d. serveur : administrateur principal, adresse vérifiée, ville, identifiant (attendu « true true $NEWCITY $NEWLOGIN », obtenu « $PROF »)" test "$PROF" = "true true $NEWCITY $NEWLOGIN"
 shot final-c3-famille-creee
 $UI tap "Copier" >/dev/null
 expect "C6. Copier : confirmation visible dans le panneau" $UI wait "Code famille copié" 8
