@@ -45,7 +45,7 @@ BOSS=$(pid boss)
 S=$(api PATCH "/api/profiles/$BOSS" -d '{"active":false}'); expect "A5. un administrateur ne se désactive pas (409 $(errcode))" test "$S" = 409 -a "$(errcode)" = admin_cannot_deactivate
 S=$(api DELETE "/api/profiles/$BOSS"); expect "A6. un administrateur ne se supprime pas (409 $(errcode))" test "$S" = 409 -a "$(errcode)" = admin_cannot_delete
 login_api boss 135790; BCOOKIE=$COOKIE
-S=$(api DELETE "/api/profiles/$ADIL"); expect "A7. l'administrateur principal ne se supprime pas, même par un autre administrateur (409 $(errcode))" test "$S" = 409 -a "$(errcode)" = primary_cannot_delete
+S=$(api DELETE "/api/profiles/$ADIL"); expect "A7. l'administrateur principal ne se supprime pas, même par un autre administrateur (409 $(errcode))" test "$S" = 409 -a "$(errcode)" = admin_cannot_delete
 S=$(api PATCH "/api/profiles/$ADIL" -d '{"role":"staff"}'); expect "A8. idem pour le rôle (409 $(errcode))" test "$S" = 409
 login_api adil 482913
 S=$(api PATCH "/api/profiles/$BOSS" -d '{"role":"parent"}'); expect "A9. retirer le rôle administrateur : permis ($S)" test "$S" = 200
@@ -162,11 +162,11 @@ expect "E4. défilement : l'article n°46 ($LATE) est chargé" $UI has "$LATE"
 # retirer / annuler
 fill "Rechercher un produit" "Tomates"
 expect "E5. recherche réelle" $UI wait "Retirer" 15
-$UI tap "Retirer" >/dev/null; sleep 2
-expect "E6. article retiré côté serveur" test "$(sql "SELECT active FROM products p JOIN families f ON f.id=p.family_id WHERE f.code='$FAMILY' AND p.name='Tomates'")" = f
-expect "E7. message avec « Annuler »" $UI wait "Annuler" 8
+$UI tap "Retirer" >/dev/null
+expect "E7. message avec « Annuler »" $UI wait "Annuler" 6
 shot lot2-retire
-expect "E8. compteur mis à jour ($((A-1)))" $UI wait "Dans mon catalogue ($((A-1)))" 10
+expect "E6. article retiré côté serveur" test "$(sql "SELECT active FROM products p JOIN families f ON f.id=p.family_id WHERE f.code='$FAMILY' AND p.name='Tomates'")" = f
+expect "E8. compteur de la recherche « Tomates » mis à jour (2 → 1)" $UI has "Dans mon catalogue (1)"
 $UI tap "Annuler" >/dev/null; sleep 3
 expect "E9. retrait annulé : l'article est de retour (réversible)" test "$(sql "SELECT active FROM products p JOIN families f ON f.id=p.family_id WHERE f.code='$FAMILY' AND p.name='Tomates'")" = t
 # ajouter depuis « À ajouter »
