@@ -57,7 +57,9 @@ fun SelectionScreen(nav: (String) -> Unit, onBack: () -> Unit) {
         if (sp != null && Launch.flag("selected") && demo.selection[sp.id] == null) demo.selection[sp.id] = Launch.str("qty")?.toIntOrNull() ?: defaultQty(sp)
         0
     }
-    val items = demo.products.filter { demo.inCatalog[it.id] == true && (query.isBlank() || it.name.contains(query.trim(), ignoreCase = true)) }
+    // Personnel : pas de recherche (et aucune recherche précédente ne masque d'article) ; tous les articles par catégorie.
+    val q = if (admin) query else ""
+    val items = demo.products.filter { demo.inCatalog[it.id] == true && (q.isBlank() || it.name.contains(q.trim(), ignoreCase = true)) }
     val entries: List<Any> = buildList { items.groupBy { it.category }.forEach { (c, ps) -> add(c); addAll(ps) } }
     val count = demo.selChanges
 
@@ -65,7 +67,7 @@ fun SelectionScreen(nav: (String) -> Unit, onBack: () -> Unit) {
         // Personnel : écran principal, sans flèche de retour (Liste du jour reste accessible par l'onglet du bas).
         TopBar(if (admin) "Ajouter des articles" else "Choisir mes articles", onBack = if (admin) onBack else null)
         Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            SearchBox(query, { query = it }, "Rechercher un produit…")
+            if (admin) SearchBox(query, { query = it }, "Rechercher un produit…")
             SegTabs(SelMode.entries.map { it.label }, demo.selMode.ordinal, { val m = SelMode.entries[it]; demo.data?.setSelMode(m) ?: run { demo.selMode = m } })
             if (demo.orphanCount > 0) SCard(padding = PaddingValues(12.dp)) {
                 Text("${demo.orphanCount} article${if (demo.orphanCount > 1) "s" else ""} d'une liste terminée", style = MaterialTheme.typography.titleSmall)
@@ -192,7 +194,7 @@ private fun SelListRow(p: Product, openSheet: () -> Unit) {
             SavedTag(p)
         }
         if (q != null) {
-            QtyChip(qtyText(p, q), openSheet)
+            QtyChip(qtyText(p, q), p.name, openSheet)
             SelBadge()
         } else AddDot()
     }
@@ -206,7 +208,7 @@ private fun AddDot() {
 }
 
 @Composable
-private fun QtyChip(text: String, onClick: () -> Unit) {
+private fun QtyChip(text: String, name: String, onClick: () -> Unit) {
     val cmp = LocalCompact.current
     Box(Modifier.heightIn(min = if (cmp) 36.dp else 48.dp).clickable(onClick = onClick), contentAlignment = Alignment.CenterStart) {
         Row(
@@ -215,7 +217,7 @@ private fun QtyChip(text: String, onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(text, style = MaterialTheme.typography.labelMedium, color = C.TealDark, maxLines = 1)
-            Icon(Icons.Rounded.Edit, "Modifier la quantité", tint = C.TealDark, modifier = Modifier.size(14.dp))
+            Icon(Icons.Rounded.Edit, "Modifier la quantité : $name", tint = C.TealDark, modifier = Modifier.size(14.dp))
         }
     }
 }
@@ -243,7 +245,7 @@ private fun SelTile(p: Product, openSheet: () -> Unit) {
             }
             if (q == null) AddDot()
         }
-        if (q != null) Box(Modifier.padding(start = 10.dp, end = 10.dp, bottom = 10.dp)) { QtyChip(qtyText(p, q), openSheet) }
+        if (q != null) Box(Modifier.padding(start = 10.dp, end = 10.dp, bottom = 10.dp)) { QtyChip(qtyText(p, q), p.name, openSheet) }
     }
 }
 
@@ -279,7 +281,7 @@ private fun SelBigCard(p: Product, openSheet: () -> Unit) {
                     size = if (LocalCompact.current) 44.dp else 48.dp, canMinus = q > stepOf(p, big),
                 )
                 Spacer(Modifier.weight(1f))
-                QtyChip("Quantité", openSheet)
+                QtyChip("Quantité", p.name, openSheet)
             }
         }
     }

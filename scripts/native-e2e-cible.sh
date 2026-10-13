@@ -10,9 +10,9 @@ fresh_list() { login_api adil 482913; api GET /api/lists/active >/dev/null; loca
 first_login() { unset PREV_FAMILY PREV_LOGIN; adb shell pm clear $PKG >/dev/null; adb shell pm grant $PKG android.permission.POST_NOTIFICATIONS >/dev/null 2>&1; launch; $UI wait "Bienvenue" 25 >/dev/null; $UI tap "Se connecter" --last >/dev/null; sleep 2; fill "https://…" "$SERVER" --last; hide_kb; $UI tap "Tester et enregistrer" >/dev/null; $UI wait "10.0.2.2:3000" 20 >/dev/null; signin "$FAMILY" "$1" "$2"; }
 
 select_qty() { # produit, nombre d'appuis sur « Augmenter » : sélectionne l'article et règle sa quantité par le panneau natif
-  fill "Rechercher un produit" "$1"; hide_kb
-  $UI tap "$1" --last >/dev/null; sleep 2
-  $UI tap "Modifier la quantité" >/dev/null; sleep 2
+  show "$1"
+  $UI tap "$1" >/dev/null; sleep 2
+  $UI tap "Modifier la quantité : $1" >/dev/null; sleep 2
   for _ in $(seq 1 "$2"); do $UI tap "Augmenter" >/dev/null; sleep 1; done
   $UI tap "Mettre à jour" >/dev/null; sleep 2
 }
@@ -40,9 +40,9 @@ if want M; then
   shot cible-reprendre
   $UI tap "Reprendre" >/dev/null; sleep 2
   expect "M4. les deux articles sont repris dans la sélection" $UI wait "Terminer ma sélection (2)" 10
-  fill "Rechercher un produit" "Carottes"; hide_kb
+  show "Carottes"
   expect "M4a. quantité conservée : Carottes 1,5 kg" $UI wait "1,5 kg" 8
-  fill "Rechercher un produit" "Tomates"; hide_kb
+  show "Tomates"
   expect "M4b. quantité conservée : Tomates 2 kg" $UI wait "2 kg" 8
   $UI tap "Terminer ma sélection" >/dev/null; sleep 6
   NEW=$(sql "SELECT l.id FROM lists l JOIN families f ON f.id=l.family_id WHERE f.code='$FAMILY' AND l.status='active'")
@@ -63,7 +63,7 @@ if want M2; then
   expect "M2c. serveur : rien n'a été écrit pour le brouillon" test "$(sql "SELECT count(*) FROM list_items i JOIN products p ON p.id=i.product_id WHERE i.list_id='$ACTIVE' AND p.name='Oignons'")" = 0
   $UI tap "Reprendre" >/dev/null; sleep 2
   expect "M2d. brouillon repris" $UI wait "Terminer ma sélection (1)" 10
-  fill "Rechercher un produit" "Oignons"; hide_kb
+  show "Oignons"
   expect "M2e. quantité conservée : 1,5 kg" $UI wait "1,5 kg" 8
 fi
 
@@ -288,11 +288,11 @@ if want P; then
   expect "P3. confirmation « Sélection enregistrée »" $UI wait "Sélection enregistrée" 10
   shot cible-personnel-enregistre
   expect "P3b. reste sur Choisir (aucune redirection)" $UI has "Choisir mes articles"
-  expect "P3c. recherche conservée (Tomates affichées)" $UI has "Tomates"
+  expect "P3c. Tomates toujours affichées (position conservée)" $UI has "Tomates"
   expect "P3d. article repéré comme enregistré, avec sa quantité" $UI wait "Enregistré · 1,5 kg" 10
   expect "P3e. « Terminer » de nouveau désactivé" bash -c "! $UI enabled 'Terminer ma sélection'"
   expect "P3f. serveur : Tomates 1.500 kg ($(TQ))" test "$(TQ)" = "1.500 kg to_buy"
-  $UI tap "Modifier la quantité" >/dev/null; sleep 2; $UI tap "Augmenter" >/dev/null; sleep 1; $UI tap "Mettre à jour" >/dev/null; sleep 2
+  $UI tap "Modifier la quantité : Tomates" >/dev/null; sleep 2; $UI tap "Augmenter" >/dev/null; sleep 1; $UI tap "Mettre à jour" >/dev/null; sleep 2
   expect "P4. modification repérée (enregistré : 1,5 kg)" $UI wait "Modifié (enregistré : 1,5 kg)" 8
   shot cible-personnel-modification
   $UI tap "Terminer ma sélection" >/dev/null
@@ -300,7 +300,7 @@ if want P; then
   expect "P4c. serveur : une seule ligne, quantité remplacée 2.000 kg ($(TQ))" test "$(TQ)" = "2.000 kg to_buy"
   expect "P4d. toujours sur Choisir" $UI has "Choisir mes articles"
   docker stop sc-recette-app >/dev/null
-  $UI tap "Modifier la quantité" >/dev/null; sleep 2; $UI tap "Augmenter" >/dev/null; sleep 1; $UI tap "Mettre à jour" >/dev/null; sleep 2
+  $UI tap "Modifier la quantité : Tomates" >/dev/null; sleep 2; $UI tap "Augmenter" >/dev/null; sleep 1; $UI tap "Mettre à jour" >/dev/null; sleep 2
   $UI tap "Terminer ma sélection" >/dev/null; sleep 4
   expect "P5. hors connexion : « Envoi en attente »" $UI wait "Envoi en attente" 15
   expect "P5b. reste sur Choisir hors connexion" $UI has "Choisir mes articles"
@@ -312,7 +312,7 @@ if want P; then
 fi
 
 if want W; then
-  echo "═══ Cas W : personnel — sans barre d'onglets, bouton fixe en bas ; 360 / 390 dp, gestes / trois boutons, clavier ═══" | tee -a "$OUT/resultats.txt"
+  echo "═══ Cas W : personnel — sans onglets ni recherche, bouton fixe en bas ; 360 / 390 dp, gestes / trois boutons ═══" | tee -a "$OUT/resultats.txt"
   fresh_list >/dev/null
   add_api marie 573918 Tomates "Pommes de terre"
   first_login marie 573918
@@ -335,12 +335,8 @@ if want W; then
       if [ $NAVM = gestes ]; then MIN=20; MAX=70; else MIN=50; MAX=95; fi
       expect "$T d. bouton juste au-dessus de la zone système ($GAP dp, attendu $MIN–$MAX)" test "$GAP" -ge $MIN -a "$GAP" -le $MAX
       shot cible-$T
-      $UI tap "Rechercher un produit" >/dev/null; sleep 3
-      read -r K1 KY1 K2 KY2 <<<"$($UI bounds 'Terminer ma sélection')"
-      echo "      $T clavier : bas du libellé y=${KY2:-absent}" | tee -a "$OUT/resultats.txt"
-      expect "$T e. clavier ouvert : bouton toujours visible et remonté au-dessus du clavier" test -n "$KY2" -a "${KY2:-$H}" -lt $((H * 70 / 100))
-      shot cible-$T-clavier
-      hide_kb
+      expect "$T e. pas de barre de recherche pour le personnel" $UI gone "Rechercher un produit" 3
+      expect "$T f. articles affichés directement par catégorie" $UI has "Légumes et herbes"
     done
   done
   adb shell wm density reset >/dev/null; adb shell cmd overlay enable-exclusive --category com.android.internal.systemui.navbar.gestural >/dev/null 2>&1

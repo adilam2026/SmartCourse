@@ -19,6 +19,9 @@ launch() { adb shell am force-stop $PKG; adb shell am start -W -n "$PKG/.MainAct
 hide_kb() { adb shell dumpsys input_method | grep -q "mInputShown=true" && adb shell input keyevent KEYCODE_BACK; sleep 1; }
 clear_field() { adb shell input keyevent KEYCODE_MOVE_END; for _ in $(seq 1 30); do adb shell input keyevent 67; done; }
 fill() { $UI tap "$1" ${3:-} >/dev/null || return 1; sleep 1; clear_field; adb shell input text "$2"; sleep 1; }
+# Personnel (sans recherche) : remonte en haut de « Choisir mes articles » puis fait défiler jusqu'à l'article
+show() { for _ in 1 2 3 4 5 6; do adb shell input swipe 540 700 540 1900 120; done; sleep 1
+  for _ in $(seq 1 25); do $UI has "$1" && return 0; adb shell input swipe 540 1500 540 1000 300; sleep 1; done; return 1; }
 tapt() { $UI tap "$@" >/dev/null; sleep 2; }
 COOKIE=""
 login_api() { COOKIE=$(curl -s -D - -o /dev/null -X POST "$BASE/api/auth/login" -H 'content-type: application/json' -d "{\"familyCode\":\"$FAMILY\",\"login\":\"$1\",\"secret\":\"$2\"}" | tr -d '\r' | grep -i '^set-cookie: sc_session=' | sed -E 's/.*sc_session=([^;]*);.*/\1/'); }
@@ -120,9 +123,9 @@ $UI tap "Se connecter" --first >/dev/null; sleep 1
 signin "$FAMILY" marie 573918
 expect "K1. personnel : accueil direct sur « Choisir mes articles »" $UI wait "Choisir mes articles" 25
 expect "K1b. personnel : aucun onglet en bas (ni Choisir ni Liste du jour)" $UI gone "Liste du jour" 3
-fill "Rechercher un produit" "Tomates"; hide_kb
+show "Tomates"
 expect "K2. article demandé repéré avec sa quantité enregistrée" $UI wait "Enregistré · 1,5 kg" 15
-$UI tap "Modifier la quantité" >/dev/null; sleep 2; $UI tap "Augmenter" >/dev/null; sleep 1; $UI tap "Mettre à jour" >/dev/null; sleep 2
+$UI tap "Modifier la quantité : Tomates" >/dev/null; sleep 2; $UI tap "Augmenter" >/dev/null; sleep 1; $UI tap "Mettre à jour" >/dev/null; sleep 2
 $UI tap "Terminer ma sélection" >/dev/null; sleep 5
 expect "K3. serveur : quantité du personnel enregistrée ($(item Tomates))" test "$(item Tomates)" = "2.000 kg to_buy"
 login_api marie 573918
@@ -130,15 +133,15 @@ S=$(api GET /api/lists); expect "K4. serveur : le personnel n'a pas l'historique
 api GET /api/lists/active >/dev/null; IT=$(jq -r '.list.items[0].id' /tmp/api.out)
 S=$(api POST "/api/lists/$ACTIVE/ops" -d "{\"ops\":[{\"opId\":\"$(cat /proc/sys/kernel/random/uuid)\",\"type\":\"purchase\",\"itemId\":\"$IT\"}]}"); expect "K5. serveur : le personnel ne peut pas marquer un achat (403, $S)" test "$S" = 403
 S=$(api GET /api/stats/purchases); expect "K6. serveur : pas de statistiques pour le personnel (403, $S)" test "$S" = 403
-$UI tap "Modifier la quantité" >/dev/null; sleep 2; $UI tap "Retirer de la liste" >/dev/null; sleep 2
+$UI tap "Modifier la quantité : Tomates" >/dev/null; sleep 2; $UI tap "Retirer de la liste" >/dev/null; sleep 2
 $UI tap "Terminer ma sélection" >/dev/null; sleep 5
 expect "K7. serveur : article retiré (« $(item Tomates) »)" test "$(item Tomates)" = "2.000 kg removed"
 expect "K8. écran : Tomates n'est plus enregistrée" $UI gone "Enregistré ·" 12
 
 # ═══ L. Hors connexion : file « Envoi en attente », envoi unique au retour ═══
-fill "Rechercher un produit" "Oignons"; hide_kb
+show "Oignons"
 docker stop sc-recette-app >/dev/null
-$UI tap "Oignons" --last >/dev/null; sleep 2
+$UI tap "Oignons" >/dev/null; sleep 2
 $UI tap "Terminer ma sélection" >/dev/null; sleep 5
 expect "L1. hors connexion : « Envoi en attente » affiché" $UI wait "Envoi en attente" 15
 shot lot3-envoi-en-attente
@@ -149,9 +152,9 @@ expect "L3. retour du réseau : la demande part toute seule" $UI gone "Envoi en 
 expect "L4. serveur : demande reçue une seule fois (« $(item Oignons) »)" test "$(sql "SELECT count(*) FROM list_items i JOIN products p ON p.id=i.product_id WHERE i.list_id='$ACTIVE' AND p.name='Oignons'")" = 1
 
 # ═══ M. Liste terminée pendant l'attente : rien n'est ajouté à l'archive, « Reprendre » ═══
-fill "Rechercher un produit" "Carottes"; hide_kb
+show "Carottes"
 docker stop sc-recette-app >/dev/null
-$UI tap "Carottes" --last >/dev/null; sleep 2
+$UI tap "Carottes" >/dev/null; sleep 2
 $UI tap "Terminer ma sélection" >/dev/null; sleep 5
 expect "M0. hors connexion : « Envoi en attente » affiché" $UI wait "Envoi en attente" 15
 ADIL=$(sql "SELECT id FROM profiles WHERE login='adil'")
@@ -168,8 +171,8 @@ ACTIVE2=$(sql "SELECT l.id FROM lists l JOIN families f ON f.id=l.family_id WHER
 expect "M5. serveur : une nouvelle liste en cours contient Carottes" test "$(sql "SELECT count(*) FROM list_items i JOIN products p ON p.id=i.product_id WHERE i.list_id='$ACTIVE2' AND p.name='Carottes'")" = 1
 
 # ═══ N. Brouillons isolés par profil ═══
-fill "Rechercher un produit" "Tomates"; hide_kb
-$UI tap "Tomates" --last >/dev/null; sleep 2
+show "Tomates"
+$UI tap "Tomates" >/dev/null; sleep 2
 expect "N1. brouillon du personnel" $UI wait "Terminer ma sélection (1)" 8
 launch
 logout
