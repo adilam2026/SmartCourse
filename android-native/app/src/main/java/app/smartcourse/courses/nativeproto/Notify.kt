@@ -69,17 +69,25 @@ object Notifier {
     fun cancel(ctx: Context) { WorkManager.getInstance(ctx).cancelUniqueWork(WORK) }
 
     fun show(ctx: Context, title: String, text: String) {
-        if (!canPost(ctx)) return
+        if (!canPost(ctx)) { android.util.Log.i("CoursesNotif", "notification non envoyée : non autorisée par Android"); return }
         ensureChannel(ctx)
         val open = PendingIntent.getActivity(ctx, 0, Intent(ctx, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val n = NotificationCompat.Builder(ctx, CHANNEL).setSmallIcon(R.drawable.ic_notif).setContentTitle(title).setContentText(text)
             .setContentIntent(open).setAutoCancel(true).setPriority(NotificationCompat.PRIORITY_DEFAULT).build()
-        try { NotificationManagerCompat.from(ctx).notify(1001, n) } catch (_: SecurityException) { }
+        try {
+            NotificationManagerCompat.from(ctx).notify(1001, n)
+            android.util.Log.i("CoursesNotif", "notification transmise à Android : « $title »")
+        } catch (e: SecurityException) {
+            android.util.Log.i("CoursesNotif", "notification refusée par Android : ${e.message}")
+        }
     }
 }
 
 class PollWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
-    override suspend fun doWork(): Result = if (pollOnce(applicationContext)) Result.success() else Result.retry()
+    override suspend fun doWork(): Result {
+        android.util.Log.i("CoursesNotif", "tâche d'arrière-plan (WorkManager) exécutée")
+        return if (pollOnce(applicationContext)) Result.success() else Result.retry()
+    }
 }
 
 /** Vérifie le serveur et notifie les nouvelles demandes d'autres profils. Renvoie faux si le réseau a manqué (nouvel essai plus tard). */
@@ -97,7 +105,7 @@ suspend fun pollOnce(ctx: Context): Boolean {
             val all = list?.validations ?: emptyList()
             val seen = kv.get(Notifier.seenKey(scope))?.split(",")?.filter { it.isNotEmpty() }?.toSet()
             val fresh = all.filter { v -> seen != null && v.id !in seen && v.by != me.displayName }
-            android.util.Log.i("CoursesNotif", "vérification : ${all.size} demande(s), ${fresh.size} nouvelle(s), repère=${seen != null}, autorisé=${Notifier.canPost(ctx)}")
+            android.util.Log.i("CoursesNotif", "vérification : réponse du serveur = ${all.size} demande(s) ; repère = ${seen?.size ?: "absent"} déjà vue(s) ; nouvelles d'autres profils = ${fresh.size} ; autorisé = ${Notifier.canPost(ctx)}")
             if (fresh.isNotEmpty()) {
                 val who = fresh.map { it.by }.distinct()
                 Notifier.show(ctx, if (fresh.size == 1) "Nouvelle demande" else "${fresh.size} nouvelles demandes", "De la part de ${who.joinToString(", ")}")

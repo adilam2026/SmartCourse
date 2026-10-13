@@ -15,26 +15,40 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
+      # Réutilisation : si le code Android (android-native/**) est identique à un build déjà réussi, son APK (même commit de code,
+      # même signature) est repris tel quel ; seuls les scripts de test changent. Sinon : compilation complète, avec cache Gradle.
+      - name: APK déjà compilé pour ce code Android ?
+        id: apk
+        uses: actions/cache@v4
+        with:
+          path: dist/
+          key: apk-natif-${{ hashFiles('android-native/**') }}
       - uses: actions/setup-java@v4
+        if: steps.apk.outputs.cache-hit != 'true'
         with:
           distribution: temurin
           java-version: 17
+          cache: gradle
       - name: Composants Android (SDK 35)
+        if: steps.apk.outputs.cache-hit != 'true'
         run: |
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0" | tail -2
       - name: Tests unitaires (client HTTP, session, erreurs)
+        if: steps.apk.outputs.cache-hit != 'true'
         working-directory: android-native
         run: ./gradlew --no-daemon testDebugUnitTest
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && steps.apk.outputs.cache-hit != 'true'
         with:
           name: tests-unitaires
           path: android-native/app/build/reports/tests/testDebugUnitTest/
       - name: Compilation de l'APK (release, R8)
+        if: steps.apk.outputs.cache-hit != 'true'
         working-directory: android-native
         run: ./gradlew --no-daemon assembleRelease -PversionCode=${{ github.run_number }} -PversionName="0.1-proto.${{ github.run_number }}"
       - name: Contrôles de l'APK
+        if: steps.apk.outputs.cache-hit != 'true'
         run: |
           set -e
           APK=$(ls android-native/app/build/outputs/apk/release/*.apk | head -1)
@@ -62,6 +76,7 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/dist" && cp "$GITHUB_WORKSPACE/$APK" "$GITHUB_WORKSPACE/dist/CoursesNatif-proto.apk"
           cp /tmp/badging.txt "$GITHUB_WORKSPACE/dist/badging.txt"; cp /tmp/webview.txt "$GITHUB_WORKSPACE/dist/webview.txt"
       - name: Bibliothèques embarquées (preuve d'architecture)
+        if: steps.apk.outputs.cache-hit != 'true'
         working-directory: android-native
         run: ./gradlew --no-daemon :app:dependencies --configuration releaseRuntimeClasspath | grep -E "^\+---|^\\\\---" | sed 's/ (\*)//' | sort -u > ../dist/dependances.txt; ! grep -iE "webkit|browser|capacitor|cordova" ../dist/dependances.txt
       - uses: actions/upload-artifact@v4

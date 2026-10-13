@@ -15,6 +15,26 @@ def dump():
     return ""
 
 
+def enabled_last(xml, needle):
+    """Vrai si le DERNIER élément (le plus bas) portant ce texte est activé (attribut enabled d'uiautomator, ou celui de son parent cliquable)."""
+    if not xml:
+        return False
+    root = ET.fromstring(xml)
+    parent = {c: p for p in root.iter() for c in p}
+    found = None
+    for n in root.iter("node"):
+        if needle in (n.get("text") or "") + "\n" + (n.get("content-desc") or ""):
+            found = n
+    if found is None:
+        return False
+    n = found
+    while n is not None and n.tag == "node":
+        if n.get("clickable") == "true":
+            return n.get("enabled") == "true"
+        n = parent.get(n)
+    return found.get("enabled") == "true"
+
+
 def matches(xml, needle):
     out = []
     if not xml:
@@ -49,6 +69,8 @@ def main():
         print(f"INTROUVABLE: {needle}")
         return 1
     secs = float(sys.argv[3]) if len(sys.argv) > 3 and not sys.argv[3].startswith("--") else 20.0
+    if cmd == "enabled":
+        return 0 if enabled_last(dump(), needle) else 1
     if cmd == "has":
         return 0 if matches(dump(), needle) else 1
     if cmd == "wait":

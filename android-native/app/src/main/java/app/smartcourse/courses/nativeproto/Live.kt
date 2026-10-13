@@ -188,6 +188,7 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
 
     fun onBackground() {
         started = false
+        android.util.Log.i("CoursesNotif", "application en arrière-plan : flux en direct fermé")
         streamJob?.cancel(); retryJob?.cancel(); draftJob?.cancel()
         netCallback?.let { cb -> try { (Env.context?.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager)?.unregisterNetworkCallback(cb) } catch (_: Exception) { } }
         netCallback = null
@@ -246,8 +247,11 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
         demo.listLoaded = true
         if (engine.catalogRev != catalogRevLoaded && engine.online) refreshCatalog()
         render(); syncDraft()
-        // Les demandes déjà vues à l'écran ne donnent pas de notification plus tard.
-        engine.list?.let { l -> kv.put(Notifier.seenKey(scopeKey), l.validations.joinToString(",") { it.id }) }
+        // Les demandes déjà vues À L'ÉCRAN (application au premier plan) ne donnent pas de notification plus tard.
+        if (started) engine.list?.let { l ->
+            kv.put(Notifier.seenKey(scopeKey), l.validations.joinToString(",") { it.id })
+            android.util.Log.i("CoursesNotif", "repère mis à jour au premier plan : ${l.validations.size} demande(s) vue(s)")
+        }
     }
 
     /* ───── Actions ───── */
