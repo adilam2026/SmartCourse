@@ -266,7 +266,8 @@ private fun TopStrip(left: String, action: String?, onAction: () -> Unit = {}) {
 private fun ToastHost(demo: Demo) {
     val t = demo.toast
     LaunchedEffect(t) { if (t != null) { delay(if (t.undoLabel != null) 8000 else 3200); if (demo.toast === t) demo.toast = null } }
-    if (t != null) Box(Modifier.fillMaxSize().padding(bottom = 96.dp, start = 16.dp, end = 16.dp), contentAlignment = Alignment.BottomCenter) {
+    // imePadding : le message (et son bouton « Annuler ») reste visible et touchable au-dessus du clavier
+    if (t != null) Box(Modifier.fillMaxSize().imePadding().padding(bottom = 96.dp, start = 16.dp, end = 16.dp), contentAlignment = Alignment.BottomCenter) {
         Row(
             Modifier.clip(RoundedCornerShape(16.dp)).background(C.Navy).padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
