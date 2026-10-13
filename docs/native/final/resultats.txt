@@ -1,25 +1,10 @@
-═══ C. Première connexion → Créer ma famille (autonome : sans lien, jeton ni serveur) ═══
-PASS  C1. formulaire direct (aucun lien, jeton ni serveur)
-PASS  C1b. ville choisie affichée dans le formulaire
-PASS  C2. bouton « Recevoir le code par e-mail » activé
-PASS  C3. écran du code (adresse masquée)
-PASS  C3b. double appui : un seul e-mail envoyé (1)
-PASS  C3c. double appui : une seule demande enregistrée
-PASS  C3d. rien n'est créé avant la vérification
-PASS  C4. code faux refusé avec un message clair
-PASS  C4b. code expiré : message clair, proposition d'un nouveau code
-PASS  C4c. nouveau code envoyé (2 e-mails au total)
-PASS  C5. famille créée et utilisateur connecté : code famille affiché
-PASS  C5b. code famille généré (JY442GFM) affiché à l'écran
-PASS  C5c. serveur : une seule famille créée (1 → 2)
-PASS  C5d. serveur : administrateur principal, adresse vérifiée, ville, identifiant (attendu « true true Casablanca Anfa karim », obtenu « true true Casablanca Anfa karim »)
-PASS  C6. Copier : confirmation visible dans le panneau
-PASS  C7. Partager : fenêtre de partage Android
-PASS  C8. « Préparer mes courses » ouvre la sélection des articles
-PASS  C9. doublon : la même adresse ne crée pas une seconde famille (409 email_in_use)
-PASS  C10. formulaire de connexion prérempli avec le code famille généré
-PASS  C10b. connecté à la nouvelle famille avec ses accès
-PASS  C11. plafond atteint : « limite temporaire de créations », aucun code envoyé
-PASS  C12. quota d'envoi atteint : message d'échec, pas d'écran « code envoyé »
+═══ F. Version finale : identifiant, nom, serveur fixe ═══
+PASS  F0. identifiant app.smartcourse.courses.natif installé
+PASS  F0b. nom affiché « Mes Courses »
+PASS  F1. écran de connexion direct (aucune saisie de serveur)
+PASS  F1b. aucun bandeau ni fonction de démonstration
+PASS  F1c. aucun lien « Serveur … Modifier »
+PASS  F1d. accès de recette désactivés (écran simulé refusé)
+PASS  F1e. pas d'écrans de démonstration
 ECHECS=0
 CRASH_APPLICATION=0
