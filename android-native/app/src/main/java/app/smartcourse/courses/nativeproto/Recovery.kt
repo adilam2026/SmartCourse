@@ -172,6 +172,7 @@ fun CreateFamilyForm(session: Session) {
         }, Modifier.fillMaxWidth(), enabled = otp.length == 6 && !busy)
         Spacer(Modifier.height(10.dp))
         SecondaryButton(if (wait > 0) "Renvoyer le code (${wait} s)" else "Renvoyer le code", {
+            if (wait > 0 || busy) return@SecondaryButton
             busy = true; error = null
             scope.launch {
                 when (val r = session.api.callPublic("POST", "/api/signup/resend", buildJsonObject { put("signupId", sid) })) {
@@ -180,7 +181,7 @@ fun CreateFamilyForm(session: Session) {
                 }
                 busy = false
             }
-        }, Modifier.fillMaxWidth(), enabled = wait == 0 && !busy)
+        }, Modifier.fillMaxWidth())
         Spacer(Modifier.height(4.dp))
         Text(
             "Modifier mes informations", color = C.TealDark, style = MaterialTheme.typography.labelLarge, textDecoration = TextDecoration.Underline, textAlign = TextAlign.Center,
