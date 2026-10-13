@@ -13,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -114,6 +115,8 @@ private fun PriceSheet(p: CatProduct, onDismiss: () -> Unit, onChanged: () -> Un
     val cents = parseCents(amount)?.takeIf { it > 0 }
     val milli = parseMilli(qty)?.takeIf { it > 0 && (unit != "g" && unit != "ml" || it % 1000 == 0L) }
     val valid = cents != null && milli != null
+    val fr = remember { androidx.compose.ui.focus.FocusRequester() }
+    LaunchedEffect(Unit) { kotlinx.coroutines.delay(500); runCatching { fr.requestFocus() } }
 
     AppSheet(onDismiss) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -129,7 +132,7 @@ private fun PriceSheet(p: CatProduct, onDismiss: () -> Unit, onChanged: () -> Un
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), textStyle = MaterialTheme.typography.titleLarge, shape = RoundedCornerShape(16.dp),
             isError = amount.isNotBlank() && cents == null,
             colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = C.Teal, unfocusedBorderColor = C.Line, focusedContainerColor = androidx.compose.ui.graphics.Color.White, unfocusedContainerColor = androidx.compose.ui.graphics.Color.White, cursorColor = C.Teal),
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().focusRequester(fr),
         )
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {

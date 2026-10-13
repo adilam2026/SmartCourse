@@ -4,6 +4,7 @@ package app.smartcourse.courses.nativeproto
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -104,7 +105,10 @@ fun DisplayScreen(onBack: () -> Unit) {
 
 @Composable
 private fun SwitchRow(title: String, sub: String, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Row(
+        Modifier.fillMaxWidth().androidx_toggle(checked, enabled, onChange).heightIn(min = 56.dp).padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.titleSmall, color = if (enabled) C.Ink else C.Muted)
             Text(sub, style = MaterialTheme.typography.bodySmall)
@@ -182,3 +186,7 @@ fun ProfilesScreenSim(onBack: () -> Unit) {
         )
     }
 }
+
+/** Toute la ligne est un interrupteur (zone tactile large, annoncée « interrupteur » par TalkBack). */
+internal fun Modifier.androidx_toggle(checked: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit): Modifier =
+    this.toggleable(value = checked, enabled = enabled, role = androidx.compose.ui.semantics.Role.Switch, onValueChange = onChange)

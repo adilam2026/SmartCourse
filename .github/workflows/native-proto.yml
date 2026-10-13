@@ -99,7 +99,8 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
           script: bash scripts/native-e2e-all.sh dist/CoursesNatif-proto.apk ${{ env.FAMILY_CODE }}
         env:
-          SKIP_LOT1: ${{ contains(github.event.head_commit.message, '[lot2]') && '1' || '' }}
+          SKIP_LOT1: ${{ (contains(github.event.head_commit.message, '[lot2]') || contains(github.event.head_commit.message, '[lot3]')) && '1' || '' }}
+          SKIP_LOT2: ${{ contains(github.event.head_commit.message, '[lot3]') && '1' || '' }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -107,6 +108,7 @@ jobs:
           path: |
             native-e2e/
             native-e2e-lot2/
+            native-e2e-lot3/
       - run: scripts/recette-locale.sh --stop
         if: always()
 
@@ -171,6 +173,7 @@ jobs:
         run: |
           if [ -d native-captures ]; then rm -rf docs/native/captures && mkdir -p docs/native/captures && cp native-captures/* docs/native/captures/; fi
           if [ -d native-e2e/native-e2e ]; then rm -rf docs/native/e2e && mkdir -p docs/native/e2e && cp native-e2e/native-e2e/* docs/native/e2e/; fi
+          if [ -d native-e2e/native-e2e-lot3 ]; then rm -rf docs/native/e2e-lot3 && mkdir -p docs/native/e2e-lot3 && cp native-e2e/native-e2e-lot3/* docs/native/e2e-lot3/; fi
           if [ -d native-e2e/native-e2e-lot2 ]; then rm -rf docs/native/e2e-lot2 && mkdir -p docs/native/e2e-lot2 && cp native-e2e/native-e2e-lot2/* docs/native/e2e-lot2/; fi
           mkdir -p docs/native/preuves && cp dist/badging.txt dist/webview.txt dist/dependances.txt docs/native/preuves/
           git config user.name "github-actions"; git config user.email "actions@users.noreply.github.com"

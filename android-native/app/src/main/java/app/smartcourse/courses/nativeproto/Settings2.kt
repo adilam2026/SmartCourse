@@ -188,18 +188,19 @@ fun NotificationsScreen(onBack: () -> Unit) {
         TopBar("Notifications", "Réglages propres à ce profil", onBack = onBack)
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SCard(padding = PaddingValues(vertical = 4.dp)) {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                val toggle: (Boolean) -> Unit = { want ->
+                    if (!want) {
+                        on = false
+                        if (data != null && kv != null) { kv.remove(Notifier.key(data.scopeKey)); Notifier.cancel(ctx) }
+                        demo.say("Notifications désactivées.")
+                    } else if (Build.VERSION.SDK_INT >= 33 && !Notifier.canPost(ctx)) ask.launch(Manifest.permission.POST_NOTIFICATIONS) else enable()
+                }
+                Row(Modifier.fillMaxWidth().androidx_toggle(on, !staff, toggle).heightIn(min = 56.dp).padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Column(Modifier.weight(1f)) {
                         Text("Nouvelles demandes", style = MaterialTheme.typography.titleSmall, color = if (staff) C.Muted else C.Ink)
                         Text(if (staff) "Réservé aux parents et aux administrateurs." else "Être prévenu quand quelqu'un ajoute des articles à la liste.", style = MaterialTheme.typography.bodySmall)
                     }
-                    TealSwitch(on, { want ->
-                        if (!want) {
-                            on = false
-                            if (data != null && kv != null) { kv.remove(Notifier.key(data.scopeKey)); Notifier.cancel(ctx) }
-                            demo.say("Notifications désactivées.")
-                        } else if (Build.VERSION.SDK_INT >= 33 && !Notifier.canPost(ctx)) ask.launch(Manifest.permission.POST_NOTIFICATIONS) else enable()
-                    }, enabled = !staff)
+                    TealSwitch(on, toggle, enabled = !staff)
                 }
             }
             if (on && !allowed && !staff) SCard(padding = PaddingValues(16.dp)) {

@@ -55,6 +55,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -301,14 +303,19 @@ fun TealSwitch(checked: Boolean, onChange: (Boolean) -> Unit, enabled: Boolean =
 }
 
 @Composable
-fun CheckBox(checked: Boolean, onChange: (Boolean) -> Unit, size: Dp = 28.dp, enabled: Boolean = true) {
+fun CheckBox(checked: Boolean, onChange: (Boolean) -> Unit, size: Dp = 28.dp, enabled: Boolean = true, label: String = "Case à cocher") {
     val shape = RoundedCornerShape(9.dp)
+    // Zone tactile de 48 dp (la case garde son aspect) ; état et nom annoncés par les lecteurs d'écran.
     Box(
-        Modifier.size(size).clip(shape)
-            .then(if (checked) Modifier.background(TealBrush) else Modifier.background(Color.White).border(BorderStroke(2.dp, Color(0xFFC3D2DF)), shape))
-            .clickable(enabled = enabled) { onChange(!checked) },
+        Modifier.size(maxOf(size, 48.dp)).clickable(enabled = enabled) { onChange(!checked) }
+            .semantics { contentDescription = label; role = androidx.compose.ui.semantics.Role.Checkbox; stateDescription = if (checked) "Coché" else "Non coché" },
         contentAlignment = Alignment.Center,
-    ) { if (checked) Icon(Icons.Rounded.Check, null, tint = Color.White, modifier = Modifier.size(size * 0.7f)) }
+    ) {
+        Box(
+            Modifier.size(size).clip(shape).then(if (checked) Modifier.background(TealBrush) else Modifier.background(Color.White).border(BorderStroke(2.dp, Color(0xFFC3D2DF)), shape)),
+            contentAlignment = Alignment.Center,
+        ) { if (checked) Icon(Icons.Rounded.Check, null, tint = Color.White, modifier = Modifier.size(size * 0.7f)) }
+    }
 }
 
 @Composable

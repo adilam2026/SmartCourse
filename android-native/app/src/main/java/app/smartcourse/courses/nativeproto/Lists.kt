@@ -150,7 +150,7 @@ fun AdminListScreen(nav: (String) -> Unit) {
                                     if (l.pending) Text("En attente d'envoi", style = MaterialTheme.typography.labelSmall, color = C.Amber)
                                     else if (l.bought && l.buyer != null) Text("Acheté par ${l.buyer}" + (l.boughtAt?.let { " · $it" } ?: ""), style = MaterialTheme.typography.labelSmall, color = C.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 }
-                                CheckBox(l.bought, { demo.setBought(p.id, it) })
+                                CheckBox(l.bought, { demo.setBought(p.id, it) }, label = "Acheté : ${p.name}")
                             }
                         }
                     }
