@@ -27,4 +27,4 @@ PASS  11a. profil désactivé : accès refusé
 PASS  11b. profil réactivé : connexion du parent
 PASS  11c. parent : pas d'onglet Réglages
 ECHECS=0
-CRASH_LIGNES=0
+CRASH_APPLICATION=0
