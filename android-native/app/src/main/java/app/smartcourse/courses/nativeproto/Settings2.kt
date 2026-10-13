@@ -278,7 +278,7 @@ fun AboutScreen(onBack: () -> Unit) {
         TopBar("À propos", onBack = onBack)
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SCard(padding = PaddingValues(16.dp)) {
-                Text("Courses", style = MaterialTheme.typography.headlineMedium)
+                Text("Mes Courses", style = MaterialTheme.typography.headlineMedium)
                 Text("Les courses en famille", style = MaterialTheme.typography.bodySmall)
                 Spacer(Modifier.height(12.dp))
                 AboutLine("Version", BuildConfig.VERSION_NAME)

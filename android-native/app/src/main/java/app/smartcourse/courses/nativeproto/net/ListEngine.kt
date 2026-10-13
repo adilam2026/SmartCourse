@@ -77,6 +77,9 @@ class ListEngine(
         saveOrphans(); saveDraft(oldListId, emptyMap())
     }
 
+    /** Une opération qui porte une demande d'article (produit + quantité) : jamais perdue si sa liste n'est plus ouverte. */
+    private fun keeps(op: Op) = op.productId != null && op.quantity != null && (op.type == "add" || op.type == "request_again" || op.type == "set_qty")
+
     fun takeOrphans(): List<Orphan> { val o = orphans; orphans = emptyList(); saveOrphans(); return o }
 
     /* ───── Lecture ───── */
@@ -170,8 +173,9 @@ class ListEngine(
                         val name = op?.name ?: list?.items?.firstOrNull { it.productId == op?.productId }?.name ?: "Cet article"
                         when (res.reason) {
                             "list_closed" -> {
-                                val adds = b.ops.filter { it.type == "add" || it.type == "request_again" }
-                                if (op != null && (op.type == "add" || op.type == "request_again")) { stash(op); orphaned++ }
+                                // Demandes gardées « à reprendre » : ajouts, nouvelles demandes et quantités demandées (personnel hors connexion).
+                                val adds = b.ops.filter { keeps(it) }
+                                if (op != null && keeps(op)) { stash(op); orphaned++ }
                                 msgs += if (adds.isNotEmpty()) "La liste a été terminée : vos articles sont gardés, appuyez sur « Reprendre »." else "La liste a été terminée : modification ignorée."
                             }
                             "stale" -> msgs += "« $name » a été modifié par quelqu'un d'autre : la liste affiche la quantité à jour."
@@ -189,7 +193,7 @@ class ListEngine(
                     when (r.failure) {
                         Failure.NOT_FOUND -> {
                             // Liste supprimée entre-temps : jamais recréée ; les demandes d'articles sont gardées.
-                            b.ops.filter { it.type == "add" || it.type == "request_again" }.forEach { stash(it); orphaned++ }
+                            b.ops.filter { keeps(it) }.forEach { stash(it); orphaned++ }
                             msgs += "La liste n'existe plus : vos articles sont gardés, appuyez sur « Reprendre »."
                             outbox = outbox.drop(1); saveOutbox()
                         }

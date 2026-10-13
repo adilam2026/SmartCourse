@@ -10,7 +10,7 @@ android {
     compileSdk = 35
 
     // Version FINALE (-Pfinal=1) : identifiant app.smartcourse.courses.natif (s'installe à côté de l'application actuelle et de la
-    // recette), nom « Courses », serveur fixé à la compilation (aucune saisie), aucun accès de recette, signée par la clé durable
+    // recette), nom « Mes Courses », serveur fixé à la compilation (aucune saisie), aucun accès de recette, signée par la clé durable
     // fournie par les secrets du CI (jamais dans le dépôt). Sans -Pfinal : build de recette inchangé.
     val final = project.findProperty("final") == "1"
     val serverUrl = (project.findProperty("serverUrl") as String?) ?: ""
@@ -27,7 +27,7 @@ android {
         buildConfigField("boolean", "RECETTE_HOOKS", if (final) "false" else "true")
         buildConfigField("boolean", "FINAL", if (final) "true" else "false")
         buildConfigField("String", "SERVER_URL", "\"$serverUrl\"")
-        manifestPlaceholders["appLabel"] = if (final) "Courses" else "Courses (natif)"
+        manifestPlaceholders["appLabel"] = if (final) "Mes Courses" else "Mes Courses (recette)"
     }
 
     signingConfigs {

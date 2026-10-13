@@ -17,7 +17,7 @@ st() { sql "SELECT string_agg(i.quantity||' '||i.unit||' '||i.status, ',') FROM 
 
 echo "═══ F. Version finale : identifiant, nom, serveur fixe ═══" | tee -a "$OUT/resultats.txt"
 expect "F0. identifiant app.smartcourse.courses.natif installé" bash -c "adb shell pm list packages | grep -qx 'package:app.smartcourse.courses.natif'"
-expect "F0b. nom affiché « Courses »" bash -c "\"\$ANDROID_HOME/build-tools/35.0.0/aapt2\" dump badging '$APK' | grep -q \"application-label:'Courses'\""
+expect "F0b. nom affiché « Mes Courses »" bash -c "\"\$ANDROID_HOME/build-tools/35.0.0/aapt2\" dump badging '$APK' | grep -q \"application-label:'Mes Courses'\""
 # Aucune ancienne session : départ propre de la base de recette
 login_api adil 482913
 api GET /api/lists/active >/dev/null; LID=$(jq -r '.list.id // empty' /tmp/api.out)
@@ -106,6 +106,71 @@ expect "P5. personnel : « Se déconnecter » dans Compte" $UI wait "Se déconne
 adb shell input keyevent KEYCODE_BACK; sleep 1
 logout
 expect "P5b. déconnecté" $UI wait "Bienvenue" 15
+
+echo "═══ J. Personnel : minuit, liste ouverte plusieurs jours, clôture par un parent (en ligne et hors connexion) ═══" | tee -a "$OUT/resultats.txt"
+# Horloge du téléphone pilotée (émulateur, accès root) ; la liste est identifiée par son identifiant et son statut, jamais par sa date.
+adb root >/dev/null 2>&1; sleep 3; adb wait-for-device; adb shell settings put global auto_time 0 >/dev/null 2>&1
+setclock() { adb shell date "$(date -u -d "@$1" +%m%d%H%M%Y.%S)" >/dev/null; }
+devnow() { adb shell date +%s | tr -d '\r'; }
+items_of() { sql "SELECT coalesce(string_agg(p.name||' '||i.quantity||' '||i.status, ',' ORDER BY p.name), '') FROM list_items i JOIN products p ON p.id=i.product_id WHERE i.list_id='$1'"; }
+login_api adil 482913
+api GET /api/lists/active >/dev/null; LID=$(jq -r '.list.id // empty' /tmp/api.out); [ -n "$LID" ] && api POST "/api/lists/$LID/close" -d '{}' >/dev/null
+api POST /api/lists -d '{}' >/dev/null; LJ=$(jq -r .list.id /tmp/api.out)
+signin "$FAMILY" marie 573918
+$UI wait "Choisir mes articles" 25 >/dev/null
+show "Tomates"; $UI tap "Tomates" >/dev/null; sleep 2
+$UI tap "Terminer ma sélection" >/dev/null; sleep 4
+expect "J1. sélection enregistrée sur la liste ouverte ($(items_of $LJ))" test "$(items_of $LJ)" = "Tomates 1.000 to_buy"
+# Minuit : 23:59:20 du jour courant du téléphone, puis passage au lendemain, application ouverte
+D0=$(adb shell date +%Y-%m-%d | tr -d '\r'); setclock "$(date -u -d "$D0 23:59:20" +%s)"; sleep 75
+D1=$(adb shell date +%Y-%m-%d | tr -d '\r')
+expect "J2. l'horloge du téléphone est passée minuit ($D0 → $D1)" test "$D1" != "$D0"
+expect "J2b. après minuit, application ouverte : sélection toujours affichée (Enregistré · 1 kg)" $UI wait "Enregistré · 1 kg" 15
+launch
+expect "J2c. après minuit, application relancée : toujours sur Choisir, sélection conservée" bash -c "$UI wait 'Choisir mes articles' 20 && $UI wait 'Enregistré · 1 kg' 15"
+expect "J2d. serveur : même liste, toujours ouverte" test "$(sql "SELECT status FROM lists WHERE id='$LJ'")" = active
+shot final-12-apres-minuit
+# Liste ouverte plusieurs jours : créée il y a 3 jours côté serveur, téléphone 3 jours plus tard
+sql "UPDATE lists SET created_at = now() - interval '3 days' WHERE id='$LJ'" >/dev/null
+setclock $(( $(devnow) + 3*86400 )); sleep 3
+launch
+expect "J3. trois jours plus tard : sélection et quantité conservées" bash -c "$UI wait 'Choisir mes articles' 20 && $UI wait 'Enregistré · 1 kg' 15"
+$UI tap "Modifier la quantité : Tomates" >/dev/null; sleep 2; $UI tap "Augmenter" >/dev/null; sleep 1; $UI tap "Mettre à jour" >/dev/null; sleep 2
+$UI tap "Terminer ma sélection" >/dev/null; sleep 4
+expect "J3b. modification enregistrée sur la MÊME liste ($(items_of $LJ))" test "$(items_of $LJ)" = "Tomates 1.500 to_buy"
+expect "J3c. serveur : toujours une seule liste ouverte" test "$(sql "SELECT count(*) FROM lists l JOIN families f ON f.id=l.family_id WHERE f.code='$FAMILY' AND l.status='active'")" = 1
+# Clôture EN LIGNE par un parent
+login_api lamiaa 573918; api POST "/api/lists/$LJ/close" -d '{}' >/dev/null
+expect "J4. clôture par le parent apprise : sélections de cette liste réinitialisées" $UI gone "Enregistré ·" 30
+expect "J4b. reste sur Choisir, articles et photos toujours affichés" bash -c "$UI has 'Choisir mes articles' && $UI has 'Tomates' && $UI has 'Légumes et herbes'"
+ARCH=$(items_of $LJ)
+expect "J4c. historique : liste archivée avec son contenu ($ARCH)" test "$(sql "SELECT status FROM lists WHERE id='$LJ'")" = archived -a "$ARCH" = "Tomates 1.500 to_buy"
+shot final-13-apres-cloture
+# Clôture HORS CONNEXION : demande non envoyée + brouillon non validé pendant que le parent clôture
+login_api adil 482913; api POST /api/lists -d '{}' >/dev/null; LK=$(jq -r .list.id /tmp/api.out)
+sleep 5; show "Tomates"; $UI tap "Tomates" >/dev/null; sleep 2; $UI tap "Terminer ma sélection" >/dev/null; sleep 4
+expect "J5. nouvelle liste : sélection enregistrée ($(items_of $LK))" test "$(items_of $LK)" = "Tomates 1.000 to_buy"
+adb shell cmd connectivity airplane-mode enable >/dev/null 2>&1; adb shell svc wifi disable >/dev/null 2>&1; adb shell svc data disable >/dev/null 2>&1; sleep 4
+$UI tap "Modifier la quantité : Tomates" >/dev/null; sleep 2; $UI tap "Augmenter" >/dev/null; sleep 1; $UI tap "Mettre à jour" >/dev/null; sleep 2
+$UI tap "Terminer ma sélection" >/dev/null; sleep 4
+expect "J5b. hors connexion : demande non envoyée (« Envoi en attente »)" $UI wait "Envoi en attente" 20
+show "Carottes"; $UI tap "Carottes" >/dev/null; sleep 2
+expect "J5c. brouillon non validé (Carottes)" $UI wait "Terminer ma sélection (1)" 8
+login_api lamiaa 573918; api POST "/api/lists/$LK/close" -d '{}' >/dev/null
+SNAP=$(items_of $LK)
+adb shell cmd connectivity airplane-mode disable >/dev/null 2>&1; adb shell svc wifi enable >/dev/null 2>&1; adb shell svc data enable >/dev/null 2>&1
+expect "J6. retour du réseau : la clôture est appliquée (sélection enregistrée réinitialisée)" $UI gone "Enregistré ·" 90
+expect "J6b. la demande non envoyée et le brouillon sont gardés : « Reprendre »" $UI wait "Reprendre" 30
+expect "J6c. historique non modifié par les demandes tardives ($(items_of $LK))" test "$(items_of $LK)" = "$SNAP" -a "$SNAP" = "Tomates 1.000 to_buy"
+expect "J6d. reste sur Choisir" $UI has "Choisir mes articles"
+shot final-14-reprendre-apres-cloture-hors-connexion
+$UI tap "Reprendre" >/dev/null; sleep 2
+expect "J7. reprise : demande (Tomates 1,5 kg) et brouillon (Carottes) repris dans la sélection" bash -c "$UI wait 'Terminer ma sélection (2)' 10 && $UI has '1,5 kg'"
+$UI tap "Terminer ma sélection" >/dev/null; sleep 6
+NEWL=$(sql "SELECT l.id FROM lists l JOIN families f ON f.id=l.family_id WHERE f.code='$FAMILY' AND l.status='active'")
+expect "J7b. serveur : nouvelle liste du jour avec les articles repris ($(items_of ${NEWL:-00000000-0000-0000-0000-000000000000}))" test "$(items_of ${NEWL:-00000000-0000-0000-0000-000000000000})" = "Carottes 1.000 to_buy,Tomates 1.500 to_buy"
+expect "J7c. les listes archivées restent intactes" test "$(items_of $LJ)" = "Tomates 1.500 to_buy" -a "$(items_of $LK)" = "Tomates 1.000 to_buy"
+adb shell settings put global auto_time 1 >/dev/null 2>&1; setclock "$(date -u +%s)"
 
 echo "ECHECS=$FAILS" | tee -a "$OUT/resultats.txt"
 adb logcat -d -b crash > "$OUT/logcat-crash.txt" 2>&1 || true

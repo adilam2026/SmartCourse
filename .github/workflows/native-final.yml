@@ -123,7 +123,7 @@ jobs:
           "$BT/aapt2" dump badging "$APK" > /tmp/badging.txt
           grep -E "^package:|application-label:" /tmp/badging.txt
           grep -q "name='app.smartcourse.courses.natif'" /tmp/badging.txt
-          grep -q "application-label:'Courses'" /tmp/badging.txt
+          grep -q "application-label:'Mes Courses'" /tmp/badging.txt
           FP=$("$BT/apksigner" verify --print-certs "$APK" | grep -m1 "certificate SHA-256 digest" | sed 's/.*: //')
           echo "Empreinte de signature : $FP"
           # Jamais de changement silencieux de clé : l'empreinte doit être celle déclarée dans le secret NATIF_CERT_SHA256.
@@ -133,7 +133,7 @@ jobs:
           strings -a /tmp/dex/classes*.dex | grep -q "$PROD_URL" || { echo "::error::adresse du serveur permanent absente"; exit 1; }
           ! strings -a /tmp/dex/classes*.dex | grep -q "trycloudflare" || { echo "::error::tunnel trouvé dans l'APK"; exit 1; }
           for pat in androidbrowserhelper customtabs capacitor cordova; do ! strings -a /tmp/dex/classes*.dex | grep -qi "$pat" || { echo "::error::$pat"; exit 1; }; done
-          mkdir -p dist && cp "$APK" "dist/Courses-$VERSION_NAME.apk"; sha256sum "dist/Courses-$VERSION_NAME.apk" | tee dist/sha256.txt
+          mkdir -p dist && cp "$APK" "dist/MesCourses-$VERSION_NAME.apk"; sha256sum "dist/MesCourses-$VERSION_NAME.apk" | tee dist/sha256.txt
           echo "$FP" > dist/empreinte.txt
       - uses: actions/upload-artifact@v4
         with: { name: apk-final, path: dist/ }
@@ -141,11 +141,11 @@ jobs:
         env: { GH_TOKEN: "${{ github.token }}" }
         run: |
           TAG="courses-natif-$VERSION_NAME-${{ github.run_number }}"
-          printf '%s\n' "Courses (application Android native) $VERSION_NAME — version finale, hors Google Play." "" \
+          printf '%s\n' "Mes Courses $VERSION_NAME (application Android native) — version finale, hors Google Play." "" \
             "- Identifiant : app.smartcourse.courses.natif (s'installe à côté de l'application actuelle et de la recette)" \
             "- Serveur : $PROD_URL" "- Code de version : $((1000 + ${{ github.run_number }}))" \
             "- Empreinte SHA-256 du certificat : $(cat dist/empreinte.txt)" "- SHA-256 du fichier : $(cut -d' ' -f1 dist/sha256.txt)" > /tmp/notes.md
-          gh release create "$TAG" "dist/Courses-$VERSION_NAME.apk" --repo "${{ github.repository }}" --target "${{ github.sha }}" --title "Courses $VERSION_NAME (natif)" --notes-file /tmp/notes.md
+          gh release create "$TAG" "dist/MesCourses-$VERSION_NAME.apk" --repo "${{ github.repository }}" --target "${{ github.sha }}" --title "Mes Courses $VERSION_NAME" --notes-file /tmp/notes.md
 
   smoke-prod:
     needs: release
@@ -169,7 +169,7 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
           script: |
-            mkdir -p native-final-prod; adb install -r dist/Courses-$VERSION_NAME.apk
+            mkdir -p native-final-prod; adb install -r dist/MesCourses-$VERSION_NAME.apk
             adb shell am start -W -n app.smartcourse.courses.natif/app.smartcourse.courses.nativeproto.MainActivity; sleep 8
             python3 scripts/native-ui.py wait "Bienvenue" 25 && echo "PASS écran de connexion" | tee native-final-prod/resultats.txt
             ! python3 scripts/native-ui.py has "RECETTE" && ! python3 scripts/native-ui.py has "Serveur :" && echo "PASS aucun bandeau ni serveur à saisir" | tee -a native-final-prod/resultats.txt

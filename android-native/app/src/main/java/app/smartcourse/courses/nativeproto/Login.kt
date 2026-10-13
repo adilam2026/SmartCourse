@@ -119,7 +119,7 @@ fun LoginScreen(session: Session?, onSimulated: (Role) -> Unit) {
                 ) { Icon(Icons.Rounded.ShoppingBasket, null, tint = C.Teal, modifier = Modifier.size(30.dp)) }
                 Spacer(Modifier.width(12.dp))
                 Column {
-                    Text("Courses", style = MaterialTheme.typography.headlineMedium)
+                    Text("Mes Courses", style = MaterialTheme.typography.headlineMedium)
                     Text("Les courses en famille", style = MaterialTheme.typography.bodySmall)
                 }
             }

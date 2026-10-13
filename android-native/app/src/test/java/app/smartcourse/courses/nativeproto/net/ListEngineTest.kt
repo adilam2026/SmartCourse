@@ -114,6 +114,16 @@ class ListEngineTest {
         assertEquals("L9", e.list?.id)
     }
 
+    @Test fun closedList_keepsRequestedQuantityChangeAsOrphan() = runBlocking {
+        json(active(list("L1", "active", item("i1", "tom", "Tomates", rev = 1, q = 1.0))))
+        val e = engine(); e.refresh()
+        val b = e.enqueue(listOf(e.op("set_qty", productId = "tom", quantity = 2.5, baseRev = 1, name = "Tomates", unit = "kg")))
+        json("""{"results":[{"opId":"${b.ops[0].opId}","status":"rejected","reason":"list_closed"}],"list":${list("L1", "archived")}}""")
+        val r = e.flush()
+        assertEquals(0, e.pendingOps); assertEquals(1, r.orphaned)
+        assertEquals("Tomates", e.orphans.single().name); assertEquals(2.5, e.orphans.single().quantity, 0.0)
+    }
+
     @Test fun staleRejection_isExplainedWithName() = runBlocking {
         json(active(list("L1", "active", item("i1", "tom", "Tomates", rev = 1, q = 2.0))))
         val e = engine(); e.refresh()
