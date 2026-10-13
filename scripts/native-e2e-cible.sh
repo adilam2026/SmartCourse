@@ -214,6 +214,8 @@ if want L; then
   add_api adil 482913 Carottes Tomates Lait
   expect "L4. articles affichés" $UI wait "Acheté : Lait" 30
   $UI wait "Acheté : Tomates" 10 >/dev/null
+  if $UI above "Acheté : Tomates" "Acheté : Carottes"; then ORDRE=(Tomates Carottes); else ORDRE=(Carottes Tomates); fi
+  echo "      ordre habituel relevé avant achat : ${ORDRE[*]}" | tee -a "$OUT/resultats.txt"
   expect "L4b. pas de section « Déjà achetés » tant que rien n'est acheté" $UI gone "Déjà achetés" 3
   $UI tap "Acheté : Tomates" >/dev/null; sleep 4
   expect "L5. section « Déjà achetés » apparue" $UI wait "Déjà achetés" 10
@@ -225,7 +227,8 @@ if want L; then
   shot cible-achete-en-bas
   $UI tap "Acheté : Tomates" >/dev/null; sleep 4
   expect "L6. décochée : section « Déjà achetés » retirée (vide)" $UI gone "Déjà achetés" 10
-  expect "L6b. Tomates revenue dans sa catégorie, à sa place (après Carottes)" $UI above "Acheté : Carottes" "Acheté : Tomates"
+  expect "L6b. Tomates revenue dans sa catégorie, à sa place habituelle (${ORDRE[*]})" $UI above "Acheté : ${ORDRE[0]}" "Acheté : ${ORDRE[1]}"
+  expect "L6b2. Tomates au-dessus de la catégorie suivante (Lait)" $UI above "Acheté : Tomates" "Acheté : Lait"
   expect "L6c. compteur actualisé : 0 sur 3" $UI has "0 sur 3 achetés"
   expect "L6d. serveur : de nouveau à acheter" test "$(sql "SELECT i.status FROM list_items i JOIN products p ON p.id=i.product_id JOIN lists l ON l.id=i.list_id JOIN families f ON f.id=l.family_id WHERE f.code='$FAMILY' AND l.status='active' AND p.name='Tomates'")" = to_buy
   shot cible-decoche-replace
@@ -241,9 +244,11 @@ if want D; then
   first_login adil 482913
   $UI wait "Ma liste" 25 >/dev/null
   tapt "Réglages"
-  expect "D1. « Se déconnecter » visible en bas des Réglages" $UI tap "Se déconnecter" --scroll
-  sleep 2
-  expect "D1b. distinct de « Réinitialiser la famille »" $UI has "Réinitialiser la famille"
+  adb shell input swipe 540 1700 540 600 300; sleep 1; adb shell input swipe 540 1700 540 600 300; sleep 1
+  expect "D1. « Se déconnecter » visible en bas des Réglages" $UI wait "Se déconnecter" 8
+  expect "D1b. distinct de « Réinitialiser la famille » (deux actions séparées, Se déconnecter au-dessus)" $UI above "Se déconnecter" "Réinitialiser la famille"
+  shot cible-reglages-bas
+  $UI tap "Se déconnecter" >/dev/null; sleep 2
   expect "D1c. confirmation demandée" $UI wait "Se déconnecter ?" 8
   shot cible-reglages-deconnexion
   $UI tap "Se déconnecter" --last >/dev/null; sleep 3
