@@ -18,7 +18,7 @@ export interface AuthContext {
 export const SESSION_DAYS = 90;
 const LOCK_AFTER = 5;
 
-async function createSession(c: pg.PoolClient, profileId: string): Promise<{ token: string; sessionId: string }> {
+export async function createSession(c: pg.PoolClient, profileId: string): Promise<{ token: string; sessionId: string }> {
   const token = newToken();
   const r = await c.query<{ id: string }>("INSERT INTO sessions (profile_id, token_hash) VALUES ($1, $2) RETURNING id", [
     profileId,
@@ -158,27 +158,12 @@ export async function setupFamily(db: Db, input: SetupInput): Promise<{ token: s
       [hashToken(input.installToken)],
     );
     if (!consumed.rows[0]) throw new HttpError(403, "invalid_install_token", "Jeton d'installation invalide ou déjà utilisé");
-    const code = generateFamilyCode();
-    const fam = await c.query<{ id: string }>("INSERT INTO families (code, name) VALUES ($1, $2) RETURNING id", [code, input.familyName]);
-    const familyId = fam.rows[0]!.id;
+    const { familyId, profileId, code } = await createFamilyRecords(c, {
+      familyName: input.familyName,
+      admin: { displayName: input.admin.displayName, login: input.admin.login, secretHash, city: input.admin.city ?? null, recoveryEmail: input.admin.recoveryEmail ?? null, emailVerified: false },
+      completed: !input.admin.recoveryEmail,
+    });
     await c.query("UPDATE install_tokens SET family_id = $2 WHERE id = $1", [consumed.rows[0].id, familyId]);
-    if (!input.admin.recoveryEmail) await c.query("UPDATE families SET setup_completed_at = now() WHERE id = $1", [familyId]);
-    const prof = await c.query<{ id: string }>(
-      `INSERT INTO profiles (family_id, display_name, login, role, secret_hash, is_primary, recovery_email, city)
-       VALUES ($1, $2, $3, 'admin', $4, true, $5, $6) RETURNING id`,
-      [familyId, input.admin.displayName, input.admin.login, secretHash, input.admin.recoveryEmail ? input.admin.recoveryEmail.trim().toLowerCase() : null, input.admin.city ?? null],
-    );
-    const profileId = prof.rows[0]!.id;
-    // Catalogue familial de départ : copie des 80 références génériques.
-    await c.query(
-      `INSERT INTO products (family_id, category, name, catalog_key, photo_asset_id, position, unit)
-       SELECT $1, category, name, key, photo_asset_id, position, unit FROM initial_catalog`,
-      [familyId],
-    );
-    await c.query("INSERT INTO audit_log (family_id, actor_profile_id, action, target_profile_id) VALUES ($1, $2, 'family.created', $2)", [
-      familyId,
-      profileId,
-    ]);
     const s = await createSession(c, profileId);
     return {
       token: s.token,
@@ -194,6 +179,40 @@ export async function setupFamily(db: Db, input: SetupInput): Promise<{ token: s
       },
     };
   });
+}
+
+/**
+ * Crée une famille, son administrateur principal et son catalogue de départ (dans la transaction de l'appelant).
+ * Partagé par l'installation (jeton) et la création autonome depuis l'application (adresse vérifiée par code).
+ * Le code famille est tiré au hasard et réessayé en cas de collision (contrainte d'unicité).
+ */
+export async function createFamilyRecords(
+  c: pg.PoolClient,
+  input: { familyName: string; admin: { displayName: string; login: string; secretHash: string; city: string | null; recoveryEmail: string | null; emailVerified: boolean }; completed: boolean },
+): Promise<{ familyId: string; profileId: string; code: string }> {
+  let code = "";
+  let familyId = "";
+  for (let i = 0; i < 6 && !familyId; i++) {
+    code = generateFamilyCode();
+    const fam = await c.query<{ id: string }>("INSERT INTO families (code, name) VALUES ($1, $2) ON CONFLICT (code) DO NOTHING RETURNING id", [code, input.familyName]);
+    familyId = fam.rows[0]?.id ?? "";
+  }
+  if (!familyId) throw new HttpError(503, "family_code_unavailable", "Création impossible pour le moment : réessayez");
+  if (input.completed) await c.query("UPDATE families SET setup_completed_at = now() WHERE id = $1", [familyId]);
+  const prof = await c.query<{ id: string }>(
+    `INSERT INTO profiles (family_id, display_name, login, role, secret_hash, is_primary, recovery_email, recovery_email_verified_at, city)
+     VALUES ($1, $2, $3, 'admin', $4, true, $5, CASE WHEN $6 THEN now() END, $7) RETURNING id`,
+    [familyId, input.admin.displayName, input.admin.login, input.admin.secretHash, input.admin.recoveryEmail ? input.admin.recoveryEmail.trim().toLowerCase() : null, input.admin.emailVerified, input.admin.city],
+  );
+  const profileId = prof.rows[0]!.id;
+  // Catalogue familial de départ : copie des 80 références génériques.
+  await c.query(
+    `INSERT INTO products (family_id, category, name, catalog_key, photo_asset_id, position, unit)
+     SELECT $1, category, name, key, photo_asset_id, position, unit FROM initial_catalog`,
+    [familyId],
+  );
+  await c.query("INSERT INTO audit_log (family_id, actor_profile_id, action, target_profile_id) VALUES ($1, $2, 'family.created', $2)", [familyId, profileId]);
+  return { familyId, profileId, code };
 }
 
 /** Registers the INSTALL_TOKEN environment variable as a one-shot install token (idempotent). */
