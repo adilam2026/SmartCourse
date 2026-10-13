@@ -10,7 +10,7 @@ UI="python3 $HERE/native-ui.py"
 mkdir -p "$OUT"; : > "$OUT/resultats.txt"
 FAILS=0
 ok()   { echo "PASS  $1" | tee -a "$OUT/resultats.txt"; }
-ko()   { echo "FAIL  $1" | tee -a "$OUT/resultats.txt"; FAILS=$((FAILS+1)); adb exec-out screencap -p > "$OUT/echec-$(echo "$1" | tr -c 'a-zA-Z0-9' '_' | cut -c1-40).png" || true; }
+ko()   { echo "FAIL  $1" | tee -a "$OUT/resultats.txt"; FAILS=$((FAILS+1)); local n; n=$(echo "$1" | tr -c 'a-zA-Z0-9' '_' | cut -c1-40); adb exec-out screencap -p > "$OUT/echec-$n.png" || true; adb shell uiautomator dump /sdcard/f.xml >/dev/null 2>&1; adb exec-out cat /sdcard/f.xml > "$OUT/echec-$n.xml" 2>/dev/null || true; }
 check() { if "$@" ; then :; fi; }
 expect() { local label=$1; shift; if "$@"; then ok "$label"; else ko "$label"; fi; }
 shot() { adb exec-out screencap -p > "$OUT/$1.png"; }
