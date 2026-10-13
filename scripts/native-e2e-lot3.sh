@@ -210,6 +210,15 @@ sleep 1; clear_field; adb shell input text "7,50"; hide_kb
 $UI tap "Enregistrer" >/dev/null; sleep 4
 expect "O6. serveur : prix de la famille enregistré (7.50)" test "$(sql "SELECT amount FROM family_prices fp JOIN products p ON p.id=fp.product_id JOIN families f ON f.id=fp.family_id WHERE f.code='$FAMILY' AND p.name='Carottes'")" = 7.50
 expect "O7. prix affiché dans la gestion des prix" $UI wait "7,50 DH" 10
+$UI tap "7,50 DH" >/dev/null; sleep 2
+$UI tap "Partager ce prix avec ma ville" --scroll >/dev/null; sleep 4
+expect "O8. prix partagé avec la ville (contribution enregistrée, sans nom de famille)" test "$(sql "SELECT count(*) FROM price_contributions WHERE city='Casablanca'")" = 1
+$UI tap "Rétablir le prix initial" --scroll >/dev/null; sleep 4
+expect "O9. « Rétablir le prix initial » : prix de la famille retiré côté serveur" test "$(sql "SELECT count(*) FROM family_prices fp JOIN products p ON p.id=fp.product_id JOIN families f ON f.id=fp.family_id WHERE f.code='$FAMILY' AND p.name='Carottes'")" = 0
+$UI tap "Synchroniser les prix de la ville" >/dev/null; sleep 3
+expect "O10. synchronisation par ville : fenêtre ouverte, aucune proposition tant qu'il manque des familles" $UI wait "Aucune nouvelle proposition" 15
+shot lot3-prix-synchronisation
+adb shell input keyevent KEYCODE_BACK; sleep 1
 
 # ═══ P. Statistiques ═══
 launch; $UI wait "Ma liste" 25 >/dev/null

@@ -81,7 +81,8 @@ class MainActivity : ComponentActivity() {
         // Recette seulement : exécute la vérification des notifications tout de suite (sans attendre Android), sans ouvrir l'application.
         if (BuildConfig.RECETTE_HOOKS && intent?.getBooleanExtra("poll", false) == true) {
             super.onCreate(savedInstanceState)
-            CoroutineScope(Dispatchers.IO).launch { pollOnce(applicationContext); runOnUiThread { finish() } }
+            android.util.Log.i("CoursesNotif", "déclenchement de la vérification (recette), nouvelle instance")
+            CoroutineScope(Dispatchers.IO).launch { val ok = pollOnce(applicationContext); android.util.Log.i("CoursesNotif", "vérification terminée, réussie=$ok"); runOnUiThread { finish() } }
             return
         }
         val splash = installSplashScreen()
@@ -106,6 +107,11 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        if (BuildConfig.RECETTE_HOOKS && intent.getBooleanExtra("poll", false)) {
+            android.util.Log.i("CoursesNotif", "déclenchement de la vérification (recette), instance existante")
+            CoroutineScope(Dispatchers.IO).launch { val ok = pollOnce(applicationContext); android.util.Log.i("CoursesNotif", "vérification terminée, réussie=$ok") }
+            return
+        }
         if (PendingInstall.accept(intent)) PendingInstall.server?.let { session?.setServer(it) }
     }
 

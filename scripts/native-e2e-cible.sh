@@ -131,7 +131,8 @@ if want I; then
   fill "Nom de la famille" "Famille Test"; fill "Votre prénom" "Test"; fill "Votre identifiant" "test"; fill "E-mail de récupération" "test@example.org"
   fill "Code d'accès (6" 135792; fill "Répétez le code" 135792; hide_kb
   $UI tap "Ville : " --scroll >/dev/null; sleep 2; fill "Rechercher une ville" "casablanca"; hide_kb; $UI tap "Casablanca" --last >/dev/null; sleep 2
-  $UI tap "Créer ma famille" --last --scroll >/dev/null; sleep 4
+  adb shell input swipe 540 1800 540 600 300; sleep 1; adb shell input swipe 540 1800 540 600 300; sleep 1
+  $UI tap "Créer ma famille" --last >/dev/null; sleep 4
   expect "I3. le SERVEUR refuse un jeton invalide (protection conservée)" $UI wait "n'est plus valable" 15
   expect "I3b. aucune famille créée" test "$(sql "SELECT count(*) FROM families WHERE name='Famille Test'")" = 0
 fi
