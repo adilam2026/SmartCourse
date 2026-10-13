@@ -93,7 +93,7 @@ fun AskAdminSheet(title: String, text: String, onDismiss: () -> Unit) {
 @Composable
 fun CreateFamilyForm(session: Session, onCreated: (familyCode: String, login: String) -> Unit) {
     val scope = rememberCoroutineScope()
-    var token by remember { mutableStateOf("") }
+    val token = PendingInstall.token
     var famName by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
     var login by remember { mutableStateOf("") }
@@ -119,8 +119,14 @@ fun CreateFamilyForm(session: Session, onCreated: (familyCode: String, login: St
         }
         return
     }
-    FormField(token, { token = it.trim() }, "Jeton d'installation (fourni par l'installateur)", leading = Icons.Rounded.Lock)
-    Spacer(Modifier.height(10.dp))
+    if (token == null) {
+        SCard(padding = PaddingValues(16.dp)) {
+            Text("Création d'une famille", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(6.dp))
+            Text("Pour créer une famille, ouvrez le lien d'installation envoyé par la personne qui a installé le serveur : il ouvre directement ce formulaire.", style = MaterialTheme.typography.bodyMedium)
+        }
+        return
+    }
     FormField(famName, { famName = it }, "Nom de la famille", leading = Icons.Rounded.Group)
     Spacer(Modifier.height(10.dp))
     SecondaryButton("Ville : ${city ?: "à choisir"}", { citySheet = true }, Modifier.fillMaxWidth(), height = 54.dp)
@@ -136,7 +142,7 @@ fun CreateFamilyForm(session: Session, onCreated: (familyCode: String, login: St
     FormField(code2, { code2 = it.filter { ch -> ch.isDigit() }.take(6) }, "Répétez le code d'accès", leading = Icons.Rounded.Lock, visual = PasswordVisualTransformation(), keyboard = KeyboardOptions(keyboardType = KeyboardType.NumberPassword))
     error?.let { Spacer(Modifier.height(8.dp)); Text(it, color = C.Danger, style = MaterialTheme.typography.bodyMedium) }
     Spacer(Modifier.height(16.dp))
-    val ready = token.length >= 16 && famName.isNotBlank() && name.isNotBlank() && login.isNotBlank() && city != null && email.contains("@") && code.length == 6
+    val ready = famName.isNotBlank() && name.isNotBlank() && login.isNotBlank() && city != null && email.contains("@") && code.length == 6
     PrimaryButton(if (busy) "Création…" else "Créer ma famille", {
         when {
             session.serverAddress == null -> error = "Définissez d'abord l'adresse du serveur."
@@ -145,16 +151,16 @@ fun CreateFamilyForm(session: Session, onCreated: (familyCode: String, login: St
                 busy = true; error = null
                 scope.launch {
                     val body = buildJsonObject {
-                        put("installToken", token); put("familyName", famName.trim())
+                        put("installToken", token!!); put("familyName", famName.trim())
                         put("admin", buildJsonObject {
                             put("displayName", name.trim()); put("login", login); put("secret", code); put("secretConfirm", code2)
                             put("recoveryEmail", email); put("city", city!!)
                         })
                     }
                     when (val r = session.api.callPublic("POST", "/api/setup/family", body)) {
-                        is Outcome.Ok -> created = (r.value["familyCode"]?.jsonPrimitive?.contentOrNull ?: "") to login
+                        is Outcome.Ok -> { created = (r.value["familyCode"]?.jsonPrimitive?.contentOrNull ?: "") to login; PendingInstall.clear() }
                         is Outcome.Fail -> error = when (r.code) {
-                            "invalid_install_token", "install_token_invalid" -> "Jeton d'installation refusé."
+                            "invalid_install_token" -> "Ce lien d'installation n'est plus valable (déjà utilisé ou refusé). Demandez-en un nouveau."
                             "already_installed", "setup_done" -> "Une famille est déjà installée avec ce jeton."
                             "login_taken" -> "Cet identifiant existe déjà."
                             "weak_secret" -> "Code d'accès trop simple (évitez 123456, 111111…)."

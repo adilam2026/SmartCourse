@@ -104,6 +104,8 @@ fun LoginScreen(session: Session?, onSimulated: (Role) -> Unit) {
     var famName by remember { mutableStateOf("") }
     var city by remember { mutableStateOf("Casablanca") }
     val focus = remember { Launch.once("keyboard") }
+    // Un lien d'installation ouvre directement « Créer ma famille » (aucun jeton à saisir).
+    LaunchedEffect(PendingInstall.token) { if (PendingInstall.token != null) { tab = 1; sub = 1 } }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         // En-tête : logo, accroche et photos de produits

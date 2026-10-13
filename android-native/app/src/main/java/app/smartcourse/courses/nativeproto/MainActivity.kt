@@ -1,5 +1,6 @@
 package app.smartcourse.courses.nativeproto
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -94,11 +95,18 @@ class MainActivity : ComponentActivity() {
         val storage = EncryptedStorage(applicationContext)
         val s = Session(storage, ApiClient(storage), scope)
         session = s
+        if (PendingInstall.accept(intent)) PendingInstall.server?.let { s.setServer(it) }
         val demoMode = Launch.str("screen") != null || Launch.str("path") != null || Launch.flag("hub")
         if (!demoMode) s.start()
         splash.setKeepOnScreenCondition { !demoMode && s.state == AuthState.Booting }
         val loader = ImageLoader.Builder(applicationContext).okHttpClient(s.api.imageClient()).crossfade(true).build()
         setContent { CoursesTheme { CompositionLocalProvider(LocalImageLoader provides loader) { Root(s, demoMode) } } }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (PendingInstall.accept(intent)) PendingInstall.server?.let { session?.setServer(it) }
     }
 
     override fun onStart() { super.onStart(); session?.verify(); LiveHolder.current?.onForeground() }
