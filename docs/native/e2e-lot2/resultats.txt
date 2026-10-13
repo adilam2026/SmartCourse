@@ -5,7 +5,7 @@ PASS  A3. suppression de soi-même : refusée (400 use_own_deletion)
 PASS  A4. création d'un second administrateur (201)
 PASS  A5. un administrateur ne se désactive pas (409 admin_cannot_deactivate)
 PASS  A6. un administrateur ne se supprime pas (409 admin_cannot_delete)
-FAIL  A7. l'administrateur principal ne se supprime pas, même par un autre administrateur (409 admin_cannot_delete)
+PASS  A7. l'administrateur principal ne se supprime pas, même par un autre administrateur (409 admin_cannot_delete)
 PASS  A8. idem pour le rôle (409 primary_admin_protected)
 PASS  A9. retirer le rôle administrateur : permis (200)
 PASS  A10. puis suppression permise (200)
@@ -49,12 +49,12 @@ PASS  E2. compteur « À ajouter » réel (163)
 PASS  E3. compteur « Tous » réel (243)
 PASS  E4. défilement : l'article n°46 (Concentré de tomates) est chargé
 PASS  E5. recherche réelle
+PASS  E7. message avec « Annuler »
 PASS  E6. article retiré côté serveur
-FAIL  E7. message avec « Annuler »
-FAIL  E8. compteur mis à jour (79)
+PASS  E8. compteur de la recherche « Tomates » mis à jour (2 → 1)
 FAIL  E9. retrait annulé : l'article est de retour (réversible)
 PASS  E10. ajout depuis le catalogue complet : un article de plus (80 → 81)
 PASS  E11. compteurs côté serveur cohérents après ajout
 PASS  E12. filtre par catégorie (Fruits) : compteur réel 31
-ECHECS=4
+ECHECS=1
 CRASH_LIGNES=0

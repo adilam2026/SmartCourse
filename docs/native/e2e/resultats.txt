@@ -5,7 +5,7 @@ PASS  2a. serveur injoignable : message clair
 PASS  2b. serveur valide enregistré
 PASS  3a. mauvais code d'accès : message d'erreur
 PASS  3b. bon code : liste de l'administrateur
-PASS  3c. bandeau : connexion réelle
+PASS  3c. bandeau : parties réelles annoncées
 PASS  4a. compte : nom du profil
 PASS  4b. compte : rôle réel
 PASS  4c. compte : famille réelle
