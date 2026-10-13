@@ -78,6 +78,15 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         // Paramètres de lancement : réservés au build de recette (captures automatiques d'écrans simulés).
         Launch.extras = if (BuildConfig.RECETTE_HOOKS) intent?.extras else null
+        // Recette seulement : confie une vérification à WorkManager (même chemin que la tâche périodique, exécutée en arrière-plan).
+        // Une tâche périodique ne peut pas être avancée par Android : on passe donc par une tâche unique, avec la même classe PollWorker.
+        if (BuildConfig.RECETTE_HOOKS && intent?.getBooleanExtra("pollwork", false) == true) {
+            super.onCreate(savedInstanceState)
+            androidx.work.WorkManager.getInstance(applicationContext).enqueue(androidx.work.OneTimeWorkRequestBuilder<PollWorker>().build())
+            android.util.Log.i("CoursesNotif", "tâche unique confiée à WorkManager (recette)")
+            finish()
+            return
+        }
         // Recette seulement : exécute la vérification des notifications tout de suite (sans attendre Android), sans ouvrir l'application.
         if (BuildConfig.RECETTE_HOOKS && intent?.getBooleanExtra("poll", false) == true) {
             super.onCreate(savedInstanceState)

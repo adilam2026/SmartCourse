@@ -136,9 +136,10 @@ fi
 if want RW; then
   echo "═══ Cas RW : notification — tâche WorkManager réellement exécutée en arrière-plan ═══" | tee -a "$OUT/resultats.txt"
   r_prepare RW
-  JOB=$(adb shell dumpsys jobscheduler | tr -d '\r' | grep -oE "#u0a[0-9]+/[0-9]+: [0-9a-f]+ $PKG" | head -1 | sed -E 's#.*/([0-9]+):.*#\1#')
-  echo "tâche Android n°${JOB:-introuvable}" | tee -a "$OUT/resultats.txt"
-  adb shell cmd jobscheduler run -f -u 0 $PKG "${JOB:-0}" 2>&1 | tee -a "$OUT/resultats.txt"; sleep 15
+  # La tâche périodique elle-même est programmée (RW-1b) mais Android ne permet pas de l'avancer : la même classe PollWorker
+  # est confiée à WorkManager en tâche unique, application fermée, puis exécutée par Android en arrière-plan.
+  adb shell am start -S -n "$PKG/.MainActivity" --ez pollwork true >/dev/null 2>&1; sleep 3
+  adb shell input keyevent KEYCODE_HOME; sleep 25
   expect "RW-4w. tâche WorkManager exécutée (et non le déclenchement de recette)" bash -c "adb logcat -d | grep -q \"tâche d'arrière-plan (WorkManager) exécutée\""
   r_check RW
 fi
