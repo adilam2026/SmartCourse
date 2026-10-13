@@ -67,7 +67,7 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
     val scopeKey = "${me.familyId.ifEmpty { "f" }}|${me.id}"
     val engine = ListEngine(session.api, kv, scopeKey)
     var online by mutableStateOf(true); private set
-    private var catalog: List<CatProduct> = emptyList()
+    private var catalog: List<CatProduct> by mutableStateOf(emptyList())
     val catalogProducts: List<CatProduct> get() = catalog
     private var catalogRevLoaded = -1L
     private var started = false

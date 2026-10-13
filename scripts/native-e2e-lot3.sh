@@ -136,16 +136,16 @@ expect "L4. serveur : demande reçue une seule fois (« $(item Oignons) »)" tes
 
 # ═══ M. Liste terminée pendant l'attente : rien n'est ajouté à l'archive, « Reprendre » ═══
 tapt "Choisir des articles"
-fill "Rechercher un produit" "Persil"; hide_kb
+fill "Rechercher un produit" "Carottes"; hide_kb
 docker stop sc-recette-app >/dev/null
-$UI tap "Persil" --last >/dev/null; sleep 2
+$UI tap "Carottes" --last >/dev/null; sleep 2
 $UI tap "Terminer ma sélection" >/dev/null; sleep 5
 $UI wait "Envoi en attente" 15 >/dev/null
 ADIL=$(sql "SELECT id FROM profiles WHERE login='adil'")
 sql "UPDATE lists SET status='archived', closed_by='$ADIL', closed_at=now() WHERE id='$ACTIVE'" >/dev/null
 docker start sc-recette-app >/dev/null; server_wait
 expect "M1. liste terminée entre-temps : la demande est refusée proprement" $UI gone "Envoi en attente" 60
-expect "M2. serveur : rien n'a été ajouté à la liste archivée" test "$(sql "SELECT count(*) FROM list_items i JOIN products p ON p.id=i.product_id WHERE i.list_id='$ACTIVE' AND p.name='Persil'")" = 0
+expect "M2. serveur : rien n'a été ajouté à la liste archivée" test "$(sql "SELECT count(*) FROM list_items i JOIN products p ON p.id=i.product_id WHERE i.list_id='$ACTIVE' AND p.name='Carottes'")" = 0
 tapt "Choisir"
 expect "M3. « Reprendre » proposé pour les articles gardés" $UI wait "Reprendre" 20
 shot lot3-reprendre
@@ -153,12 +153,12 @@ $UI tap "Reprendre" >/dev/null; sleep 2
 expect "M4. article repris dans la sélection" $UI wait "Terminer ma sélection (1)" 10
 $UI tap "Terminer ma sélection" >/dev/null; sleep 5
 ACTIVE2=$(sql "SELECT l.id FROM lists l JOIN families f ON f.id=l.family_id WHERE f.code='$FAMILY' AND l.status='active'")
-expect "M5. serveur : une nouvelle liste en cours contient Persil" test "$(sql "SELECT count(*) FROM list_items i JOIN products p ON p.id=i.product_id WHERE i.list_id='$ACTIVE2' AND p.name='Persil'")" = 1
+expect "M5. serveur : une nouvelle liste en cours contient Carottes" test "$(sql "SELECT count(*) FROM list_items i JOIN products p ON p.id=i.product_id WHERE i.list_id='$ACTIVE2' AND p.name='Carottes'")" = 1
 
 # ═══ N. Brouillons isolés par profil ═══
 tapt "Choisir"
-fill "Rechercher un produit" "Carottes"; hide_kb
-$UI tap "Carottes" --last >/dev/null; sleep 2
+fill "Rechercher un produit" "Tomates"; hide_kb
+$UI tap "Tomates" --last >/dev/null; sleep 2
 expect "N1. brouillon du personnel" $UI wait "Terminer ma sélection (1)" 8
 launch
 logout
@@ -222,12 +222,13 @@ expect "Q6. tâche périodique programmée par Android" bash -c "adb shell dumps
 
 # ═══ R. Notification réelle : une demande d'un autre profil, application en arrière-plan ═══
 launch; $UI wait "Ma liste" 25 >/dev/null; sleep 8
-adb shell input keyevent KEYCODE_HOME; sleep 2
+adb shell input keyevent KEYCODE_HOME; sleep 8
 login_api marie 573918
 api GET /api/catalog >/dev/null; PID=$(jq -r '[.categories[].products[] | select(.name=="Lait")][0].id' /tmp/api.out)
 api POST /api/lists/active/ops -d "{\"ops\":[{\"opId\":\"$(cat /proc/sys/kernel/random/uuid)\",\"type\":\"add\",\"productId\":\"$PID\",\"quantity\":1}]}" >/dev/null
 JOB=$(adb shell dumpsys jobscheduler | grep -E "JOB #.*$PKG" | head -1 | sed -E 's/.*#[^/]*\/([0-9]+).*/\1/')
-adb shell cmd jobscheduler run -f $PKG "${JOB:-1}" >/dev/null 2>&1; sleep 12
+echo "tâche WorkManager n°${JOB:-?}" | tee -a "$OUT/resultats.txt"
+sleep 3; adb shell cmd jobscheduler run -u 0 -f $PKG "${JOB:-1}" 2>&1 | tee -a "$OUT/resultats.txt"; sleep 12
 echo "--- diagnostic notification ---" | tee -a "$OUT/resultats.txt"
 adb shell dumpsys jobscheduler | grep -B1 -A6 "$PKG" | head -40 | tee -a "$OUT/resultats.txt"
 adb logcat -d | grep -E "CoursesData|WM-|PollWorker|SystemJobService" | tail -25 | tee -a "$OUT/resultats.txt"
