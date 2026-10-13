@@ -6,6 +6,11 @@ name: Android natif — version finale (tests, APK release signé)
 # Aucun déploiement, aucune publication Google Play.
 on:
   workflow_dispatch:
+    inputs:
+      livrer:
+        description: "Construire et publier l'APK final signé (sinon : tests seulement)"
+        type: boolean
+        default: false
   push:
     branches: [claude/android-native]
     paths: ['android-native/**', 'scripts/native-*', '.github/workflows/native-final.yml']
@@ -78,7 +83,7 @@ jobs:
   release:
     needs: test-final
     # APK livré : uniquement sur lancement manuel (jamais automatiquement à l'envoi d'un commit).
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && inputs.livrer
     runs-on: ubuntu-latest
     timeout-minutes: 40
     permissions: { contents: write }

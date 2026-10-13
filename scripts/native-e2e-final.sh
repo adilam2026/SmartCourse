@@ -55,20 +55,21 @@ expect "C3b. double appui : un seul e-mail envoyé ($(mails))" test "$(mails)" =
 expect "C3c. double appui : une seule demande enregistrée" test "$(sql "SELECT count(*) FROM family_signups WHERE email='$NEWMAIL'")" = 1
 expect "C3d. rien n'est créé avant la vérification" test "$(sql "SELECT count(*) FROM families")" = "$FAM_BEFORE"
 shot final-c2-code
-fill "Code reçu par e-mail" 000000; hide_kb
-[ "$(lastcode)" = 000000 ] && fill "Code reçu par e-mail" 111111 && hide_kb
+# Le libellé du champ disparaît dès qu'il est rempli : on le retrouve ensuite par son contenu courant ($CUR).
+WRONG=000000; [ "$(lastcode)" = 000000 ] && WRONG=111111
+fill "Code reçu par e-mail" "$WRONG"; hide_kb; CUR=$WRONG
 $UI tap "Créer ma famille" --last >/dev/null; sleep 3
 expect "C4. code faux refusé avec un message clair" $UI wait "Code incorrect" 10
 # Code expiré (30 minutes) : nouveau code SANS ressaisir les informations
 sql "UPDATE family_signups SET expires_at = now() - interval '1 minute', last_sent_at = now() - interval '31 minutes' WHERE email='$NEWMAIL'" >/dev/null
-fill "Code reçu par e-mail" "$(lastcode)"; hide_kb
+C1CODE=$(lastcode); fill "$CUR" "$C1CODE"; hide_kb; CUR=$C1CODE
 $UI tap "Créer ma famille" --last >/dev/null; sleep 3
 expect "C4b. code expiré : message clair, proposition d'un nouveau code" bash -c "$UI wait 'Ce code a expiré' 10 && $UI has 'Recevoir un nouveau code' && ! $UI has 'Nom de la famille'"
 shot final-c2b-code-expire
 for _ in $(seq 1 40); do $UI enabled "Recevoir un nouveau code" && break; sleep 2; done
 $UI tap "Recevoir un nouveau code" >/dev/null; sleep 5
 expect "C4c. nouveau code envoyé ($(mails) e-mails au total)" test "$(mails)" = 2
-fill "Code reçu par e-mail" "$(lastcode)"; hide_kb
+fill "Code reçu par e-mail" "$(lastcode)"; hide_kb   # champ vidé par le renvoi : libellé de nouveau visible
 $UI tap "Créer ma famille" --last >/dev/null; sleep 6
 expect "C5. famille créée et utilisateur connecté : code famille affiché" $UI wait "Votre famille est créée" 20
 NEWCODE=$(sql "SELECT f.code FROM families f JOIN profiles p ON p.family_id=f.id WHERE p.recovery_email='$NEWMAIL'")
@@ -87,7 +88,9 @@ login_api adil 482913
 S=$(curl -s -o /tmp/api.out -w '%{http_code}' -X POST "$BASE/api/signup/start" -H 'content-type: application/json' -d "{\"requestId\":\"$(cat /proc/sys/kernel/random/uuid)\",\"familyName\":\"Doublon\",\"displayName\":\"K\",\"login\":\"k2\",\"city\":\"Casablanca\",\"email\":\"$NEWMAIL\",\"secret\":\"274915\",\"secretConfirm\":\"274915\"}")
 expect "C9. doublon : la même adresse ne crée pas une seconde famille ($S $(jq -r .error /tmp/api.out))" test "$S" = 409 -a "$(jq -r .error /tmp/api.out)" = email_in_use
 logout
-fill "${PREV_FAMILY:-Code famille}" "$NEWCODE"; fill "${PREV_LOGIN:-Identifiant}" "$NEWLOGIN"; fill "Code d'accès" 274915; hide_kb
+# Après déconnexion, le formulaire est déjà rempli avec le code famille et l'identifiant du dernier profil : seul le code d'accès est saisi.
+expect "C10. formulaire de connexion prérempli avec le code famille généré" bash -c "$UI has '$NEWCODE' && $UI has '$NEWLOGIN'"
+fill "Code d'accès" 274915; hide_kb
 $UI tap "Se connecter" --last >/dev/null; sleep 4; PREV_FAMILY="$NEWCODE"; PREV_LOGIN="$NEWLOGIN"
 expect "C10b. connecté à la nouvelle famille avec ses accès" $UI wait "Ma liste" 20
 logout
