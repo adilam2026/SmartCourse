@@ -42,7 +42,7 @@ fun AdminListScreen(nav: (String) -> Unit) {
     val total = demo.lines.size
     val bought = demo.boughtCount
     val all = total > 0 && bought == total
-    val groups = demo.lines.groupBy { demo.byId[it.productId]!!.category }
+    val groups = demo.lines.groupBy { demo.byId[it.productId]?.category ?: "" }
 
     Column(Modifier.fillMaxSize()) {
         TopBar("Ma liste", demo.listDate, actions = {
@@ -176,11 +176,15 @@ fun AdminListScreen(nav: (String) -> Unit) {
     editId?.let { id ->
         val p = demo.byId[id]
         val line = demo.lines.firstOrNull { it.productId == id }
-        if (p != null && line != null) QuantitySheet(
-            p, line.qty, demo.showPrices, demo.priceLabel(p, line), focusInput = false,
-            onDismiss = { editId = null }, onConfirm = { demo.setLineQty(id, it); editId = null },
-            onRemove = { demo.removeLine(id); editId = null }, removeLabel = "Retirer de la liste", confirmLabel = "Mettre à jour",
-        ) else editId = null
+        if (p == null || line == null) {
+            editId = null
+        } else {
+            QuantitySheet(
+                p, line.qty, demo.showPrices, demo.priceLabel(p, line), focusInput = false,
+                onDismiss = { editId = null }, onConfirm = { demo.setLineQty(id, it); editId = null },
+                onRemove = { demo.removeLine(id); editId = null }, removeLabel = "Retirer de la liste", confirmLabel = "Mettre à jour",
+            )
+        }
     }
     if (favs && demo.live) FavoritesSheet({ favs = false })
     else if (favs) {

@@ -34,6 +34,7 @@ class ListEngineTest {
     private fun list(id: String = "L1", status: String = "active", vararg items: String) = """{"id":"$id","status":"$status","createdAt":"2026-05-12T07:00:00Z","closedAt":null,"items":[${items.joinToString(",")}]}"""
     private fun active(l: String?) = """{"list":${l ?: "null"},"catalogRev":3,"prefsRev":1}"""
     private fun json(body: String, code: Int = 200) = server.enqueue(MockResponse().setResponseCode(code).setBody(body))
+    private fun nextRequest() = server.takeRequest(10, java.util.concurrent.TimeUnit.SECONDS) ?: error("aucune requête reçue")
     private fun down() = server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST))
 
     @Test fun refresh_parsesListAndCachesIt() = runBlocking {
@@ -61,15 +62,15 @@ class ListEngineTest {
         down()
         val r1 = e.flush()
         assertTrue(r1.networkDown); assertEquals(1, e.pendingOps); assertFalse(e.online)
-        server.takeRequest() // GET /api/lists/active
-        val first = server.takeRequest(); val firstBody = first.body.readUtf8()
+        nextRequest() // GET /api/lists/active
+        val first = nextRequest(); val firstBody = first.body.readUtf8()
         // Restart: the batch survives on the disk
         val e2 = engine(); assertEquals(1, e2.pendingOps)
 
         json("""{"results":[{"opId":"00000000-0000-4000-8000-000000000001","status":"applied"}],"list":${list("L1", "active", item("i1", "tom", "Tomates"), item("i3", "oig", "Oignons", q = 1.5))}}""")
         val r2 = e2.flush()
         assertEquals(1, r2.sent); assertEquals(0, e2.pendingOps); assertTrue(e2.online)
-        val second = server.takeRequest()
+        val second = nextRequest()
         assertEquals("/api/lists/L1/ops", second.path)
         assertEquals("Same operation ids and same batch on the second try", firstBody, second.body.readUtf8())
         assertEquals(2, e2.effective().size); assertFalse(e2.effective().any { it.pending })
@@ -98,8 +99,8 @@ class ListEngineTest {
         val r = e.flush()
         assertEquals(0, e.pendingOps); assertEquals(1, e.orphans.size); assertEquals(1, r.orphaned)
         assertEquals(2, server.requestCount) // lecture + un seul envoi : aucune création de liste
-        server.takeRequest()
-        assertEquals("/api/lists/L1/ops", server.takeRequest().path)
+        nextRequest()
+        assertEquals("/api/lists/L1/ops", nextRequest().path)
     }
 
     @Test fun noActiveList_usesActiveOpsEndpoint() = runBlocking {
@@ -108,8 +109,8 @@ class ListEngineTest {
         e.enqueue(listOf(e.op("add", productId = "oig", quantity = 1.0, name = "Oignons")))
         json("""{"results":[{"opId":"x","status":"applied"}],"list":${list("L9", "active", item("i9", "oig", "Oignons"))}}""")
         e.flush()
-        server.takeRequest()
-        assertEquals("/api/lists/active/ops", server.takeRequest().path)
+        nextRequest()
+        assertEquals("/api/lists/active/ops", nextRequest().path)
         assertEquals("L9", e.list?.id)
     }
 
