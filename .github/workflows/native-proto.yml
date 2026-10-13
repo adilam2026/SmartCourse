@@ -193,6 +193,7 @@ jobs:
           if [ -d native-e2e/native-e2e ]; then rm -rf docs/native/e2e && mkdir -p docs/native/e2e && cp native-e2e/native-e2e/* docs/native/e2e/; fi
           if [ -d native-e2e/native-e2e-lot3 ]; then rm -rf docs/native/e2e-lot3 && mkdir -p docs/native/e2e-lot3 && cp native-e2e/native-e2e-lot3/* docs/native/e2e-lot3/; fi
           if [ -d native-e2e/native-e2e-lot2 ]; then rm -rf docs/native/e2e-lot2 && mkdir -p docs/native/e2e-lot2 && cp native-e2e/native-e2e-lot2/* docs/native/e2e-lot2/; fi
+          if [ -d native-e2e/native-e2e-cible ]; then rm -rf docs/native/e2e-cible && mkdir -p docs/native/e2e-cible && cp native-e2e/native-e2e-cible/* docs/native/e2e-cible/; fi
           mkdir -p docs/native/preuves && cp dist/badging.txt dist/webview.txt dist/dependances.txt docs/native/preuves/
           git config user.name "github-actions"; git config user.email "actions@users.noreply.github.com"
           git add docs/native

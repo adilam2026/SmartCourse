@@ -42,19 +42,25 @@ fun AdminListScreen(nav: (String) -> Unit) {
     val total = demo.lines.size
     val bought = demo.boughtCount
     val all = total > 0 && bought == total
-    val groups = demo.lines.groupBy { demo.byId[it.productId]?.category ?: "" }
+    // Aucune liste en cours (≠ liste en cours vide) : rien n'est créé en consultant l'écran.
+    val noList = demo.live && demo.listLoaded && !demo.hasList && total == 0
+    val canClose = !demo.live || demo.hasList
+    val canShare = total > bought
+    // À acheter, groupés par catégorie ; les articles achetés passent dans « Déjà achetés », après toutes les catégories.
+    val groups = demo.lines.filter { !it.bought }.groupBy { demo.byId[it.productId]?.category ?: "" }
+    val boughtLines = demo.lines.filter { it.bought }
 
     Column(Modifier.fillMaxSize()) {
-        TopBar("Ma liste", demo.listDate, actions = {
-            Box {
+        TopBar("Ma liste", if (noList) "" else demo.listDate, actions = {
+            if (canClose || canShare) Box {
                 IconButton({ menu = true }) { Icon(Icons.Rounded.MoreVert, "Plus d'actions", tint = C.Ink) }
                 DropdownMenu(menu, { menu = false }, containerColor = Color.White, shape = RoundedCornerShape(16.dp)) {
-                    DropdownMenuItem(
+                    if (canClose) DropdownMenuItem(
                         text = { Text("Clôturer la liste") },
                         leadingIcon = { Icon(Icons.Rounded.Check, null, tint = C.Ink) },
                         onClick = { menu = false; confirmClose = true },
                     )
-                    DropdownMenuItem(
+                    if (canShare) DropdownMenuItem(
                         text = { Text("Partager la liste") },
                         leadingIcon = { Icon(Icons.Rounded.Share, null, tint = C.Ink) },
                         onClick = { menu = false; if (demo.live) shareList(ctx, demo) else demo.simulated("partage de la liste") },
@@ -88,7 +94,7 @@ fun AdminListScreen(nav: (String) -> Unit) {
                 }
             }
             item {
-                if (all) {
+                if (all && canClose) {
                     SCard(padding = PaddingValues(14.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             Box(Modifier.size(36.dp).clip(CircleShape).background(C.TealSoft), contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Check, null, tint = C.TealDark) }
@@ -99,7 +105,7 @@ fun AdminListScreen(nav: (String) -> Unit) {
                     }
                 }
             }
-            item {
+            if (!noList && demo.listLoaded) item {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     PrimaryButton("Ajouter des articles", { nav("v04") }, Modifier.weight(1.5f), leading = Icons.Rounded.Add)
                     SecondaryButton("Favoris", { favs = true }, Modifier.weight(1f), leading = Icons.Rounded.Star)
@@ -108,11 +114,12 @@ fun AdminListScreen(nav: (String) -> Unit) {
             if (total == 0) item {
                 Column(Modifier.fillMaxWidth().padding(top = 36.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     if (demo.live && !demo.listLoaded) Text("Chargement de la liste…", style = MaterialTheme.typography.bodyMedium, color = C.Muted)
-                    else if (demo.live && !demo.hasList) {
-                        Text("Aucune liste en cours.", style = MaterialTheme.typography.titleSmall)
-                        Text("Créez la liste de vos prochaines courses.", style = MaterialTheme.typography.bodySmall)
+                    else if (noList) {
+                        Text("Aucune liste en cours", style = MaterialTheme.typography.titleSmall)
+                        Text("Choisissez les articles de vos prochaines courses.", style = MaterialTheme.typography.bodySmall)
                         Spacer(Modifier.height(14.dp))
-                        PrimaryButton("Créer une liste", { demo.data?.createList() }, leading = Icons.Rounded.Add)
+                        // Ouvre le parcours de sélection : la liste n'est créée qu'à la validation des articles.
+                        PrimaryButton("Créer une liste", { nav("v04") }, leading = Icons.Rounded.Add)
                     } else {
                         Text("La liste est vide.", style = MaterialTheme.typography.titleSmall)
                         Text("Ajoutez des articles pour commencer.", style = MaterialTheme.typography.bodySmall)
@@ -130,31 +137,20 @@ fun AdminListScreen(nav: (String) -> Unit) {
                         Icon(if (closed) Icons.Rounded.KeyboardArrowDown else Icons.Rounded.KeyboardArrowUp, if (closed) "Déplier" else "Replier", tint = C.Muted)
                     }
                 }
-                if (!closed) item(key = "c-$cat") {
-                    SCard {
-                        lines.forEachIndexed { i, l ->
-                            val p = demo.byId[l.productId] ?: return@forEachIndexed
-                            if (i > 0) HorizontalDivider(color = C.Line.copy(alpha = 0.6f), modifier = Modifier.padding(start = 66.dp))
-                            Row(
-                                Modifier.fillMaxWidth().then(if (!l.bought) Modifier.clickable { editId = p.id } else Modifier).padding(horizontal = 12.dp, vertical = 8.dp).heightIn(min = 48.dp),
-                                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            ) {
-                                ProductPhoto(p, 44.dp, radius = 10.dp)
-                                Column(Modifier.weight(1f).alpha(if (l.bought) 0.55f else 1f)) {
-                                    Text(p.name, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                    val price = demo.priceLabel(p, l)
-                                    Text(
-                                        qtyText(p, l.qty) + if (demo.showPrices && price != null) "  ·  $price" else "",
-                                        style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                    )
-                                    if (l.pending) Text("En attente d'envoi", style = MaterialTheme.typography.labelSmall, color = C.Amber)
-                                    else if (l.bought && l.buyer != null) Text("Acheté par ${l.buyer}" + (l.boughtAt?.let { " · $it" } ?: ""), style = MaterialTheme.typography.labelSmall, color = C.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                }
-                                CheckBox(l.bought, { demo.setBought(p.id, it) }, label = "Acheté : ${p.name}")
-                            }
-                        }
+                if (!closed) item(key = "c-$cat") { AdminLines(lines, demo) { editId = it } }
+            }
+            if (boughtLines.isNotEmpty()) {
+                val closed = collapsed[BOUGHT] == true
+                item(key = "h-$BOUGHT") {
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { collapsed[BOUGHT] = !closed }.padding(horizontal = 4.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("Déjà achetés (${boughtLines.size})", style = MaterialTheme.typography.titleMedium, color = C.Muted, modifier = Modifier.weight(1f))
+                        Icon(if (closed) Icons.Rounded.KeyboardArrowDown else Icons.Rounded.KeyboardArrowUp, if (closed) "Déplier" else "Replier", tint = C.Muted)
                     }
                 }
+                if (!closed) item(key = "c-$BOUGHT") { AdminLines(boughtLines, demo) { editId = it } }
             }
         }
     }
@@ -203,6 +199,36 @@ fun AdminListScreen(nav: (String) -> Unit) {
     }
 }
 
+private const val BOUGHT = "\u0000achetes"
+
+/** Lignes d'une carte (catégorie ou « Déjà achetés ») : photo, nom, quantité, case Acheté. */
+@Composable
+private fun AdminLines(lines: List<Line>, demo: Demo, onEdit: (String) -> Unit) {
+    SCard {
+        lines.forEachIndexed { i, l ->
+            val p = demo.byId[l.productId] ?: return@forEachIndexed
+            if (i > 0) HorizontalDivider(color = C.Line.copy(alpha = 0.6f), modifier = Modifier.padding(start = 66.dp))
+            Row(
+                Modifier.fillMaxWidth().then(if (!l.bought) Modifier.clickable { onEdit(p.id) } else Modifier).padding(horizontal = 12.dp, vertical = 8.dp).heightIn(min = 48.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                ProductPhoto(p, 44.dp, radius = 10.dp)
+                Column(Modifier.weight(1f).alpha(if (l.bought) 0.55f else 1f)) {
+                    Text(p.name, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    val price = demo.priceLabel(p, l)
+                    Text(
+                        qtyText(p, l.qty) + if (demo.showPrices && price != null) "  ·  $price" else "",
+                        style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    )
+                    if (l.pending) Text("En attente d'envoi", style = MaterialTheme.typography.labelSmall, color = C.Amber)
+                    else if (l.bought && l.buyer != null) Text("Acheté par ${l.buyer}" + (l.boughtAt?.let { " · $it" } ?: ""), style = MaterialTheme.typography.labelSmall, color = C.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                CheckBox(l.bought, { demo.setBought(p.id, it) }, label = "Acheté : ${p.name}")
+            }
+        }
+    }
+}
+
 /* ───────────── V03 — Liste personnel ───────────── */
 
 @Composable
@@ -211,19 +237,24 @@ fun StaffListScreen(nav: (String) -> Unit) {
     var filter by remember { mutableIntStateOf(when (Launch.str("filter")) { "todo" -> 1; "done" -> 2; else -> 0 }) }
     val total = demo.lines.size
     val bought = demo.boughtCount
-    val shown = demo.lines.filter { when (filter) { 1 -> !it.bought; 2 -> it.bought; else -> true } }
+    val noList = demo.live && demo.listLoaded && !demo.hasList && total == 0
+    // À acheter groupés par catégorie, puis « Déjà achetés » en bas (ordre habituel conservé : décoché, l'article reprend sa place).
+    val todo = if (filter == 2) emptyList() else demo.lines.filter { !it.bought }.groupBy { demo.byId[it.productId]?.category ?: "" }
+    val done = if (filter == 1) emptyList() else demo.lines.filter { it.bought }
+    val shownEmpty = todo.isEmpty() && done.isEmpty()
 
     Column(Modifier.fillMaxSize()) {
-        TopBar("Liste du jour", demo.listDate)
+        TopBar("Liste du jour", if (noList) "" else demo.listDate)
         if (total == 0) {
             Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                 Box(Modifier.size(88.dp).clip(CircleShape).background(C.TealSoft), contentAlignment = Alignment.Center) {
                     Icon(Icons.Rounded.ShoppingBasket, null, tint = C.TealDark, modifier = Modifier.size(44.dp))
                 }
                 Spacer(Modifier.height(18.dp))
-                Text("Aucun article pour le moment", style = MaterialTheme.typography.titleLarge)
+                // Le personnel ne crée ni ne clôture de liste : ses demandes ouvrent la liste du jour (droit inchangé).
+                Text(if (noList) "Aucune liste en cours" else "Aucun article pour le moment", style = MaterialTheme.typography.titleLarge)
                 Spacer(Modifier.height(6.dp))
-                Text("Choisissez les articles à ajouter à la liste.", style = MaterialTheme.typography.bodyMedium, color = C.Muted)
+                Text(if (noList) "Choisissez les articles nécessaires : ils seront envoyés à la famille." else "Choisissez les articles à ajouter à la liste.", style = MaterialTheme.typography.bodyMedium, color = C.Muted)
                 Spacer(Modifier.height(20.dp))
                 PrimaryButton("Choisir des articles", { nav("v04") }, Modifier.fillMaxWidth())
             }
@@ -244,44 +275,53 @@ fun StaffListScreen(nav: (String) -> Unit) {
                         listOf("Tous", "À acheter", "Achetés").forEachIndexed { i, t -> ToggleChip(t, filter == i, { filter = i }) }
                     }
                 }
-                if (shown.isEmpty()) item {
+                if (shownEmpty) item {
                     Text(if (filter == 1) "Tout est acheté." else "Rien n'est encore acheté.", style = MaterialTheme.typography.bodyMedium, color = C.Muted, modifier = Modifier.padding(top = 16.dp))
                 }
-                items(shown, key = { it.productId }) { l ->
-                    val p = demo.byId[l.productId] ?: return@items
-                    SCard(padding = PaddingValues(12.dp)) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                            ProductPhoto(p, 72.dp, radius = 16.dp, modifier = Modifier.alpha(if (l.bought) 0.6f else 1f))
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text(p.name, style = MaterialTheme.typography.titleMedium.copy(fontSize = 17.sp), maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Pill(qtyText(p, l.qty), C.Ink, Color(0xFFE8F0F7))
-                                    if (l.bought) Pill("Acheté", C.TealDark, C.TealSoft) else if (l.pending) Pill("En attente d'envoi", C.Amber, C.AmberSoft) else Pill("À acheter", C.Amber, C.AmberSoft)
-                                }
-                                val price = demo.priceLabel(p, l)
-                                if (demo.showPrices && price != null) Text(price, style = MaterialTheme.typography.bodySmall)
-                            }
-                        }
-                        if (!l.bought) {
-                            Spacer(Modifier.height(10.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Stepper(
-                                    qtyText(p, l.qty),
-                                    { demo.setLineQty(p.id, (l.qty - stepOf(p, l.qty >= 1000)).coerceAtLeast(stepOf(p, l.qty >= 1000))) },
-                                    { demo.setLineQty(p.id, l.qty + stepOf(p, l.qty >= 1000)) },
-                                    size = 48.dp, canMinus = l.qty > stepOf(p, l.qty >= 1000),
-                                )
-                                Spacer(Modifier.weight(1f))
-                                RoundBtn(Icons.Rounded.Delete, "Retirer ${p.name}", { demo.removeLine(p.id) }, size = 48.dp)
-                            }
-                        }
-                    }
+                todo.forEach { (cat, lines) ->
+                    item(key = "h-$cat") { Text(cat, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(start = 4.dp, top = 4.dp)) }
+                    items(lines, key = { it.productId }) { l -> StaffCard(l, demo) }
+                }
+                if (done.isNotEmpty()) {
+                    item(key = "h-achetes") { Text("Déjà achetés (${done.size})", style = MaterialTheme.typography.titleMedium, color = C.Muted, modifier = Modifier.padding(start = 4.dp, top = 4.dp)) }
+                    items(done, key = { it.productId }) { l -> StaffCard(l, demo) }
                 }
             }
         }
     }
 }
 
+@Composable
+private fun StaffCard(l: Line, demo: Demo) {
+    val p = demo.byId[l.productId] ?: return
+    SCard(padding = PaddingValues(12.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            ProductPhoto(p, 72.dp, radius = 16.dp, modifier = Modifier.alpha(if (l.bought) 0.6f else 1f))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(p.name, style = MaterialTheme.typography.titleMedium.copy(fontSize = 17.sp), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Pill(qtyText(p, l.qty), C.Ink, Color(0xFFE8F0F7))
+                    if (l.bought) Pill("Acheté", C.TealDark, C.TealSoft) else if (l.pending) Pill("En attente d'envoi", C.Amber, C.AmberSoft) else Pill("À acheter", C.Amber, C.AmberSoft)
+                }
+                val price = demo.priceLabel(p, l)
+                if (demo.showPrices && price != null) Text(price, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+        if (!l.bought) {
+            Spacer(Modifier.height(10.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Stepper(
+                    qtyText(p, l.qty),
+                    { demo.setLineQty(p.id, (l.qty - stepOf(p, l.qty >= 1000)).coerceAtLeast(stepOf(p, l.qty >= 1000))) },
+                    { demo.setLineQty(p.id, l.qty + stepOf(p, l.qty >= 1000)) },
+                    size = 48.dp, canMinus = l.qty > stepOf(p, l.qty >= 1000),
+                )
+                Spacer(Modifier.weight(1f))
+                RoundBtn(Icons.Rounded.Delete, "Retirer ${p.name}", { demo.removeLine(p.id) }, size = 48.dp)
+            }
+        }
+    }
+}
 
 /** Partage du texte de la liste (messagerie, notes…) : uniquement les articles et quantités. */
 fun shareList(ctx: android.content.Context, demo: Demo) {

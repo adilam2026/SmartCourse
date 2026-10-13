@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Pilote l'interface de l'application native sur l'émulateur (adb + uiautomator), comme le ferait un utilisateur.
-Usage : native-ui.py tap TEXTE [--last|--first] | has TEXTE | wait TEXTE [secondes] | gone TEXTE [secondes]"""
+Usage : native-ui.py tap TEXTE [--last|--first] | has TEXTE | wait TEXTE [secondes] | gone TEXTE [secondes] | above A B"""
 import re, subprocess, sys, time
 import xml.etree.ElementTree as ET
 
@@ -68,6 +68,12 @@ def main():
             time.sleep(1)
         print(f"INTROUVABLE: {needle}")
         return 1
+    if cmd == "above":  # above A B : le premier A est affiché plus haut que le premier B (les deux visibles)
+        xml = dump(); a, b = matches(xml, needle), matches(xml, sys.argv[3])
+        if not a or not b:
+            print(f"ABSENT: {needle if not a else sys.argv[3]}")
+            return 1
+        return 0 if a[0][2] < b[0][2] else 1
     secs = float(sys.argv[3]) if len(sys.argv) > 3 and not sys.argv[3].startswith("--") else 20.0
     if cmd == "enabled":
         return 0 if enabled_last(dump(), needle) else 1

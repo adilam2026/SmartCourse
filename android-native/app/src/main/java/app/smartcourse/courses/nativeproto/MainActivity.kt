@@ -172,6 +172,9 @@ private fun startRoute(): String = when (Launch.str("screen")?.lowercase()) {
     else -> "v01"
 }
 
+/** Ouvre la confirmation de déconnexion (null hors session réelle). */
+val LocalLogout = androidx.compose.runtime.compositionLocalOf<(() -> Unit)?> { null }
+
 @Composable
 fun App(session: Session, me: Me?) {
     val uiRole = if (me?.role == "staff") Role.STAFF else Role.ADMIN
@@ -206,7 +209,7 @@ fun App(session: Session, me: Me?) {
     val showBar = route != null && route != "v01" && route != "v04" &&
         (demo.role == Role.ADMIN || route == "v03")
 
-    CompositionLocalProvider(LocalDemo provides demo, LocalSession provides (if (me != null) session else null), LocalCompact provides (demo.role == Role.ADMIN && route != "v01")) {
+    CompositionLocalProvider(LocalDemo provides demo, LocalSession provides (if (me != null) session else null), LocalCompact provides (demo.role == Role.ADMIN && route != "v01"), LocalLogout provides (if (me != null) ({ confirmLogout = true }) else null)) {
         Box(Modifier.fillMaxSize().background(C.Bg)) {
             Column(Modifier.fillMaxSize()) {
                 if (me != null) TopStrip("RECETTE · données réelles", "Compte") { account = true }
@@ -262,8 +265,14 @@ fun App(session: Session, me: Me?) {
             }
         }, { cityPicker = false })
         if (confirmLogout) ConfirmDialog(
-            "Se déconnecter ?", "Vous devrez saisir à nouveau votre code d'accès pour rouvrir l'application.",
-            "Se déconnecter", { confirmLogout = false; session.signOut() }, { confirmLogout = false }, danger = true,
+            "Se déconnecter ?",
+            // Rien n'est supprimé en silence : les modifications non envoyées restent sur ce téléphone pour ce profil
+            // et repartent à sa prochaine connexion ; on prévient avant de quitter.
+            (demo.pendingOps + demo.orphanCount).let { n ->
+                if (n > 0) "$n modification${if (n > 1) "s n'ont" else " n'a"} pas encore été envoyée${if (n > 1) "s" else ""}. Elle${if (n > 1) "s resteront" else " restera"} sur ce téléphone et ne partira qu'à la prochaine connexion de ce profil. Vous devrez saisir à nouveau votre code d'accès."
+                else "Vous devrez saisir à nouveau votre code d'accès pour rouvrir l'application."
+            },
+            if (demo.pendingOps + demo.orphanCount > 0) "Se déconnecter quand même" else "Se déconnecter", { confirmLogout = false; session.signOut() }, { confirmLogout = false }, danger = true,
         )
     }
 }

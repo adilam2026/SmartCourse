@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
+import androidx.compose.material.icons.automirrored.rounded.Logout
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -58,6 +59,10 @@ fun AdminHubScreen(nav: (String) -> Unit) {
                 }
             }
             Spacer(Modifier.height(18.dp))
+            LocalLogout.current?.let { logout ->
+                SecondaryButton("Se déconnecter", logout, Modifier.fillMaxWidth(), leading = Icons.AutoMirrored.Rounded.Logout)
+                Spacer(Modifier.height(4.dp))
+            }
             Row(
                 Modifier.align(Alignment.CenterHorizontally).clip(RoundedCornerShape(12.dp)).clickable { reset = true }.padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),

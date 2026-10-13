@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Tests CIBLÉS : reproduisent un par un les échecs du parcours des lots 3 à 6, sans rejouer toute la suite.
-# Chaque cas part d'un état propre. Usage : native-e2e-cible.sh APK CODE_FAMILLE SORTIE [cas…]  (cas : M | M2 | K9 | R | RW | I ; tous par défaut)
+# Chaque cas part d'un état propre. Usage : native-e2e-cible.sh APK CODE_FAMILLE SORTIE [cas…]  (cas : M | M2 | K9 | R | RW | I | L | D ; tous par défaut)
 set -uo pipefail
-CASES=("${@:4}"); [ ${#CASES[@]} -eq 0 ] && CASES=(M M2 K9 R RW I)
+CASES=("${@:4}"); [ ${#CASES[@]} -eq 0 ] && CASES=(M M2 K9 R RW I L D)
 # Fonctions et installation communes, reprises telles quelles du parcours complet (lignes 4 à l'installation de l'APK).
 source <(sed -n '/^PKG=/,/^adb shell pm grant/p' "$(dirname "$0")/native-e2e-lot3.sh")
 want() { for c in "${CASES[@]}"; do [ "$c" = "$1" ] && return 0; done; return 1; }
@@ -175,6 +175,99 @@ if want I; then
   expect "I3e. le serveur a répondu 403 à CETTE requête (jeton refusé)" bash -c "docker logs sc-recette-app 2>&1 | grep -F '$REQ' | grep -q '\"statusCode\":403'"
   expect "I3f. message clair à l'écran" $UI wait "n'est plus valable" 15
   expect "I3g. aucune famille créée" test "$(sql "SELECT count(*) FROM families WHERE name='Famille_Test'")" = 0
+fi
+
+add_api() { # profil code produit… : demande d'articles par l'API (comme un autre téléphone)
+  login_api "$1" "$2"; shift 2; api GET /api/catalog >/dev/null
+  local ops="" pid
+  for n in "$@"; do pid=$(jq -r --arg n "$n" '[.categories[].products[] | select(.name==$n)][0].id' /tmp/api.out); ops="$ops${ops:+,}{\"opId\":\"$(cat /proc/sys/kernel/random/uuid)\",\"type\":\"add\",\"productId\":\"$pid\",\"quantity\":1}"; done
+  api POST /api/lists/active/ops -d "{\"ops\":[$ops]}" >/dev/null
+}
+active_count() { sql "SELECT count(*) FROM lists l JOIN families f ON f.id=l.family_id WHERE f.code='$FAMILY' AND l.status='active'"; }
+
+if want L; then
+  echo "═══ Cas L : aucune liste en cours ≠ liste vide ; articles achetés en bas ═══" | tee -a "$OUT/resultats.txt"
+  L0=$(fresh_list); login_api adil 482913; api POST "/api/lists/$L0/close" -d '{}' >/dev/null
+  expect "L0. serveur : aucune liste en cours au départ" test "$(active_count)" = 0
+  first_login adil 482913
+  expect "L1. « Aucune liste en cours » affiché" $UI wait "Aucune liste en cours" 25
+  expect "L1b. action principale « Créer une liste »" $UI has "Créer une liste"
+  expect "L1c. pas de « Ajouter des articles »" $UI gone "Ajouter des articles" 3
+  expect "L1d. menu sans action utile : trois points masqués (ni Clôturer, ni Terminer)" $UI gone "Plus d'actions" 3
+  expect "L1e. pas de « Terminer les courses »" $UI gone "Terminer les courses" 2
+  shot cible-aucune-liste
+  sleep 3
+  expect "L1f. serveur : consulter l'écran n'a créé aucune liste" test "$(active_count)" = 0
+  tapt "Créer une liste"
+  expect "L2. « Créer une liste » ouvre le parcours de sélection" $UI wait "Rechercher un produit" 15
+  shot cible-creer-liste-selection
+  expect "L2b. serveur : toujours aucune liste tant que rien n'est validé" test "$(active_count)" = 0
+  adb shell input keyevent KEYCODE_BACK; sleep 2
+  login_api adil 482913; api POST /api/lists -d '{}' >/dev/null
+  expect "L3. liste créée sur un autre appareil : « La liste est vide » en direct" $UI wait "La liste est vide" 30
+  expect "L3b. liste active vide : « Ajouter des articles »" $UI has "Ajouter des articles"
+  expect "L3c. pas de « Créer une liste »" $UI gone "Créer une liste" 3
+  tapt "Plus d'actions"
+  expect "L3d. menu : « Clôturer la liste » disponible" $UI wait "Clôturer la liste" 8
+  adb shell input keyevent KEYCODE_BACK; sleep 1
+  shot cible-liste-vide
+  add_api adil 482913 Carottes Tomates Lait
+  expect "L4. articles affichés" $UI wait "Acheté : Lait" 30
+  $UI wait "Acheté : Tomates" 10 >/dev/null
+  expect "L4b. pas de section « Déjà achetés » tant que rien n'est acheté" $UI gone "Déjà achetés" 3
+  $UI tap "Acheté : Tomates" >/dev/null; sleep 4
+  expect "L5. section « Déjà achetés » apparue" $UI wait "Déjà achetés" 10
+  expect "L5b. Tomates cochée sous « Déjà achetés »" $UI above "Déjà achetés" "Acheté : Tomates"
+  expect "L5c. Carottes (à acheter) au-dessus de « Déjà achetés »" $UI above "Acheté : Carottes" "Déjà achetés"
+  expect "L5d. Lait (à acheter) au-dessus de « Déjà achetés »" $UI above "Acheté : Lait" "Déjà achetés"
+  expect "L5e. compteur actualisé : 1 sur 3" $UI has "1 sur 3 achetés"
+  expect "L5f. serveur : achat enregistré" test "$(sql "SELECT i.status FROM list_items i JOIN products p ON p.id=i.product_id JOIN lists l ON l.id=i.list_id JOIN families f ON f.id=l.family_id WHERE f.code='$FAMILY' AND l.status='active' AND p.name='Tomates'")" = purchased
+  shot cible-achete-en-bas
+  $UI tap "Acheté : Tomates" >/dev/null; sleep 4
+  expect "L6. décochée : section « Déjà achetés » retirée (vide)" $UI gone "Déjà achetés" 10
+  expect "L6b. Tomates revenue dans sa catégorie, à sa place (après Carottes)" $UI above "Acheté : Carottes" "Acheté : Tomates"
+  expect "L6c. compteur actualisé : 0 sur 3" $UI has "0 sur 3 achetés"
+  expect "L6d. serveur : de nouveau à acheter" test "$(sql "SELECT i.status FROM list_items i JOIN products p ON p.id=i.product_id JOIN lists l ON l.id=i.list_id JOIN families f ON f.id=l.family_id WHERE f.code='$FAMILY' AND l.status='active' AND p.name='Tomates'")" = to_buy
+  shot cible-decoche-replace
+  L1=$(sql "SELECT l.id FROM lists l JOIN families f ON f.id=l.family_id WHERE f.code='$FAMILY' AND l.status='active'")
+  login_api lamiaa 573918; api POST "/api/lists/$L1/close" -d '{}' >/dev/null
+  expect "L7. liste clôturée sur un autre appareil : « Aucune liste en cours » aussitôt" $UI wait "Aucune liste en cours" 30
+  expect "L7b. « Ajouter des articles » retiré" $UI gone "Ajouter des articles" 3
+fi
+
+if want D; then
+  echo "═══ Cas D : « Se déconnecter » visible dans Réglages et dans Compte, avertissement si envoi en attente ═══" | tee -a "$OUT/resultats.txt"
+  fresh_list >/dev/null
+  first_login adil 482913
+  $UI wait "Ma liste" 25 >/dev/null
+  tapt "Réglages"
+  expect "D1. « Se déconnecter » visible en bas des Réglages" $UI tap "Se déconnecter" --scroll
+  sleep 2
+  expect "D1b. distinct de « Réinitialiser la famille »" $UI has "Réinitialiser la famille"
+  expect "D1c. confirmation demandée" $UI wait "Se déconnecter ?" 8
+  shot cible-reglages-deconnexion
+  $UI tap "Se déconnecter" --last >/dev/null; sleep 3
+  expect "D2. retour à l'écran de connexion" $UI wait "Bienvenue" 20
+  expect "D2b. aucune donnée du profil précédent affichée" $UI gone "Ma liste" 3
+  shot cible-apres-deconnexion
+  signin "$FAMILY" marie 573918
+  expect "D3. personnel connecté" $UI wait "Liste du jour" 25
+  tapt "Choisir"; select_qty Oignons 0
+  docker stop sc-recette-app >/dev/null
+  $UI tap "Terminer ma sélection" >/dev/null; sleep 5
+  expect "D3b. hors connexion : envoi en attente" $UI wait "Envoi en attente" 20
+  tapt "Compte"
+  expect "D4. personnel : « Se déconnecter » dans Compte" $UI tap "Se déconnecter"
+  sleep 2
+  expect "D4b. avertissement : modification non envoyée" $UI wait "pas encore été envoyée" 8
+  shot cible-deconnexion-avertissement
+  $UI tap "Annuler" >/dev/null; sleep 1
+  expect "D4c. annulation : toujours connecté, rien supprimé" $UI has "Envoi en attente"
+  docker start sc-recette-app >/dev/null; server_wait
+  expect "D5. la modification part au retour du réseau" $UI gone "Envoi en attente" 90
+  logout
+  expect "D6. personnel déconnecté depuis Compte" $UI wait "Bienvenue" 20
+  expect "D6b. aucune donnée du personnel affichée" $UI gone "Liste du jour" 3
 fi
 
 echo "ECHECS=$FAILS" | tee -a "$OUT/resultats.txt"
