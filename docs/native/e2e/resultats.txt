@@ -5,7 +5,8 @@ PASS  2a. serveur injoignable : message clair
 PASS  2b. serveur valide enregistré
 PASS  3a. mauvais code d'accès : message d'erreur
 PASS  3b. bon code : liste de l'administrateur
-PASS  3c. bandeau : parties réelles annoncées
+PASS  3c. aucun bandeau RECETTE / PROTOTYPE
+PASS  3d. accès Compte dans l'en-tête
 PASS  4a. compte : nom du profil
 PASS  4b. compte : rôle réel
 PASS  4c. compte : famille réelle
@@ -17,7 +18,7 @@ PASS  6c. serveur de retour : plus d'indication hors connexion
 PASS  7a. session révoquée : retour à la connexion
 PASS  7b. session révoquée : explication
 PASS  7c. session révoquée : reste déconnecté au lancement suivant
-PASS  8a. personnel : liste du jour
+PASS  8a. personnel : écran « Choisir mes articles »
 PASS  8b. personnel : rôle réel
 PASS  9a. déconnexion : retour à la connexion
 PASS  9b. déconnexion : session révoquée côté serveur (actives=0)

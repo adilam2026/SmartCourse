@@ -27,13 +27,14 @@ PASS  K0a. aide à la connexion
 PASS  K0b. récupération du code par e-mail (formulaire réel)
 PASS  K0c. création de famille : lien d'installation exigé (aucun champ technique)
 PASS  K1. personnel : accueil direct sur « Choisir mes articles »
-PASS  K2. article demandé visible
+PASS  K1b. personnel : aucun onglet en bas (ni Choisir ni Liste du jour)
+PASS  K2. article demandé repéré avec sa quantité enregistrée
 PASS  K3. serveur : quantité du personnel enregistrée (2.000 kg to_buy)
 PASS  K4. serveur : le personnel n'a pas l'historique (403, 403)
 PASS  K5. serveur : le personnel ne peut pas marquer un achat (403, 403)
 PASS  K6. serveur : pas de statistiques pour le personnel (403, 403)
 PASS  K7. serveur : article retiré (« 2.000 kg removed »)
-PASS  K8. écran : liste vide pour le personnel
+PASS  K8. écran : Tomates n'est plus enregistrée
 PASS  L1. hors connexion : « Envoi en attente » affiché
 PASS  L2. la demande en attente survit à la fermeture de l'application
 PASS  L3. retour du réseau : la demande part toute seule
@@ -47,46 +48,61 @@ PASS  M5. serveur : une nouvelle liste en cours contient Carottes
 PASS  N1. brouillon du personnel
 PASS  N2. parent connecté
 PASS  N3. le brouillon d'un autre profil n'apparaît pas
-PASS  K9. réinitialisation : confirmation par mot de passe et code famille
-PASS  O1. serveur : préférence « prix » enregistrée pour ce profil
-PASS  O2. serveur : préférence « total » enregistrée
+FAIL  K9. réinitialisation : confirmation par mot de passe et code famille
+      écran : "Ma liste"|"Mardi 13 octobre"|"Plus d'actions"|"Compte"|"0 sur 1 achetés"|"0 %"|"Ajouter des articles"|"Favoris"|"Légumes et herbes"|"Replier"|"Carottes"|"1 kg"|"Acheté : Carottes"|"Liste"|"Liste"|"Historique"|"Historique"|"Statistiques"|"Statistiques"|
+FAIL  O1. serveur : préférence « prix » enregistrée pour ce profil
+      écran : "Tue, Oct 13"|"Tue, Oct 13"|"Gmail"|"Gmail"|"Photos"|"Photos"|"YouTube"|"YouTube"|"Home"|"Phone"|"Phone"|"Messages"|"Messages"|"Chrome"|"Chrome"|"Courses (natif)"|"Predicted app: Courses (natif)"|"Search"|"Google app"|"Voice search"|"Google Lens"|
+FAIL  O2. serveur : préférence « total » enregistrée
+      écran : "Tue, Oct 13"|"Tue, Oct 13"|"Gmail"|"Gmail"|"Photos"|"Photos"|"YouTube"|"YouTube"|"Home"|"Phone"|"Phone"|"Messages"|"Messages"|"Chrome"|"Chrome"|"Courses (natif)"|"Predicted app: Courses (natif)"|"Search"|"Google app"|"Voice search"|"Google Lens"|
 PASS  O3. les autres profils ne sont pas touchés
-PASS  O4. gestion des prix : catalogue réel
-PASS  O5. panneau de prix
-PASS  O6. serveur : prix de la famille enregistré (7.50)
-PASS  O7. prix affiché dans la gestion des prix
-PASS  O8. prix partagé avec la ville (contribution enregistrée, sans nom de famille)
+FAIL  O4. gestion des prix : catalogue réel
+      écran : "Tue, Oct 13"|"Tue, Oct 13"|"Gmail"|"Gmail"|"Photos"|"Photos"|"YouTube"|"YouTube"|"Home"|"Phone"|"Phone"|"Messages"|"Messages"|"Chrome"|"Chrome"|"Courses (natif)"|"Predicted app: Courses (natif)"|"Search"|"Google app"|"Voice search"|"Google Lens"|
+FAIL  O5. panneau de prix
+      écran : "Tue, Oct 13"|"Tue, Oct 13"|"Gmail"|"Gmail"|"Photos"|"Photos"|"YouTube"|"YouTube"|"Home"|"Phone"|"Phone"|"Messages"|"Messages"|"Chrome"|"Chrome"|"Courses (natif)"|"Predicted app: Courses (natif)"|"Search"|"Google app"|"Voice search"|"Google Lens"|
+FAIL  O6. serveur : prix de la famille enregistré (7.50)
+      écran : "Tue, Oct 13"|"Tue, Oct 13"|"Gmail"|"Gmail"|"Photos"|"Photos"|"YouTube"|"YouTube"|"Home"|"Phone"|"Phone"|"Messages"|"Messages"|"Chrome"|"Chrome"|"Courses (natif)"|"Predicted app: Courses (natif)"|"Search"|"Google app"|"Voice search"|"Google Lens"|
+FAIL  O7. prix affiché dans la gestion des prix
+      écran : "Tue, Oct 13"|"Tue, Oct 13"|"Gmail"|"Gmail"|"Photos"|"Photos"|"YouTube"|"YouTube"|"Home"|"Phone"|"Phone"|"Messages"|"Messages"|"Chrome"|"Chrome"|"Courses (natif)"|"Predicted app: Courses (natif)"|"Search"|"Google app"|"Voice search"|"Google Lens"|
+FAIL  O8. prix partagé avec la ville (contribution enregistrée, sans nom de famille)
+      écran : "7,500"|"7,500"|"Search null"|"7,501"|"7,501"|"Search null"|"7,502"|"7,502"|"Search null"|"7,503"|"7,503"|"Search null"|"7,504"|"7,504"|"Search null"|"7,505"|"7,505"|"Search null"|"7,506"|"7,506"|"Search null"|"7,507"|"7,507"|"Search null"|"7,508"|"7,508"|"Search null"|"7,509"|"7,509"|"Search null"|"Search"|"Google app"|"7,50"|"Clear search box"|"Home"|
 PASS  O9. « Rétablir le prix initial » : prix de la famille retiré côté serveur
-PASS  O10. synchronisation par ville : fenêtre ouverte, aucune proposition tant qu'il manque des familles
+FAIL  O10. synchronisation par ville : fenêtre ouverte, aucune proposition tant qu'il manque des familles
+      écran : "7,500"|"7,500"|"Search null"|"7,501"|"7,501"|"Search null"|"7,502"|"7,502"|"Search null"|"7,503"|"7,503"|"Search null"|"7,504"|"7,504"|"Search null"|"7,505"|"7,505"|"Search null"|"7,506"|"7,506"|"Search null"|"7,507"|"7,507"|"Search null"|"7,508"|"7,508"|"Search null"|"7,509"|"7,509"|"Search null"|"Search"|"Google app"|"7,50"|"Clear search box"|"Home"|
 PASS  P1. statistiques réelles : achat de Tomates
 PASS  P2. dépense payée jamais inventée
 PASS  S1. mise à jour en direct : la demande de Marie apparaît toute seule
-PASS  T1. favori enregistré côté serveur (1 favori)
-PASS  T2. favori affiché dans la fenêtre
-PASS  T3. « Utiliser » ajoute les articles à la liste en cours (Laitue : 1.000 piece to_buy → 2.000 piece to_buy)
+FAIL  T1. favori enregistré côté serveur (0 favori)
+      écran : "Close sheet"|"Favoris"|"Des listes toutes prêtes. Les utiliser ajoute leurs articles à la liste en cours, sans rien supprimer."|"Aucun favori pour le moment."|
+FAIL  T2. favori affiché dans la fenêtre
+      écran : "Close sheet"|"Favoris"|"Des listes toutes prêtes. Les utiliser ajoute leurs articles à la liste en cours, sans rien supprimer."|"Aucun favori pour le moment."|
+FAIL  T3. « Utiliser » ajoute les articles à la liste en cours (Laitue : 1.000 piece to_buy → 1.000 piece to_buy)
+      écran : "Close sheet"|"Favoris"|"Des listes toutes prêtes. Les utiliser ajoute leurs articles à la liste en cours, sans rien supprimer."|"Aucun favori pour le moment."|
 PASS  T4. favori supprimé côté serveur
 PASS  V1. fenêtre de partage Android ouverte
 PASS  U0. historique affiché (3 commande(s) archivée(s))
-PASS  U1. commande supprimée côté serveur (3 → 2)
-PASS  Q1. récupération : adresse réelle
-PASS  Q2. adresse vérifiée
-PASS  Q3. sauvegarde : lecture seule, état réel
-PASS  Q4. à propos : version et serveur
-PASS  Q5. notifications activées
+FAIL  U1. commande supprimée côté serveur (3 → 3)
+      écran : "Recommander"|
+FAIL  Q1. récupération : adresse réelle
+      écran : "Recommander"|
+FAIL  Q2. adresse vérifiée
+      écran : "Recommander"|
+FAIL  Q3. sauvegarde : lecture seule, état réel
+      écran : "Historique"|"3 commandes terminées"|"Compte"|"Mardi 13 octobre"|"0 article acheté · 1 non acheté · Adil"|"Actions de la commande du Mardi 13 octobre"|"Recommander"|"Mardi 13 octobre"|"1 article acheté · Adil"|"Actions de la commande du Mardi 13 octobre"|"Recommander"|"Mardi 13 octobre"|"0 article acheté · Adil"|"Actions de la commande du Mardi 13 octobre"|"Recommander"|"Liste"|"Liste"|"Historique"|"Historique"|"Statistiques"|"Statistiques"|
+FAIL  Q4. à propos : version et serveur
+      écran : "Ma liste"|"Mardi 13 octobre"|"Plus d'actions"|"Compte"|"0 sur 2 achetés"|"0 %"|"Ajouter des articles"|"Favoris"|"Légumes et herbes"|"Replier"|"Carottes"|"1 kg"|"Acheté : Carottes"|"Laitue"|"1 pièce"|"Acheté : Laitue"|"Liste"|"Liste"|"Historique"|"Historique"|"Statistiques"|"Statistiques"|
+FAIL  Q5. notifications activées
+      écran : "Calendar"|"Calendar"|"Camera"|"Camera"|"Chrome"|"Chrome"|"Clock"|"Clock"|"Contacts"|"Contacts"|"Courses (natif)"|"Courses (natif)"|"Drive"|"Drive"|"Files"|"Files"|"Gmail"|"Gmail"|"Google"|"Google"|"Maps"|"Maps"|"Messages"|"Messages"|"Phone"|"Phone"|"Photos"|"Photos"|"Settings"|"Settings"|"TMoble"|"TMoble"|"YouTube"|"YouTube"|"YT Music"|"YT Music"|"YouTube"|"YouTube"|"Settings"|"Settings"|
 PASS  Q6. tâche périodique programmée par Android
-tâche WorkManager n°1
-10-13 14:27:53.630 25409 25409 I CoursesNotif: déclenchement de la vérification (recette), nouvelle instance
-10-13 14:27:54.224 25409 25431 I CoursesNotif: vérification : réponse du serveur = 4 demande(s) ; repère = 3 déjà vue(s) ; nouvelles d'autres profils = 1 ; autorisé = true
-10-13 14:27:54.226 25409 25431 I CoursesNotif: notification transmise à Android : « Nouvelle demande »
-10-13 14:27:54.227 25409 25431 I CoursesNotif: vérification terminée, réussie=true
+tâche WorkManager n°?
+10-13 16:13:29.889 28238 28238 I CoursesNotif: déclenchement de la vérification (recette), nouvelle instance
+10-13 16:13:30.094 28238 28259 I CoursesNotif: arrêt : notifications désactivées pour ce profil
+10-13 16:13:30.097 28238 28259 I CoursesNotif: vérification terminée, réussie=true
 --- diagnostic notification ---
-10-13 14:27:53.054   521   603 I JobServiceContext: Letting ab6641b #u0a130/1009 com.google.android.apps.messaging/androidx.work.impl.background.systemjob.SystemJobService continue to run past min execution time
-10-13 14:27:53.604 25409 25409 D WM-WrkMgrInitializer: Initializing WorkManager with default configuration.
-10-13 14:27:53.605 25409 25409 D WM-PackageManagerHelper: Skipping component enablement for androidx.work.impl.background.systemjob.SystemJobService
-10-13 14:27:53.605 25409 25409 D WM-Schedulers: Created SystemJobScheduler and enabled SystemJobService
-    NotificationRecord(0x085aa3e6: pkg=app.smartcourse.courses.nativeproto user=UserHandle{0} id=1001 tag=null importance=3 key=0|app.smartcourse.courses.nativeproto|1001|null|10194: Notification(channel=demandes shortcut=null contentView=null vibrate=null sound=null defaults=0x0 flags=0x10 color=0x00000000 vis=PRIVATE))
-      icon=Icon(typ=RESOURCE pkg=app.smartcourse.courses.nativeproto id=0x7f050009)
-PASS  R1. notification « Nouvelle demande » affichée
+10-13 16:13:29.878 28238 28238 D WM-WrkMgrInitializer: Initializing WorkManager with default configuration.
+10-13 16:13:29.879 28238 28238 D WM-PackageManagerHelper: Skipping component enablement for androidx.work.impl.background.systemjob.SystemJobService
+10-13 16:13:29.879 28238 28238 D WM-Schedulers: Created SystemJobScheduler and enabled SystemJobService
+FAIL  R1. notification « Nouvelle demande » affichée
+      écran : "Tue, Oct 13"|"Tue, Oct 13"|"Gmail"|"Gmail"|"Photos"|"Photos"|"YouTube"|"YouTube"|"Home"|"Phone"|"Phone"|"Messages"|"Messages"|"Chrome"|"Chrome"|"Courses (natif)"|"Predicted app: Courses (natif)"|"Search"|"Google app"|"Voice search"|"Google Lens"|
 --- journal de l'application ---
-ECHECS=0
+ECHECS=19
 CRASH_APPLICATION=0
