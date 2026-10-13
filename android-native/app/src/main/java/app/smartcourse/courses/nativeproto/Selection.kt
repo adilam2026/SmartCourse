@@ -65,7 +65,16 @@ fun SelectionScreen(nav: (String) -> Unit, onBack: () -> Unit) {
         TopBar(if (admin) "Ajouter des articles" else "Choisir mes articles", onBack = onBack)
         Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             SearchBox(query, { query = it }, "Rechercher un produit…")
-            SegTabs(SelMode.entries.map { it.label }, demo.selMode.ordinal, { demo.selMode = SelMode.entries[it] })
+            SegTabs(SelMode.entries.map { it.label }, demo.selMode.ordinal, { val m = SelMode.entries[it]; demo.data?.setSelMode(m) ?: run { demo.selMode = m } })
+            if (demo.orphanCount > 0) SCard(padding = PaddingValues(12.dp)) {
+                Text("${demo.orphanCount} article${if (demo.orphanCount > 1) "s" else ""} d'une liste terminée", style = MaterialTheme.typography.titleSmall)
+                Text("Ils n'ont pas été ajoutés. Voulez-vous les reprendre dans votre sélection ?", style = MaterialTheme.typography.bodySmall)
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PrimaryButton("Reprendre", { demo.data?.resumeOrphans() }, Modifier.weight(1f))
+                    SecondaryButton("Ignorer", { demo.data?.dismissOrphans() }, Modifier.weight(1f))
+                }
+            }
         }
         Spacer(Modifier.height(6.dp))
         Box(Modifier.weight(1f)) {
@@ -99,14 +108,18 @@ fun SelectionScreen(nav: (String) -> Unit, onBack: () -> Unit) {
             PrimaryButton(
                 if (count == 0) "Terminer ma sélection" else "Terminer ma sélection ($count)",
                 {
-                    demo.selection.forEach { (id, q) ->
-                        val i = demo.lines.indexOfFirst { it.productId == id }
-                        if (i >= 0 && !demo.lines[i].bought) demo.lines[i] = demo.lines[i].copy(qty = demo.lines[i].qty + q)
-                        else if (i < 0) demo.lines.add(Line(id, q, false))
+                    val d = demo.data
+                    if (d != null) d.submitSelection { nav(if (admin) "v02" else "v03") }
+                    else {
+                        demo.selection.forEach { (id, q) ->
+                            val i = demo.lines.indexOfFirst { it.productId == id }
+                            if (i >= 0 && !demo.lines[i].bought) demo.lines[i] = demo.lines[i].copy(qty = demo.lines[i].qty + q)
+                            else if (i < 0) demo.lines.add(Line(id, q, false))
+                        }
+                        demo.selection.clear()
+                        demo.simulated(if (admin) "articles ajoutés à la liste" else "demande envoyée (hors connexion : « Envoi en attente »)")
+                        nav(if (admin) "v02" else "v03")
                     }
-                    demo.selection.clear()
-                    demo.simulated(if (admin) "articles ajoutés à la liste" else "demande envoyée (hors connexion : « Envoi en attente »)")
-                    nav(if (admin) "v02" else "v03")
                 },
                 Modifier.fillMaxWidth(), enabled = count > 0, trailing = Icons.AutoMirrored.Rounded.ArrowForward,
             )
@@ -116,7 +129,7 @@ fun SelectionScreen(nav: (String) -> Unit, onBack: () -> Unit) {
     sheetFor?.let { id ->
         val p = demo.byId[id]
         if (p != null) QuantitySheet(
-            p, demo.selection[id], demo.showPrices, demo.prices[id], focusInput = remember { Launch.once("keyboard") },
+            p, demo.selection[id], demo.showPrices, demo.priceLabel(p), focusInput = remember { Launch.once("keyboard") },
             onDismiss = { sheetFor = null },
             onConfirm = { demo.selection[id] = it; sheetFor = null },
             onRemove = { demo.selection.remove(id); sheetFor = null },
@@ -140,8 +153,7 @@ private fun SelBadge(modifier: Modifier = Modifier) {
 @Composable
 private fun PriceLine(p: Product) {
     val demo = LocalDemo.current
-    val price = demo.prices[p.id]
-    if (demo.showPrices) Text(if (price != null) priceText(price, p) else "Prix non renseigné", style = MaterialTheme.typography.bodySmall, maxLines = 1)
+    if (demo.showPrices) Text(demo.priceLabel(p) ?: "Prix non renseigné", style = MaterialTheme.typography.bodySmall, maxLines = 1)
     else Text(when (p.unit) { UnitKind.MASS -> "au kilo"; UnitKind.VOLUME -> "au litre"; UnitKind.COUNT -> "à l'unité" }, style = MaterialTheme.typography.bodySmall, maxLines = 1)
 }
 
@@ -158,7 +170,7 @@ private fun SelListRow(p: Product, openSheet: () -> Unit) {
             .padding(10.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Photo(p.photo, 56.dp, radius = 12.dp)
+        ProductPhoto(p, 56.dp, radius = 12.dp)
         Column(Modifier.weight(1f)) {
             Text(p.name, style = MaterialTheme.typography.titleSmall.copy(fontSize = 16.sp), maxLines = 2, overflow = TextOverflow.Ellipsis)
             PriceLine(p)
@@ -204,7 +216,7 @@ private fun SelTile(p: Product, openSheet: () -> Unit) {
             .clickable { if (q == null) demo.selection[p.id] = defaultQty(p) else demo.selection.remove(p.id) },
     ) {
         Box {
-            Image(painterResource(p.photo), null, Modifier.fillMaxWidth().aspectRatio(1.15f), contentScale = ContentScale.Crop)
+            ProductImage(p, Modifier.fillMaxWidth().aspectRatio(1.15f), contentScale = ContentScale.Crop)
             if (q != null) SelBadge(Modifier.align(Alignment.TopEnd).padding(8.dp))
         }
         Row(Modifier.padding(start = 12.dp, end = 8.dp, top = 8.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -229,7 +241,7 @@ private fun SelBigCard(p: Product, openSheet: () -> Unit) {
             .then(if (q != null) Modifier.border(SelBorder, shape) else Modifier),
     ) {
         Box(Modifier.clickable { if (q == null) demo.selection[p.id] = defaultQty(p) else demo.selection.remove(p.id) }) {
-            Image(painterResource(p.photo), null, Modifier.fillMaxWidth().height(190.dp), contentScale = ContentScale.Crop)
+            ProductImage(p, Modifier.fillMaxWidth().height(190.dp), contentScale = ContentScale.Crop)
             if (q != null) SelBadge(Modifier.align(Alignment.TopEnd).padding(12.dp))
         }
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -262,8 +274,9 @@ private fun display(q: Int, p: Product, big: Boolean): String =
 
 @Composable
 fun QuantitySheet(
-    p: Product, current: Int?, showPrice: Boolean, price: Int?, focusInput: Boolean,
+    p: Product, current: Int?, showPrice: Boolean, priceLabel: String?, focusInput: Boolean,
     onDismiss: () -> Unit, onConfirm: (Int) -> Unit, onRemove: () -> Unit,
+    removeLabel: String = "Retirer de la sélection", confirmLabel: String? = null,
 ) {
     var qty by remember { mutableIntStateOf(current ?: defaultQty(p)) }
     var big by remember { mutableStateOf(p.unit != UnitKind.COUNT && qty >= 1000) }
@@ -285,10 +298,10 @@ fun QuantitySheet(
 
     AppSheet(onDismiss) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Photo(p.photo, 76.dp, radius = 18.dp)
+            ProductPhoto(p, 76.dp, radius = 18.dp)
             Column(Modifier.weight(1f)) {
                 Text(p.name, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                if (showPrice) Text(if (price != null) "Prix indicatif : ${priceText(price, p)}" else "Prix non renseigné", style = MaterialTheme.typography.bodySmall)
+                if (showPrice) Text(if (priceLabel != null) "Prix indicatif : $priceLabel" else "Prix non renseigné", style = MaterialTheme.typography.bodySmall)
                 else Text(if (hasUnits) "Se choisit en $bigName ou en ${p.unit.small}" else "Se compte en ${p.countLabel}s", style = MaterialTheme.typography.bodySmall)
             }
         }
@@ -324,10 +337,10 @@ fun QuantitySheet(
             modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(14.dp))
-        PrimaryButton(if (current == null) "Ajouter à ma sélection" else "Mettre à jour", { onConfirm(qty) }, Modifier.fillMaxWidth(), enabled = valid)
+        PrimaryButton(confirmLabel ?: if (current == null) "Ajouter à ma sélection" else "Mettre à jour", { onConfirm(qty) }, Modifier.fillMaxWidth(), enabled = valid)
         if (current != null) {
             Spacer(Modifier.height(8.dp))
-            TextButton(onRemove, Modifier.align(Alignment.CenterHorizontally)) { Text("Retirer de la sélection", color = C.Danger, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold) }
+            TextButton(onRemove, Modifier.align(Alignment.CenterHorizontally)) { Text(removeLabel, color = C.Danger, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold) }
         }
     }
 }

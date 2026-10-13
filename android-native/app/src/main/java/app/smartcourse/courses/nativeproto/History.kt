@@ -102,7 +102,7 @@ fun HistoryDetailScreen(id: String, nav: (String) -> Unit, onBack: () -> Unit) {
                         val p = demo.byId[pid]!!
                         if (i > 0) HorizontalDivider(color = C.Line.copy(alpha = 0.6f), modifier = Modifier.padding(start = 66.dp))
                         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Photo(p.photo, 44.dp, radius = 10.dp)
+                            ProductPhoto(p, 44.dp, radius = 10.dp)
                             Text(p.name, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis)
                             Text(qtyText(p, q), style = MaterialTheme.typography.bodyMedium, color = C.Muted, maxLines = 1)
                         }

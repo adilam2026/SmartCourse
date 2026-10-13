@@ -82,7 +82,7 @@ fun CatalogScreenSim(onBack: () -> Unit) {
                         val inside = demo.inCatalog[p.id] == true
                         if (i > 0) HorizontalDivider(color = C.Line.copy(alpha = 0.6f), modifier = Modifier.padding(start = 66.dp))
                         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp).heightIn(min = 52.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Photo(p.photo, 46.dp, radius = 10.dp)
+                            ProductPhoto(p, 46.dp, radius = 10.dp)
                             Column(Modifier.weight(1f)) {
                                 Text(p.name, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -138,7 +138,7 @@ fun PricesScreen(onBack: () -> Unit) {
                         if (i > 0) HorizontalDivider(color = C.Line.copy(alpha = 0.6f), modifier = Modifier.padding(start = 66.dp))
                         val price = demo.prices[p.id]
                         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp).heightIn(min = 60.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Photo(p.photo, 44.dp, radius = 10.dp)
+                            ProductPhoto(p, 44.dp, radius = 10.dp)
                             Column(Modifier.weight(1f)) {
                                 Text(p.name, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                 Text("Réf. ${refLabel(p)}", style = MaterialTheme.typography.bodySmall, maxLines = 1)
@@ -177,7 +177,7 @@ private fun PriceEditSheet(p: Product, current: Int?, onDismiss: () -> Unit, onS
     val cents = text.trim().replace(',', '.').toDoubleOrNull()?.takeIf { it > 0 }?.let { Math.round(it * 100).toInt() }
     AppSheet(onDismiss) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Photo(p.photo, 56.dp, radius = 14.dp)
+            ProductPhoto(p, 56.dp, radius = 14.dp)
             Column(Modifier.weight(1f)) {
                 Text(p.name, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text("Prix par ${refLabel(p)}", style = MaterialTheme.typography.bodySmall)

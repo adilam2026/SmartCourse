@@ -43,8 +43,9 @@ jobs:
           "$BT/apksigner" verify --print-certs "$APK" | grep -E "Verifies|SHA-256" | head -3
           grep -E "^package:" /tmp/badging.txt
           echo "--- permissions déclarées :"; grep -c "uses-permission" /tmp/badging.txt || true
-          # Seule permission autorisée : INTERNET (joindre le serveur choisi par l'utilisateur)
-          grep "uses-permission" /tmp/badging.txt | grep -v "android.permission.INTERNET" | grep -v "DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" && { echo "::error::permission inattendue"; exit 1; } || true
+          # Permissions autorisées : INTERNET (joindre le serveur choisi), ACCESS_NETWORK_STATE (savoir quand le réseau revient),
+          # POST_NOTIFICATIONS (notifications, demandées à l'utilisateur), et celles de WorkManager (relance au démarrage, jamais de position ni de contacts)
+          grep "uses-permission" /tmp/badging.txt | grep -v "android.permission.INTERNET" | grep -v "DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" | grep -v "android.permission.ACCESS_NETWORK_STATE" | grep -v "android.permission.POST_NOTIFICATIONS" | grep -v "android.permission.RECEIVE_BOOT_COMPLETED" | grep -v "android.permission.WAKE_LOCK" | grep -v "android.permission.FOREGROUND_SERVICE" && { echo "::error::permission inattendue"; exit 1; } || true
           grep -q "android.permission.INTERNET" /tmp/badging.txt
           # Signature de recette STABLE : toujours la même empreinte, pour mettre à jour sans désinstaller
           FP=$("$BT/apksigner" verify --print-certs "$APK" | grep -m1 "certificate SHA-256 digest" | sed 's/.*: //')

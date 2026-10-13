@@ -76,3 +76,25 @@ fun CityPickerSheet(current: String?, onPick: (String) -> Unit, onDismiss: () ->
         }
     }
 }
+
+/** Photo d'un produit : image fournie avec l'application (démonstration) ou photo du serveur (données réelles). */
+@Composable
+fun ProductPhoto(p: Product, size: Dp, modifier: Modifier = Modifier, radius: Dp = 12.dp) {
+    if (p.photo != 0) Photo(p.photo, size, modifier, radius) else RemotePhoto(p.photoUrl, size, radius, modifier)
+}
+
+/** Grande image d'un produit (cartes et carrés de la sélection) : remplit la taille donnée par [modifier]. */
+@Composable
+fun ProductImage(p: Product, modifier: Modifier, contentScale: ContentScale = ContentScale.Crop) {
+    if (p.photo != 0) {
+        androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(p.photo), null, modifier, contentScale = contentScale)
+    } else {
+        val base = LocalSession.current?.serverAddress
+        val loader = LocalImageLoader.current
+        Box(modifier.background(Color(0xFFEFF4F8))) {
+            if (p.photoUrl != null && base != null && loader != null) {
+                AsyncImage(model = base + p.photoUrl, imageLoader = loader, contentDescription = null, contentScale = contentScale, modifier = Modifier.fillMaxSize())
+            }
+        }
+    }
+}

@@ -33,6 +33,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
@@ -58,6 +59,7 @@ import kotlinx.coroutines.delay
 import app.smartcourse.courses.nativeproto.net.ApiClient
 import app.smartcourse.courses.nativeproto.net.AuthState
 import app.smartcourse.courses.nativeproto.net.EncryptedStorage
+import app.smartcourse.courses.nativeproto.net.FileKv
 import app.smartcourse.courses.nativeproto.net.Me
 import app.smartcourse.courses.nativeproto.net.Outcome
 import app.smartcourse.courses.nativeproto.net.ProfilesRepo
@@ -81,6 +83,8 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.light(Color.White.toArgb(), Color.White.toArgb()),
         )
         super.onCreate(savedInstanceState)
+        Env.context = applicationContext
+        Env.kv = FileKv(java.io.File(filesDir, "store"))
         val storage = EncryptedStorage(applicationContext)
         val s = Session(storage, ApiClient(storage), scope)
         session = s
@@ -91,7 +95,8 @@ class MainActivity : ComponentActivity() {
         setContent { CoursesTheme { CompositionLocalProvider(LocalImageLoader provides loader) { Root(s, demoMode) } } }
     }
 
-    override fun onStart() { super.onStart(); session?.verify() }
+    override fun onStart() { super.onStart(); session?.verify(); LiveHolder.current?.onForeground() }
+    override fun onStop() { super.onStop(); LiveHolder.current?.onBackground() }
     override fun onDestroy() { super.onDestroy(); scope.cancel() }
 }
 
@@ -141,7 +146,15 @@ private fun startRoute(): String = when (Launch.str("screen")?.lowercase()) {
 @Composable
 fun App(session: Session, me: Me?) {
     val uiRole = if (me?.role == "staff") Role.STAFF else Role.ADMIN
-    val demo = remember { Demo(if (me != null) uiRole else null) }
+    val demo = remember { Demo(if (me != null) uiRole else null, live = me != null) }
+    val scopeUi = rememberCoroutineScope()
+    val data = remember(me?.id) { if (me != null && Env.kv != null) AppData(demo, session, me, Env.kv!!, scopeUi) else null }
+    DisposableEffect(data) {
+        LiveHolder.current = data
+        data?.onForeground()
+        onDispose { data?.onBackground(); if (LiveHolder.current === data) LiveHolder.current = null }
+    }
+    LaunchedEffect(me?.prefs) { data?.applyPrefs(me?.prefs) }
     val nav = rememberNavController()
     val entry by nav.currentBackStackEntryAsState()
     val route = entry?.destination?.route
@@ -149,7 +162,6 @@ fun App(session: Session, me: Me?) {
     var account by remember { mutableStateOf(false) }
     var confirmLogout by remember { mutableStateOf(false) }
     var cityPicker by remember { mutableStateOf(false) }
-    val scopeUi = rememberCoroutineScope()
     val profilesRepo = remember { ProfilesRepo(session.api) }
     val path = remember { Launch.str("path")?.split(",")?.filter { it.isNotBlank() } }
     val start = remember { if (me != null) (if (uiRole == Role.STAFF) "v03" else "v02") else path?.firstOrNull() ?: startRoute() }
@@ -168,10 +180,15 @@ fun App(session: Session, me: Me?) {
     CompositionLocalProvider(LocalDemo provides demo, LocalSession provides (if (me != null) session else null), LocalCompact provides (demo.role == Role.ADMIN && route != "v01")) {
         Box(Modifier.fillMaxSize().background(C.Bg)) {
             Column(Modifier.fillMaxSize()) {
-                if (me != null) TopStrip("RECETTE · réel : compte, profils, catalogue", "Compte") { account = true }
+                if (me != null) TopStrip("RECETTE · données réelles", "Compte") { account = true }
                 else TopStrip("PROTOTYPE · données fictives", "Écrans de démo") { hub = true }
-                if (me != null && !session.online) Box(Modifier.fillMaxWidth().background(C.AmberSoft).padding(horizontal = 14.dp, vertical = 6.dp)) {
-                    Text("Hors connexion : session conservée sur ce téléphone.", color = C.Ink, style = MaterialTheme.typography.labelMedium)
+                if (me != null && (!session.online || data?.online == false)) Box(Modifier.fillMaxWidth().background(C.AmberSoft).padding(horizontal = 14.dp, vertical = 6.dp)) {
+                    Text("Hors connexion : session et dernières données conservées sur ce téléphone.", color = C.Ink, style = MaterialTheme.typography.labelMedium)
+                }
+                if (me != null && demo.pendingOps > 0) Row(Modifier.fillMaxWidth().background(C.AmberSoft).padding(horizontal = 14.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Envoi en attente : ${demo.pendingOps} modification${if (demo.pendingOps > 1) "s" else ""}", color = C.Ink, style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f))
+                    Text("Réessayer", color = C.TealDark, style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { scopeUi.launch { data?.flushAndRefresh() } }.heightIn(min = 48.dp).wrapContentHeight(Alignment.CenterVertically).padding(horizontal = 8.dp))
                 }
                 Column(Modifier.weight(1f).fillMaxWidth().imePadding()) {
                     NavHost(nav, startDestination = start, modifier = Modifier.weight(1f)) {

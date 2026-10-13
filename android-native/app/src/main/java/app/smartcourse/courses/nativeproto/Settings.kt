@@ -95,18 +95,19 @@ fun DisplayScreen(onBack: () -> Unit) {
         Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SCard(padding = PaddingValues(vertical = 4.dp)) {
                 SwitchRow("Prix indicatifs", "Affiche le prix unitaire dans les listes et le panneau de quantité.", demo.showPrices) {
-                    demo.showPrices = it; if (!it) demo.showTotals = false
+                    val d = demo.data
+                    if (d != null) d.setPrefs(it, demo.showTotals && it) else { demo.showPrices = it; if (!it) demo.showTotals = false }
                 }
                 HorizontalDivider(color = C.Line.copy(alpha = 0.6f), modifier = Modifier.padding(horizontal = 16.dp))
                 SwitchRow(
                     "Total estimé", if (demo.showPrices) "Affiche une estimation du montant de la liste." else "Nécessite les prix indicatifs.",
                     demo.showTotals, enabled = demo.showPrices,
-                ) { demo.showTotals = it }
+                ) { val d = demo.data; if (d != null) d.setPrefs(demo.showPrices || it, it) else demo.showTotals = it }
             }
             SCard(padding = PaddingValues(16.dp)) {
                 Text("Mode de sélection préféré", style = MaterialTheme.typography.titleSmall)
                 Spacer(Modifier.height(10.dp))
-                SegTabs(SelMode.entries.map { it.label }, demo.selMode.ordinal, { demo.selMode = SelMode.entries[it] })
+                SegTabs(SelMode.entries.map { it.label }, demo.selMode.ordinal, { val m = SelMode.entries[it]; demo.data?.setSelMode(m) ?: run { demo.selMode = m } })
             }
             Row(Modifier.padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Icon(Icons.Rounded.Info, null, tint = C.Muted, modifier = Modifier.size(18.dp))

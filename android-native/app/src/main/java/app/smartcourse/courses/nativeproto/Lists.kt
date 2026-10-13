@@ -32,6 +32,8 @@ private fun pct(done: Int, total: Int) = if (total == 0) 0 else (done * 100) / t
 @Composable
 fun AdminListScreen(nav: (String) -> Unit) {
     val demo = LocalDemo.current
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    var editId by remember { mutableStateOf<String?>(null) }
     var menu by remember { mutableStateOf(Launch.once("menu")) }
     var confirmClose by remember { mutableStateOf(Launch.once("confirm")) }
     var confirmFinish by remember { mutableStateOf(false) }
@@ -43,7 +45,7 @@ fun AdminListScreen(nav: (String) -> Unit) {
     val groups = demo.lines.groupBy { demo.byId[it.productId]!!.category }
 
     Column(Modifier.fillMaxSize()) {
-        TopBar("Ma liste", "Lundi 12 mai", actions = {
+        TopBar("Ma liste", demo.listDate, actions = {
             Box {
                 IconButton({ menu = true }) { Icon(Icons.Rounded.MoreVert, "Plus d'actions", tint = C.Ink) }
                 DropdownMenu(menu, { menu = false }, containerColor = Color.White, shape = RoundedCornerShape(16.dp)) {
@@ -55,7 +57,7 @@ fun AdminListScreen(nav: (String) -> Unit) {
                     DropdownMenuItem(
                         text = { Text("Partager la liste") },
                         leadingIcon = { Icon(Icons.Rounded.Share, null, tint = C.Ink) },
-                        onClick = { menu = false; demo.simulated("partage de la liste") },
+                        onClick = { menu = false; if (demo.live) shareList(ctx, demo) else demo.simulated("partage de la liste") },
                     )
                 }
             }
@@ -105,8 +107,16 @@ fun AdminListScreen(nav: (String) -> Unit) {
             }
             if (total == 0) item {
                 Column(Modifier.fillMaxWidth().padding(top = 36.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("La liste est vide.", style = MaterialTheme.typography.titleSmall)
-                    Text("Ajoutez des articles pour commencer.", style = MaterialTheme.typography.bodySmall)
+                    if (demo.live && !demo.listLoaded) Text("Chargement de la liste…", style = MaterialTheme.typography.bodyMedium, color = C.Muted)
+                    else if (demo.live && !demo.hasList) {
+                        Text("Aucune liste en cours.", style = MaterialTheme.typography.titleSmall)
+                        Text("Créez la liste de vos prochaines courses.", style = MaterialTheme.typography.bodySmall)
+                        Spacer(Modifier.height(14.dp))
+                        PrimaryButton("Créer une liste", { demo.data?.createList() }, leading = Icons.Rounded.Add)
+                    } else {
+                        Text("La liste est vide.", style = MaterialTheme.typography.titleSmall)
+                        Text("Ajoutez des articles pour commencer.", style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             }
             groups.forEach { (cat, lines) ->
@@ -123,20 +133,22 @@ fun AdminListScreen(nav: (String) -> Unit) {
                 if (!closed) item(key = "c-$cat") {
                     SCard {
                         lines.forEachIndexed { i, l ->
-                            val p = demo.byId[l.productId]!!
+                            val p = demo.byId[l.productId] ?: return@forEachIndexed
                             if (i > 0) HorizontalDivider(color = C.Line.copy(alpha = 0.6f), modifier = Modifier.padding(start = 66.dp))
                             Row(
-                                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp).heightIn(min = 48.dp),
+                                Modifier.fillMaxWidth().then(if (!l.bought) Modifier.clickable { editId = p.id } else Modifier).padding(horizontal = 12.dp, vertical = 8.dp).heightIn(min = 48.dp),
                                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
-                                Photo(p.photo, 44.dp, radius = 10.dp)
+                                ProductPhoto(p, 44.dp, radius = 10.dp)
                                 Column(Modifier.weight(1f).alpha(if (l.bought) 0.55f else 1f)) {
                                     Text(p.name, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                    val price = demo.prices[p.id]
+                                    val price = demo.priceLabel(p, l)
                                     Text(
-                                        qtyText(p, l.qty) + if (demo.showPrices && price != null) "  ·  ${priceText(price, p)}" else "",
+                                        qtyText(p, l.qty) + if (demo.showPrices && price != null) "  ·  $price" else "",
                                         style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis,
                                     )
+                                    if (l.pending) Text("En attente d'envoi", style = MaterialTheme.typography.labelSmall, color = C.Amber)
+                                    else if (l.bought && l.buyer != null) Text("Acheté par ${l.buyer}" + (l.boughtAt?.let { " · $it" } ?: ""), style = MaterialTheme.typography.labelSmall, color = C.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 }
                                 CheckBox(l.bought, { demo.setBought(p.id, it) })
                             }
@@ -152,16 +164,26 @@ fun AdminListScreen(nav: (String) -> Unit) {
         ConfirmDialog(
             "Clôturer la liste ?",
             if (left == 0) "La liste sera archivée dans l'historique." else "Il reste $left article${if (left > 1) "s" else ""} non acheté${if (left > 1) "s" else ""}. La liste sera archivée dans l'historique.",
-            "Clôturer", { confirmClose = false; demo.simulated("clôture de la liste"); nav("v06") }, { confirmClose = false },
+            "Clôturer", { confirmClose = false; val d = demo.data; if (d != null) d.closeList { ok -> if (ok) nav("v06") } else { demo.simulated("clôture de la liste"); nav("v06") } }, { confirmClose = false },
         )
     }
     if (confirmFinish) {
         ConfirmDialog(
             "Terminer les courses ?", "Tout est acheté. La liste sera archivée dans l'historique.",
-            "Terminer", { confirmFinish = false; demo.simulated("fin des courses"); nav("v06") }, { confirmFinish = false },
+            "Terminer", { confirmFinish = false; val d = demo.data; if (d != null) d.closeList { ok -> if (ok) nav("v06") } else { demo.simulated("fin des courses"); nav("v06") } }, { confirmFinish = false },
         )
     }
-    if (favs) {
+    editId?.let { id ->
+        val p = demo.byId[id]
+        val line = demo.lines.firstOrNull { it.productId == id }
+        if (p != null && line != null) QuantitySheet(
+            p, line.qty, demo.showPrices, demo.priceLabel(p, line), focusInput = false,
+            onDismiss = { editId = null }, onConfirm = { demo.setLineQty(id, it); editId = null },
+            onRemove = { demo.removeLine(id); editId = null }, removeLabel = "Retirer de la liste", confirmLabel = "Mettre à jour",
+        ) else editId = null
+    }
+    if (favs && demo.live) FavoritesSheet({ favs = false })
+    else if (favs) {
         AppSheet({ favs = false }) {
             Text("Favoris", style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.height(8.dp))
@@ -188,7 +210,7 @@ fun StaffListScreen(nav: (String) -> Unit) {
     val shown = demo.lines.filter { when (filter) { 1 -> !it.bought; 2 -> it.bought; else -> true } }
 
     Column(Modifier.fillMaxSize()) {
-        TopBar("Liste du jour", "Lundi 12 mai")
+        TopBar("Liste du jour", demo.listDate)
         if (total == 0) {
             Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                 Box(Modifier.size(88.dp).clip(CircleShape).background(C.TealSoft), contentAlignment = Alignment.Center) {
@@ -222,18 +244,18 @@ fun StaffListScreen(nav: (String) -> Unit) {
                     Text(if (filter == 1) "Tout est acheté." else "Rien n'est encore acheté.", style = MaterialTheme.typography.bodyMedium, color = C.Muted, modifier = Modifier.padding(top = 16.dp))
                 }
                 items(shown, key = { it.productId }) { l ->
-                    val p = demo.byId[l.productId]!!
+                    val p = demo.byId[l.productId] ?: return@items
                     SCard(padding = PaddingValues(12.dp)) {
                         Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                            Photo(p.photo, 72.dp, radius = 16.dp, modifier = Modifier.alpha(if (l.bought) 0.6f else 1f))
+                            ProductPhoto(p, 72.dp, radius = 16.dp, modifier = Modifier.alpha(if (l.bought) 0.6f else 1f))
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text(p.name, style = MaterialTheme.typography.titleMedium.copy(fontSize = 17.sp), maxLines = 2, overflow = TextOverflow.Ellipsis)
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Pill(qtyText(p, l.qty), C.Ink, Color(0xFFE8F0F7))
-                                    if (l.bought) Pill("Acheté", C.TealDark, C.TealSoft) else Pill("À acheter", C.Amber, C.AmberSoft)
+                                    if (l.bought) Pill("Acheté", C.TealDark, C.TealSoft) else if (l.pending) Pill("En attente d'envoi", C.Amber, C.AmberSoft) else Pill("À acheter", C.Amber, C.AmberSoft)
                                 }
-                                val price = demo.prices[p.id]
-                                if (demo.showPrices && price != null) Text(priceText(price, p), style = MaterialTheme.typography.bodySmall)
+                                val price = demo.priceLabel(p, l)
+                                if (demo.showPrices && price != null) Text(price, style = MaterialTheme.typography.bodySmall)
                             }
                         }
                         if (!l.bought) {
@@ -254,4 +276,15 @@ fun StaffListScreen(nav: (String) -> Unit) {
             }
         }
     }
+}
+
+
+/** Partage du texte de la liste (messagerie, notes…) : uniquement les articles et quantités. */
+fun shareList(ctx: android.content.Context, demo: Demo) {
+    val text = buildString {
+        append("Liste de courses — ${demo.listDate}\n")
+        demo.lines.filter { !it.bought }.forEach { l -> demo.byId[l.productId]?.let { p -> append("• ${p.name} : ${qtyText(p, l.qty)}\n") } }
+    }
+    val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(android.content.Intent.EXTRA_TEXT, text) }
+    try { ctx.startActivity(android.content.Intent.createChooser(send, "Partager la liste").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) { demo.say("Aucune application de partage disponible.") }
 }

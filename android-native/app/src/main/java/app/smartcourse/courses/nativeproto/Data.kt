@@ -9,6 +9,8 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import app.smartcourse.courses.nativeproto.net.PriceRef
+import app.smartcourse.courses.nativeproto.net.fmtPrice
 import java.util.Locale
 
 /** Paramètres de lancement (adb) : servent uniquement à ouvrir un écran dans un état précis pour les captures. */
@@ -41,6 +43,9 @@ data class Product(
     val countLabel: String = "pièce",
     val basePrice: Int?,       // centimes de DH par kg / L / pièce — valeurs fictives
     val inCatalog: Boolean,
+    val photoUrl: String? = null,     // données réelles : photo du serveur
+    val serverUnit: String = "",      // données réelles : unité du serveur (kg, litre, piece, paquet…)
+    val price: PriceRef? = null,      // données réelles : prix indicatif en vigueur
 )
 
 fun fmtNum(v: Double): String {
@@ -76,15 +81,20 @@ enum class Role { ADMIN, STAFF }
 enum class SelMode(val label: String) { LIST("Liste"), GRID("Carrés"), CARDS("Grandes cartes") }
 enum class ProfRole(val label: String) { ADMIN("Administrateur"), PARENT("Parent"), STAFF("Personnel") }
 
-data class Line(val productId: String, val qty: Int, val bought: Boolean)
+data class Line(
+    val productId: String, val qty: Int, val bought: Boolean,
+    val itemId: String? = null, val rev: Int = 0, val purchaseId: String? = null,
+    val buyer: String? = null, val boughtAt: String? = null, val pending: Boolean = false, val price: PriceRef? = null,
+)
 data class Profile(val name: String, val role: ProfRole, val primary: Boolean = false, val active: Boolean = true, val color: Color)
 data class Order(val id: String, val date: String, val lines: List<Pair<String, Int>>)
 data class Toast(val message: String, val undoLabel: String? = null, val undo: (() -> Unit)? = null)
 
-class Demo(initialRole: Role? = null) {
+class Demo(initialRole: Role? = null, val live: Boolean = false) {
     private val long = Launch.flag("long")
 
-    val products: List<Product> = buildList {
+    var products: List<Product> by mutableStateOf(buildList<Product> {
+        if (live) return@buildList
         if (long) add(Product("long", "Boisson végétale à l'avoine sans sucres ajoutés, grande bouteille familiale", R.drawable.p_lait, "Boissons", UnitKind.VOLUME, basePrice = 2490, inCatalog = true))
         add(Product("tomates", "Tomates", R.drawable.p_tomates, "Fruits et légumes", UnitKind.MASS, basePrice = 290, inCatalog = true))
         add(Product("pommes-de-terre", "Pommes de terre", R.drawable.p_pommes_de_terre, "Fruits et légumes", UnitKind.MASS, basePrice = 350, inCatalog = true))
@@ -112,8 +122,8 @@ class Demo(initialRole: Role? = null) {
         add(Product("poulet", "Poulet", R.drawable.p_poulet, "Viandes et poissons", UnitKind.MASS, basePrice = 3500, inCatalog = false))
         add(Product("eau", "Eau minérale", R.drawable.p_eau_minerale, "Boissons", UnitKind.VOLUME, basePrice = 250, inCatalog = true))
         add(Product("the", "Thé", R.drawable.p_the, "Boissons", UnitKind.COUNT, "boîte", 1800, false))
-    }
-    val byId: Map<String, Product> = products.associateBy { it.id }
+    })
+    var byId: Map<String, Product> by mutableStateOf(products.associateBy { it.id })
 
     var role by mutableStateOf(initialRole ?: if (Launch.str("role") == "staff") Role.STAFF else Role.ADMIN)
     var showPrices by mutableStateOf(Launch.flag("prices"))
@@ -129,7 +139,7 @@ class Demo(initialRole: Role? = null) {
     val selection = mutableStateMapOf<String, Int>()
     val lines = mutableStateListOf<Line>().apply {
         val allBought = Launch.str("state") == "allbought"
-        val empty = Launch.str("state") == "empty"
+        val empty = Launch.str("state") == "empty" || live
         if (!empty) {
             if (long) add(Line("long", 1000, false))
             add(Line("tomates", 2000, true))
@@ -155,19 +165,32 @@ class Demo(initialRole: Role? = null) {
     )
     val deletedOrders = mutableStateListOf<String>()
 
+    /** Données réelles (null : écrans de démonstration, données fictives). */
+    var data: AppData? = null
+    var pendingOps by mutableStateOf(0)
+    var orphanCount by mutableStateOf(0)
+    var listLoaded by mutableStateOf(!live)
+    var hasList by mutableStateOf(true)
+    var listDate by mutableStateOf("Lundi 12 mai")
+
     fun say(msg: String, undoLabel: String? = null, undo: (() -> Unit)? = null) { toast = Toast(msg, undoLabel, undo) }
     fun simulated(what: String) = say("Action simulée : $what")
 
     val boughtCount get() = lines.count { it.bought }
-    fun setBought(id: String, v: Boolean) { val i = lines.indexOfFirst { it.productId == id }; if (i >= 0) lines[i] = lines[i].copy(bought = v) }
-    fun setLineQty(id: String, q: Int) { val i = lines.indexOfFirst { it.productId == id }; if (i >= 0) lines[i] = lines[i].copy(qty = q) }
-    fun removeLine(id: String) { lines.removeAll { it.productId == id } }
+    fun setBought(id: String, v: Boolean) { data?.let { it.setBought(id, v); return }; val i = lines.indexOfFirst { it.productId == id }; if (i >= 0) lines[i] = lines[i].copy(bought = v) }
+    fun setLineQty(id: String, q: Int) { data?.let { it.setQty(id, q); return }; val i = lines.indexOfFirst { it.productId == id }; if (i >= 0) lines[i] = lines[i].copy(qty = q) }
+    fun removeLine(id: String) { data?.let { it.remove(id); return }; lines.removeAll { it.productId == id } }
+
+    /** Texte du prix indicatif d'un produit (ou null s'il n'y en a pas). */
+    fun priceLabel(p: Product, line: Line? = null): String? =
+        if (live) (line?.price ?: p.price)?.let { fmtPrice(it) } else prices[p.id]?.let { priceText(it, p) }
 }
 
 val LocalDemo = compositionLocalOf<Demo> { error("Demo manquant") }
 
 /** Estimation indicative de la liste : (montant en centimes de DH, nombre d'articles sans prix). Jamais un montant payé. */
 fun Demo.estimate(): Pair<Long, Int> {
+    data?.let { return it.estimate() }
     var total = 0L
     var missing = 0
     lines.forEach { l ->
@@ -178,3 +201,19 @@ fun Demo.estimate(): Pair<Long, Int> {
     }
     return total to missing
 }
+
+
+/* ───────────── Conversion des unités du serveur ───────────── */
+
+fun unitKindOf(serverUnit: String): UnitKind = when (serverUnit) { "kg" -> UnitKind.MASS; "litre" -> UnitKind.VOLUME; else -> UnitKind.COUNT }
+
+fun countLabelOf(serverUnit: String): String = when (serverUnit) { "piece" -> "pièce"; "boite" -> "boîte"; else -> serverUnit }
+
+/** Quantité du serveur (kg, litres ou unités) → entier de l'application (g, ml ou unités). */
+fun toBase(serverUnit: String, q: Double): Int = if (unitKindOf(serverUnit) == UnitKind.COUNT) Math.round(q).toInt() else Math.round(q * 1000).toInt()
+
+fun toServer(serverUnit: String, base: Int): Double = if (unitKindOf(serverUnit) == UnitKind.COUNT) base.toDouble() else base / 1000.0
+
+/** Quantité en texte décimal exact pour le calcul des prix. */
+fun serverQtyText(serverUnit: String, base: Int): String =
+    if (unitKindOf(serverUnit) == UnitKind.COUNT) base.toString() else java.math.BigDecimal(base).movePointLeft(3).stripTrailingZeros().toPlainString()

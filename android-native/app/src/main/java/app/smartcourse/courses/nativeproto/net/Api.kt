@@ -1,6 +1,8 @@
 package app.smartcourse.courses.nativeproto.net
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -36,7 +38,11 @@ data class Me(
     val city: String? = null,
     val family: FamilyInfo? = null,
     val primary: Boolean? = null,
+    val prefs: Prefs? = null,
 )
+
+@Serializable
+data class Prefs(val showPrices: Boolean = false, val showTotals: Boolean = false, val rev: Long = 0)
 
 enum class Failure {
     INVALID_CREDENTIALS, RATE_LIMITED, SETUP_INCOMPLETE, SESSION_EXPIRED,
@@ -123,6 +129,37 @@ class ApiClient(private val store: SessionStorage, client: OkHttpClient? = null)
         }
         if (out is Outcome.Fail && out.failure == Failure.SESSION_EXPIRED) onSessionExpired?.invoke()
         return out
+    }
+
+    /**
+     * Flux d'événements du serveur (SSE) : appelle [onEvent] pour chaque événement (« ready », « list.updated »…) jusqu'à la coupure.
+     * Se termine par Ok quand le serveur ferme proprement, sinon par la cause. Annulable : l'annulation de la coroutine ferme la connexion.
+     */
+    suspend fun stream(path: String, onOpen: () -> Unit, onEvent: (String) -> Unit): Outcome<Unit> = withContext(Dispatchers.IO) {
+        val base = store.server ?: return@withContext Outcome.Fail(Failure.BAD_ADDRESS)
+        if (store.cookie == null) return@withContext Outcome.Fail(Failure.SESSION_EXPIRED)
+        val client = http.newBuilder().readTimeout(70, TimeUnit.SECONDS).build()
+        val call = client.newCall(builder(base, path, true).header("Accept", "text/event-stream").get().build())
+        val handle = coroutineContext[Job]?.invokeOnCompletion { call.cancel() }
+        try {
+            call.execute().use { r ->
+                if (r.code == 401) { onSessionExpired?.invoke(); return@withContext Outcome.Fail(Failure.SESSION_EXPIRED, 401) }
+                if (r.code != 200) return@withContext Outcome.Fail(if (r.code in 500..599) Failure.SERVER_ERROR else Failure.UNKNOWN, r.code)
+                onOpen()
+                val src = r.body!!.source()
+                var ev: String? = null
+                while (true) {
+                    val line = src.readUtf8Line() ?: break
+                    if (line.startsWith("event:")) ev = line.substring(6).trim()
+                    else if (line.isEmpty()) { ev?.let(onEvent); ev = null }
+                }
+                Outcome.Ok(Unit)
+            }
+        } catch (e: Exception) {
+            Outcome.Fail(map(e))
+        } finally {
+            handle?.dispose()
+        }
     }
 
     private fun map(e: Exception): Failure = when {
