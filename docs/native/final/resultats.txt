@@ -17,11 +17,11 @@ PASS  C4. code faux refusé avec un message clair
 PASS  C4b. code expiré : message clair, proposition d'un nouveau code
 PASS  C4c. nouveau code envoyé (2 e-mails au total)
 PASS  C5. famille créée et utilisateur connecté : code famille affiché
-PASS  C5b. code famille généré (39WSP8V8) affiché à l'écran
-FAIL  C5c. serveur : une seule famille créée, administrateur principal, adresse vérifiée
-      écran : "Close sheet"|"Votre famille est créée"|"Voici le code famille. Les autres membres en auront besoin, avec l'identifiant et le code d'accès que vous leur créerez dans Réglages → Profils."|"39WSP8V8"|"Copier"|"Partager"|"Préparer mes courses"|
-FAIL  C6. Copier : confirmation
-      écran : "Close sheet"|"Votre famille est créée"|"Voici le code famille. Les autres membres en auront besoin, avec l'identifiant et le code d'accès que vous leur créerez dans Réglages → Profils."|"39WSP8V8"|"Copier"|"Partager"|"Préparer mes courses"|
+PASS  C5b. code famille généré (CE8A46U4) affiché à l'écran
+PASS  C5c. serveur : une seule famille créée (1 → 2)
+FAIL  C5d. serveur : administrateur principal, adresse vérifiée, ville, identifiant (« true true Casablanca Anfa karim »)
+      écran : "Close sheet"|"Votre famille est créée"|"Voici le code famille. Les autres membres en auront besoin, avec l'identifiant et le code d'accès que vous leur créerez dans Réglages → Profils."|"CE8A46U4"|"Copier"|"Partager"|"Préparer mes courses"|
+PASS  C6. Copier : confirmation visible dans le panneau
 PASS  C7. Partager : fenêtre de partage Android
 PASS  C8. « Préparer mes courses » ouvre la sélection des articles
 PASS  C9. doublon : la même adresse ne crée pas une seconde famille (409 email_in_use)
@@ -87,5 +87,5 @@ PASS  J6d. reste sur Choisir
 PASS  J7. reprise : demande (Tomates 1,5 kg) et brouillon (Carottes) repris dans la sélection
 PASS  J7b. serveur : nouvelle liste du jour avec les articles repris (Carottes 1.000 to_buy,Tomates 1.500 to_buy)
 PASS  J7c. les listes archivées restent intactes
-ECHECS=2
+ECHECS=1
 CRASH_APPLICATION=0
