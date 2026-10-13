@@ -52,9 +52,9 @@ PASS  E5. recherche réelle
 PASS  E8. compteur de la recherche « Tomates » mis à jour (2 → 1)
 PASS  E7. message avec « Annuler »
 PASS  E6. article retiré côté serveur
-FAIL  E9. retrait annulé : l'article est de retour (réversible)
+PASS  E9. retrait annulé : l'article est de retour (réversible)
 PASS  E10. ajout depuis le catalogue complet : un article de plus (80 → 81)
 PASS  E11. compteurs côté serveur cohérents après ajout
 PASS  E12. filtre par catégorie (Fruits) : compteur réel 31
-ECHECS=1
+ECHECS=0
 CRASH_APPLICATION=0
