@@ -46,8 +46,8 @@ async function family() {
   return { admin, add, products };
 }
 const addOp = (productId: string, quantity?: number) => ({ opId: randomUUID(), type: "add", productId, ...(quantity ? { quantity } : {}) });
-const post = (cookies: object, ops: object[], batchId = randomUUID()) => app.inject({ method: "POST", url: "/api/lists/active/ops", cookies, payload: { ops, batch: { id: batchId } } });
-const active = async (f: { admin: object }) => (await app.inject({ method: "GET", url: "/api/lists/active", cookies: f.admin })).json().list;
+const post = (cookies: object, ops: object[], batchId = randomUUID()) => app.inject({ method: "POST", url: "/api/lists/active/ops", cookies: cookies as Record<string, string>, payload: { ops, batch: { id: batchId } } });
+const active = async (f: { admin: object }) => (await app.inject({ method: "GET", url: "/api/lists/active", cookies: f.admin as Record<string, string> })).json().list;
 const nActive = async () => (await db.query("SELECT count(*)::int AS n FROM lists WHERE status = 'active'")).rows[0].n as number;
 
 describe("demandes du personnel sans liste", () => {
