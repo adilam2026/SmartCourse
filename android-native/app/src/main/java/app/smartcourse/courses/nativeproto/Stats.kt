@@ -32,7 +32,7 @@ private val CATS = listOf("Fruits et légumes" to 0.38f, "Épicerie" to 0.27f, "
 /* ───────────── V12 — Statistiques ───────────── */
 
 @Composable
-fun StatsScreen() {
+fun StatsScreenSim() {
     var period by remember { mutableIntStateOf(1) }
     var help by remember { mutableStateOf(Launch.once("help")) }
     val d = PERIODS[period]
@@ -89,7 +89,7 @@ fun StatsScreen() {
 }
 
 @Composable
-private fun Kpi(label: String, value: String, modifier: Modifier, tag: String? = null, tagFg: Color = C.Muted, tagBg: Color = Color.Transparent) {
+internal fun Kpi(label: String, value: String, modifier: Modifier, tag: String? = null, tagFg: Color = C.Muted, tagBg: Color = Color.Transparent) {
     SCard(modifier, padding = PaddingValues(14.dp)) {
         Text(label, style = MaterialTheme.typography.bodySmall, maxLines = 1)
         Spacer(Modifier.height(4.dp))

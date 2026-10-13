@@ -67,22 +67,7 @@ fun AdminHubScreen(nav: (String) -> Unit) {
             Spacer(Modifier.height(16.dp))
         }
     }
-    if (reset) ConfirmDialog(
-        "Réinitialiser la famille ?", "Les listes et l'historique de la famille seront effacés. Cette action est définitive.",
-        "Réinitialiser", { reset = false; demo.simulated("réinitialisation (rien n'est effacé dans ce prototype)") }, { reset = false }, danger = true,
-    )
-}
-
-@Composable
-fun StubScreen(title: String, onBack: () -> Unit) {
-    Column(Modifier.fillMaxSize()) {
-        TopBar(title, onBack = onBack)
-        Column(Modifier.weight(1f).fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-            Pill("Hors du périmètre visuel", C.Amber, C.AmberSoft)
-            Spacer(Modifier.height(12.dp))
-            Text("Cet écran sera conçu à une étape ultérieure.", style = MaterialTheme.typography.bodyMedium, color = C.Muted, textAlign = TextAlign.Center)
-        }
-    }
+    if (reset) ResetFamilySheet { reset = false }
 }
 
 /* ───────────── V11 — Affichage ───────────── */

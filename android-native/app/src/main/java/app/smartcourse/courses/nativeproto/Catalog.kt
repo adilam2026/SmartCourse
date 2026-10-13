@@ -106,7 +106,7 @@ fun CatalogScreenSim(onBack: () -> Unit) {
 /* ───────────── V10 — Gestion des prix ───────────── */
 
 @Composable
-fun PricesScreen(onBack: () -> Unit) {
+fun PricesScreenSim(onBack: () -> Unit) {
     val demo = LocalDemo.current
     var query by remember { mutableStateOf("") }
     var cat by remember { mutableStateOf<String?>(null) }
@@ -156,7 +156,7 @@ fun PricesScreen(onBack: () -> Unit) {
 }
 
 @Composable
-private fun PricePill(text: String?, onClick: () -> Unit) {
+internal fun PricePill(text: String?, onClick: () -> Unit) {
     val shape = RoundedCornerShape(12.dp)
     if (text != null) Box(
         Modifier.heightIn(min = 40.dp).widthIn(min = 110.dp).soft(shape, 1.dp).clip(shape).background(Color.White).border(BorderStroke(1.dp, C.Line), shape)

@@ -110,23 +110,7 @@ class ApiClient(private val store: SessionStorage, client: OkHttpClient? = null)
         if (store.cookie == null) return Outcome.Fail(Failure.SESSION_EXPIRED)
         val rb = body?.toString()?.toRequestBody(media) ?: if (method == "GET" || method == "DELETE") null else "{}".toRequestBody(media)
         val req = builder(base, path, true).method(method, rb).build()
-        val out = exec(req) { r, text ->
-            val code = errorCode(text)
-            when {
-                r.code in 200..299 -> {
-                    val obj = try { if (text.isBlank()) JsonObject(emptyMap()) else json.parseToJsonElement(text).jsonObject } catch (_: Exception) { null }
-                    if (obj == null) Outcome.Fail(Failure.NOT_COURSES_SERVER, r.code) else Outcome.Ok(obj)
-                }
-                r.code == 401 -> Outcome.Fail(Failure.SESSION_EXPIRED, r.code, code)
-                r.code == 403 -> Outcome.Fail(if (code == "setup_incomplete") Failure.SETUP_INCOMPLETE else Failure.FORBIDDEN, r.code, code)
-                r.code == 404 -> Outcome.Fail(Failure.NOT_FOUND, r.code, code)
-                r.code == 409 -> Outcome.Fail(Failure.CONFLICT, r.code, code)
-                r.code == 429 -> Outcome.Fail(Failure.RATE_LIMITED, r.code, code)
-                r.code in 400..499 -> Outcome.Fail(Failure.BAD_REQUEST, r.code, code)
-                r.code in 500..599 -> Outcome.Fail(Failure.SERVER_ERROR, r.code, code)
-                else -> Outcome.Fail(Failure.UNKNOWN, r.code, code)
-            }
-        }
+        val out = exec(req) { r, text -> classify(r, text) }
         if (out is Outcome.Fail && out.failure == Failure.SESSION_EXPIRED) onSessionExpired?.invoke()
         return out
     }
@@ -160,6 +144,31 @@ class ApiClient(private val store: SessionStorage, client: OkHttpClient? = null)
         } finally {
             handle?.dispose()
         }
+    }
+
+    private fun classify(r: Response, text: String): Outcome<JsonObject> {
+        val code = errorCode(text)
+        return when {
+            r.code in 200..299 -> {
+                val obj = try { if (text.isBlank()) JsonObject(emptyMap()) else json.parseToJsonElement(text).jsonObject } catch (_: Exception) { null }
+                if (obj == null) Outcome.Fail(Failure.NOT_COURSES_SERVER, r.code) else Outcome.Ok(obj)
+            }
+            r.code == 401 -> Outcome.Fail(Failure.SESSION_EXPIRED, r.code, code)
+            r.code == 403 -> Outcome.Fail(if (code == "setup_incomplete") Failure.SETUP_INCOMPLETE else Failure.FORBIDDEN, r.code, code)
+            r.code == 404 -> Outcome.Fail(Failure.NOT_FOUND, r.code, code)
+            r.code == 409 -> Outcome.Fail(Failure.CONFLICT, r.code, code)
+            r.code == 429 -> Outcome.Fail(Failure.RATE_LIMITED, r.code, code)
+            r.code in 400..499 -> Outcome.Fail(Failure.BAD_REQUEST, r.code, code)
+            r.code in 500..599 -> Outcome.Fail(Failure.SERVER_ERROR, r.code, code)
+            else -> Outcome.Fail(Failure.UNKNOWN, r.code, code)
+        }
+    }
+
+    /** Requête sans session (récupération par e-mail, création de famille) : le cookie n'est jamais envoyé ni conservé. */
+    suspend fun callPublic(method: String, path: String, body: JsonObject): Outcome<JsonObject> {
+        val base = store.server ?: return Outcome.Fail(Failure.BAD_ADDRESS)
+        val req = builder(base, path, false).method(method, body.toString().toRequestBody(media)).build()
+        return exec(req) { r, text -> classify(r, text) }
     }
 
     private fun map(e: Exception): Failure = when {

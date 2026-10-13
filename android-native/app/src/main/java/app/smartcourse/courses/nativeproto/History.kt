@@ -23,10 +23,10 @@ import androidx.compose.ui.unit.dp
 
 /** Menu « … » d'une commande : Recommander et Supprimer, visibles et explicites. */
 @Composable
-private fun OrderMenu(expanded: Boolean, onDismiss: () -> Unit, onReorder: () -> Unit, onDelete: () -> Unit) {
+internal fun OrderMenu(expanded: Boolean, onDismiss: () -> Unit, onReorder: () -> Unit, onDelete: () -> Unit, canDelete: Boolean = true) {
     DropdownMenu(expanded, onDismiss, containerColor = Color.White, shape = RoundedCornerShape(16.dp)) {
         DropdownMenuItem(text = { Text("Recommander") }, leadingIcon = { Icon(Icons.Rounded.Replay, null, tint = C.Ink) }, onClick = { onDismiss(); onReorder() })
-        DropdownMenuItem(
+        if (canDelete) DropdownMenuItem(
             text = { Text("Supprimer", color = C.Danger) }, leadingIcon = { Icon(Icons.Rounded.Delete, null, tint = C.Danger) },
             onClick = { onDismiss(); onDelete() },
         )
@@ -34,7 +34,7 @@ private fun OrderMenu(expanded: Boolean, onDismiss: () -> Unit, onReorder: () ->
 }
 
 @Composable
-fun HistoryScreen(nav: (String) -> Unit) {
+fun HistoryScreenSim(nav: (String) -> Unit) {
     val demo = LocalDemo.current
     var menuFor by remember { mutableStateOf(Launch.strOnce("omenu")) }
     var deleteFor by remember { mutableStateOf<String?>(null) }
@@ -83,7 +83,7 @@ fun HistoryScreen(nav: (String) -> Unit) {
 }
 
 @Composable
-fun HistoryDetailScreen(id: String, nav: (String) -> Unit, onBack: () -> Unit) {
+fun HistoryDetailScreenSim(id: String, nav: (String) -> Unit, onBack: () -> Unit) {
     val demo = LocalDemo.current
     val o = demo.history.firstOrNull { it.id == id } ?: return
     var menu by remember { mutableStateOf(Launch.once("menu")) }

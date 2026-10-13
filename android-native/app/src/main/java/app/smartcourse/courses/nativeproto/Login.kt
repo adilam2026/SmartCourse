@@ -95,6 +95,7 @@ fun LoginScreen(session: Session?, onSimulated: (Role) -> Unit) {
     var tab by remember { mutableIntStateOf(if (Launch.str("tab") == "first") 1 else 0) }
     var sub by remember { mutableIntStateOf(if (Launch.str("sub") == "create") 1 else 0) }
     var help by remember { mutableStateOf(Launch.once("help")) }
+    var helpKind by remember { mutableIntStateOf(0) }
     var family by remember { mutableStateOf(session?.storage?.lastFamily ?: "") }
     var login by remember { mutableStateOf(session?.storage?.lastLogin ?: "") }
     var code by remember { mutableStateOf("") }
@@ -183,7 +184,17 @@ fun LoginScreen(session: Session?, onSimulated: (Role) -> Unit) {
             } else {
                 SegTabs(listOf("Rejoindre une famille", "Créer ma famille"), sub, { sub = it })
                 Spacer(Modifier.height(12.dp))
-                if (sub == 0) {
+                if (session != null && sub == 0) {
+                    SCard(padding = PaddingValues(16.dp)) {
+                        Text("Votre profil est créé par un administrateur", style = MaterialTheme.typography.titleMedium)
+                        Spacer(Modifier.height(6.dp))
+                        Text("Demandez à un administrateur de la famille de créer votre profil : il vous donnera le code famille, votre identifiant et un code d'accès à 6 chiffres. Vous pourrez alors vous connecter.", style = MaterialTheme.typography.bodyMedium)
+                        Spacer(Modifier.height(12.dp))
+                        PrimaryButton("Aller à la connexion", { tab = 0 }, Modifier.fillMaxWidth())
+                    }
+                } else if (session != null) {
+                    CreateFamilyForm(session) { fc, lg -> family = fc; login = lg; tab = 0 }
+                } else if (sub == 0) {
                     FormField(family, { family = it }, "Code famille", leading = Icons.Rounded.Group)
                     Spacer(Modifier.height(10.dp))
                     FormField(login, { login = it }, "Votre prénom", leading = Icons.Rounded.Person)
@@ -212,15 +223,20 @@ fun LoginScreen(session: Session?, onSimulated: (Role) -> Unit) {
     }
 
     if (serverSheet && session != null) ServerSheet(session) { serverSheet = false }
+    if (session != null) when (helpKind) {
+        1 -> RecoveryHelpSheet(session, true) { helpKind = 0 }
+        2 -> RecoveryHelpSheet(session, false) { helpKind = 0 }
+        3 -> AskAdminSheet("Code famille inconnu", "Le code famille se trouve dans l'écran Compte d'un administrateur de la famille. Demandez-le lui, ou utilisez « Récupérer ma famille » si vous êtes l'administrateur principal.") { helpKind = 0 }
+    }
     if (help) {
         AppSheet({ help = false }) {
             Text("Besoin d'aide ?", style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.height(4.dp))
             Text("Choisissez ce qui vous correspond.", style = MaterialTheme.typography.bodySmall)
             Spacer(Modifier.height(10.dp))
-            HelpRow(Icons.Rounded.Key, "J'ai oublié mon code d'accès", "Demander un nouveau code à l'administrateur") { help = false; demo.simulated("demande de nouveau code") }
-            HelpRow(Icons.Rounded.Email, "Récupérer ma famille", "Recevoir un lien par e-mail") { help = false; demo.simulated("envoi du lien de récupération") }
-            HelpRow(Icons.Rounded.Group, "Je ne connais pas le code famille", "Le demander à un administrateur de la famille") { help = false; demo.simulated("aide code famille") }
+            HelpRow(Icons.Rounded.Key, "J'ai oublié mon code d'accès", "Administrateur principal : lien par e-mail. Sinon, demandez à un administrateur") { help = false; if (session != null) helpKind = 1 else demo.simulated("demande de nouveau code") }
+            HelpRow(Icons.Rounded.Email, "Récupérer ma famille", "Recevoir le code famille par e-mail") { help = false; if (session != null) helpKind = 2 else demo.simulated("envoi du lien de récupération") }
+            HelpRow(Icons.Rounded.Group, "Je ne connais pas le code famille", "Le demander à un administrateur de la famille") { help = false; if (session != null) helpKind = 3 else demo.simulated("aide code famille") }
         }
     }
 }

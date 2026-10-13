@@ -64,10 +64,11 @@ private fun CatProduct.toProduct() = Product(
  * (mêmes écrans validés, données réelles) et transforme chaque action en opérations numérotées.
  */
 class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: KeyValueStore, private val scope: CoroutineScope) {
-    private val scopeKey = "${me.familyId.ifEmpty { "f" }}|${me.id}"
+    val scopeKey = "${me.familyId.ifEmpty { "f" }}|${me.id}"
     val engine = ListEngine(session.api, kv, scopeKey)
     var online by mutableStateOf(true); private set
     private var catalog: List<CatProduct> = emptyList()
+    val catalogProducts: List<CatProduct> get() = catalog
     private var catalogRevLoaded = -1L
     private var started = false
     private var streamJob: Job? = null
@@ -243,6 +244,8 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
         demo.listLoaded = true
         if (engine.catalogRev != catalogRevLoaded && engine.online) refreshCatalog()
         render(); syncDraft()
+        // Les demandes déjà vues à l'écran ne donnent pas de notification plus tard.
+        engine.list?.let { l -> kv.put(Notifier.seenKey(scopeKey), l.validations.joinToString(",") { it.id }) }
     }
 
     /* ───── Actions ───── */
