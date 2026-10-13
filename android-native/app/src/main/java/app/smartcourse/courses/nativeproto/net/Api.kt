@@ -240,6 +240,22 @@ class ApiClient(private val store: SessionStorage, client: OkHttpClient? = null)
         }
     }
 
+    /** Création de famille : code de vérification de l'adresse exact → famille créée et session ouverte (cookie gardé comme à la connexion). */
+    suspend fun signupVerify(signupId: String, code: String): Outcome<Pair<Me, String>> {
+        val base = store.server ?: return Outcome.Fail(Failure.BAD_ADDRESS)
+        val payload = buildJsonObject { put("signupId", JsonPrimitive(signupId)); put("code", JsonPrimitive(code)) }.toString()
+        return exec(builder(base, "/api/signup/verify", false).post(payload.toRequestBody(media)).build()) { r, body ->
+            if (r.code == 201) {
+                val cookie = sessionFromSetCookie(r.headers("Set-Cookie"))
+                val o = try { json.parseToJsonElement(body).jsonObject } catch (_: Exception) { null }
+                val me = try { json.decodeFromJsonElement(Me.serializer(), o?.get("me") as JsonObject) } catch (_: Exception) { null }
+                val fc = (o?.get("familyCode") as? JsonPrimitive)?.content
+                if (cookie == null || me == null || fc == null) Outcome.Fail(Failure.NOT_COURSES_SERVER, r.code)
+                else { store.cookie = cookie; Outcome.Ok(me to fc) }
+            } else (classify(r, body) as? Outcome.Fail) ?: Outcome.Fail(Failure.UNKNOWN, r.code)
+        }
+    }
+
     /** Vérifie la session auprès du serveur (désactivation, révocation et expiration prennent effet ici). */
     suspend fun me(): Outcome<Me> {
         val base = store.server ?: return Outcome.Fail(Failure.BAD_ADDRESS)

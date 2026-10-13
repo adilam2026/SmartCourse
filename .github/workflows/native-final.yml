@@ -77,6 +77,8 @@ jobs:
 
   release:
     needs: test-final
+    # APK livré : uniquement sur lancement manuel (jamais automatiquement à l'envoi d'un commit).
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     permissions: { contents: write }
@@ -102,6 +104,10 @@ jobs:
         run: |
           H=$(curl -fsS -m 20 "$PROD_URL/health"); echo "$H"
           echo "$H" | grep -q '"status":"ok"'
+          # Compatibilité : la création de famille autonome doit exister (requête invalide → 400 ; route absente → 404). Aucune donnée créée.
+          C=$(curl -s -o /dev/null -w '%{http_code}' -m 20 -X POST "$PROD_URL/api/signup/verify" -H 'content-type: application/json' -d '{}')
+          echo "POST /api/signup/verify (corps vide) : $C"
+          [ "$C" = 400 ] || { echo "::error::le serveur permanent n'a pas encore la création de famille autonome (déployer d'abord)"; exit 1; }
       - name: APK FINAL (release, R8, clé durable)
         working-directory: android-native
         env:

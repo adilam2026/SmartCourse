@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Tests CIBLÉS : reproduisent un par un les échecs du parcours des lots 3 à 6, sans rejouer toute la suite.
-# Chaque cas part d'un état propre. Usage : native-e2e-cible.sh APK CODE_FAMILLE SORTIE [cas…]  (cas : M | M2 | K9 | R | RW | I | L | D | P | W ; tous par défaut)
+# Chaque cas part d'un état propre. Usage : native-e2e-cible.sh APK CODE_FAMILLE SORTIE [cas…]  (cas : M | M2 | K9 | R | RW | L | D | P | W ; tous par défaut)
 set -uo pipefail
-CASES=("${@:4}"); [ ${#CASES[@]} -eq 0 ] && CASES=(M M2 K9 R RW I L D P W)
+CASES=("${@:4}"); [ ${#CASES[@]} -eq 0 ] && CASES=(M M2 K9 R RW L D P W)
 # Fonctions et installation communes, reprises telles quelles du parcours complet (lignes 4 à l'installation de l'APK).
 source <(sed -n '/^PKG=/,/^adb shell pm grant/p' "$(dirname "$0")/native-e2e-lot3.sh")
 want() { for c in "${CASES[@]}"; do [ "$c" = "$1" ] && return 0; done; return 1; }
@@ -141,38 +141,6 @@ if want RW; then
   r_check RW
 fi
 
-if want I; then
-  echo "═══ Cas I : lien d'installation — aucun jeton à saisir, protection du serveur conservée ═══" | tee -a "$OUT/resultats.txt"
-  adb shell pm clear $PKG >/dev/null; launch; $UI wait "Bienvenue" 25 >/dev/null
-  $UI tap "Se connecter" --last >/dev/null; sleep 2; fill "https://…" "$SERVER" --last; hide_kb; $UI tap "Tester et enregistrer" >/dev/null; $UI wait "10.0.2.2:3000" 20 >/dev/null
-  $UI tap "Première connexion" >/dev/null; sleep 1; $UI tap "Créer ma famille" >/dev/null; sleep 2
-  expect "I1. sans lien d'installation : explication, aucun champ technique" $UI wait "ouvrez le lien d'installation" 10
-  expect "I1b. aucun champ « jeton »" $UI gone "Jeton" 3
-  adb shell am start -a android.intent.action.VIEW -d "coursesnatif://installer?serveur=$SERVER\&jeton=aaaaaaaaaaaaaaaaaaaaaaaa" $PKG >/dev/null 2>&1; sleep 4
-  expect "I2. avec le lien : formulaire de création, serveur déjà réglé" $UI wait "Nom de la famille" 15
-  expect "I2b. toujours aucun champ « jeton » à saisir" $UI gone "Jeton" 3
-  shot cible-creer-famille
-  fill "Nom de la famille" "Famille_Test" --scroll; hide_kb; fill "Votre prénom" "Test" --scroll; hide_kb; fill "Votre identifiant" "test" --scroll; hide_kb
-  fill "E-mail de récupération" "test@example.org" --scroll; hide_kb; fill "Code d'accès (6" 135792 --scroll; hide_kb; fill "Répétez le code" 135792 --scroll; hide_kb
-  $UI tap "Ville : " --scroll >/dev/null; sleep 2; fill "Rechercher une ville" "casablanca"; hide_kb; $UI tap "Casablanca" --last >/dev/null; sleep 2
-  adb shell input swipe 540 1800 540 600 300; sleep 1; adb shell input swipe 540 1800 540 600 300; sleep 1
-  for v in "Test" "test@example.org" "Ville : Casablanca"; do expect "I3a. formulaire complet : « $v » saisi" $UI has "$v"; done
-  adb shell input swipe 540 600 540 1800 300; sleep 1
-  expect "I3a. formulaire complet : nom de famille saisi" $UI has "Famille_Test"
-  adb shell input swipe 540 1800 540 600 300; sleep 1; adb shell input swipe 540 1800 540 600 300; sleep 1
-  expect "I3b. bouton final ACTIVÉ" $UI enabled "Créer ma famille"
-  BEFORE=$(docker logs sc-recette-app 2>&1 | grep -c '/api/setup/family')
-  expect "I3c. bouton final TOUCHÉ" $UI tap "Créer ma famille" --last
-  sleep 5
-  AFTER=$(docker logs sc-recette-app 2>&1 | grep -c '/api/setup/family')
-  docker logs sc-recette-app 2>&1 | grep '/api/setup/family' | tail -2 | cut -c1-300 | tee -a "$OUT/resultats.txt"
-  expect "I3d. une requête a atteint le serveur ($BEFORE → $AFTER lignes de journal)" test "$AFTER" -gt "$BEFORE"
-  REQ=$(docker logs sc-recette-app 2>&1 | grep '/api/setup/family' | tail -1 | grep -oE '"reqId":"?[^",]+"?' | head -1)
-  docker logs sc-recette-app 2>&1 | grep -F "$REQ" | grep -oE '"statusCode":[0-9]+' | tail -1 | tee -a "$OUT/resultats.txt"
-  expect "I3e. le serveur a répondu 403 à CETTE requête (jeton refusé)" bash -c "docker logs sc-recette-app 2>&1 | grep -F '$REQ' | grep -q '\"statusCode\":403'"
-  expect "I3f. message clair à l'écran" $UI wait "n'est plus valable" 15
-  expect "I3g. aucune famille créée" test "$(sql "SELECT count(*) FROM families WHERE name='Famille_Test'")" = 0
-fi
 
 add_api() { # profil code produit… : demande d'articles par l'API (comme un autre téléphone)
   login_api "$1" "$2"; shift 2; api GET /api/catalog >/dev/null

@@ -25,6 +25,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.BarChart
+import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Checklist
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.History
@@ -109,7 +112,6 @@ class MainActivity : ComponentActivity() {
         session = s
         // Version finale : serveur permanent fixé à la compilation, jamais demandé à l'utilisateur.
         if (BuildConfig.FINAL) s.setServer(BuildConfig.SERVER_URL)
-        if (PendingInstall.accept(intent) && !BuildConfig.FINAL) PendingInstall.server?.let { s.setServer(it) }
         val demoMode = Launch.str("screen") != null || Launch.str("path") != null || Launch.flag("hub")
         if (!demoMode) s.start()
         splash.setKeepOnScreenCondition { !demoMode && s.state == AuthState.Booting }
@@ -125,7 +127,6 @@ class MainActivity : ComponentActivity() {
             CoroutineScope(Dispatchers.IO).launch { val ok = pollOnce(applicationContext); android.util.Log.i("CoursesNotif", "vérification terminée, réussie=$ok") }
             return
         }
-        if (PendingInstall.accept(intent) && !BuildConfig.FINAL) PendingInstall.server?.let { session?.setServer(it) }
     }
 
     override fun onStart() { super.onStart(); session?.verify(); LiveHolder.current?.onForeground() }
@@ -273,6 +274,31 @@ fun App(session: Session, me: Me?) {
                 }
             }
         }, { cityPicker = false })
+        // Famille tout juste créée : son code (à transmettre aux autres membres) avec Copier / Partager, puis préparation des courses.
+        val welcome = if (me != null) session.welcomeFamilyCode else null
+        if (welcome != null) {
+            val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+            val ctx = androidx.compose.ui.platform.LocalContext.current
+            AppSheet({ session.welcomeFamilyCode = null }) {
+                Text("Votre famille est créée", style = MaterialTheme.typography.titleLarge)
+                Spacer(Modifier.height(6.dp))
+                Text("Voici le code famille. Les autres membres en auront besoin, avec l'identifiant et le code d'accès que vous leur créerez dans Réglages → Profils.", style = MaterialTheme.typography.bodyMedium)
+                Spacer(Modifier.height(14.dp))
+                Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(C.TealSoft).padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
+                    Text(welcome, style = MaterialTheme.typography.headlineMedium, color = C.TealDark, letterSpacing = 3.sp)
+                }
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    SecondaryButton("Copier", { clipboard.setText(androidx.compose.ui.text.AnnotatedString(welcome)); demo.say("Code famille copié.") }, Modifier.weight(1f), leading = Icons.Rounded.ContentCopy)
+                    SecondaryButton("Partager", {
+                        val send = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, "Rejoignez notre famille sur Mes Courses. Code famille : $welcome. Je vous donnerai votre identifiant et votre code d'accès.") }
+                        try { ctx.startActivity(Intent.createChooser(send, "Partager le code famille").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) { demo.say("Aucune application de partage disponible.") }
+                    }, Modifier.weight(1f), leading = Icons.Rounded.Share)
+                }
+                Spacer(Modifier.height(12.dp))
+                PrimaryButton("Préparer mes courses", { session.welcomeFamilyCode = null; go("v04") }, Modifier.fillMaxWidth(), trailing = Icons.AutoMirrored.Rounded.ArrowForward)
+            }
+        }
         if (confirmLogout) ConfirmDialog(
             "Se déconnecter ?",
             // Rien n'est supprimé en silence : les modifications non envoyées restent sur ce téléphone pour ce profil

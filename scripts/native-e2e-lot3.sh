@@ -119,7 +119,7 @@ expect "K0b. récupération du code par e-mail (formulaire réel)" $UI wait "Env
 shot lot3-aide-code-oublie
 adb shell input keyevent KEYCODE_BACK; sleep 1; hide_kb; adb shell input keyevent KEYCODE_BACK; sleep 1
 $UI tap "Première connexion" >/dev/null; sleep 1; $UI tap "Créer ma famille" >/dev/null; sleep 2
-expect "K0c. création de famille : lien d'installation exigé (aucun champ technique)" $UI wait "ouvrez le lien d'installation" 10
+expect "K0c. création de famille : formulaire direct, sans lien ni jeton" bash -c "$UI wait 'Nom de la famille' 10 && ! $UI has 'jeton' && ! $UI has 'installé le serveur'"
 shot lot3-creer-famille
 $UI tap "Se connecter" --first >/dev/null; sleep 1
 signin "$FAMILY" marie 573918

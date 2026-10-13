@@ -32,6 +32,57 @@ adb shell am force-stop $PKG; adb shell am start -W -n "$ACT" --es screen v02 --
 expect "F1d. accès de recette désactivés (écran simulé refusé)" $UI wait "Bienvenue" 15
 expect "F1e. pas d'écrans de démonstration" $UI gone "Écrans de démonstration" 2
 
+echo "═══ C. Première connexion → Créer ma famille (autonome : sans lien, jeton ni serveur) ═══" | tee -a "$OUT/resultats.txt"
+NEWMAIL="famille.$(date +%s)@example.org"; NEWLOGIN="karim"
+mails() { docker exec sc-recette-app node -e "fetch('http://127.0.0.1:3199/__sent?to=$NEWMAIL').then(r=>r.json()).then(j=>console.log(j.length))"; }
+lastcode() { docker exec sc-recette-app node -e "fetch('http://127.0.0.1:3199/__sent?to=$NEWMAIL').then(r=>r.json()).then(j=>console.log((j.at(-1)||{subject:''}).subject.match(/(\d{6})/)?.[1]||''))"; }
+FAM_BEFORE=$(sql "SELECT count(*) FROM families")
+$UI tap "Première connexion" >/dev/null; sleep 1; $UI tap "Créer ma famille" >/dev/null; sleep 2
+expect "C1. formulaire direct (aucun lien, jeton ni serveur)" bash -c "$UI wait 'Nom de la famille' 10 && ! $UI has 'jeton' && ! $UI has 'installé le serveur' && ! $UI has 'Serveur'"
+fill "Nom de la famille" "Famille Benali" --scroll; hide_kb
+fill "Votre prénom" "Karim" --scroll; hide_kb
+fill "Votre identifiant" "$NEWLOGIN" --scroll; hide_kb
+$UI tap "Ville : " --scroll >/dev/null; sleep 2; fill "Rechercher une ville" "casablanca"; hide_kb; $UI tap "Casablanca" --last >/dev/null; sleep 2
+fill "E-mail de récupération" "$NEWMAIL" --scroll; hide_kb
+fill "Code d'accès (6" 274915 --scroll; hide_kb
+fill "Confirmez le code" 274915 --scroll; hide_kb
+shot final-c1-formulaire
+expect "C2. bouton « Recevoir le code par e-mail » activé" $UI enabled "Recevoir le code par e-mail"
+read -r X1 Y1 X2 Y2 <<<"$($UI bounds 'Recevoir le code par e-mail')"; X=$(( (X1+X2)/2 )); Y=$(( (Y1+Y2)/2 ))
+adb shell "input tap $X $Y; input tap $X $Y"; sleep 5   # double appui très rapproché
+expect "C3. écran du code (adresse masquée)" $UI wait "Vérifiez votre adresse" 15
+expect "C3b. double appui : un seul e-mail envoyé ($(mails))" test "$(mails)" = 1
+expect "C3c. double appui : une seule demande enregistrée" test "$(sql "SELECT count(*) FROM family_signups WHERE email='$NEWMAIL'")" = 1
+expect "C3d. rien n'est créé avant la vérification" test "$(sql "SELECT count(*) FROM families")" = "$FAM_BEFORE"
+shot final-c2-code
+fill "Code reçu par e-mail" 000000; hide_kb
+[ "$(lastcode)" = 000000 ] && fill "Code reçu par e-mail" 111111 && hide_kb
+$UI tap "Créer ma famille" --last >/dev/null; sleep 3
+expect "C4. code faux refusé avec un message clair" $UI wait "Code incorrect" 10
+fill "Code reçu par e-mail" "$(lastcode)"; hide_kb
+$UI tap "Créer ma famille" --last >/dev/null; sleep 6
+expect "C5. famille créée et utilisateur connecté : code famille affiché" $UI wait "Votre famille est créée" 20
+NEWCODE=$(sql "SELECT f.code FROM families f JOIN profiles p ON p.family_id=f.id WHERE p.recovery_email='$NEWMAIL'")
+expect "C5b. code famille généré ($NEWCODE) affiché à l'écran" $UI has "${NEWCODE:-ABSENT}"
+expect "C5c. serveur : une seule famille créée, administrateur principal, adresse vérifiée" test "$(sql "SELECT count(*) FROM families")" = $((FAM_BEFORE + 1)) -a "$(sql "SELECT p.is_primary::text||' '||(p.recovery_email_verified_at IS NOT NULL)::text||' '||p.city||' '||p.login FROM profiles p WHERE p.recovery_email='$NEWMAIL'")" = "true true Casablanca $NEWLOGIN"
+shot final-c3-famille-creee
+$UI tap "Copier" >/dev/null
+expect "C6. Copier : confirmation" $UI wait "Code famille copié" 8
+$UI tap "Partager" >/dev/null; sleep 3
+expect "C7. Partager : fenêtre de partage Android" bash -c "adb shell dumpsys activity activities | grep -qE 'ChooserActivity|ResolverActivity'"
+adb shell input keyevent KEYCODE_BACK; sleep 2
+$UI tap "Préparer mes courses" >/dev/null; sleep 3
+expect "C8. « Préparer mes courses » ouvre la sélection des articles" $UI wait "Rechercher un produit" 15
+shot final-c4-preparer
+login_api adil 482913
+S=$(curl -s -o /tmp/api.out -w '%{http_code}' -X POST "$BASE/api/signup/start" -H 'content-type: application/json' -d "{\"requestId\":\"$(cat /proc/sys/kernel/random/uuid)\",\"familyName\":\"Doublon\",\"displayName\":\"K\",\"login\":\"k2\",\"city\":\"Casablanca\",\"email\":\"$NEWMAIL\",\"secret\":\"274915\",\"secretConfirm\":\"274915\"}")
+expect "C9. doublon : la même adresse ne crée pas une seconde famille ($S $(jq -r .error /tmp/api.out))" test "$S" = 409 -a "$(jq -r .error /tmp/api.out)" = email_in_use
+logout
+fill "${PREV_FAMILY:-Code famille}" "$NEWCODE"; fill "${PREV_LOGIN:-Identifiant}" "$NEWLOGIN"; fill "Code d'accès" 274915; hide_kb
+$UI tap "Se connecter" --last >/dev/null; sleep 4; PREV_FAMILY="$NEWCODE"; PREV_LOGIN="$NEWLOGIN"
+expect "C10b. connecté à la nouvelle famille avec ses accès" $UI wait "Ma liste" 20
+logout
+
 echo "═══ G. Administrateur : connexion, sélection, achat, historique ═══" | tee -a "$OUT/resultats.txt"
 signin "$FAMILY" adil 482913
 expect "G1. administrateur connecté" $UI wait "Ma liste" 25

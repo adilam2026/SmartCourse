@@ -24,6 +24,21 @@ class Session(val storage: SessionStorage, val api: ApiClient, private val scope
         private set
     var serverAddress: String? by mutableStateOf(storage.server)
         private set
+    /** Famille tout juste créée depuis l'application : son code est montré une fois (Copier / Partager) après la connexion. */
+    var welcomeFamilyCode: String? by mutableStateOf(null)
+
+    /** Code de vérification exact : la famille est créée côté serveur et l'utilisateur est connecté directement. */
+    suspend fun completeSignup(signupId: String, code: String): Outcome.Fail? {
+        notice = null
+        return when (val r = api.signupVerify(signupId, code.trim())) {
+            is Outcome.Ok -> {
+                val (me, familyCode) = r.value
+                val full = (api.me() as? Outcome.Ok)?.value ?: me
+                online = true; remember(full); welcomeFamilyCode = familyCode; state = AuthState.SignedIn(full); null
+            }
+            is Outcome.Fail -> r
+        }
+    }
 
     init {
         // Toute requête authentifiée refusée en 401 (session révoquée, profil désactivé) ramène à la connexion.

@@ -105,8 +105,6 @@ fun LoginScreen(session: Session?, onSimulated: (Role) -> Unit) {
     var famName by remember { mutableStateOf("") }
     var city by remember { mutableStateOf("Casablanca") }
     val focus = remember { Launch.once("keyboard") }
-    // Un lien d'installation ouvre directement « Créer ma famille » (aucun jeton à saisir).
-    LaunchedEffect(PendingInstall.token) { if (PendingInstall.token != null) { tab = 1; sub = 1 } }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         // En-tête : logo, accroche et photos de produits
@@ -197,7 +195,7 @@ fun LoginScreen(session: Session?, onSimulated: (Role) -> Unit) {
                         PrimaryButton("Aller à la connexion", { tab = 0 }, Modifier.fillMaxWidth())
                     }
                 } else if (session != null) {
-                    CreateFamilyForm(session) { fc, lg -> family = fc; login = lg; tab = 0 }
+                    CreateFamilyForm(session)
                 } else if (sub == 0) {
                     FormField(family, { family = it }, "Code famille", leading = Icons.Rounded.Group)
                     Spacer(Modifier.height(10.dp))

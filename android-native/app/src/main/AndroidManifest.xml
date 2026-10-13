@@ -22,13 +22,6 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Lien d'installation d'une famille : coursesnatif://installer?serveur=…&jeton=… (le jeton est vérifié par le serveur) -->
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="coursesnatif" android:host="installer" />
-            </intent-filter>
         </activity>
     </application>
 </manifest>
