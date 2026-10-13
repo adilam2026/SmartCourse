@@ -31,15 +31,16 @@ adb shell settings put global sysui_demo_allowed 1
 adb shell am broadcast -a com.android.systemui.demo -e command enter >/dev/null
 adb shell am broadcast -a com.android.systemui.demo -e command clock -e hhmm 0941 >/dev/null
 adb shell am broadcast -a com.android.systemui.demo -e command battery -e level 100 -e plugged false >/dev/null
-adb shell am broadcast -a com.android.systemui.demo -e command network -e wifi show -e level 4 >/dev/null
-adb shell am broadcast -a com.android.systemui.demo -e command network -e mobile show -e level 4 -e datatype none >/dev/null
+adb shell am broadcast -a com.android.systemui.demo -e command network -e wifi show -e level 4 -e fully true >/dev/null
+adb shell am broadcast -a com.android.systemui.demo -e command network -e mobile show -e level 4 -e datatype none -e fully true >/dev/null
 adb shell am broadcast -a com.android.systemui.demo -e command notifications -e visible false >/dev/null
 
 # Application propre (aucune session antérieure), connexion de Sophie (administratrice fictive)
 adb install -r "$APK" >/dev/null; adb shell pm clear $PKG >/dev/null; adb shell pm grant $PKG android.permission.POST_NOTIFICATIONS >/dev/null 2>&1 || true
 adb shell am start -W -n "$ACT" >/dev/null 2>&1; sleep 4
 $UI wait "Bienvenue" 25 >/dev/null
-fill "Code famille" "$FAMILY"; fill "Identifiant" sophie; fill "Code d'accès" 482913; hide_kb
+# Écran de 1920 px : le clavier masque les champs suivants, il est refermé après chaque saisie.
+fill "Code famille" "$FAMILY"; hide_kb; fill "Identifiant" sophie; hide_kb; fill "Code d'accès" 482913; hide_kb
 $UI tap "Se connecter" --last >/dev/null; sleep 4
 expect "S1. liste partagée affichée" $UI wait "Ma liste" 25
 sleep 3; shot play-1-liste-partagee

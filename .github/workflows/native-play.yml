@@ -77,7 +77,8 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
           script: bash scripts/native-play-ci.sh dist/Courses-final-test.apk ${{ env.FAMILY_CODE }}
         env:
-          SECTIONS: ${{ inputs.sections }}
+          # [play-captures] dans le message : captures seulement (aucune modification de l'application à revalider).
+          SECTIONS: ${{ inputs.sections || (contains(github.event.head_commit.message, '[play-captures]') && 'aucune' || '') }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -100,8 +101,8 @@ jobs:
         with: { name: play-tests, path: play-tests }
       - run: |
           mkdir -p docs/native/play
-          rm -rf docs/native/play/tests-api36 docs/native/play/captures-originales
-          [ -d play-tests/native-final-36 ] && cp -r play-tests/native-final-36 docs/native/play/tests-api36
+          rm -rf docs/native/play/captures-originales
+          [ -d play-tests/native-final-36 ] && { rm -rf docs/native/play/tests-api36; cp -r play-tests/native-final-36 docs/native/play/tests-api36; }
           [ -d play-tests/play-captures ] && cp -r play-tests/play-captures docs/native/play/captures-originales
           git config user.name "github-actions"; git config user.email "github-actions@users.noreply.github.com"
           git add docs/native/play && git commit -m "Google Play : résultats Android 16 et captures originales (run ${{ github.run_number }}) [skip ci]" || echo "rien à commiter"
