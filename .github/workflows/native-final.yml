@@ -41,10 +41,10 @@ jobs:
       - uses: actions/setup-java@v4
         if: steps.apk.outputs.cache-hit != 'true'
         with: { distribution: temurin, java-version: 17, cache: gradle }
-      - name: Composants Android (SDK 35)
+      - name: Composants Android (SDK 36)
         run: |
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0" | tail -2
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" "build-tools;35.0.0" | tail -2
       - name: APK final de TEST (serveur local de l'émulateur, clé jetable — jamais distribué)
         if: steps.apk.outputs.cache-hit != 'true'
         working-directory: android-native
@@ -117,10 +117,10 @@ jobs:
           [ -z "$miss" ] || { echo "::error::Secrets manquants (NATIF_KEYSTORE_B64, NATIF_KEYSTORE_PASSWORD, NATIF_KEY_ALIAS, NATIF_KEY_PASSWORD, NATIF_CERT_SHA256) :$miss — aucun APK final n'est produit sans la clé durable."; exit 1; }
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 17, cache: gradle }
-      - name: Composants Android (SDK 35)
+      - name: Composants Android (SDK 36)
         run: |
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0" | tail -2
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" "build-tools;35.0.0" | tail -2
       - name: Serveur permanent joignable et à jour
         run: |
           H=$(curl -fsS -m 20 "$PROD_URL/health"); echo "$H"

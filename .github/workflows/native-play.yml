@@ -1,0 +1,250 @@
+name: Android natif — Google Play (bundle AAB signé, API 36, captures)
+# Prépare la livraison Google Play de « Mes Courses » SANS rien publier sur Google Play :
+# 1. test-36 : version finale (cible API 36) sur émulateur Android 16, recette locale jetable ; puis captures de la fiche
+#              sur la même version avec une famille FICTIVE.
+# 2. bundle  : uniquement sur demande (livrer) et si test-36 est vert : Android App Bundle release signé par la clé durable,
+#              contrôles du bundle ET d'un APK généré depuis ce bundle (bundletool), publication en pré-version GitHub.
+# 3. smoke-36: l'APK généré depuis le bundle s'ouvre sur Android 16 (écran de connexion, aucune connexion au serveur permanent).
+# Aucun déploiement serveur, aucun envoi vers Google Play.
+on:
+  workflow_dispatch:
+    inputs:
+      livrer:
+        description: "Construire et publier le bundle AAB signé (sinon : tests et captures seulement)"
+        type: boolean
+        default: false
+      sections:
+        description: "Sections du parcours final (vide = toutes ; « aucune » = captures seulement)"
+        required: false
+        default: ""
+permissions:
+  contents: read
+env:
+  PROD_URL: https://smartcourse-production-c7ce.up.railway.app
+  VERSION_NAME: "1.0.1"
+jobs:
+  test-36:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: APK de test déjà compilé pour ce code et ces paramètres ?
+        id: apk
+        uses: actions/cache@v4
+        with:
+          path: dist/
+          key: apk-final-test-${{ hashFiles('android-native/**') }}-final1-srv-10.0.2.2-3000-v${{ env.VERSION_NAME }}-test-vc1-sig-essai-jetable
+      - uses: actions/setup-java@v4
+        if: steps.apk.outputs.cache-hit != 'true'
+        with: { distribution: temurin, java-version: 17, cache: gradle }
+      - name: Composants Android (SDK 36)
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" "build-tools;35.0.0" | tail -2
+      - name: APK final de TEST (serveur local de l'émulateur, clé jetable — jamais distribué)
+        if: steps.apk.outputs.cache-hit != 'true'
+        working-directory: android-native
+        run: |
+          export NATIF_KEYSTORE_FILE=/tmp/test-final.p12 NATIF_KEYSTORE_PASSWORD=essai-final NATIF_KEY_ALIAS=essai NATIF_KEY_PASSWORD=essai-final
+          keytool -genkeypair -noprompt -keystore $NATIF_KEYSTORE_FILE -storetype PKCS12 -alias essai -keyalg RSA -keysize 2048 -validity 2 -storepass essai-final -keypass essai-final -dname "CN=Essai version finale non distribuable"
+          ./gradlew --no-daemon assembleRelease -Pfinal=1 -PserverUrl=http://10.0.2.2:3000 -PversionCode=1 -PversionName="$VERSION_NAME-test"
+          mkdir -p ../dist && cp app/build/outputs/apk/release/*.apk ../dist/Courses-final-test.apk
+      - name: Niveau d'API cible (36 exigé par Google Play)
+        run: |
+          "$ANDROID_HOME/build-tools/36.0.0/aapt2" dump badging dist/Courses-final-test.apk | grep -E "^package:|application-label:|targetSdkVersion" | tee /tmp/badging.txt
+          grep -q "targetSdkVersion:'36'" /tmp/badging.txt
+      - name: Serveur local jetable (code identique au serveur permanent)
+        run: |
+          NO_TUNNEL=1 scripts/recette-locale.sh | tee /tmp/recette.out
+          echo "FAMILY_CODE=$(grep -oE 'Code famille : [A-Z0-9]+' /tmp/recette.out | awk '{print $4}')" >> "$GITHUB_ENV"
+      - name: KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - name: Parcours final puis captures, sur Android 16 (API 36)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
+          script: bash scripts/native-play-ci.sh dist/Courses-final-test.apk ${{ env.FAMILY_CODE }}
+        env:
+          SECTIONS: ${{ inputs.sections }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: play-tests
+          path: |
+            native-final-36/
+            play-captures/
+      - run: scripts/recette-locale.sh --stop
+        if: always()
+
+  publier-tests:
+    needs: test-36
+    if: always() && needs.test-36.result != 'skipped'
+    runs-on: ubuntu-latest
+    permissions: { contents: write }
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: "${{ github.ref_name }}" }
+      - uses: actions/download-artifact@v4
+        with: { name: play-tests, path: play-tests }
+      - run: |
+          mkdir -p docs/native/play
+          rm -rf docs/native/play/tests-api36 docs/native/play/captures-originales
+          [ -d play-tests/native-final-36 ] && cp -r play-tests/native-final-36 docs/native/play/tests-api36
+          [ -d play-tests/play-captures ] && cp -r play-tests/play-captures docs/native/play/captures-originales
+          git config user.name "github-actions"; git config user.email "github-actions@users.noreply.github.com"
+          git add docs/native/play && git commit -m "Google Play : résultats Android 16 et captures originales (run ${{ github.run_number }}) [skip ci]" || echo "rien à commiter"
+          git pull --rebase origin ${{ github.ref_name }} && git push origin HEAD:${{ github.ref_name }}
+
+  bundle:
+    needs: test-36
+    if: inputs.livrer
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions: { contents: write }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Clé durable présente ?
+        env:
+          KS_B64: ${{ secrets.NATIF_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.NATIF_KEYSTORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.NATIF_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.NATIF_KEY_PASSWORD }}
+          CERT: ${{ secrets.NATIF_CERT_SHA256 }}
+        run: |
+          miss=""; for v in KS_B64 KS_PASS KS_ALIAS KEY_PASS CERT; do [ -n "${!v}" ] || miss="$miss $v"; done
+          [ -z "$miss" ] || { echo "::error::Secrets manquants :$miss — aucun bundle n'est produit sans la clé durable."; exit 1; }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17, cache: gradle }
+      - name: Composants Android (SDK 36)
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" | tail -2
+      - name: Serveur permanent joignable et à jour (lecture seule)
+        run: |
+          H=$(curl -fsS -m 20 "$PROD_URL/health"); echo "$H"; echo "$H" | grep -q '"status":"ok"'
+          C=$(curl -s -o /dev/null -w '%{http_code}' -m 20 -X POST "$PROD_URL/api/signup/verify" -H 'content-type: application/json' -d '{}')
+          [ "$C" = 400 ] || { echo "::error::création de famille absente du serveur permanent ($C)"; exit 1; }
+      - name: Code de version strictement supérieur à toutes les versions publiées
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          VC=$((1100 + ${{ github.run_number }}))
+          MAX=$(gh api "repos/${{ github.repository }}/releases?per_page=100" --paginate --jq '.[].body' | grep -oE 'Code de version : [0-9]+' | grep -oE '[0-9]+' | sort -n | tail -1)
+          echo "Plus haut code de version publié : ${MAX:-aucun} ; nouveau : $VC"
+          [ "$VC" -gt "${MAX:-0}" ] || { echo "::error::code de version $VC non supérieur à $MAX"; exit 1; }
+          echo "VC=$VC" >> "$GITHUB_ENV"
+      - name: Android App Bundle (release, R8, clé durable) et APK généré depuis le bundle
+        working-directory: android-native
+        env:
+          KS_B64: ${{ secrets.NATIF_KEYSTORE_B64 }}
+          NATIF_KEYSTORE_PASSWORD: ${{ secrets.NATIF_KEYSTORE_PASSWORD }}
+          NATIF_KEY_ALIAS: ${{ secrets.NATIF_KEY_ALIAS }}
+          NATIF_KEY_PASSWORD: ${{ secrets.NATIF_KEY_PASSWORD }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          umask 077; echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/natif.keystore"
+          export NATIF_KEYSTORE_FILE="$RUNNER_TEMP/natif.keystore"
+          ./gradlew --no-daemon bundleRelease -Pfinal=1 -PserverUrl="$PROD_URL" -PversionCode=$VC -PversionName="$VERSION_NAME"
+          J=$(gh api repos/google/bundletool/releases/latest --jq '.assets[] | select(.name | test("^bundletool-all-.*\\.jar$")) | .browser_download_url' | head -1)
+          echo "bundletool : $J"; curl -fsSL -o "$RUNNER_TEMP/bundletool.jar" "$J"
+          mkdir -p ../dist; cp app/build/outputs/bundle/release/app-release.aab "../dist/MesCourses-$VERSION_NAME.aab"
+          BT() { java -jar "$RUNNER_TEMP/bundletool.jar" "$@"; }
+          BT validate --bundle="../dist/MesCourses-$VERSION_NAME.aab" | head -5
+          # APK universel (toutes configurations) et jeu d'APK fractionnés, tels que Google Play les génère, signés par la même clé
+          for mode in universal default; do
+            BT build-apks --bundle="../dist/MesCourses-$VERSION_NAME.aab" --output="$RUNNER_TEMP/$mode.apks" --mode=$mode \
+              --ks="$NATIF_KEYSTORE_FILE" --ks-pass="pass:$NATIF_KEYSTORE_PASSWORD" --ks-key-alias="$NATIF_KEY_ALIAS" --key-pass="pass:$NATIF_KEY_PASSWORD"
+          done
+          rm -f "$NATIF_KEYSTORE_FILE"
+          (cd "$RUNNER_TEMP" && unzip -qo universal.apks universal.apk && mkdir -p splits && unzip -qo default.apks -d splits)
+          cp "$RUNNER_TEMP/universal.apk" "../dist/MesCourses-$VERSION_NAME-depuis-bundle.apk"
+          BT dump manifest --bundle="../dist/MesCourses-$VERSION_NAME.aab" > /tmp/manifest.xml
+          ls "$RUNNER_TEMP/splits/splits" | tee /tmp/splits.txt
+      - name: Contrôles du bundle et de l'APK généré (identifiant, version, API 36, signature durable, serveur, 16 Ko)
+        env:
+          CERT: ${{ secrets.NATIF_CERT_SHA256 }}
+        run: |
+          set -e
+          AAB="dist/MesCourses-$VERSION_NAME.aab"; APK="dist/MesCourses-$VERSION_NAME-depuis-bundle.apk"; B="$ANDROID_HOME/build-tools/36.0.0"
+          WANT=$(echo "$CERT" | tr -d ': ' | tr 'A-F' 'a-f')
+          echo "── Bundle"
+          grep -oE 'package="[^"]+"|android:versionCode="[^"]+"|android:versionName="[^"]+"|android:targetSdkVersion="[^"]+"|android:minSdkVersion="[^"]+"' /tmp/manifest.xml | tee /tmp/aab.txt
+          grep -q 'package="app.smartcourse.courses.natif"' /tmp/aab.txt
+          grep -q "android:versionCode=\"$VC\"" /tmp/aab.txt
+          grep -q "android:versionName=\"$VERSION_NAME\"" /tmp/aab.txt
+          grep -q 'android:targetSdkVersion="36"' /tmp/aab.txt
+          echo "Permissions du bundle :"; grep -oE 'uses-permission[^>]*android:name="[^"]+"' /tmp/manifest.xml | grep -oE '"[^"]+"$' | tee dist/permissions.txt
+          jarsigner -verify -strict "$AAB" | tail -1
+          FPA=$(keytool -printcert -jarfile "$AAB" | grep -m1 "SHA256:" | sed 's/.*SHA256: //' | tr -d ': ' | tr 'A-F' 'a-f')
+          echo "Empreinte de signature du bundle : $FPA"
+          [ "$FPA" = "$WANT" ] || { echo "::error::bundle : empreinte différente de NATIF_CERT_SHA256"; exit 1; }
+          echo "── APK généré depuis le bundle"
+          "$B/aapt2" dump badging "$APK" > /tmp/badging.txt
+          grep -E "^package:|application-label:|targetSdkVersion|sdkVersion" /tmp/badging.txt
+          grep -q "name='app.smartcourse.courses.natif' versionCode='$VC' versionName='$VERSION_NAME'" /tmp/badging.txt
+          grep -q "targetSdkVersion:'36'" /tmp/badging.txt
+          grep -q "application-label:'Mes Courses'" /tmp/badging.txt
+          FP=$("$B/apksigner" verify --print-certs "$APK" | grep -m1 "certificate SHA-256 digest" | sed 's/.*: //')
+          echo "Empreinte de signature de l'APK : $FP"
+          [ "$FP" = "$WANT" ] || { echo "::error::APK : empreinte différente de NATIF_CERT_SHA256"; exit 1; }
+          [ "$FP" != "49802f27bda9539d96401dc6fc7e82cf8788be0eb82da5ada41578e3239940d0" ] || { echo "::error::clé de recette interdite"; exit 1; }
+          mkdir -p /tmp/dex && (cd /tmp/dex && unzip -qo "$GITHUB_WORKSPACE/$APK" 'classes*.dex')
+          strings -a /tmp/dex/classes*.dex | grep -q "$PROD_URL" || { echo "::error::serveur permanent absent"; exit 1; }
+          for pat in trycloudflare 10.0.2.2 androidbrowserhelper customtabs capacitor cordova; do ! strings -a /tmp/dex/classes*.dex | grep -qi "$pat" || { echo "::error::$pat trouvé dans l'APK"; exit 1; }; done
+          echo "── Pages mémoire de 16 Ko (exigence Google Play, cible Android 15+)"
+          "$B/zipalign" -c -P 16 -v 4 "$APK" | tail -1
+          mkdir -p /tmp/so && (cd /tmp/so && unzip -qo "$GITHUB_WORKSPACE/$APK" 'lib/*') || true
+          for so in $(find /tmp/so -name '*.so' -path '*64*'); do
+            A=$(readelf -lW "$so" | awk '/LOAD/ {print $NF}' | sort -u | tr '\n' ' '); echo "$(basename $(dirname $so))/$(basename $so) : $A"
+            for a in $A; do [ $((a)) -ge 16384 ] || { echo "::error::$so non aligné sur 16 Ko"; exit 1; }; done
+          done
+          for f in "$RUNNER_TEMP"/splits/splits/*.apk; do "$B/zipalign" -c -P 16 4 "$f" || { echo "::error::$f non aligné"; exit 1; }; done
+          echo "Jeu d'APK fractionnés : $(wc -l < /tmp/splits.txt) fichiers, alignés."
+          (cd dist && sha256sum "MesCourses-$VERSION_NAME.aab" "MesCourses-$VERSION_NAME-depuis-bundle.apk" | tee sha256.txt)
+          echo "$FP" > dist/empreinte.txt
+      - uses: actions/upload-artifact@v4
+        with: { name: bundle-play, path: dist/ }
+      - name: Pré-version GitHub (pas Google Play)
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          TAG="courses-natif-play-$VERSION_NAME-${{ github.run_number }}"
+          printf '%s\n' "Mes Courses $VERSION_NAME — Android App Bundle pour Google Play. NON publié sur Google Play." "" \
+            "- Identifiant : app.smartcourse.courses.natif" "- Serveur : $PROD_URL" "- Code de version : $VC" "- Niveau d'API cible : 36 (Android 16)" \
+            "- Empreinte SHA-256 du certificat (clé durable, clé d'importation Play) : $(cat dist/empreinte.txt)" \
+            "- SHA-256 des fichiers :" "$(sed 's/^/  /' dist/sha256.txt)" "" \
+            "MesCourses-$VERSION_NAME-depuis-bundle.apk : APK universel généré depuis ce bundle par bundletool, signé par la même clé (contrôle et installation directe)." > /tmp/notes.md
+          gh release create "$TAG" "dist/MesCourses-$VERSION_NAME.aab" "dist/MesCourses-$VERSION_NAME-depuis-bundle.apk" --prerelease \
+            --repo "${{ github.repository }}" --target "${{ github.sha }}" --title "Mes Courses $VERSION_NAME — bundle Google Play (non publié)" --notes-file /tmp/notes.md
+
+  smoke-36:
+    needs: bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: bundle-play, path: dist }
+      - name: KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - name: APK généré depuis le bundle, sur Android 16 (écran de connexion uniquement, aucune connexion)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
+          script: bash scripts/native-play-smoke.sh dist/MesCourses-$VERSION_NAME-depuis-bundle.apk play-smoke
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: play-smoke, path: play-smoke/ }

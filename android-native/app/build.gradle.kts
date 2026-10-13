@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "app.smartcourse.courses.nativeproto"
-    compileSdk = 35
+    compileSdk = 36
 
     // Version FINALE (-Pfinal=1) : identifiant app.smartcourse.courses.natif (s'installe à côté de l'application actuelle et de la
     // recette), nom « Mes Courses », serveur fixé à la compilation (aucune saisie), aucun accès de recette, signée par la clé durable
@@ -20,7 +20,7 @@ android {
         // Identifiant de recette distinct : s'installe à côté de l'application actuelle.
         applicationId = if (final) "app.smartcourse.courses.natif" else "app.smartcourse.courses.nativeproto"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = (project.findProperty("versionCode") as String?)?.toInt() ?: 1
         versionName = (project.findProperty("versionName") as String?) ?: "0.2-recette"
         // Build de recette : permet d'ouvrir directement un écran simulé (captures automatiques). À retirer pour une version de production.

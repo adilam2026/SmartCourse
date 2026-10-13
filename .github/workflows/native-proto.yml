@@ -29,11 +29,11 @@ jobs:
           distribution: temurin
           java-version: 17
           cache: gradle
-      - name: Composants Android (SDK 35)
+      - name: Composants Android (SDK 36)
         if: steps.apk.outputs.cache-hit != 'true'
         run: |
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0" | tail -2
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" "build-tools;35.0.0" | tail -2
       - name: Tests unitaires (client HTTP, session, erreurs)
         if: steps.apk.outputs.cache-hit != 'true'
         working-directory: android-native

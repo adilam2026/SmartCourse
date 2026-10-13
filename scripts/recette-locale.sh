@@ -28,7 +28,7 @@ for _ in $(seq 1 60); do docker exec "$APP" node -e 'fetch("http://127.0.0.1:300
 docker cp scripts/recette-seed.mjs "$APP":/tmp/recette-seed.mjs
 # Faux service Brevo dans le conteneur (recette seulement) : l'installation exige un e-mail vérifié.
 docker cp scripts/mock-brevo.mjs "$APP":/tmp/mock-brevo.mjs && docker exec -d "$APP" node /tmp/mock-brevo.mjs; sleep 1
-OUT=$(docker exec -e INSTALL_TOKEN="$TOKEN" "$APP" node /tmp/recette-seed.mjs)
+OUT=$(docker exec -e INSTALL_TOKEN="$TOKEN" -e SEED_PLAY="${SEED_PLAY:-}" "$APP" node /tmp/recette-seed.mjs)
 CODE=$(echo "$OUT" | sed -E 's/.*"familyCode":"([^"]+)".*/\1/')
 URL="http://localhost:3000 (cet ordinateur seulement ; pas de tunnel)"
 if [ "${NO_TUNNEL:-}" != "1" ]; then
