@@ -6,181 +6,60 @@ PASS  F1b. aucun bandeau ni fonction de démonstration
 PASS  F1c. aucun lien « Serveur … Modifier »
 PASS  F1d. accès de recette désactivés (écran simulé refusé)
 PASS  F1e. pas d'écrans de démonstration
-═══ G. Administrateur : connexion, sélection, achat, historique ═══
-PASS  G1. administrateur connecté
-PASS  G1b. aucun bandeau
-PASS  G1c. Compte dans l'en-tête
-PASS  G1d. aucune liste : « Créer une liste »
-PASS  G2. sélection (recherche pour l'administrateur)
-PASS  G3. liste créée avec Tomates
-PASS  G3b. serveur : Tomates à acheter (1.000 kg to_buy)
-PASS  G4. achat enregistré par le serveur (1.000 kg purchased)
-PASS  G4b. article dans « Déjà achetés »
-PASS  G5. liste archivée par le serveur
-PASS  G5b. historique affiché
-PASS  G6. Réglages : « Se déconnecter » visible
-PASS  G6b. aucune fonction technique dans Réglages
-PASS  G7. Compte : profil réel, sans serveur ni démonstration
-PASS  G8. déconnecté : retour à la connexion
-═══ H. Parent : rôle ═══
-PASS  H1. parent connecté
-PASS  H2. parent : pas d'onglet Réglages
-PASS  H3. parent : Historique accessible
-ECHECS=0
+═══ P. Personnel : Choisir mes articles, enregistrement, hors connexion ═══
+PASS  P1. personnel : « Choisir mes articles » directement
+PASS  P1b. aucun onglet en bas
+PASS  P1c. aucune recherche
+PASS  P1d. aucun bandeau
+PASS  P1e. Compte dans l'en-tête
+PASS  P2. « Sélection enregistrée »
+PASS  P2b. reste sur Choisir
+PASS  P2c. serveur : liste du jour créée par la demande (1.000 kg to_buy)
+PASS  P2d. quantité enregistrée affichée
+PASS  P3. hors connexion : « Envoi en attente »
+PASS  P3b. la demande survit à la fermeture de l'application
+PASS  P4. reprise : envoi au retour du réseau
+PASS  P4b. serveur : une seule ligne, quantité remplacée (1.500 kg to_buy)
+PASS  P5. personnel : « Se déconnecter » dans Compte
+PASS  P5b. déconnecté
+═══ J. Personnel : minuit, liste ouverte plusieurs jours, clôture par un parent (en ligne et hors connexion) ═══
+FAIL  J1. sélection enregistrée sur la liste ouverte ()
+      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Code famille"|"marie"|"••••••"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Renseignez le code famille."|"Se connecter"|"Besoin d'aide ?"|
+PASS  J2. l'horloge du téléphone est passée minuit (2026-10-14 → 2026-10-15)
+FAIL  J2b. après minuit, application ouverte : sélection toujours affichée (Enregistré · 1 kg)
+      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Code famille"|"marie"|"••••••"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Renseignez le code famille."|"Se connecter"|"Besoin d'aide ?"|
+FAIL  J2c. après minuit, application relancée : toujours sur Choisir, sélection conservée
+      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Code famille"|"marie"|"Code d'accès"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Se connecter"|"Besoin d'aide ?"|
+PASS  J2d. serveur : même liste, toujours ouverte
+FAIL  J3. trois jours plus tard : sélection et quantité conservées
+      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Code famille"|"marie"|"Code d'accès"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Se connecter"|"Besoin d'aide ?"|
+FAIL  J3b. modification enregistrée sur la MÊME liste ()
+      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Code famille"|"marie"|"Code d'accès"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Se connecter"|"Besoin d'aide ?"|
+PASS  J3c. serveur : toujours une seule liste ouverte
+PASS  J4. clôture par le parent apprise : sélections de cette liste réinitialisées
+FAIL  J4b. reste sur Choisir, articles et photos toujours affichés
+      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Code famille"|"marie"|"Code d'accès"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Se connecter"|"Besoin d'aide ?"|
+FAIL  J4c. historique : liste archivée avec son contenu ()
+      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Code famille"|"marie"|"Code d'accès"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Se connecter"|"Besoin d'aide ?"|
+FAIL  J5. nouvelle liste : sélection enregistrée ()
+      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Code famille"|"marie"|"Code d'accès"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Se connecter"|"Besoin d'aide ?"|
+FAIL  J5b. hors connexion : demande non envoyée (« Envoi en attente »)
+      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Code famille"|"marie"|"Code d'accès"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Se connecter"|"Besoin d'aide ?"|
+FAIL  J5c. brouillon non validé (Carottes)
+      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Code famille"|"marie"|"Code d'accès"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Se connecter"|"Besoin d'aide ?"|
+PASS  J6. retour du réseau : la clôture est appliquée (sélection enregistrée réinitialisée)
+FAIL  J6b. la demande non envoyée et le brouillon sont gardés : « Reprendre »
+      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Code famille"|"marie"|"Code d'accès"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Se connecter"|"Besoin d'aide ?"|
+FAIL  J6c. historique non modifié par les demandes tardives ()
+      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Code famille"|"marie"|"Code d'accès"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Se connecter"|"Besoin d'aide ?"|
+FAIL  J6d. reste sur Choisir
+      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Code famille"|"marie"|"Code d'accès"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Se connecter"|"Besoin d'aide ?"|
+FAIL  J7. reprise : demande (Tomates 1,5 kg) et brouillon (Carottes) repris dans la sélection
+      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Code famille"|"marie"|"Code d'accès"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Se connecter"|"Besoin d'aide ?"|
+FAIL  J7b. serveur : nouvelle liste du jour avec les articles repris ()
+      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Code famille"|"marie"|"Code d'accès"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Se connecter"|"Besoin d'aide ?"|
+FAIL  J7c. les listes archivées restent intactes
+      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Code famille"|"marie"|"Code d'accès"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Se connecter"|"Besoin d'aide ?"|
+ECHECS=16
 CRASH_APPLICATION=0
-═══ C. Première connexion → Créer ma famille (autonome : sans lien, jeton ni serveur) ═══
-PASS  C1. formulaire direct (aucun lien, jeton ni serveur)
-PASS  C1b. ville choisie affichée dans le formulaire
-PASS  C2. bouton « Recevoir le code par e-mail » activé
-PASS  C3. écran du code (adresse masquée)
-PASS  C3b. double appui : un seul e-mail envoyé (1)
-PASS  C3c. double appui : une seule demande enregistrée
-PASS  C3d. rien n'est créé avant la vérification
-PASS  C4. code faux refusé avec un message clair
-PASS  C4b. code expiré : message clair, proposition d'un nouveau code
-PASS  C4c. nouveau code envoyé (2 e-mails au total)
-PASS  C5. famille créée et utilisateur connecté : code famille affiché
-PASS  C5b. code famille généré (SCSS3WAX) affiché à l'écran
-PASS  C5c. serveur : une seule famille créée (1 → 2)
-PASS  C5d. serveur : administrateur principal, adresse vérifiée, ville, identifiant (attendu « true true Casablanca Anfa karim », obtenu « true true Casablanca Anfa karim »)
-PASS  C6. Copier : confirmation visible dans le panneau
-PASS  C7. Partager : fenêtre de partage Android
-PASS  C8. « Préparer mes courses » ouvre la sélection des articles
-PASS  C9. doublon : la même adresse ne crée pas une seconde famille (409 email_in_use)
-PASS  C10. formulaire de connexion prérempli avec le code famille généré
-PASS  C10b. connecté à la nouvelle famille avec ses accès
-PASS  C11. plafond atteint : « limite temporaire de créations », aucun code envoyé
-PASS  C12. quota d'envoi atteint : message d'échec, pas d'écran « code envoyé »
-═══ D. Suppression de compte et de famille (familles JETABLES de la recette) ═══
-PASS  D1. personnel connecté
-PASS  D1b. « Supprimer mon compte » dans le menu Compte (personnel)
-PASS  D1c. distinct de la déconnexion (Se déconnecter au-dessus)
-PASS  D2. écran explicite : ce qui est supprimé / ce qui reste
-PASS  D2b. bouton désactivé tant que le code et la confirmation manquent
-PASS  D2c. confirmation demandée
-PASS  D3. retour à la connexion avec message de suppression (essais refusés : 0)
-PASS  D3b. serveur : profil anonymisé (Ancien profil|true|-|false)
-PASS  D3c. serveur : aucune session ouverte
-PASS  D3d. l'autre session (autre téléphone) est fermée : 401
-PASS  D3e. reconnexion refusée (API : 401)
-PASS  D3f. reconnexion refusée dans l'application
-PASS  D3g. sa demande reste dans la liste, attribuée à « Ancien profil »
-PASS  D3h. les autres membres et la famille sont intacts
-PASS  D7. page web /suppression-compte servie (« Mes Courses »)
-PASS  D7b. page web : mauvais code refusé (401), rien ne change
-PASS  D7c. page web : suppression acceptée
-PASS  D7d. page web : profil anonymisé, reconnexion refusée
-PASS  D8. suppression de la famille : conséquences explicites
-PASS  D8b. bouton désactivé sans la case « Je comprends »
-PASS  D8c. confirmation explicite
-PASS  D9. famille supprimée : retour à la connexion avec message
-PASS  D9b. serveur : famille, profils, listes et demande de création effacés (demande avant : 1)
-PASS  D9c. reconnexion refusée ; l'autre famille reste
-ECHECS=0
-CRASH_APPLICATION=0
-═══ K. Clavier numérique des codes d'accès ═══
-PASS  K1. connexion : clavier numérique pour le code (0x12)
-PASS  K2. code affiché : zéro initial conservé (047193)
-PASS  K2b. clavier toujours numérique quand le code est affiché (0x12)
-PASS  K2c. 6 chiffres au plus (le 7e est ignoré)
-PASS  K3. code remasqué
-═══ S. Partager l'accès d'un membre (famille JETABLE) ═══
-PASS  S0. administrateur connecté (saisies vérifiées)
-PASS  S1. code famille affiché avec « Partager le code famille » et « Copier »
-PASS  S1b. son propre profil : partage impossible
-PASS  S1c. ville reprise de l'administrateur
-PASS  S2. création : clavier numérique (0x12)
-PASS  S2b. code saisi avec son zéro initial (047193)
-PASS  S3. partage proposé dès la création
-PASS  S3b. serveur : profil créé, code non stocké en clair
-PASS  S4b. « Copier les informations »
-PASS  S4d. panneau de partage de l'application fermé
-PASS  S5. le code partagé fonctionne (zéro initial) : connexion de Zoé
-PASS  S6. menu : « Partager l'accès » (rien ne change à l'ouverture)
-PASS  S6b. explication : code non conservé, l'ancien cessera de fonctionner
-PASS  S6c. annulation : code inchangé (empreinte identique, connexion 047193 toujours valable)
-PASS  S7. nouveau code généré et affiché (843586)
-PASS  S7b. l'ancien code ne fonctionne plus ; le nouveau, si
-PASS  S8. avec WhatsApp : WhatsApp s'ouvre avec le message (envoi par l'administrateur)
-PASS  S9. code famille : WhatsApp s'ouvre
-PASS  S9b. « Copier » le code famille
-PASS  S4. sans WhatsApp : partage Android ouvert (rien n'est envoyé)
-PASS  S4c. panneau de partage refermé sans rien envoyer, retour à l'application
-ECHECS=0
-CRASH_APPLICATION=0
-═══ A. Bouton « Affichage » : 3 présentations × 2 organisations, pour les 3 rôles ═══
-PASS  A0. Personnel connecté
-PASS  A·Personnel · Liste · Par catégorie (repère : Affichage : Liste, par catégorie ; Tomates y=620, Pommes de terre y=853)
-PASS  A·Personnel · Petites cartes · Par catégorie (repère : Affichage : Petites cartes, par catégorie ; Tomates y=1024, Pommes de terre y=1024)
-PASS  A·Personnel · Grandes cartes · Par catégorie (repère : Affichage : Grandes cartes, par catégorie ; Tomates y=1146, Pommes de terre y=1900)
-PASS  A·Personnel · Liste · Liste globale (repère : Affichage : Liste, liste globale ; Ail y=518, Assouplissant y=751)
-PASS  A·Personnel · Petites cartes · Liste globale (repère : Affichage : Petites cartes, liste globale ; Ail y=911, Assouplissant y=911)
-PASS  A·Personnel · Grandes cartes · Liste globale (repère : Affichage : Grandes cartes, liste globale ; Ail y=1027, Assouplissant y=1781)
-PASS  A1. Personnel : sélection conservée après les 6 changements
-PASS  A2. personnel : toujours sans recherche ni onglets
-FAIL  A0. Parent connecté — champ « YB5446DS » introuvable
-      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Code famille"|"marie"|"Code d'accès"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Se connecter"|"Besoin d'aide ?"|
-FAIL  A·Parent · Liste · Par catégorie (repère :  ; Tomates y=, Pommes de terre y=hors écran)
-      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Code famille"|"marie"|"Code d'accès"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Se connecter"|"Besoin d'aide ?"|
-FAIL  A·Parent · Petites cartes · Par catégorie (repère :  ; Tomates y=, Pommes de terre y=hors écran)
-      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Code famille"|"marie"|"Code d'accès"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Se connecter"|"Besoin d'aide ?"|
-FAIL  A·Parent · Grandes cartes · Par catégorie (repère :  ; Tomates y=, Pommes de terre y=hors écran)
-      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Code famille"|"marie"|"Code d'accès"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Se connecter"|"Besoin d'aide ?"|
-FAIL  A·Parent · Liste · Liste globale (repère :  ; Ail y=, Assouplissant y=hors écran)
-      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Code famille"|"marie"|"Code d'accès"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Se connecter"|"Besoin d'aide ?"|
-FAIL  A·Parent · Petites cartes · Liste globale (repère :  ; Ail y=, Assouplissant y=hors écran)
-      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Code famille"|"marie"|"Code d'accès"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Se connecter"|"Besoin d'aide ?"|
-FAIL  A·Parent · Grandes cartes · Liste globale (repère :  ; Ail y=, Assouplissant y=hors écran)
-      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Code famille"|"marie"|"Code d'accès"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Se connecter"|"Besoin d'aide ?"|
-FAIL  A1. Parent : sélection conservée après les 6 changements
-      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Code famille"|"marie"|"Code d'accès"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Se connecter"|"Besoin d'aide ?"|
-FAIL  A3. parent : recherche disponible
-      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Code famille"|"marie"|"Code d'accès"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Se connecter"|"Besoin d'aide ?"|
-FAIL  A0. Administrateur connecté — champ « YB5446DS » introuvable
-      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Code famille"|"marie"|"Code d'accès"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Se connecter"|"Besoin d'aide ?"|
-FAIL  A·Administrateur · Liste · Par catégorie (repère :  ; Tomates y=, Pommes de terre y=hors écran)
-      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Code famille"|"marie"|"Code d'accès"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Se connecter"|"Besoin d'aide ?"|
-FAIL  A·Administrateur · Petites cartes · Par catégorie (repère :  ; Tomates y=, Pommes de terre y=hors écran)
-      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Code famille"|"marie"|"Code d'accès"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Se connecter"|"Besoin d'aide ?"|
-FAIL  A·Administrateur · Grandes cartes · Par catégorie (repère :  ; Tomates y=, Pommes de terre y=hors écran)
-      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Code famille"|"marie"|"Code d'accès"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Se connecter"|"Besoin d'aide ?"|
-FAIL  A·Administrateur · Liste · Liste globale (repère :  ; Ail y=, Assouplissant y=hors écran)
-      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Code famille"|"marie"|"Code d'accès"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Se connecter"|"Besoin d'aide ?"|
-FAIL  A·Administrateur · Petites cartes · Liste globale (repère :  ; Ail y=, Assouplissant y=hors écran)
-      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Code famille"|"marie"|"Code d'accès"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Se connecter"|"Besoin d'aide ?"|
-FAIL  A·Administrateur · Grandes cartes · Liste globale (repère :  ; Ail y=, Assouplissant y=hors écran)
-      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Code famille"|"marie"|"Code d'accès"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Se connecter"|"Besoin d'aide ?"|
-FAIL  A1. Administrateur : sélection conservée après les 6 changements
-      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Code famille"|"marie"|"Code d'accès"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Se connecter"|"Besoin d'aide ?"|
-FAIL  A4. après un changement d'écran (administrateur)
-      écran : "At a glance"|"Wed, Oct 14"|"Wed, Oct 14"|"Gmail"|"Gmail"|"Photos"|"Photos"|"YouTube"|"YouTube"|"Home"|"Phone"|"Phone"|"Messages"|"Messages"|"Chrome"|"Chrome"|"Mes Courses"|"Predicted app: Mes Courses"|"Google search"|"Google app"|"Voice search"|"Google Lens"|
-FAIL  A5. après fermeture et réouverture (administrateur)
-      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Code famille"|"marie"|"Code d'accès"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Se connecter"|"Besoin d'aide ?"|
-FAIL  A6. changement de compte : préférences du personnel, pas celles de l'administrateur
-      écran : "At a glance"|"Wed, Oct 14"|"Wed, Oct 14"|"Gmail"|"Gmail"|"Photos"|"Photos"|"YouTube"|"YouTube"|"Home"|"Phone"|"Phone"|"Messages"|"Messages"|"Chrome"|"Chrome"|"Mes Courses"|"Predicted app: Mes Courses"|"Google search"|"Google app"|"Voice search"|"Google Lens"|
-FAIL  A7. parent : ses propres préférences
-      écran : "At a glance"|"Wed, Oct 14"|"Wed, Oct 14"|"Gmail"|"Gmail"|"Photos"|"Photos"|"YouTube"|"YouTube"|"Home"|"Phone"|"Phone"|"Messages"|"Messages"|"Chrome"|"Chrome"|"Mes Courses"|"Predicted app: Mes Courses"|"Google search"|"Google app"|"Voice search"|"Google Lens"|
-FAIL  A8. reconnexion de l'administrateur : ses préférences retrouvées
-      écran : "At a glance"|"Wed, Oct 14"|"Wed, Oct 14"|"Gmail"|"Gmail"|"Photos"|"Photos"|"YouTube"|"YouTube"|"Home"|"Phone"|"Phone"|"Messages"|"Messages"|"Chrome"|"Chrome"|"Mes Courses"|"Predicted app: Mes Courses"|"Google search"|"Google app"|"Voice search"|"Google Lens"|
-ECHECS=22
-CRASH_APPLICATION=0
-═══ T. Administrateur principal : transfert du rôle puis suppression de son seul compte (famille JETABLE) ═══
-PASS  T0. formulaire neuf : code famille, identifiant et code saisis et vérifiés ; envoi
-PASS  T0b. administrateur principal connecté (formulaire neuf)
-PASS  T0c. essai refusé (identifiant inconnu) : saisies vérifiées ; envoi
-PASS  T0d. refus affiché
-PASS  T0e. après le refus : saisies vérifiées (adil) ; envoi
-PASS  T0f. administrateur principal connecté après un refus
-PASS  D4. principal : suppression seule impossible, expliquée
-FAIL  D4b. deux choix : transférer le rôle / supprimer toute la famille
-      écran : "Close sheet"|"Supprimer mon compte"|"Vous êtes l'administrateur principal de « Recette ». Ce rôle tient la famille (adresse de récupération, suppression de la famille) : votre compte ne peut pas être supprimé seul tant que vous l'avez."|"1. Supprimer seulement mon compte"|"Confiez d'abord le rôle d'administrateur principal à un autre administrateur de la famille. Votre adresse de récupération sera retirée ; le nouvel administrateur principal enregistrera la sienne (Réglages → Récupération). Vous pourrez ensuite supprimer votre compte ; la famille et ses membres resteront."|"Nouvel administrateur principal :"|"Driss (dadmin)"|"Votre code d'accès"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Transférer le rôle"|
-PASS  D4c. candidat proposé : l'autre administrateur actif
-PASS  T4d. code saisi pour le transfert
-PASS  D5. transfert confirmé à l'écran
-PASS  D5b. serveur : Driss est l'administrateur principal, adresse de l'ancien retirée
-PASS  T5c. code saisi pour la suppression
-PASS  D6. ancien principal : compte supprimé, retour à la connexion
-PASS  D6b. reconnexion refusée ; Driss et Lamiaa se connectent
-ECHECS=1
-CRASH_APPLICATION=0
-TOTAL_ECHECS=23
+TOTAL_ECHECS=16
