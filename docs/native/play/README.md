@@ -9,8 +9,8 @@
 
 ## Version livrée (pré-version GitHub, NON publiée sur Google Play)
 
-- Fichier : `MesCourses-1.0.1.aab` — https://github.com/adilam2026/SmartCourse/releases/download/courses-natif-play-1.0.1-6/MesCourses-1.0.1.aab
-- APK généré depuis ce bundle (contrôle) : https://github.com/adilam2026/SmartCourse/releases/download/courses-natif-play-1.0.1-6/MesCourses-1.0.1-depuis-bundle.apk
-- Identifiant `app.smartcourse.courses.natif` · version 1.0.1 · versionCode **1106** · cible API 36 · min API 26
+- Fichier : `MesCourses-1.0.1.aab` — https://github.com/adilam2026/SmartCourse/releases/download/courses-natif-play-1.0.1-18/MesCourses-1.0.1.aab
+- APK généré depuis ce bundle (contrôle) : https://github.com/adilam2026/SmartCourse/releases/download/courses-natif-play-1.0.1-18/MesCourses-1.0.1-depuis-bundle.apk
+- Identifiant `app.smartcourse.courses.natif` · version 1.0.1 · versionCode **1118** · cible API 36 · min API 26
 - Certificat (clé durable) SHA-256 : `C2:CB:CE:5E:2F:61:8A:21:7A:C6:7A:15:A7:2C:E2:0F:BB:B3:B9:80:BC:3B:AF:43:DD:8A:4A:EA:E6:69:C8:8E`
-- SHA-256 du bundle : `401104e2e8c9e7e0e816c99169c6bfc94f2ddc55f6baf1741820fd4978d9aeb5`
+- SHA-256 du bundle : `9f9ecc93f3be9bfc9b37ae90af14868d9e1f0055885d553485b88c92eed143d0`
