@@ -1,64 +1,12 @@
-═══ C. Première connexion → Créer ma famille (autonome : sans lien, jeton ni serveur) ═══
-PASS  C1. formulaire direct (aucun lien, jeton ni serveur)
-PASS  C1b. ville choisie affichée dans le formulaire
-PASS  C2. bouton « Recevoir le code par e-mail » activé
-PASS  C3. écran du code (adresse masquée)
-PASS  C3b. double appui : un seul e-mail envoyé (1)
-PASS  C3c. double appui : une seule demande enregistrée
-PASS  C3d. rien n'est créé avant la vérification
-PASS  C4. code faux refusé avec un message clair
-PASS  C4b. code expiré : message clair, proposition d'un nouveau code
-PASS  C4c. nouveau code envoyé (2 e-mails au total)
-PASS  C5. famille créée et utilisateur connecté : code famille affiché
-PASS  C5b. code famille généré (Q2AGZFTQ) affiché à l'écran
-PASS  C5c. serveur : une seule famille créée (1 → 2)
-PASS  C5d. serveur : administrateur principal, adresse vérifiée, ville, identifiant (attendu « true true Casablanca Anfa karim », obtenu « true true Casablanca Anfa karim »)
-PASS  C6. Copier : confirmation visible dans le panneau
-PASS  C7. Partager : fenêtre de partage Android
-PASS  C8. « Préparer mes courses » ouvre la sélection des articles
-PASS  C9. doublon : la même adresse ne crée pas une seconde famille (409 email_in_use)
-PASS  C10. formulaire de connexion prérempli avec le code famille généré
-PASS  C10b. connecté à la nouvelle famille avec ses accès
-PASS  C11. plafond atteint : « limite temporaire de créations », aucun code envoyé
-PASS  C12. quota d'envoi atteint : message d'échec, pas d'écran « code envoyé »
-═══ D. Suppression de compte et de famille (familles JETABLES de la recette) ═══
-PASS  D1. personnel connecté
-PASS  D1b. « Supprimer mon compte » dans le menu Compte (personnel)
-PASS  D1c. distinct de la déconnexion (Se déconnecter au-dessus)
-PASS  D2. écran explicite : ce qui est supprimé / ce qui reste
-PASS  D2b. bouton désactivé tant que le code et la confirmation manquent
-PASS  D2c. confirmation demandée
-PASS  D3. retour à la connexion avec message de suppression (essais refusés : 0)
-PASS  D3b. serveur : profil anonymisé (Ancien profil|true|-|false)
-PASS  D3c. serveur : aucune session ouverte
-PASS  D3d. l'autre session (autre téléphone) est fermée : 401
-PASS  D3e. reconnexion refusée (API : 401)
-PASS  D3f. reconnexion refusée dans l'application
-PASS  D3g. sa demande reste dans la liste, attribuée à « Ancien profil »
-PASS  D3h. les autres membres et la famille sont intacts
-FAIL  D4. principal : suppression seule impossible, expliquée
-      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Q2AGZFTQ"|"adil"|"Code d'accès"|"Afficher le code"|"Identifiants incorrects ou accès temporairement bloqué. Vérifiez le code famille, l'identifiant et le code d'accès."|"Se connecter"|"Besoin d'aide ?"|
-FAIL  D4b. deux choix : transférer le rôle / supprimer toute la famille
-      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Q2AGZFTQ"|"adil"|"Code d'accès"|"Afficher le code"|"Identifiants incorrects ou accès temporairement bloqué. Vérifiez le code famille, l'identifiant et le code d'accès."|"Se connecter"|"Besoin d'aide ?"|
-FAIL  D4c. candidat proposé : l'autre administrateur actif
-      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Q2AGZFTQ"|"adil"|"Code d'accès"|"Afficher le code"|"Identifiants incorrects ou accès temporairement bloqué. Vérifiez le code famille, l'identifiant et le code d'accès."|"Se connecter"|"Besoin d'aide ?"|
-FAIL  D5. transfert confirmé à l'écran
-      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Q2AGZFTQ"|"adil"|"Code d'accès"|"Afficher le code"|"Identifiants incorrects ou accès temporairement bloqué. Vérifiez le code famille, l'identifiant et le code d'accès."|"Se connecter"|"Besoin d'aide ?"|
-FAIL  D5b. serveur : Driss est l'administrateur principal, adresse de l'ancien retirée
-      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Q2AGZFTQ"|"adil"|"Code d'accès"|"Afficher le code"|"Identifiants incorrects ou accès temporairement bloqué. Vérifiez le code famille, l'identifiant et le code d'accès."|"Se connecter"|"Besoin d'aide ?"|
-FAIL  D6. ancien principal : compte supprimé, retour à la connexion
-      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Q2AGZFTQ"|"adil"|"Code d'accès"|"Afficher le code"|"Identifiants incorrects ou accès temporairement bloqué. Vérifiez le code famille, l'identifiant et le code d'accès."|"Se connecter"|"Besoin d'aide ?"|
-FAIL  D6b. reconnexion refusée ; Driss et Lamiaa se connectent
-      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Q2AGZFTQ"|"adil"|"Code d'accès"|"Afficher le code"|"Identifiants incorrects ou accès temporairement bloqué. Vérifiez le code famille, l'identifiant et le code d'accès."|"Se connecter"|"Besoin d'aide ?"|
-PASS  D7. page web /suppression-compte servie (« Mes Courses »)
-PASS  D7b. page web : mauvais code refusé (401), rien ne change
-PASS  D7c. page web : suppression acceptée
-PASS  D7d. page web : profil anonymisé, reconnexion refusée
-PASS  D8. suppression de la famille : conséquences explicites
-PASS  D8b. bouton désactivé sans la case « Je comprends »
-PASS  D8c. confirmation explicite
-PASS  D9. famille supprimée : retour à la connexion avec message
-PASS  D9b. serveur : famille, profils, listes et demande de création effacés (demande avant : 1)
-PASS  D9c. reconnexion refusée ; l'autre famille reste
-ECHECS=7
+═══ T. Administrateur principal : transfert du rôle puis suppression de son seul compte (famille JETABLE) ═══
+PASS  T0. formulaire rempli (code famille, adil, code saisi)
+PASS  T0b. administrateur principal connecté
+PASS  D4. principal : suppression seule impossible, expliquée
+PASS  D4b. deux choix : transférer le rôle / supprimer toute la famille
+PASS  D4c. candidat proposé : l'autre administrateur actif
+PASS  D5. transfert confirmé à l'écran
+PASS  D5b. serveur : Driss est l'administrateur principal, adresse de l'ancien retirée
+PASS  D6. ancien principal : compte supprimé, retour à la connexion
+PASS  D6b. reconnexion refusée ; Driss et Lamiaa se connectent
+ECHECS=0
 CRASH_APPLICATION=0
