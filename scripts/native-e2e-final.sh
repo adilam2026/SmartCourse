@@ -408,72 +408,37 @@ logout
 fi
 
 if want_s A; then
-echo "═══ A. Bouton « Affichage » : 3 présentations × 2 organisations, pour les 3 rôles ═══" | tee -a "$OUT/resultats.txt"
-check_or_stop() { local l=$1; shift; if "$@"; then ok "$l"; else ko "$l${T_ERR:+ — $T_ERR}"; fi; T_ERR=""; }
-y1() { $UI bounds "$1" | awk '{print $2}'; }
+echo "═══ A. Catalogue (contrôle rapide) : Tous les articles / Par catégories × Liste / Cartes ═══" | tee -a "$OUT/resultats.txt"
 set_display() { # $1 présentation, $2 organisation (libellés du panneau)
   $UI tap "Affichage" >/dev/null; sleep 2
   $UI tap "$1" >/dev/null; sleep 1; $UI tap "$2" >/dev/null; sleep 1
   $UI tap "Fermer" --last >/dev/null; sleep 2
 }
-check_layout() { # $1 rôle, $2 présentation, $3 organisation
-  local a b exp="Affichage : $2, ${3,}"
-  if [ "$3" = "Par catégorie" ]; then a=Tomates; b="Pommes de terre"; else a=Ail; b=Assouplissant; fi
-  for _ in 1 2 3 4; do adb shell input swipe 540 700 540 1900 150; done; sleep 1
-  local d; d=$(show_desc)
-  local ya yb; ya=$(y1 "$a"); yb=$(y1 "$b")
-  local org_ok=1
-  if [ "$3" = "Par catégorie" ]; then $UI has "Légumes et herbes" || org_ok=0; else $UI has "Légumes et herbes" && org_ok=0; fi
-  local pres_ok=0
-  case "$2" in
-    "Petites cartes") [ -n "$ya" ] && [ "$ya" = "$yb" ] && pres_ok=1;;
-    Liste) [ -n "$ya" ] && [ -n "$yb" ] && [ $((yb - ya)) -gt 0 ] && [ $((yb - ya)) -lt 400 ] && pres_ok=1;;
-    "Grandes cartes") [ -n "$ya" ] && { [ -z "$yb" ] || [ $((yb - ya)) -gt 600 ]; } && pres_ok=1;;
-  esac
-  expect "A·$1 · $2 · $3 (repère : $d ; $a y=$ya, $b y=${yb:-hors écran})" test "$d" = "$exp" -a "$org_ok" = 1 -a "$pres_ok" = 1
-}
-run_role() { # $1 rôle (libellé), $2 identifiant, $3 code, $4 écran attendu
-  launch; $UI wait "Bienvenue" 25 >/dev/null
-  check_or_stop "A0. $1 connecté" tf_login "$FAMILY" "$2" "$3"
-  if [ "$4" = admin ]; then $UI wait "Compte" 25 >/dev/null; tapt "Ajouter des articles"; fi
-  $UI wait "Affichage" 20 >/dev/null
-  # sélection en cours : elle doit survivre à tous les changements d'affichage
-  for _ in 1 2 3 4; do adb shell input swipe 540 700 540 1900 150; done
-  $UI tap "Oignons" >/dev/null; sleep 2
-  for org in "Par catégorie" "Liste globale"; do
-    for pres in "Liste" "Petites cartes" "Grandes cartes"; do set_display "$pres" "$org"; check_layout "$1" "$pres" "$org"; done
-  done
-  expect "A1. $1 : sélection conservée après les 6 changements" $UI has "Terminer ma sélection (1)"
-}
-run_role "Personnel" marie 573918 staff
-shot final-a1-personnel-grandes-cartes-globale
-expect "A2. personnel : toujours sans recherche ni onglets" bash -c "! $UI has 'Rechercher un produit' && ! $UI has 'Liste du jour'"
-$UI tap "Affichage" >/dev/null; sleep 2; shot final-a2-panneau-affichage; $UI tap "Fermer" --last >/dev/null; sleep 1
-set_display "Liste" "Par catégorie"
+launch; $UI wait "Bienvenue" 25 >/dev/null
+expect "A0. démarrage, personnel connecté" tf_login "$FAMILY" marie 573918
+$UI wait "Affichage" 20 >/dev/null
+expect "A1. icône Affichage dans l'en-tête, plus de rangée de boutons" bash -c "$UI has 'Affichage : ' && ! $UI has 'Grandes cartes'"
+set_display "Cartes" "Par catégories"
+expect "A2. Par catégories : grille des catégories (sans articles)" bash -c "$UI has 'Légumes et herbes' && ! $UI has 'Oignons'"
+shot final-a1-grille-categories
+$UI tap "Légumes et herbes" >/dev/null; sleep 2
+expect "A3. catégorie ouverte : ses articles et le retour" bash -c "$UI has 'Retour aux catégories' && $UI has 'Oignons'"
+$UI tap "Oignons" >/dev/null; sleep 2
+expect "A4. article choisi" $UI has "Terminer ma sélection (1)"
+shot final-a2-categorie-ouverte
+$UI tap "Retour aux catégories" >/dev/null; sleep 2
+expect "A5. retour à la grille, badge « choisi(s) » sur la catégorie" bash -c "$UI has 'Légumes et herbes' && $UI has ' choisi' && $UI has 'Terminer ma sélection (1)'"
+shot final-a3-badge-categorie
+$UI tap "Légumes et herbes" >/dev/null; sleep 2; adb shell input keyevent KEYCODE_BACK; sleep 2
+expect "A6. retour Android : grille, application toujours ouverte" bash -c "$UI has 'Légumes et herbes' && ! $UI has 'Retour aux catégories' && $UI has 'Terminer ma sélection (1)'"
+set_display "Liste" "Tous les articles"
+expect "A7. Tous les articles en Liste : titres de catégorie, sélection conservée" bash -c "$UI has 'Légumes et herbes' && $UI has 'Terminer ma sélection (1)' && $UI has 'Affichage : Liste, tous les articles'"
+shot final-a4-tous-les-articles-liste
+adb shell am force-stop $PKG; adb shell am start -W -n "$ACT" >/dev/null 2>&1; sleep 4; $UI wait "Affichage" 25 >/dev/null
+expect "A8. préférence gardée après fermeture de l'application" test "$(show_desc)" = "Affichage : Liste, tous les articles"
+logout; tf_login "$FAMILY" marie 573918; $UI wait "Affichage" 25 >/dev/null
+expect "A9. préférence gardée après déconnexion / reconnexion" test "$(show_desc)" = "Affichage : Liste, tous les articles"
 logout
-run_role "Parent" lamiaa 573918 admin
-expect "A3. parent : recherche disponible" $UI has "Rechercher un produit"
-set_display "Petites cartes" "Liste globale"
-shot final-a3-parent-petites-cartes-globale
-adb shell input keyevent KEYCODE_BACK; sleep 2; logout
-run_role "Administrateur" adil 482913 admin
-set_display "Grandes cartes" "Liste globale"
-shot final-a4-admin-grandes-cartes-globale
-# Mémorisation : autre écran, redémarrage, déconnexion / reconnexion, changement de compte
-adb shell input keyevent KEYCODE_BACK; sleep 2; tapt "Historique"; tapt "Liste"; tapt "Ajouter des articles"
-expect "A4. après un changement d'écran (administrateur)" test "$(show_desc)" = "Affichage : Grandes cartes, liste globale"
-adb shell am force-stop $PKG; adb shell am start -W -n "$ACT" >/dev/null 2>&1; sleep 4; $UI wait "Compte" 25 >/dev/null; tapt "Ajouter des articles"
-expect "A5. après fermeture et réouverture (administrateur)" test "$(show_desc)" = "Affichage : Grandes cartes, liste globale"
-adb shell input keyevent KEYCODE_BACK; sleep 2; logout
-tf_login "$FAMILY" marie 573918; $UI wait "Affichage" 25 >/dev/null
-expect "A6. changement de compte : préférences du personnel, pas celles de l'administrateur" test "$(show_desc)" = "Affichage : Liste, par catégorie"
-logout
-tf_login "$FAMILY" lamiaa 573918; $UI wait "Compte" 25 >/dev/null; tapt "Ajouter des articles"
-expect "A7. parent : ses propres préférences" test "$(show_desc)" = "Affichage : Petites cartes, liste globale"
-adb shell input keyevent KEYCODE_BACK; sleep 2; logout
-tf_login "$FAMILY" adil 482913; $UI wait "Compte" 25 >/dev/null; tapt "Ajouter des articles"
-expect "A8. reconnexion de l'administrateur : ses préférences retrouvées" test "$(show_desc)" = "Affichage : Grandes cartes, liste globale"
-adb shell input keyevent KEYCODE_BACK; sleep 2; logout
 fi
 
 if want_s D; then

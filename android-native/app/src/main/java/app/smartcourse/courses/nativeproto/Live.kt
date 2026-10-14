@@ -95,8 +95,8 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
         engine.trace = { android.util.Log.i("CoursesData", it) }
         kv.get(catKey)?.let { s -> try { parseCatalog(json.parseToJsonElement(s) as JsonObject) } catch (_: Exception) { null } }?.let { catalog = it.products }
         // Préférences d'affichage DE CE PROFIL (téléphone) : celles d'un profil précédent ne sont jamais reprises ; valeurs par défaut sinon.
-        demo.selMode = kv.get(modeKey)?.let { m -> SelMode.entries.firstOrNull { it.name == m } } ?: SelMode.GRID
-        demo.selOrg = kv.get(orgKey)?.let { o -> SelOrg.entries.firstOrNull { it.name == o } } ?: SelOrg.CATEGORY
+        demo.selMode = SelMode.parse(kv.get(modeKey))
+        demo.selOrg = SelOrg.parse(kv.get(orgKey))
         demo.listLoaded = engine.list != null
         applyPrefs(me.prefs)
         render()

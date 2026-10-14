@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
@@ -62,24 +63,30 @@ fun SelectionScreen(nav: (String) -> Unit, onBack: () -> Unit) {
     // Personnel : pas de recherche (et aucune recherche précédente ne masque d'article) ; tous les articles par catégorie.
     val q = if (admin) query else ""
     val items = demo.products.filter { demo.inCatalog[it.id] == true && (q.isBlank() || it.name.contains(q.trim(), ignoreCase = true)) }
-    // Organisation : par catégorie (en-têtes) ou liste globale (ordre alphabétique français, sans en-têtes). Les trois présentations
-    // acceptent les deux ; la sélection en cours n'est jamais touchée par un changement d'affichage.
-    val collator = remember { java.text.Collator.getInstance(java.util.Locale.FRENCH) }
-    val entries: List<Any> =
-        if (demo.selOrg == SelOrg.GLOBAL) items.sortedWith(compareBy(collator) { it.name })
-        else buildList { items.groupBy { it.category }.forEach { (c, ps) -> add(c); addAll(ps) } }
+    // Organisation : « Tous les articles » (blocs titrés par catégorie, tous dépliés) ou « Par catégories » (grille de catégories,
+    // puis les articles d'une seule catégorie). La présentation (Liste / Cartes) s'applique aux articles. Changer d'affichage, ouvrir
+    // une catégorie ou revenir à la grille ne touche jamais à la sélection en cours.
+    val groups = items.groupBy { it.category }
+    var openCat by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
+    val byCategory = demo.selOrg == SelOrg.CATEGORY
+    // Une recherche affiche directement ses résultats en blocs ; sans recherche, la grille des catégories.
+    val showGrid = byCategory && openCat == null && q.isBlank()
+    val shown: Map<String, List<Product>> = if (byCategory && openCat != null && q.isBlank()) mapOf(openCat!! to groups[openCat].orEmpty()) else groups
+    val entries: List<Any> = buildList { shown.forEach { (c, ps) -> if (!(byCategory && openCat != null && q.isBlank())) add(c); addAll(ps) } }
+    if (openCat != null && (!byCategory || groups[openCat] == null) && q.isBlank()) openCat = null
+    androidx.activity.compose.BackHandler(enabled = byCategory && openCat != null && q.isBlank()) { openCat = null }
     var display by remember { mutableStateOf(false) }
     val count = demo.selChanges
 
     Column(Modifier.fillMaxSize()) {
-        // Personnel : écran principal, sans flèche de retour (Liste du jour reste accessible par l'onglet du bas).
-        TopBar(if (admin) "Ajouter des articles" else "Choisir mes articles", onBack = if (admin) onBack else null)
+        // Personnel : écran principal, sans flèche de retour (Liste du jour reste accessible par l'onglet du bas). L'icône Affichage est
+        // sur la ligne du titre, juste à gauche de l'icône profil.
+        TopBar(
+            if (admin) "Ajouter des articles" else "Choisir mes articles",
+            onBack = if (admin) ({ if (byCategory && openCat != null && q.isBlank()) openCat = null else onBack() }) else null,
+        ) { DisplayIcon { display = true } }
         Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            // Un seul bouton compact « Affichage » (tous les rôles) ; la recherche reste réservée aux parents et administrateurs.
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (admin) SearchBox(query, { query = it }, "Rechercher un produit…", Modifier.weight(1f)) else Spacer(Modifier.weight(1f))
-                DisplayButton { display = true }
-            }
+            if (admin) SearchBox(query, { query = it }, "Rechercher un produit…", Modifier.fillMaxWidth())
             if (demo.orphanCount > 0) SCard(padding = PaddingValues(12.dp)) {
                 Text("${demo.orphanCount} article${if (demo.orphanCount > 1) "s" else ""} d'une liste terminée", style = MaterialTheme.typography.titleSmall)
                 Text("Ils n'ont pas été ajoutés. Voulez-vous les reprendre dans votre sélection ?", style = MaterialTheme.typography.bodySmall)
@@ -90,12 +97,19 @@ fun SelectionScreen(nav: (String) -> Unit, onBack: () -> Unit) {
                 }
             }
         }
-        Spacer(Modifier.height(6.dp))
+        if (admin || demo.orphanCount > 0) Spacer(Modifier.height(6.dp))
+        if (byCategory && openCat != null && q.isBlank()) CategoryBar(openCat!!, groups[openCat].orEmpty().size) { openCat = null }
         Box(Modifier.weight(1f)) {
-            when (demo.selMode) {
+            if (showGrid) LazyVerticalGrid(
+                GridCells.Fixed(2), contentPadding = PaddingValues(16.dp, 4.dp, 16.dp, 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                groups.forEach { (c, ps) -> item(key = "c-$c") { CategoryCard(c, ps) { openCat = c } } }
+            }
+            else when (demo.selMode) {
                 SelMode.LIST -> LazyColumn(contentPadding = PaddingValues(16.dp, 4.dp, 16.dp, 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(entries, key = { if (it is Product) it.id else "h-$it" }) { e ->
-                        if (e is Product) SelListRow(e) { sheetFor = e.id } else Header(e as String)
+                        if (e is Product) SelListRow(e) { sheetFor = e.id } else Header(e as String, groups[e].orEmpty().size)
                     }
                 }
                 SelMode.GRID -> LazyVerticalGrid(
@@ -104,12 +118,7 @@ fun SelectionScreen(nav: (String) -> Unit, onBack: () -> Unit) {
                 ) {
                     entries.forEach { e ->
                         if (e is Product) item(key = e.id) { SelTile(e) { sheetFor = e.id } }
-                        else item(key = "h-$e", span = { GridItemSpan(maxLineSpan) }) { Header(e as String) }
-                    }
-                }
-                SelMode.CARDS -> LazyColumn(contentPadding = PaddingValues(16.dp, 4.dp, 16.dp, 12.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    items(entries, key = { if (it is Product) it.id else "h-$it" }) { e ->
-                        if (e is Product) SelBigCard(e) { sheetFor = e.id } else Header(e as String)
+                        else item(key = "h-$e", span = { GridItemSpan(maxLineSpan) }) { Header(e as String, groups[e].orEmpty().size) }
                     }
                 }
             }
@@ -166,8 +175,70 @@ fun SelectionScreen(nav: (String) -> Unit, onBack: () -> Unit) {
     Text(t, style = MaterialTheme.typography.labelSmall, color = c, maxLines = 1, overflow = TextOverflow.Ellipsis)
 }
 
-@Composable private fun Header(text: String) {
-    Text(text, style = MaterialTheme.typography.titleMedium, modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 2.dp))
+@Composable private fun Header(text: String, total: Int) {
+    Row(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 2.dp).semantics(mergeDescendants = true) {}, verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(text, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f, fill = false))
+        Text(articles(total), style = MaterialTheme.typography.bodySmall, color = C.Muted, modifier = Modifier.padding(bottom = 2.dp))
+    }
+}
+
+private fun articles(n: Int) = if (n > 1) "$n articles" else "$n article"
+
+/** Nombre de produits DISTINCTS choisis dans une catégorie (pas leurs quantités) : ceux qui portent la coche. */
+@Composable private fun selectedIn(ps: List<Product>): Int { val demo = LocalDemo.current; return ps.count { demo.selQty(it.id) != null } }
+
+/** Carte d'entrée d'une catégorie : photos représentatives, nom, nombre d'articles ; petit badge du nombre de produits choisis. */
+@Composable
+private fun CategoryCard(name: String, ps: List<Product>, onOpen: () -> Unit) {
+    val sel = selectedIn(ps)
+    val shape = RoundedCornerShape(20.dp)
+    Column(
+        Modifier.fillMaxWidth().shadow(4.dp, shape, ambientColor = C.Navy.copy(alpha = 0.10f), spotColor = C.Navy.copy(alpha = 0.2f)).clip(shape)
+            .background(Color.White).clickable(onClick = onOpen)
+            .semantics(mergeDescendants = true) { contentDescription = "$name, ${articles(ps.size)}" + if (sel > 0) ", $sel choisi${if (sel > 1) "s" else ""}" else "" },
+    ) {
+        Box {
+            val pics = ps.take(4)
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                for (r in 0 until 2) Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                    for (c in 0 until 2) {
+                        val p = pics.getOrNull(r * 2 + c)
+                        val m = Modifier.weight(1f).aspectRatio(1.25f)
+                        if (p != null) ProductImage(p, m, contentScale = ContentScale.Crop) else Box(m.background(Color(0xFFEFF4F8)))
+                    }
+                }
+            }
+            if (sel > 0) Box(
+                Modifier.align(Alignment.TopEnd).padding(8.dp).heightIn(min = 26.dp).widthIn(min = 26.dp).clip(RoundedCornerShape(50)).background(C.Teal)
+                    .padding(horizontal = 7.dp),
+                contentAlignment = Alignment.Center,
+            ) { Text(sel.toString(), color = Color.White, style = MaterialTheme.typography.labelLarge, maxLines = 1) }
+        }
+        Column(Modifier.padding(start = 12.dp, end = 10.dp, top = 8.dp, bottom = 12.dp)) {
+            Text(name, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(articles(ps.size), style = MaterialTheme.typography.bodySmall, color = C.Muted)
+        }
+    }
+}
+
+/** Catégorie ouverte : retour clair vers la grille des catégories, puis son nom. */
+@Composable
+private fun CategoryBar(name: String, total: Int, onBack: () -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        val shape = RoundedCornerShape(50)
+        Row(
+            Modifier.heightIn(min = 48.dp).clip(shape).background(Color.White).border(BorderStroke(1.dp, C.Line), shape).clickable(onClick = onBack)
+                .semantics(mergeDescendants = true) { contentDescription = "Retour aux catégories" }.padding(start = 10.dp, end = 14.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Icon(Icons.AutoMirrored.Rounded.ArrowBack, null, tint = C.Ink, modifier = Modifier.size(20.dp))
+            Text("Catégories", style = MaterialTheme.typography.labelLarge, color = C.Ink)
+        }
+        Column(Modifier.weight(1f)) {
+            Text(name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(articles(total), style = MaterialTheme.typography.bodySmall, color = C.Muted)
+        }
+    }
 }
 
 private val SelBorder = BorderStroke(2.5.dp, C.Teal)
@@ -261,44 +332,6 @@ private fun SelTile(p: Product, openSheet: () -> Unit) {
     }
 }
 
-@Composable
-private fun SelBigCard(p: Product, openSheet: () -> Unit) {
-    val demo = LocalDemo.current
-    val q = demo.selQty(p.id)
-    val shape = RoundedCornerShape(24.dp)
-    Column(
-        Modifier.fillMaxWidth().shadow(5.dp, shape, ambientColor = C.Navy.copy(alpha = 0.12f), spotColor = C.Navy.copy(alpha = 0.22f)).clip(shape)
-            .background(if (q != null) C.TealSoft else Color.White)
-            .then(if (q != null) Modifier.border(SelBorder, shape) else Modifier),
-    ) {
-        Box(Modifier.clickable { demo.selToggle(p, openSheet) }) {
-            ProductImage(p, Modifier.fillMaxWidth().height(190.dp), contentScale = ContentScale.Crop)
-            if (q != null) SelBadge(Modifier.align(Alignment.TopEnd).padding(12.dp))
-        }
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(p.name, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    PriceLine(p)
-                    SavedTag(p)
-                }
-                if (q == null) AddDot()
-            }
-            if (q != null) Row(verticalAlignment = Alignment.CenterVertically) {
-                val big = q >= 1000 && p.unit != UnitKind.COUNT
-                Stepper(
-                    qtyText(p, q),
-                    { demo.setSel(p.id, (q - stepOf(p, big)).coerceAtLeast(stepOf(p, big))) },
-                    { demo.setSel(p.id, q + stepOf(p, big)) },
-                    size = if (LocalCompact.current) 44.dp else 48.dp, canMinus = q > stepOf(p, big),
-                )
-                Spacer(Modifier.weight(1f))
-                QtyChip("Quantité", p.name, openSheet)
-            }
-        }
-    }
-}
-
 /* ───────────── V05 — Panneau de quantité ───────────── */
 
 private fun display(q: Int, p: Product, big: Boolean): String =
@@ -378,19 +411,12 @@ fun QuantitySheet(
 }
 
 
-/** Bouton compact « Affichage » : son nom accessible indique les deux réglages actifs. */
+/** Icône « Affichage » de l'en-tête (zone tactile 48 dp) ; son nom accessible indique aussi les deux réglages actifs. */
 @Composable
-private fun DisplayButton(onClick: () -> Unit) {
+private fun DisplayIcon(onClick: () -> Unit) {
     val demo = LocalDemo.current
-    val shape = RoundedCornerShape(14.dp)
-    Row(
-        Modifier.height(48.dp).clip(shape).background(Color.White).border(BorderStroke(1.dp, C.Line), shape).clickable(onClick = onClick)
-            .semantics { contentDescription = "Affichage : ${demo.selMode.label}, ${demo.selOrg.label.lowercase()}" }
-            .padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Icon(Icons.Rounded.Tune, null, tint = C.TealDark, modifier = Modifier.size(20.dp))
-        Text("Affichage", style = MaterialTheme.typography.labelLarge, color = C.TealDark)
+    IconButton(onClick, Modifier.semantics { contentDescription = "Affichage : ${demo.selMode.label}, ${demo.selOrg.label.lowercase()}" }) {
+        Icon(Icons.Rounded.Tune, null, tint = C.Ink, modifier = Modifier.size(26.dp))
     }
 }
 
@@ -403,26 +429,33 @@ private fun DisplaySheet(onDismiss: () -> Unit) {
         Text("Appliqué tout de suite et mémorisé pour votre profil. Votre sélection ne change pas.", style = MaterialTheme.typography.bodySmall)
         Spacer(Modifier.height(14.dp))
         Text("Présentation", style = MaterialTheme.typography.titleSmall)
-        SelMode.entries.forEach { m -> ChoiceRow(m.label, demo.selMode == m) { demo.data?.setSelMode(m) ?: run { demo.selMode = m } } }
-        Spacer(Modifier.height(12.dp))
-        Text("Organisation", style = MaterialTheme.typography.titleSmall)
-        SelOrg.entries.forEach { o -> ChoiceRow(if (o == SelOrg.GLOBAL) "${o.label} (A → Z)" else o.label, demo.selOrg == o) { demo.data?.setSelOrg(o) ?: run { demo.selOrg = o } } }
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SelMode.entries.forEach { m -> ChoiceRow(m.label, if (m == SelMode.LIST) Icons.AutoMirrored.Rounded.ViewList else Icons.Rounded.GridView, demo.selMode == m, Modifier.weight(1f)) { demo.data?.setSelMode(m) ?: run { demo.selMode = m } } }
+        }
         Spacer(Modifier.height(14.dp))
+        Text("Organisation", style = MaterialTheme.typography.titleSmall)
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SelOrg.entries.forEach { o -> ChoiceRow(o.label, if (o == SelOrg.GLOBAL) Icons.Rounded.ViewAgenda else Icons.Rounded.Category, demo.selOrg == o, Modifier.weight(1f)) { demo.data?.setSelOrg(o) ?: run { demo.selOrg = o } } }
+        }
+        Spacer(Modifier.height(16.dp))
         SecondaryButton("Fermer", onDismiss, Modifier.fillMaxWidth())
     }
 }
 
 @Composable
-private fun ChoiceRow(label: String, selected: Boolean, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(12.dp)
+private fun ChoiceRow(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(14.dp)
     Row(
-        Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(shape).background(if (selected) C.TealSoft else Color.Transparent).clickable(onClick = onClick)
-            .semantics { contentDescription = if (selected) "$label, choisi" else label }
-            .padding(horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        modifier.heightIn(min = 52.dp).clip(shape).background(if (selected) C.Teal else Color.White)
+            .border(BorderStroke(if (selected) 0.dp else 1.dp, if (selected) C.Teal else C.Line), shape).clickable(onClick = onClick)
+            .semantics(mergeDescendants = true) { contentDescription = if (selected) "$label, choisi" else label }
+            .padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
     ) {
-        RadioButton(selected, null, colors = RadioButtonDefaults.colors(selectedColor = C.Teal))
-        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f).padding(start = 4.dp))
-        if (selected) Icon(Icons.Rounded.Check, null, tint = C.TealDark, modifier = Modifier.size(20.dp))
+        Icon(icon, null, tint = if (selected) Color.White else C.Ink, modifier = Modifier.size(18.dp))
+        Text(label, style = MaterialTheme.typography.labelLarge, color = if (selected) Color.White else C.Ink, textAlign = TextAlign.Center, maxLines = 2)
+        if (selected) Icon(Icons.Rounded.Check, null, tint = Color.White, modifier = Modifier.size(18.dp))
     }
 }

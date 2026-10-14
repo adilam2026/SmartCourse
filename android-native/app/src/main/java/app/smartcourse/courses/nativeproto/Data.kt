@@ -79,9 +79,18 @@ fun defaultQty(p: Product): Int = when (p.unit) { UnitKind.MASS -> 1000; UnitKin
 
 enum class Role { ADMIN, STAFF }
 /** Présentation des articles à choisir (le nom interne GRID est conservé : préférences déjà enregistrées). */
-enum class SelMode(val label: String) { LIST("Liste"), GRID("Petites cartes"), CARDS("Grandes cartes") }
-/** Organisation des articles à choisir : par catégorie (en-têtes) ou liste globale (A → Z, sans en-têtes). */
-enum class SelOrg(val label: String) { CATEGORY("Par catégorie"), GLOBAL("Liste globale") }
+enum class SelMode(val label: String) {
+    LIST("Liste"), GRID("Cartes");
+    companion object {
+        /** Préférence enregistrée → présentation. L'ancienne « Grandes cartes » (CARDS) devient « Cartes ». */
+        fun parse(s: String?): SelMode = if (s == "CARDS") GRID else entries.firstOrNull { it.name == s } ?: GRID
+    }
+}
+/** GLOBAL : tout le catalogue sur une page, en blocs titrés par catégorie. CATEGORY : grille de catégories, puis les articles d'une catégorie. */
+enum class SelOrg(val label: String) {
+    GLOBAL("Tous les articles"), CATEGORY("Par catégories");
+    companion object { fun parse(s: String?): SelOrg = entries.firstOrNull { it.name == s } ?: CATEGORY }
+}
 enum class ProfRole(val label: String) { ADMIN("Administrateur"), PARENT("Parent"), STAFF("Personnel") }
 
 data class Line(
@@ -132,7 +141,7 @@ class Demo(initialRole: Role? = null, val live: Boolean = false) {
     var showPrices by mutableStateOf(Launch.flag("prices"))
     var showTotals by mutableStateOf(false)
     var selMode by mutableStateOf(
-        when (Launch.str("mode")) { "list" -> SelMode.LIST; "cards" -> SelMode.CARDS; else -> SelMode.GRID }
+        when (Launch.str("mode")) { "list" -> SelMode.LIST; else -> SelMode.GRID }
     )
     var selOrg by mutableStateOf(SelOrg.CATEGORY)
     var toast by mutableStateOf<Toast?>(null)
