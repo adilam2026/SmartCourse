@@ -8,6 +8,7 @@ import { hardenApiRoles } from "./harden.js";
 import { migrate } from "./migrate.js";
 import { createBackupStorage } from "./backup-store.js";
 import { startBackupScheduler } from "./backup.js";
+import { purgeOldSignups } from "./signup.js";
 import { photoBackupHooks } from "./backup-photos.js";
 import { createPhotoStore } from "./photos.js";
 import { purgeOrphanAssets, syncCatalogPhotos } from "./photos-import.js";
@@ -45,6 +46,18 @@ const purgeOnce = async () => {
 };
 if (readBackOk) await purgeOnce(); // after a failed switch nothing is purged
 setInterval(() => void purgeOnce(), 6 * 3_600_000).unref();
+
+// Demandes de création de famille et e-mails de code de plus de 30 jours : effacés au démarrage puis toutes les 6 heures,
+// qu'il y ait ou non de nouvelles inscriptions.
+const purgeSignups = async () => {
+  try {
+    await purgeOldSignups(db);
+  } catch (e) {
+    console.error(`Effacement des anciennes demandes de création impossible : ${(e as Error).message}`);
+  }
+};
+await purgeSignups();
+setInterval(() => void purgeSignups(), 6 * 3_600_000).unref();
 
 const external = config.BACKUP_MODE === "external";
 const backup = config.BACKUP_KEY || external ? createBackupStorage(config) : null;

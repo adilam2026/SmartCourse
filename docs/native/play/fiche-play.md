@@ -73,6 +73,6 @@ Première version de Mes Courses sur Google Play :
 ## Catégorie et coordonnées
 
 - Type : Application. Catégorie proposée : **Shopping** (ou « Style de vie »).
-- Adresse e-mail de contact du développeur : **à fournir** (obligatoire, publique sur la fiche).
+- Adresse e-mail de contact du développeur (publique sur la fiche) : `adilam.pro@gmail.com`
 - Site web : facultatif.
 - Règles de confidentialité : `https://smartcourse-production-c7ce.up.railway.app/confidentialite`

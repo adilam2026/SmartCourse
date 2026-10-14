@@ -60,8 +60,9 @@ déclarer comme type distinct, mais il relève de la gestion du compte.
   sont effacés immédiatement ; sessions fermées, reconnexion refusée. Les listes et achats, qui appartiennent à la famille,
   restent sous « Ancien profil ».
 - **Suppression de la famille** (administrateur principal) : toutes les données de la famille sont effacées immédiatement.
-- **Conservation** : demandes de création de famille 30 jours au plus ; sauvegardes chiffrées 3 mois au plus (7 quotidiennes,
-  4 hebdomadaires, 3 mensuelles) ; journaux techniques de l'hébergeur : durée limitée fixée par Railway (non vérifiée).
+- **Conservation** : demandes de création de famille et e-mails de code effacés par le serveur au-delà de 30 jours (au
+  démarrage puis toutes les 6 heures). Aucune durée n'est annoncée pour les sauvegardes ni pour les journaux de l'hébergeur
+  (non vérifiées).
 - Données conservées après suppression : aucune donnée personnelle ; seuls subsistent le libellé « Ancien profil » dans
   l'historique de la famille (suppression d'un compte) ou une trace anonyme (suppression d'une famille).
 
@@ -118,8 +119,8 @@ Points à corriger avant soumission (préparés, **non déployés** — votre ac
    (« Mes Courses »). Corrigé dans `web/public/*.html` sur la branche `claude/android-native`.
 2. La page de confidentialité décrit les notifications de l'application web (Firebase Cloud Messaging) ; l'application Android
    n'utilise aucun service de notification tiers. Corrigé dans la même modification.
-3. **Adresse de contact publique absente** (« le contact public de l'application n'est pas encore renseigné ») : variable
-   `CONTACT_EMAIL` du serveur à renseigner (changement de configuration Railway, redémarrage du serveur, aucune donnée touchée).
+3. Adresse de contact publique : **adilam.pro@gmail.com** (choisie par le propriétaire, affichée sur les deux pages ;
+   une variable Railway `CONTACT_EMAIL` la remplacerait si elle était définie).
 
 ## 6. Compte de démonstration pour l'examen Google
 
@@ -149,7 +150,6 @@ Aucun abonnement, aucun paiement. Les données de ce compte sont fictives.
 
 ## 7. Informations manquantes (non inventées)
 
-- Adresse e-mail de contact du développeur (fiche Play) et `CONTACT_EMAIL` du serveur.
 - Compte développeur Google Play (nom du développeur affiché, vérification d'identité, adresse si compte organisation).
 - Adresse dédiée au compte de démonstration, puis code famille et codes d'accès de ce compte.
 - Choix de la signature d'application Play (option A ou B ci-dessus).

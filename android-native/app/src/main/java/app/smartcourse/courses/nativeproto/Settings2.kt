@@ -352,7 +352,7 @@ fun ResetFamilySheet(onDismiss: () -> Unit) {
             Text(
                 "• La famille « ${fam?.get("name")?.jsonPrimitive?.contentOrNull ?: ""} » et ses ${n("profiles")} profils sont supprimés : plus personne ne peut s'y connecter, sur aucun téléphone.\n" +
                 "• Sont effacés : ${n("lists")} listes, ${n("purchases")} achats, ${n("products")} produits, l'historique, les favoris, les prix de la famille et ceux qu'elle a partagés, les photos ajoutées, l'adresse de récupération.\n" +
-                "• Rien ne peut être récupéré depuis l'application. Les sauvegardes chiffrées du serveur contiennent encore ces données jusqu'à leur effacement automatique (3 mois au plus).\n" +
+                "• Rien ne peut être récupéré depuis l'application. Des sauvegardes du serveur, s'il en existe, peuvent encore contenir ces données jusqu'à leur propre suppression.\n" +
                 "• Les autres familles ne sont pas touchées.",
                 style = MaterialTheme.typography.bodyMedium,
             )
