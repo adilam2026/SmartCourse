@@ -349,6 +349,9 @@ expect "S3b. serveur : profil créé, code non stocké en clair" bash -c "test \
 shot final-s1-partage-apres-creation
 $UI tap "Copier les informations" >/dev/null; sleep 1
 expect "S4b. « Copier les informations »" $UI wait "Informations copiées" 5
+# Android 13+ affiche quelques secondes l'aperçu du presse-papiers en bas de l'écran (avec un raccourci de partage) : on attend
+# qu'il disparaisse, sinon l'appui suivant le toucherait et ouvrirait Quick Share.
+sleep 10
 $UI tap "Fermer" --last >/dev/null; sleep 2
 expect "S4d. panneau de partage de l'application fermé" $UI gone "Informations copiées" 5
 expect "S5. le code partagé fonctionne (zéro initial) : connexion de Zoé" test "$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d "{\"familyCode\":\"$FAMILY\",\"login\":\"zoe\",\"secret\":\"047193\"}")" = 200
@@ -387,6 +390,7 @@ else
 fi
 $UI tap "Copier" --last >/dev/null; sleep 1
 expect "S9b. « Copier » le code famille" $UI wait "Copié" 5
+sleep 10   # aperçu du presse-papiers d'Android
 shot final-s5-profils-code-famille
 # Partage Android sans WhatsApp, joué en dernier : l'émulateur Google peut ouvrir ensuite, avec un délai variable, l'accueil de
 # Quick Share (hors application), qui masquerait les étapes suivantes.
