@@ -314,32 +314,6 @@ expect "D3f. reconnexion refusée dans l'application" bash -c "sleep 3; $UI has 
 expect "D3g. sa demande reste dans la liste, attribuée à « Ancien profil »" test "$(sql "SELECT p.display_name FROM list_items i JOIN profiles p ON p.id=i.added_by WHERE i.id='$DITEM'")" = "Ancien profil"
 expect "D3h. les autres membres et la famille sont intacts" bash -c "test \"\$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"$FAMILY\",\"login\":\"lamiaa\",\"secret\":\"573918\"}')\" = 200 && test \"\$(sql \"SELECT count(*) FROM profiles WHERE family_id='$FID' AND login IN ('adil','lamiaa','marie','dadmin') AND deleted_at IS NULL\")\" = 4"
 
-# Administrateur principal : explication, transfert du rôle, puis suppression de son seul compte
-sleep 61   # limite de 20 connexions par minute et par adresse : les contrôles ci-dessus en ont fait beaucoup
-signin "$FAMILY" adil 482913
-$UI wait "Compte" 25 >/dev/null
-tapt "Compte"; $UI tap "Supprimer mon compte" --last >/dev/null; sleep 3
-expect "D4. principal : suppression seule impossible, expliquée" bash -c "$UI wait 'Vous êtes l' 10 && $UI has 'ne peut pas être supprimé seul'"
-expect "D4b. deux choix : transférer le rôle / supprimer toute la famille" bash -c "$UI has 'Supprimer seulement mon compte' && $UI has 'Transférer le rôle' && $UI has 'Supprimer toute la famille'"
-expect "D4c. candidat proposé : l'autre administrateur actif" $UI wait "(dadmin)" 10
-shot final-d3-principal-choix
-$UI tap "(dadmin)" >/dev/null; sleep 1
-fill "Votre code d'accès" 482913; hide_kb
-$UI tap "Transférer le rôle" --last --scroll >/dev/null; sleep 2
-$UI tap "Transférer" --last >/dev/null; sleep 5
-expect "D5. transfert confirmé à l'écran" $UI wait "est maintenant l'administrateur principal" 15
-expect "D5b. serveur : Driss est l'administrateur principal, adresse de l'ancien retirée" test "$(sql "SELECT string_agg(login||':'||is_primary::text||':'||coalesce(recovery_email,'-'), ',' ORDER BY login) FROM profiles WHERE family_id='$FID' AND login IN ('adil','dadmin')")" = "adil:false:-,dadmin:true:-"
-shot final-d4-transfert
-fill "Votre code d'accès" 482913; hide_kb
-$UI tap "Je comprends que la suppression" --scroll >/dev/null; sleep 1
-$UI tap "Supprimer mon compte" --last --scroll >/dev/null; sleep 2
-$UI tap "Supprimer" --last >/dev/null; sleep 5
-expect "D6. ancien principal : compte supprimé, retour à la connexion" $UI wait "Votre compte a été supprimé" 20
-expect "D6b. reconnexion refusée ; Driss et Lamiaa se connectent" bash -c "
-  test \"\$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"$FAMILY\",\"login\":\"adil\",\"secret\":\"482913\"}')\" = 401 &&
-  test \"\$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"$FAMILY\",\"login\":\"dadmin\",\"secret\":\"628351\"}')\" = 200 &&
-  test \"\$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"$FAMILY\",\"login\":\"lamiaa\",\"secret\":\"573918\"}')\" = 200"
-
 # Page web publique /suppression-compte (même règle que dans l'application)
 expect "D7. page web /suppression-compte servie (« Mes Courses »)" bash -c "curl -s $BASE/suppression-compte | grep -q 'Supprimer mon compte Mes Courses'"
 login_api dadmin 628351
@@ -379,6 +353,46 @@ if [ -n "$BCODE" ]; then
 else
   echo "(D8-D9 non joués : la famille de la section C n'existe pas dans ce lancement)" | tee -a "$OUT/resultats.txt"
 fi
+
+fi
+if want_s T; then
+echo "═══ T. Administrateur principal : transfert du rôle puis suppression de son seul compte (famille JETABLE) ═══" | tee -a "$OUT/resultats.txt"
+export -f sql
+FID=$(sql "SELECT id FROM families WHERE code='$FAMILY'")
+# Une seule session API, réutilisée : Driss (administrateur) existe déjà si la section D a été jouée
+if [ "$(sql "SELECT count(*) FROM profiles WHERE family_id='$FID' AND login='dadmin'")" = 0 ]; then
+  login_api adil 482913
+  api POST /api/profiles -d '{"displayName":"Driss","login":"dadmin","role":"admin","secret":"628351","secretConfirm":"628351","city":"Casablanca"}' >/dev/null
+fi
+# Administrateur principal : explication, transfert du rôle, puis suppression de son seul compte
+# Formulaire de connexion propre (application relancée), clavier refermé entre les champs, état vérifié avant l'envoi.
+launch; $UI wait "Bienvenue" 25 >/dev/null
+fill "${PREV_FAMILY:-Code famille}" "$FAMILY"; hide_kb; fill "${PREV_LOGIN:-Identifiant}" adil; hide_kb; fill "Code d'accès" 482913; hide_kb
+expect "T0. formulaire rempli (code famille, adil, code saisi)" bash -c "$UI has '$FAMILY' && $UI has 'adil' && $UI has '••••••'"
+$UI tap "Se connecter" --last >/dev/null; sleep 4; PREV_FAMILY="$FAMILY"; PREV_LOGIN=adil
+expect "T0b. administrateur principal connecté" $UI wait "Compte" 25
+tapt "Compte"; $UI tap "Supprimer mon compte" --last >/dev/null; sleep 3
+expect "D4. principal : suppression seule impossible, expliquée" bash -c "$UI wait 'Vous êtes l' 10 && $UI has 'ne peut pas être supprimé seul'"
+expect "D4b. deux choix : transférer le rôle / supprimer toute la famille" bash -c "$UI has 'Supprimer seulement mon compte' && $UI has 'Transférer le rôle' && $UI has 'Supprimer toute la famille'"
+expect "D4c. candidat proposé : l'autre administrateur actif" $UI wait "(dadmin)" 10
+shot final-d3-principal-choix
+$UI tap "(dadmin)" >/dev/null; sleep 1
+fill "Votre code d'accès" 482913; hide_kb
+$UI tap "Transférer le rôle" --last --scroll >/dev/null; sleep 2
+$UI tap "Transférer" --last >/dev/null; sleep 5
+expect "D5. transfert confirmé à l'écran" $UI wait "est maintenant l'administrateur principal" 15
+expect "D5b. serveur : Driss est l'administrateur principal, adresse de l'ancien retirée" test "$(sql "SELECT string_agg(login||':'||is_primary::text||':'||coalesce(recovery_email,'-'), ',' ORDER BY login) FROM profiles WHERE family_id='$FID' AND login IN ('adil','dadmin')")" = "adil:false:-,dadmin:true:-"
+shot final-d4-transfert
+fill "Votre code d'accès" 482913; hide_kb
+$UI tap "Je comprends que la suppression" --scroll >/dev/null; sleep 1
+$UI tap "Supprimer mon compte" --last --scroll >/dev/null; sleep 2
+$UI tap "Supprimer" --last >/dev/null; sleep 5
+expect "D6. ancien principal : compte supprimé, retour à la connexion" $UI wait "Votre compte a été supprimé" 20
+expect "D6b. reconnexion refusée ; Driss et Lamiaa se connectent" bash -c "
+  test \"\$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"$FAMILY\",\"login\":\"adil\",\"secret\":\"482913\"}')\" = 401 &&
+  test \"\$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"$FAMILY\",\"login\":\"dadmin\",\"secret\":\"628351\"}')\" = 200 &&
+  test \"\$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"$FAMILY\",\"login\":\"lamiaa\",\"secret\":\"573918\"}')\" = 200"
+
 
 fi
 echo "ECHECS=$FAILS" | tee -a "$OUT/resultats.txt"
