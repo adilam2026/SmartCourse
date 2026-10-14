@@ -29,7 +29,7 @@ Réponses générales :
 |---|---|
 | L'application collecte-t-elle ou partage-t-elle des données utilisateur des types requis ? | **Oui** |
 | Toutes les données collectées sont-elles chiffrées en transit ? | **Oui** (HTTPS uniquement vers le serveur permanent) |
-| Proposez-vous un moyen de demander la suppression des données ? | **Oui** — dans l'application (Réglages → Réinitialiser la famille ; lien « Supprimer mon compte ») et sur le web : `/suppression-compte` |
+| Proposez-vous un moyen de demander la suppression des données ? | **Oui** — dans l'application : *Compte → Supprimer mon compte* (tous les rôles ; l'administrateur principal transfère d'abord son rôle ou supprime toute la famille) ; sur le web : `/suppression-compte` |
 | Données partagées avec des tiers | **Aucune** (Railway — hébergement — et Brevo — envoi d'e-mails — sont des prestataires agissant pour notre compte : ce n'est pas un « partage » au sens de Google Play) |
 
 Aucune bibliothèque de publicité, de mesure d'audience ou de rapport de plantage n'est incluse (vérifié dans les dépendances :
@@ -52,6 +52,18 @@ Non collectés : position précise, contacts, photos et vidéos (l'application A
 celles du catalogue), fichiers, agenda, santé, messages, audio, identifiants d'appareil ou publicitaires, rapports de
 plantage, diagnostics. Le code d'accès n'est jamais conservé en clair (empreinte seulement) ; Google ne demande pas de le
 déclarer comme type distinct, mais il relève de la gestion du compte.
+
+### Suppression et conservation (réponses « Suppression des données » et texte d'aide)
+
+- **Suppression d'un compte** (dans l'application ou sur `/suppression-compte`) : nom, identifiant, code d'accès, ville,
+  réglages, adresse e-mail éventuelle, liens et journal des e-mails, demande de création et abonnements aux notifications
+  sont effacés immédiatement ; sessions fermées, reconnexion refusée. Les listes et achats, qui appartiennent à la famille,
+  restent sous « Ancien profil ».
+- **Suppression de la famille** (administrateur principal) : toutes les données de la famille sont effacées immédiatement.
+- **Conservation** : demandes de création de famille 30 jours au plus ; sauvegardes chiffrées 3 mois au plus (7 quotidiennes,
+  4 hebdomadaires, 3 mensuelles) ; journaux techniques de l'hébergeur : durée limitée fixée par Railway (non vérifiée).
+- Données conservées après suppression : aucune donnée personnelle ; seuls subsistent le libellé « Ancien profil » dans
+  l'historique de la famille (suppression d'un compte) ou une trace anonyme (suppression d'une famille).
 
 Remarque : le serveur conserve temporairement l'adresse IP des requêtes pour la sécurité (limitation des abus) ; c'est une
 donnée de journal technique, non un type à déclarer dans ce formulaire.
@@ -99,7 +111,7 @@ de permission spéciale n'est donc demandée par la Play Console.
 | Usage | URL | Vérification |
 |---|---|---|
 | Règles de confidentialité | `https://smartcourse-production-c7ce.up.railway.app/confidentialite` | 200, HTML, page lisible sans connexion |
-| Suppression de compte | `https://smartcourse-production-c7ce.up.railway.app/suppression-compte` | 200, HTML, formulaire sans connexion ; l'API répond `401 invalid_credentials` à des identifiants inexistants (aucune donnée modifiée) |
+| Suppression de compte | `https://smartcourse-production-c7ce.up.railway.app/suppression-compte` | 200, HTML, formulaire sans connexion ; l'API répond `401 invalid_credentials` à des identifiants inexistants (aucune donnée modifiée). Suppression réelle vérifiée sur une famille jetable du serveur d'essai (section D du parcours final). |
 
 Points à corriger avant soumission (préparés, **non déployés** — votre accord est nécessaire) :
 1. Les pages s'intitulent encore « Courses » : Google demande que la page de suppression cite le **nom affiché sur la fiche**

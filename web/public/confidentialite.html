@@ -16,7 +16,7 @@
 <body>
 <main>
   <h1>Mes Courses — Confidentialité et suppression des données</h1>
-  <p class="muted">Application Android « Mes Courses » (app.smartcourse.courses.natif) et application web « Courses — Liste familiale », qui partagent le même serveur. Dernière mise à jour : 14 octobre 2026 (application Android « Mes Courses », création de famille vérifiée par e-mail). Contact : <!--CONTACT-->.</p>
+  <p class="muted">Application Android « Mes Courses » (app.smartcourse.courses.natif) et application web « Courses — Liste familiale », qui partagent le même serveur. Dernière mise à jour : 14 octobre 2026 (application Android « Mes Courses », création de famille vérifiée par e-mail, suppression de compte et durées de conservation). Contact : <!--CONTACT-->.</p>
 
   <h2>À quoi sert l'application</h2>
   <p>Mes Courses est la liste de courses partagée d'une famille. Elle n'est destinée qu'aux membres d'une même famille ; elle ne contient aucune publicité, aucun traceur publicitaire et ne vend ni ne partage de données à des fins commerciales.</p>
@@ -45,16 +45,26 @@
   <p>Les échanges avec le serveur sont chiffrés (HTTPS).</p>
 
   <h2>Conservation et sauvegardes</h2>
-  <p>Les données sont conservées tant que la famille existe. Des sauvegardes chiffrées de la base sont conservées pour la reprise après incident (7 jours, 4 semaines, 3 mois) puis supprimées automatiquement.</p>
+  <ul>
+    <li><b>Famille, profils, listes, historique, favoris, prix</b> : conservés tant que la famille existe, jusqu'à leur suppression (voir plus bas).</li>
+    <li><b>Demandes de création de famille</b> (adresse e-mail, prénom, identifiant, ville, empreinte de l'adresse IP) et journal des e-mails de code : effacés automatiquement au bout de <b>30 jours</b>, et immédiatement si le compte qui a créé la famille ou la famille est supprimé. Rien n'est créé tant que le code n'est pas vérifié ; un code expire au bout de 30 minutes.</li>
+    <li><b>Liens envoyés par e-mail</b> : vérification de l'adresse valable 48 heures, nouveau code d'accès 60 minutes ; seule une empreinte est conservée, effacée avec le compte.</li>
+    <li><b>Sessions</b> : une connexion reste ouverte 90 jours sans utilisation au plus ; elle est fermée immédiatement à la déconnexion, au changement de code d'accès ou à la suppression du compte.</li>
+    <li><b>Journal de sécurité</b> (actions sur les profils, sans nom ni adresse) : conservé avec la famille et effacé avec elle ; après la suppression d'une famille, il ne reste qu'une trace anonyme (empreinte non réversible du code famille et nombre d'éléments supprimés).</li>
+    <li><b>Journaux techniques du serveur</b> (adresse IP des requêtes) : conservés par l'hébergeur pour une durée limitée.</li>
+    <li><b>Sauvegardes chiffrées</b> de la base, pour la reprise après incident : 7 sauvegardes quotidiennes, 4 hebdomadaires et 3 mensuelles au plus, puis supprimées automatiquement ; une donnée supprimée peut donc y subsister <b>3 mois au plus</b>.</li>
+  </ul>
 
   <h2 id="suppression">Supprimer vos données</h2>
   <ul>
-    <li><b>Toute la famille</b> : l'administrateur principal ouvre <i>Réglages → Réinitialiser la famille</i>. Après vérification du mot de passe et du code famille, la famille, les profils, les listes, les achats, les historiques, les favoris, les prix de la famille, les prix qu'elle avait partagés, les photos de la famille, les abonnements aux notifications et l'adresse de récupération sont supprimés définitivement. Les sauvegardes existantes contiennent encore ces données jusqu'à leur expiration automatique (3 mois au plus).</li>
-    <li><b>Un seul compte, sans supprimer la famille</b> : chaque personne peut supprimer son propre profil, depuis l'application (<i>son profil → Supprimer mon compte</i>) ou depuis la <a href="/suppression-compte.html"><b>page publique de suppression de compte</b></a> (sans connexion préalable : code famille, identifiant et mot de passe). Son nom, son identifiant et son code sont effacés, ses accès fermés et ses abonnements aux notifications supprimés ; dans l'historique des achats de la famille, son nom devient « Ancien profil ». La famille et les autres profils ne changent pas. Le profil principal (qui détient l'adresse de récupération) ne se supprime qu'avec toute la famille.</li>
-    <li><b>Une liste clôturée</b> : un administrateur peut la supprimer depuis l'historique (<i>Supprimer la liste</i>). La liste et ses achats sont alors supprimés définitivement de l'application et les statistiques sont recalculées ; le catalogue, les favoris et les autres listes ne changent pas. Les sauvegardes déjà faites contiennent encore cette liste jusqu'à leur expiration automatique (3 mois au plus).</li>
-    <li><b>Un administrateur</b> peut aussi supprimer le profil d'un parent ou d'un membre du personnel (<i>Réglages → Famille et profils → Profil → Supprimer ce profil</i>).</li>
+    <li><b>Mon compte seulement</b> (tous les rôles) : dans l'application, <i>Compte (icône en haut à droite) → Supprimer mon compte</i>, avec votre code d'accès ; ou sur la <a href="/suppression-compte.html"><b>page publique de suppression de compte</b></a> (sans connexion préalable : code famille, identifiant et code d'accès). Sont effacés immédiatement : votre nom, votre identifiant, votre code d'accès, votre ville, vos réglages, votre adresse e-mail le cas échéant, les liens et le journal des e-mails qui vous concernent, et vos abonnements aux notifications. Vos accès sont fermés sur tous vos téléphones et la reconnexion est refusée. Restent, car ils appartiennent à la famille : les listes, achats et historique, où votre nom est remplacé par « Ancien profil ». La famille et les autres membres ne changent pas. Désactiver un profil n'est pas le supprimer.</li>
+    <li><b>Administrateur principal</b> : son compte tient la famille (adresse de récupération, suppression de la famille). Pour supprimer seulement son compte, il confie d'abord ce rôle à un autre administrateur (<i>Compte → Supprimer mon compte → Transférer le rôle</i>) ; son adresse de récupération est alors retirée et le nouvel administrateur principal enregistre la sienne.</li>
+    <li><b>Toute la famille</b> (administrateur principal uniquement) : <i>Compte → Supprimer mon compte → Supprimer toute la famille</i>, ou <i>Réglages → Supprimer toute la famille</i>. Après le code d'accès, le code famille et une confirmation, sont supprimés définitivement : la famille, tous les profils, les listes, les achats, l'historique, les favoris, les prix de la famille et ceux qu'elle avait partagés, les photos de la famille, les abonnements aux notifications, l'adresse de récupération et la demande de création de la famille. Plus aucun membre ne peut se connecter.</li>
+    <li><b>Une liste clôturée</b> : un administrateur peut la supprimer depuis l'historique (<i>Supprimer la liste</i>) ; la liste et ses achats sont supprimés définitivement et les statistiques recalculées.</li>
+    <li><b>Un administrateur</b> peut aussi supprimer le profil d'un parent ou d'un membre du personnel (<i>Réglages → Profils → ⋮ → Supprimer le profil</i>) : mêmes effets que « Supprimer mon compte ».</li>
     <li><b>Vous ne pouvez plus vous connecter</b> : demandez à l'administrateur de votre famille de supprimer votre profil, ou écrivez à <!--CONTACT-->.</li>
-    <li><b>Désinstaller l'application</b> n'efface pas les données de la famille sur le serveur ; elle efface seulement les données locales du téléphone.</li>
+    <li>Dans tous les cas, les sauvegardes chiffrées déjà faites contiennent encore les données supprimées jusqu'à leur effacement automatique (3 mois au plus).</li>
+    <li><b>Désinstaller l'application</b> n'efface pas les données de la famille sur le serveur ; elle efface seulement les données du téléphone. Après la suppression d'un compte, l'application efface aussi les données de ce profil gardées sur le téléphone.</li>
   </ul>
 
   <h2>Vos droits</h2>
