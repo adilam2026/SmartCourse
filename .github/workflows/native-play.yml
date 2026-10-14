@@ -66,6 +66,17 @@ jobs:
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - name: Sections à jouer
+        env: { MSG: "${{ github.event.head_commit.message }}", IN: "${{ inputs.sections }}" }
+        run: |
+          # Lancement manuel : champ « sections ». Envoi de commit : [play-captures] = captures seules ; [sections:C,D] = parcours ciblé.
+          S="$IN"
+          if [ -z "$S" ]; then
+            if echo "$MSG" | grep -q '\[play-captures\]'; then S=aucune; fi
+            M=$(echo "$MSG" | grep -oE '\[sections:[A-Z,]+\]' | head -1 | sed -E 's/\[sections:([A-Z,]+)\]/\1/')
+            if [ -n "$M" ]; then S="$M"; fi
+          fi
+          echo "SECTIONS=$S" >> "$GITHUB_ENV"; echo "Sections : ${S:-toutes}"
       - name: Parcours final puis captures, sur Android 16 (API 36)
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -76,9 +87,6 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
           script: bash scripts/native-play-ci.sh dist/Courses-final-test.apk ${{ env.FAMILY_CODE }}
-        env:
-          # [play-captures] dans le message : captures seulement (aucune modification de l'application à revalider).
-          SECTIONS: ${{ inputs.sections || (contains(github.event.head_commit.message, '[play-captures]') && 'aucune' || '') }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:

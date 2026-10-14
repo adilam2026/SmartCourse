@@ -10,6 +10,8 @@ R=0
 if [ "${SECTIONS:-}" != "aucune" ]; then
   bash "$HERE/native-e2e-final.sh" "$APK" "$FAMILY" native-final-36 || R=1
 fi
+# Parcours ciblé (sections choisies) : pas de captures, elles ne changent pas.
+if [ -n "${SECTIONS:-}" ] && [ "${SECTIONS}" != "aucune" ]; then exit $R; fi
 "$HERE/recette-locale.sh" --stop >/dev/null
 SEED_PLAY=1 NO_TUNNEL=1 "$HERE/recette-locale.sh" >/dev/null || { echo "recette fictive impossible"; exit 1; }
 # Les captures ne conditionnent pas le bundle (leur résultat est relu avant toute utilisation) ; le parcours, si.
