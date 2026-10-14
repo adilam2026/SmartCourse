@@ -431,7 +431,7 @@ private fun DisplaySheet(onDismiss: () -> Unit) {
         Text("Présentation", style = MaterialTheme.typography.titleSmall)
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SelMode.entries.forEach { m -> ChoiceRow(m.label, if (m == SelMode.LIST) Icons.AutoMirrored.Rounded.ViewList else Icons.Rounded.GridView, demo.selMode == m, Modifier.weight(1f)) { demo.data?.setSelMode(m) ?: run { demo.selMode = m } } }
+            SelMode.entries.forEach { m -> ChoiceRow(m.label, if (m == SelMode.LIST) Icons.Rounded.ViewList else Icons.Rounded.GridView, demo.selMode == m, Modifier.weight(1f)) { demo.data?.setSelMode(m) ?: run { demo.selMode = m } } }
         }
         Spacer(Modifier.height(14.dp))
         Text("Organisation", style = MaterialTheme.typography.titleSmall)
