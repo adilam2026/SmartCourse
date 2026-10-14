@@ -582,8 +582,9 @@ if [ "$t_ok" != 1 ]; then
 else
 tapt "Compte"; $UI tap "Supprimer mon compte" --last >/dev/null; sleep 3
 expect "D4. principal : suppression seule impossible, expliquée" bash -c "$UI wait 'Vous êtes l' 10 && $UI has 'ne peut pas être supprimé seul'"
-expect "D4b. deux choix : transférer le rôle / supprimer toute la famille" bash -c "$UI has 'Supprimer seulement mon compte' && $UI has 'Transférer le rôle' && { $UI has 'Supprimer toute la famille' || { adb shell input swipe 540 1700 540 900 300; sleep 1; $UI has 'Supprimer toute la famille'; }; }"
-for _ in 1 2; do adb shell input swipe 540 900 540 1700 300; done; sleep 1   # retour en haut du panneau
+# « Supprimer toute la famille » est plus bas dans ce panneau : il est vérifié (et utilisé) par la section D (D8). Ne pas faire défiler ici :
+# un glissement vers le bas, contenu déjà en haut, fermerait le panneau.
+expect "D4b. deux choix : transférer le rôle (et, plus bas, supprimer toute la famille)" bash -c "$UI has 'Supprimer seulement mon compte' && $UI has 'Transférer le rôle'"
 expect "D4c. candidat proposé : l'autre administrateur actif" $UI wait "(dadmin)" 10
 shot final-d3-principal-choix
 $UI tap "(dadmin)" >/dev/null; sleep 1
