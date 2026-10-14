@@ -136,6 +136,7 @@ export async function purgeFamily(db: Db, store: PhotoStore, familyId: string, e
       "DELETE FROM products WHERE family_id = $1",
       `DELETE FROM sessions WHERE profile_id IN ${mine}`,
       `DELETE FROM auth_tokens WHERE profile_id IN ${mine}`,
+      `DELETE FROM family_signups WHERE family_id = $1 OR profile_id IN ${mine}`,
       `DELETE FROM email_log WHERE profile_id IN ${mine}`,
       `DELETE FROM audit_log WHERE family_id = $1 OR actor_profile_id IN ${mine} OR target_profile_id IN ${mine}`,
     ];

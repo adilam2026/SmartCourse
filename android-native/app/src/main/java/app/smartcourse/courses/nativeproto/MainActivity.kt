@@ -202,6 +202,8 @@ fun App(session: Session, me: Me?) {
     var account by remember { mutableStateOf(false) }
     var confirmLogout by remember { mutableStateOf(false) }
     var cityPicker by remember { mutableStateOf(false) }
+    var deleteAccount by remember { mutableStateOf(false) }
+    var deleteFamily by remember { mutableStateOf(false) }
     val profilesRepo = remember { ProfilesRepo(session.api) }
     val path = remember { Launch.str("path")?.split(",")?.filter { it.isNotBlank() } }
     val start = remember { if (me != null) (if (uiRole == Role.STAFF) "v04" else "v02") else path?.firstOrNull() ?: startRoute() }
@@ -265,7 +267,9 @@ fun App(session: Session, me: Me?) {
             demo.pendingSheet = if (r.startsWith("v04?sheet=")) r.substringAfter("=") else null
             nav.navigate(r.substringBefore("?")) { launchSingleTop = true }
         }
-        if (account && me != null) AccountSheet(me, session, { account = false }, { account = false; confirmLogout = true }, { account = false; cityPicker = true })
+        if (account && me != null) AccountSheet(me, session, { account = false }, { account = false; confirmLogout = true }, { account = false; cityPicker = true }, { account = false; deleteAccount = true })
+        if (deleteAccount && me != null) DeleteAccountSheet(me, session, { deleteAccount = false }, { deleteAccount = false; deleteFamily = true })
+        if (deleteFamily) ResetFamilySheet { deleteFamily = false }
         if (cityPicker && me != null) CityPickerSheet(me.city, { city ->
             cityPicker = false
             scopeUi.launch {
@@ -317,7 +321,7 @@ fun App(session: Session, me: Me?) {
 }
 
 @Composable
-private fun AccountSheet(me: Me, session: Session, onDismiss: () -> Unit, onLogout: () -> Unit, onCity: () -> Unit) {
+private fun AccountSheet(me: Me, session: Session, onDismiss: () -> Unit, onLogout: () -> Unit, onCity: () -> Unit, onDeleteAccount: () -> Unit) {
     val roleLabel = when (me.role) { "admin" -> if (me.primary == true) "Administrateur principal" else "Administrateur"; "parent" -> "Parent"; else -> "Personnel" }
     AppSheet(onDismiss) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -337,6 +341,12 @@ private fun AccountSheet(me: Me, session: Session, onDismiss: () -> Unit, onLogo
         Text(if (session.online) "État : connecté" else "État : hors connexion, session conservée", style = MaterialTheme.typography.bodyMedium, color = if (session.online) C.TealDark else C.Amber)
         Spacer(Modifier.height(16.dp))
         SecondaryButton("Se déconnecter", onLogout, Modifier.fillMaxWidth(), danger = true)
+        // Suppression du compte : pour chaque rôle, distincte de la déconnexion et de la désactivation d'un profil.
+        Text(
+            "Supprimer mon compte", style = MaterialTheme.typography.labelLarge, color = C.Danger,
+            modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 6.dp).clip(RoundedCornerShape(12.dp)).clickable(onClick = onDeleteAccount)
+                .heightIn(min = 48.dp).padding(horizontal = 16.dp).wrapContentHeight(Alignment.CenterVertically),
+        )
     }
 }
 

@@ -56,6 +56,14 @@ class ListEngine(
     private fun saveOutbox() { if (outbox.isEmpty()) kv.remove(key("outbox")) else kv.put(key("outbox"), storeJson.encodeToString(ListSerializer(Batch.serializer()), outbox)) }
     private fun saveOrphans() { if (orphans.isEmpty()) kv.remove(key("orphans")) else kv.put(key("orphans"), storeJson.encodeToString(ListSerializer(Orphan.serializer()), orphans)) }
 
+    /** Compte supprimé : la copie locale de ce profil (liste, envois en attente, demandes à reprendre, brouillons) est effacée. */
+    fun wipeLocal() {
+        val listId = list?.id
+        for (k in listOf("list", "outbox", "orphans")) kv.remove(key(k))
+        kv.remove(draftKey(listId)); kv.remove(draftKey(null))
+        list = null; outbox = emptyList(); orphans = emptyList()
+    }
+
     /* ───── Brouillon de sélection (par famille + profil + liste ; « none » quand aucune liste n'existe) ───── */
 
     private fun draftKey(listId: String?) = "draft|$scope|${listId ?: "none"}"

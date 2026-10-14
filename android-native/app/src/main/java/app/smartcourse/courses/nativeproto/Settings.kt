@@ -63,12 +63,13 @@ fun AdminHubScreen(nav: (String) -> Unit) {
                 SecondaryButton("Se déconnecter", logout, Modifier.fillMaxWidth(), leading = Icons.AutoMirrored.Rounded.Logout)
                 Spacer(Modifier.height(4.dp))
             }
-            Row(
+            // Supprimer toute la famille : réservé à l'administrateur principal (le serveur le vérifie aussi).
+            if (demo.data == null || demo.data?.me?.primary == true) Row(
                 Modifier.align(Alignment.CenterHorizontally).clip(RoundedCornerShape(12.dp)).clickable { reset = true }.padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Icon(Icons.Rounded.PowerSettingsNew, null, tint = C.Danger, modifier = Modifier.size(20.dp))
-                Text("Réinitialiser la famille", color = C.Danger, style = MaterialTheme.typography.labelLarge)
+                Text("Supprimer toute la famille", color = C.Danger, style = MaterialTheme.typography.labelLarge)
             }
             Spacer(Modifier.height(16.dp))
         }

@@ -192,8 +192,8 @@ expect "O0. administrateur reconnecté (onglet Réglages présent)" $UI wait "R�
 # ═══ Écrans supplémentaires (captures pour validation) ═══
 shot lot3-liste-admin
 tapt "Favoris"; shot lot3-favoris; adb shell input keyevent KEYCODE_BACK; sleep 1
-tapt "Réglages"; $UI tap "Réinitialiser la famille" --scroll >/dev/null; sleep 3
-expect "K9. réinitialisation : confirmation par mot de passe et code famille" $UI wait "Réinitialiser définitivement" 15
+tapt "Réglages"; $UI tap "Supprimer toute la famille" --scroll >/dev/null; sleep 3
+expect "K9. réinitialisation : confirmation par mot de passe et code famille" $UI wait "Supprimer définitivement la famille" 15
 shot lot3-reinitialiser
 adb shell input keyevent KEYCODE_BACK; sleep 1
 tapt "Réglages"; tapt "Affichage"

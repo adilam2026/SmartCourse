@@ -274,6 +274,110 @@ expect "J7c. les listes archivées restent intactes" test "$(items_of $LJ)" = "T
 adb shell settings put global auto_time 1 >/dev/null 2>&1; setclock "$(date -u +%s)"
 
 fi
+if want_s D; then
+echo "═══ D. Suppression de compte et de famille (familles JETABLES de la recette) ═══" | tee -a "$OUT/resultats.txt"
+launch; $UI wait "Bienvenue" 25 >/dev/null
+FID=$(sql "SELECT id FROM families WHERE code='$FAMILY'")
+login_api adil 482913
+api POST /api/profiles -d '{"displayName":"Dina","login":"dpers","role":"staff","secret":"735194","secretConfirm":"735194","city":"Casablanca"}' >/dev/null
+api POST /api/profiles -d '{"displayName":"Driss","login":"dadmin","role":"admin","secret":"628351","secretConfirm":"628351","city":"Casablanca"}' >/dev/null
+DPERS=$(sql "SELECT id FROM profiles WHERE family_id='$FID' AND login='dpers'")
+# Dina (personnel) a fait une demande, et garde une seconde session ouverte (API) : les deux doivent être traitées
+login_api dpers 735194; DCOOKIE=$COOKIE
+OIG=$(sql "SELECT id FROM products WHERE family_id='$FID' AND name='Oignons'")
+api POST /api/lists/active/ops -d "{\"ops\":[{\"opId\":\"$(cat /proc/sys/kernel/random/uuid)\",\"type\":\"add\",\"productId\":\"$OIG\",\"quantity\":1}]}" >/dev/null
+DITEM=$(sql "SELECT id FROM list_items WHERE added_by='$DPERS' LIMIT 1")
+signin "$FAMILY" dpers 735194
+expect "D1. personnel connecté" $UI wait "Choisir mes articles" 25
+tapt "Compte"
+expect "D1b. « Supprimer mon compte » dans le menu Compte (personnel)" $UI has "Supprimer mon compte"
+expect "D1c. distinct de la déconnexion (Se déconnecter au-dessus)" $UI above "Se déconnecter" "Supprimer mon compte"
+$UI tap "Supprimer mon compte" --last >/dev/null; sleep 2
+expect "D2. écran explicite : ce qui est supprimé / ce qui reste" bash -c "$UI wait 'Ce qui est supprimé définitivement' 10 && $UI has 'Ancien profil'"
+expect "D2b. bouton désactivé tant que le code et la confirmation manquent" bash -c "! $UI enabled 'Supprimer mon compte'"
+shot final-d1-supprimer-mon-compte
+fill "Votre code d'accès" 735194; hide_kb
+$UI tap "Je comprends que la suppression" --scroll >/dev/null; sleep 1
+$UI tap "Supprimer mon compte" --last --scroll >/dev/null; sleep 2
+expect "D2c. confirmation demandée" $UI wait "Supprimer votre compte ?" 8
+$UI tap "Supprimer" --last >/dev/null; sleep 5
+expect "D3. retour à la connexion avec message de suppression" bash -c "$UI wait 'Votre compte a été supprimé' 20 && $UI has 'Bienvenue'"
+shot final-d2-compte-supprime
+expect "D3b. serveur : profil anonymisé ($(sql "SELECT display_name||'|'||(deleted_at IS NOT NULL)::text||'|'||coalesce(city,'-')||'|'||active::text FROM profiles WHERE id='$DPERS'"))" \
+  test "$(sql "SELECT display_name||'|'||(deleted_at IS NOT NULL)::text||'|'||coalesce(city,'-')||'|'||active::text FROM profiles WHERE id='$DPERS'")" = "Ancien profil|true|-|false"
+expect "D3c. serveur : aucune session ouverte" test "$(sql "SELECT count(*) FROM sessions WHERE profile_id='$DPERS' AND revoked_at IS NULL")" = 0
+expect "D3d. l'autre session (autre téléphone) est fermée : 401" test "$(curl -s -o /dev/null -w '%{http_code}' $BASE/api/me -H "Cookie: sc_session=$DCOOKIE")" = 401
+expect "D3e. reconnexion refusée (API : 401)" test "$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d "{\"familyCode\":\"$FAMILY\",\"login\":\"dpers\",\"secret\":\"735194\"}")" = 401
+signin "$FAMILY" dpers 735194
+expect "D3f. reconnexion refusée dans l'application" bash -c "sleep 3; $UI has 'Bienvenue' && ! $UI has 'Choisir mes articles'"
+expect "D3g. sa demande reste dans la liste, attribuée à « Ancien profil »" test "$(sql "SELECT p.display_name FROM list_items i JOIN profiles p ON p.id=i.added_by WHERE i.id='$DITEM'")" = "Ancien profil"
+expect "D3h. les autres membres et la famille sont intacts" bash -c "test \"\$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"$FAMILY\",\"login\":\"lamiaa\",\"secret\":\"573918\"}')\" = 200 && test \"\$(sql \"SELECT count(*) FROM profiles WHERE family_id='$FID' AND login IN ('adil','lamiaa','marie','dadmin') AND deleted_at IS NULL\")\" = 4"
+
+# Administrateur principal : explication, transfert du rôle, puis suppression de son seul compte
+signin "$FAMILY" adil 482913
+$UI wait "Compte" 25 >/dev/null
+tapt "Compte"; $UI tap "Supprimer mon compte" --last >/dev/null; sleep 3
+expect "D4. principal : suppression seule impossible, expliquée" bash -c "$UI wait 'Vous êtes l' 10 && $UI has 'ne peut pas être supprimé seul'"
+expect "D4b. deux choix : transférer le rôle / supprimer toute la famille" bash -c "$UI has 'Supprimer seulement mon compte' && $UI has 'Transférer le rôle' && $UI has 'Supprimer toute la famille'"
+expect "D4c. candidat proposé : l'autre administrateur actif" $UI wait "(dadmin)" 10
+shot final-d3-principal-choix
+$UI tap "(dadmin)" >/dev/null; sleep 1
+fill "Votre code d'accès" 482913; hide_kb
+$UI tap "Transférer le rôle" --last --scroll >/dev/null; sleep 2
+$UI tap "Transférer" --last >/dev/null; sleep 5
+expect "D5. transfert confirmé à l'écran" $UI wait "est maintenant l'administrateur principal" 15
+expect "D5b. serveur : Driss est l'administrateur principal, adresse de l'ancien retirée" test "$(sql "SELECT string_agg(login||':'||is_primary::text||':'||coalesce(recovery_email,'-'), ',' ORDER BY login) FROM profiles WHERE family_id='$FID' AND login IN ('adil','dadmin')")" = "adil:false:-,dadmin:true:-"
+shot final-d4-transfert
+fill "Votre code d'accès" 482913; hide_kb
+$UI tap "Je comprends que la suppression" --scroll >/dev/null; sleep 1
+$UI tap "Supprimer mon compte" --last --scroll >/dev/null; sleep 2
+$UI tap "Supprimer" --last >/dev/null; sleep 5
+expect "D6. ancien principal : compte supprimé, retour à la connexion" $UI wait "Votre compte a été supprimé" 20
+expect "D6b. reconnexion refusée ; Driss et Lamiaa se connectent" bash -c "
+  test \"\$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"$FAMILY\",\"login\":\"adil\",\"secret\":\"482913\"}')\" = 401 &&
+  test \"\$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"$FAMILY\",\"login\":\"dadmin\",\"secret\":\"628351\"}')\" = 200 &&
+  test \"\$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"$FAMILY\",\"login\":\"lamiaa\",\"secret\":\"573918\"}')\" = 200"
+
+# Page web publique /suppression-compte (même règle que dans l'application)
+expect "D7. page web /suppression-compte servie (« Mes Courses »)" bash -c "curl -s $BASE/suppression-compte | grep -q 'Supprimer mon compte Mes Courses'"
+login_api dadmin 628351
+api POST /api/profiles -d '{"displayName":"Walid","login":"dweb","role":"parent","secret":"846203","secretConfirm":"846203","city":"Casablanca"}' >/dev/null
+DWEB=$(sql "SELECT id FROM profiles WHERE family_id='$FID' AND login='dweb'")
+expect "D7b. page web : mauvais code refusé (401), rien ne change" test "$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/account/delete -H 'content-type: application/json' -d "{\"familyCode\":\"$FAMILY\",\"login\":\"dweb\",\"secret\":\"000001\"}")" = 401
+expect "D7c. page web : suppression acceptée" test "$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/account/delete -H 'content-type: application/json' -d "{\"familyCode\":\"$FAMILY\",\"login\":\"dweb\",\"secret\":\"846203\"}")" = 200
+expect "D7d. page web : profil anonymisé, reconnexion refusée" bash -c "test \"\$(sql \"SELECT display_name FROM profiles WHERE id='$DWEB'\")\" = 'Ancien profil' && test \"\$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"$FAMILY\",\"login\":\"dweb\",\"secret\":\"846203\"}')\" = 401"
+
+# Toute la famille (administrateur principal) : la famille créée dans l'application en section C
+BCODE=$(sql "SELECT code FROM families WHERE name='Famille Benali'")
+if [ -n "$BCODE" ]; then
+  BFID=$(sql "SELECT id FROM families WHERE code='$BCODE'")
+  SIGN_BEFORE=$(sql "SELECT count(*) FROM family_signups WHERE email='$NEWMAIL'")
+  signin "$BCODE" karim 274915
+  $UI wait "Compte" 25 >/dev/null
+  tapt "Compte"; $UI tap "Supprimer mon compte" --last >/dev/null; sleep 3
+  $UI tap "Supprimer toute la famille…" --scroll >/dev/null; sleep 4
+  expect "D8. suppression de la famille : conséquences explicites" bash -c "$UI wait 'Conséquences, définitives' 15 && $UI has 'Les autres familles ne sont pas touchées'"
+  fill "Votre code d'accès" 274915; hide_kb
+  fill "Tapez le code famille" "$BCODE" --scroll; hide_kb
+  expect "D8b. bouton désactivé sans la case « Je comprends »" bash -c "! $UI enabled 'Supprimer définitivement la famille'"
+  shot final-d5-supprimer-famille
+  $UI tap "Je comprends que toute la famille" --scroll >/dev/null; sleep 1
+  $UI tap "Supprimer définitivement la famille" --last --scroll >/dev/null; sleep 2
+  expect "D8c. confirmation explicite" $UI wait "Supprimer toute la famille ?" 8
+  $UI tap "Supprimer la famille" --last >/dev/null; sleep 6
+  expect "D9. famille supprimée : retour à la connexion avec message" $UI wait "La famille a été supprimée" 20
+  shot final-d6-famille-supprimee
+  expect "D9b. serveur : famille, profils, listes et demande de création effacés (demande avant : $SIGN_BEFORE)" bash -c "
+    test \"\$(sql \"SELECT count(*) FROM families WHERE id='$BFID'\")\" = 0 && test \"\$(sql \"SELECT count(*) FROM profiles WHERE family_id='$BFID'\")\" = 0 &&
+    test \"\$(sql \"SELECT count(*) FROM lists WHERE family_id='$BFID'\")\" = 0 && test \"\$(sql \"SELECT count(*) FROM family_signups WHERE email='$NEWMAIL'\")\" = 0 && test '$SIGN_BEFORE' -ge 1"
+  expect "D9c. reconnexion refusée ; l'autre famille reste" bash -c "
+    test \"\$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"$BCODE\",\"login\":\"karim\",\"secret\":\"274915\"}')\" = 401 &&
+    test \"\$(sql \"SELECT count(*) FROM families WHERE code='$FAMILY'\")\" = 1"
+else
+  echo "(D8-D9 non joués : la famille de la section C n'existe pas dans ce lancement)" | tee -a "$OUT/resultats.txt"
+fi
+
+fi
 echo "ECHECS=$FAILS" | tee -a "$OUT/resultats.txt"
 adb logcat -d -b crash > "$OUT/logcat-crash.txt" 2>&1 || true
 echo "CRASH_APPLICATION=$(grep -c app.smartcourse "$OUT/logcat-crash.txt")" | tee -a "$OUT/resultats.txt"

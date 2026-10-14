@@ -105,11 +105,19 @@ function mailRefused(status: string): boolean {
   return status === "failed" || status === "not_configured";
 }
 
+/** Durée de conservation des demandes de création (abouties ou non) et de leurs e-mails de code : les limites n'utilisent que 24 heures. */
+export const SIGNUP_RETENTION_DAYS = 30;
+export async function purgeOldSignups(db: Pick<Db, "query">): Promise<void> {
+  await db.query(`DELETE FROM family_signups WHERE created_at < now() - interval '${SIGNUP_RETENTION_DAYS} days'`);
+  await db.query(`DELETE FROM email_log WHERE kind = 'signup_code' AND created_at < now() - interval '${SIGNUP_RETENTION_DAYS} days'`);
+}
+
 export async function startSignup(db: Db, recovery: RecoveryService, input: SignupInput, ipHash: string | null, limits: SignupLimits): Promise<SignupView> {
   if (!isValidNewSecret(input.secret)) throw new HttpError(400, "invalid_secret", "Le code d'accès doit comporter exactement 6 chiffres");
   if (isWeakSecret(input.secret)) throw new HttpError(400, "weak_secret", "Code d'accès trop simple (évitez 123456, 111111…)");
   const email = normalizeEmail(input.email);
   const eh = emailKey(email);
+  await purgeOldSignups(db);
 
   // Double appui : la même demande est renvoyée telle quelle (aucun nouvel e-mail, aucun doublon).
   const same = (await db.query("SELECT id, email, expires_at, last_sent_at, completed_at, superseded_at, email_hash FROM family_signups WHERE request_id = $1", [input.requestId])).rows[0];

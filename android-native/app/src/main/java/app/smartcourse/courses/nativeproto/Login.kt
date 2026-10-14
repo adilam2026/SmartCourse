@@ -149,9 +149,11 @@ fun LoginScreen(session: Session?, onSimulated: (Role) -> Unit) {
                 )
                 Spacer(Modifier.height(16.dp))
                 val notice = session?.notice
-                if (notice != null && error == null) Banner(failureMessage(notice), info = true)
+                val farewell = session?.farewell
+                if (farewell != null && error == null) Banner(farewell, info = true)
+                else if (notice != null && error == null) Banner(failureMessage(notice), info = true)
                 error?.let { Banner(it) }
-                if (error != null || notice != null) Spacer(Modifier.height(10.dp))
+                if (error != null || notice != null || farewell != null) Spacer(Modifier.height(10.dp))
                 PrimaryButton(if (busy) "Connexion…" else "Se connecter", {
                     error = null
                     session?.clearNotice()

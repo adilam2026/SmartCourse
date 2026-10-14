@@ -23,7 +23,7 @@ import { canonicalCity } from "./cities.js";
 import { priceRoutes } from "./prices.js";
 import { templateRoutes } from "./templates.js";
 import { priceCommunityRoutes } from "./price-community.js";
-import { createProfile, deleteOwnAccount, deleteProfile, listProfiles, resetSecret, setOwnCity, updateProfile } from "./profiles.js";
+import { createProfile, deleteOwnAccount, deleteProfile, listProfiles, resetSecret, setOwnCity, transferPrimary, updateProfile } from "./profiles.js";
 import { mailerFromEnv } from "./mail.js";
 import { countFamilyData, identifyFamily, purgeFamily } from "./family-purge.js";
 import { RecoveryService, secretMatches } from "./recovery.js";
@@ -275,6 +275,14 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     await deleteOwnAccount(db, hub, a.familyId, a.profileId, "self");
     reply.clearCookie(COOKIE, { path: "/" });
     return { ok: true };
+  });
+
+  // L'administrateur principal confie ce rôle à un autre administrateur (préalable à la suppression de son seul compte).
+  app.post("/api/family/transfer-primary", { preHandler: guard("family.manage"), config: { rateLimit: limit } }, async (req) => {
+    const a = req.auth!;
+    const body = z.object({ toProfileId: z.string().uuid(), secret: z.string().regex(SECRET_PATTERN) }).parse(req.body ?? {});
+    await confirmPassword(db, a.profileId, body.secret);
+    return { profile: await transferPrimary(db, a, body.toProfileId) };
   });
 
   // Page publique de demande de suppression (sans connexion préalable) : mêmes vérifications et mêmes verrouillages que la connexion.

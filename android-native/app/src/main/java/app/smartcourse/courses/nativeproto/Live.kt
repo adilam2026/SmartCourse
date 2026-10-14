@@ -83,6 +83,12 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
     private val catKey = "catalog|$scopeKey"
     private val modeKey = "selmode|$scopeKey"
 
+    /** Compte supprimé : plus rien de ce profil ne reste sur le téléphone (copie de la liste, envois en attente, catalogue, réglages). */
+    fun wipeLocal() {
+        engine.wipeLocal()
+        for (k in listOf(catKey, modeKey, Notifier.key(scopeKey), Notifier.seenKey(scopeKey))) kv.remove(k)
+    }
+
     init {
         demo.data = this
         engine.trace = { android.util.Log.i("CoursesData", it) }

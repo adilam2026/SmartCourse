@@ -161,7 +161,7 @@ adb exec-out screencap -p > "$OUT/retour-1-profils-$W.png"
 adb shell input keyevent KEYCODE_BACK; sleep 2
 adb exec-out screencap -p > "$OUT/retour-2-apres-retour-$W.png"
 adb shell uiautomator dump /sdcard/u.xml >/dev/null 2>&1; adb shell cat /sdcard/u.xml > "$OUT/retour-2.xml"
-if grep -q "Administration\|Réinitialiser la famille" "$OUT/retour-2.xml"; then echo "RETOUR_ECRAN_PRECEDENT=OK" >> "$OUT/controles.txt"; else echo "RETOUR_ECRAN_PRECEDENT=ECHEC" >> "$OUT/controles.txt"; fi
+if grep -q "Administration\|Supprimer toute la famille" "$OUT/retour-2.xml"; then echo "RETOUR_ECRAN_PRECEDENT=OK" >> "$OUT/controles.txt"; else echo "RETOUR_ECRAN_PRECEDENT=ECHEC" >> "$OUT/controles.txt"; fi
 
 adb shell am start -S -W -n "$PKG/.MainActivity" --ez keyboard true >/dev/null 2>&1; sleep 3
 adb shell dumpsys input_method | grep -E "mInputShown=true" >/dev/null && echo "CLAVIER_VISIBLE=OUI" >> "$OUT/controles.txt" || echo "CLAVIER_VISIBLE=NON" >> "$OUT/controles.txt"

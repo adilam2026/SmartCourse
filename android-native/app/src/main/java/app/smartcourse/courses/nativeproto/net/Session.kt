@@ -24,6 +24,8 @@ class Session(val storage: SessionStorage, val api: ApiClient, private val scope
         private set
     var serverAddress: String? by mutableStateOf(storage.server)
         private set
+    /** Message d'adieu montré sur l'écran de connexion après la suppression du compte (ou de la famille) par cette personne. */
+    var farewell: String? by mutableStateOf(null)
     /** Famille tout juste créée depuis l'application : son code est montré une fois (Copier / Partager) après la connexion. */
     var welcomeFamilyCode: String? by mutableStateOf(null)
 
@@ -142,5 +144,18 @@ class Session(val storage: SessionStorage, val api: ApiClient, private val scope
         scope.launch { if (api.logout(server, cookie) is Outcome.Ok) storage.pendingRevoke = null }
     }
 
-    fun clearNotice() { notice = null }
+    fun clearNotice() { notice = null; farewell = null }
+
+    /**
+     * Compte (ou famille) supprimé côté serveur : la session y est déjà fermée. Rien n'est renvoyé au serveur (aucune déconnexion à
+     * rejouer) ; la session locale est oubliée et l'écran de connexion affiche [message].
+     */
+    fun accountDeleted(message: String) {
+        forgetSessionLocally()
+        storage.pendingRevoke = null
+        notice = null
+        online = true
+        farewell = message
+        state = AuthState.SignedOut
+    }
 }

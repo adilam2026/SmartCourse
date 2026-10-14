@@ -312,7 +312,7 @@ fun AboutScreen(onBack: () -> Unit) {
 
 private fun Modifier.clickableRow(onClick: () -> Unit) = this.then(Modifier.clickable(onClick = onClick))
 
-/* ───────────── Réinitialiser la famille ───────────── */
+/* ───────────── Supprimer toute la famille (administrateur principal) ───────────── */
 
 @Composable
 fun ResetFamilySheet(onDismiss: () -> Unit) {
@@ -323,49 +323,67 @@ fun ResetFamilySheet(onDismiss: () -> Unit) {
     var error by remember { mutableStateOf<String?>(null) }
     var password by remember { mutableStateOf("") }
     var code by remember { mutableStateOf("") }
+    var understood by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var confirm by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         if (data != null) when (val r = data.session.api.call("GET", "/api/family/reset-preview")) {
             is Outcome.Ok -> preview = r.value
-            is Outcome.Fail -> error = if (r.failure == app.smartcourse.courses.nativeproto.net.Failure.FORBIDDEN) "Seul l'administrateur principal peut réinitialiser la famille." else explain(r)
+            is Outcome.Fail -> error = if (r.failure == app.smartcourse.courses.nativeproto.net.Failure.FORBIDDEN) "Seul l'administrateur principal peut supprimer toute la famille." else explain(r)
         }
     }
     AppSheet(onDismiss) {
       // Hauteur stable (le contenu arrive après le chargement de l'aperçu) et défilement si l'écran est petit ou le clavier ouvert.
       Column(Modifier.heightIn(min = 420.dp).verticalScroll(rememberScrollState())) {
-        Text("Réinitialiser la famille", style = MaterialTheme.typography.titleLarge)
+        Text("Supprimer toute la famille", style = MaterialTheme.typography.titleLarge)
         Spacer(Modifier.height(6.dp))
         if (data == null) {
             Text("Les listes et l'historique de la famille seront effacés. Cette action est définitive.", style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.height(12.dp))
-            PrimaryButton("Réinitialiser (simulation)", { onDismiss(); demo.simulated("réinitialisation (rien n'est effacé dans ce prototype)") }, Modifier.fillMaxWidth())
+            PrimaryButton("Supprimer (simulation)", { onDismiss(); demo.simulated("suppression (rien n'est effacé dans ce prototype)") }, Modifier.fillMaxWidth())
         } else {
         error?.let { Text(it, color = C.Danger, style = MaterialTheme.typography.bodyMedium) }
         preview?.let { p ->
             val fam = p["family"]?.jsonObject
             val counts = p["counts"]?.jsonObject
             val ready = p["ready"]?.jsonObject?.get("recoveryEmailVerified")?.jsonPrimitive?.booleanOrNull == true
-            Text("Seront effacés définitivement pour « ${fam?.get("name")?.jsonPrimitive?.contentOrNull ?: ""} » : ${counts?.get("profiles")?.jsonPrimitive?.contentOrNull ?: "?"} profils, ${counts?.get("lists")?.jsonPrimitive?.contentOrNull ?: "?"} listes, ${counts?.get("purchases")?.jsonPrimitive?.contentOrNull ?: "?"} achats, ${counts?.get("products")?.jsonPrimitive?.contentOrNull ?: "?"} produits. Les autres familles ne sont pas touchées.", style = MaterialTheme.typography.bodyMedium)
+            fun n(k: String) = counts?.get(k)?.jsonPrimitive?.contentOrNull ?: "?"
+            Text("Conséquences, définitives :", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "• La famille « ${fam?.get("name")?.jsonPrimitive?.contentOrNull ?: ""} » et ses ${n("profiles")} profils sont supprimés : plus personne ne peut s'y connecter, sur aucun téléphone.\n" +
+                "• Sont effacés : ${n("lists")} listes, ${n("purchases")} achats, ${n("products")} produits, l'historique, les favoris, les prix de la famille et ceux qu'elle a partagés, les photos ajoutées, l'adresse de récupération.\n" +
+                "• Rien ne peut être récupéré depuis l'application. Les sauvegardes chiffrées du serveur contiennent encore ces données jusqu'à leur effacement automatique (3 mois au plus).\n" +
+                "• Les autres familles ne sont pas touchées.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
             Spacer(Modifier.height(10.dp))
-            if (!ready) Text("Vérifiez d'abord votre adresse e-mail de récupération (écran Récupération).", color = C.Amber, style = MaterialTheme.typography.bodyMedium)
+            if (!ready) Text("Vérifiez d'abord votre adresse e-mail de récupération (Réglages → Récupération).", color = C.Amber, style = MaterialTheme.typography.bodyMedium)
             else {
                 FormField(password, { password = it }, "Votre code d'accès", leading = Icons.Rounded.Lock, visual = PasswordVisualTransformation(), keyboard = KeyboardOptions(keyboardType = KeyboardType.NumberPassword))
                 Spacer(Modifier.height(8.dp))
                 FormField(code, { code = it.uppercase() }, "Tapez le code famille ${fam?.get("code")?.jsonPrimitive?.contentOrNull ?: ""}")
-                Spacer(Modifier.height(12.dp))
-                PrimaryButton("Réinitialiser définitivement", { confirm = true }, Modifier.fillMaxWidth(), enabled = password.isNotBlank() && code.isNotBlank() && !busy)
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { understood = !understood }) {
+                    CheckBox(understood, { understood = it }, label = "Je comprends que toute la famille sera supprimée définitivement")
+                    Text("Je comprends que toute la famille sera supprimée définitivement.", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                }
+                Spacer(Modifier.height(8.dp))
+                PrimaryButton("Supprimer définitivement la famille", { confirm = true }, Modifier.fillMaxWidth(), enabled = password.isNotBlank() && code.isNotBlank() && understood && !busy)
             }
         }
         }
       }
     }
-    if (confirm && data != null) ConfirmDialog("Effacer toute la famille ?", "Cette action est définitive et ne peut pas être annulée.", "Effacer", {
+    if (confirm && data != null) ConfirmDialog("Supprimer toute la famille ?", "Tous les profils, listes et historiques seront effacés. Cette action est définitive et ne peut pas être annulée.", "Supprimer la famille", {
         confirm = false; busy = true
         scope.launch {
             when (val r = data.session.api.call("POST", "/api/family/reset", buildJsonObject { put("password", password); put("confirmCode", code.trim()) })) {
-                is Outcome.Ok -> { demo.say("Famille réinitialisée."); onDismiss(); data.session.signOut() }
-                is Outcome.Fail -> demo.say(when (r.code) { "invalid_credentials", "wrong_password" -> "Code d'accès incorrect."; "reset_not_ready" -> "Vérifiez d'abord votre adresse e-mail de récupération."; "confirm_mismatch", "wrong_confirmation" -> "Le code famille saisi ne correspond pas."; else -> explain(r) })
+                is Outcome.Ok -> { data.wipeLocal(); onDismiss(); data.session.accountDeleted("La famille a été supprimée définitivement. Plus aucun membre ne peut s'y connecter.") }
+                is Outcome.Fail -> demo.say(when {
+                    r.code == "code_mismatch" -> "Le code famille saisi ne correspond pas."
+                    r.code == "reset_not_ready" -> "Vérifiez d'abord votre adresse e-mail de récupération."
+                    r.failure == app.smartcourse.courses.nativeproto.net.Failure.FORBIDDEN || r.code == "invalid_credentials" -> "Code d'accès incorrect."
+                    else -> explain(r)
+                })
             }
             busy = false
         }

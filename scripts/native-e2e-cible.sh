@@ -72,7 +72,7 @@ if want K9; then
   fresh_list >/dev/null
   first_login adil 482913
   $UI wait "Ma liste" 25 >/dev/null
-  tapt "Réglages"; $UI tap "Réinitialiser la famille" --scroll >/dev/null; sleep 3
+  tapt "Réglages"; $UI tap "Supprimer toute la famille" --scroll >/dev/null; sleep 3
   expect "K9a. aperçu des données effacées" $UI wait "Seront effacés" 15
   expect "K9b. champ mot de passe" $UI wait "Votre code d'accès" 10
   expect "K9c. champ code famille" $UI has "Tapez le code famille"
@@ -82,7 +82,7 @@ if want K9; then
   expect "K9d. clavier ouvert" test "$KB" -ge 1
   shot cible-reinitialiser-clavier
   $UI tap "Tapez le code famille" --scroll >/dev/null; sleep 1; adb shell input text "$FAMILY"; sleep 1
-  expect "K9e. le bouton reste atteignable clavier ouvert (défilement)" $UI tap "Réinitialiser définitivement" --scroll
+  expect "K9e. le bouton reste atteignable clavier ouvert (défilement)" $UI tap "Supprimer définitivement la famille" --scroll
   sleep 2
   expect "K9f. confirmation finale demandée avant tout effacement" $UI wait "Effacer toute la famille" 10
   shot cible-reinitialiser-confirmation
@@ -211,7 +211,7 @@ if want D; then
   tapt "Réglages"
   adb shell input swipe 540 1700 540 600 300; sleep 1; adb shell input swipe 540 1700 540 600 300; sleep 1
   expect "D1. « Se déconnecter » visible en bas des Réglages" $UI wait "Se déconnecter" 8
-  expect "D1b. distinct de « Réinitialiser la famille » (deux actions séparées, Se déconnecter au-dessus)" $UI above "Se déconnecter" "Réinitialiser la famille"
+  expect "D1b. distinct de « Supprimer toute la famille » (deux actions séparées, Se déconnecter au-dessus)" $UI above "Se déconnecter" "Supprimer toute la famille"
   shot cible-reglages-bas
   $UI tap "Se déconnecter" >/dev/null; sleep 2
   expect "D1c. confirmation demandée" $UI wait "Se déconnecter ?" 8
