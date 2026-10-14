@@ -89,15 +89,16 @@ jobs:
         id: plan
         env: { MSG: "${{ github.event.head_commit.message }}", IN: "${{ inputs.sections }}" }
         run: |
-          # Lancement manuel : champ « sections ». Envoi de commit : [sections:C,D] = parcours ciblé (un émulateur) ;
+          # Lancement manuel : champ « sections ». Envoi de commit : [sections:C,D] = parcours ciblé (un émulateur) ; [sections:A;T] = deux
+          # groupes ciblés, sur deux émulateurs en parallèle ;
           # [play-captures] = captures de la fiche (seulement sur demande). Sans précision : tous les groupes, en parallèle.
           S="$IN"
           if [ -z "$S" ]; then
-            M=$(echo "$MSG" | grep -oE '\[sections:[A-Z,]+\]' | head -1 | sed -E 's/\[sections:([A-Z,]+)\]/\1/')
+            M=$(echo "$MSG" | grep -oE '\[sections:[A-Z,;]+\]' | head -1 | sed -E 's/\[sections:([A-Z,;]+)\]/\1/')
             if [ -n "$M" ]; then S="$M"; elif echo "$MSG" | grep -q '\[play-captures\]'; then S=aucune; fi
           fi
           # Chaque groupe part d'une recette neuve. F ferme la liste du jeu d'essai (attendu par G et P) ; D reprend la famille créée en C.
-          if [ "$S" = aucune ]; then MATRIX='[]'; elif [ -n "$S" ]; then MATRIX="[\"$S\"]"; else MATRIX='["F,G,H","C,D","F,P,J","K,S","A","T"]'; fi
+          if [ "$S" = aucune ]; then MATRIX='[]'; elif [ -n "$S" ]; then MATRIX="[\"${S//;/\",\"}\"]"; else MATRIX='["F,G,H","C,D","F,P,J","K,S","A","T"]'; fi
           CAP=0; if echo "$MSG" | grep -q '\[play-captures\]'; then CAP=1; fi
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"; echo "captures=$CAP" >> "$GITHUB_OUTPUT"
           echo "Groupes : $MATRIX ; captures : $CAP"
