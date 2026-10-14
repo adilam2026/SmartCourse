@@ -31,8 +31,12 @@ tf_secret() {
   return $r
 }
 tf_login() { # $1 famille, $2 identifiant, $3 code : formulaire rempli et vérifié, puis envoyé
-  tf_text "${PREV_FAMILY:-Code famille}" "$1" || return 1; PREV_FAMILY="$1"
-  tf_text "${PREV_LOGIN:-Identifiant}" "$2" || return 1; PREV_LOGIN="$2"
+  # Champ retrouvé par sa valeur précédente si elle est affichée, sinon par son libellé (ex. code famille non mémorisé pour le personnel).
+  local tf=Code\ famille tl=Identifiant
+  [ -n "${PREV_FAMILY:-}" ] && $UI has "$PREV_FAMILY" && tf="$PREV_FAMILY"
+  [ -n "${PREV_LOGIN:-}" ] && $UI has "$PREV_LOGIN" && tl="$PREV_LOGIN"
+  tf_text "$tf" "$1" || return 1; PREV_FAMILY="$1"
+  tf_text "$tl" "$2" || return 1; PREV_LOGIN="$2"
   tf_secret "$3" || return 1
   $UI tap "Se connecter" --last >/dev/null; sleep 4
 }
@@ -578,7 +582,8 @@ if [ "$t_ok" != 1 ]; then
 else
 tapt "Compte"; $UI tap "Supprimer mon compte" --last >/dev/null; sleep 3
 expect "D4. principal : suppression seule impossible, expliquée" bash -c "$UI wait 'Vous êtes l' 10 && $UI has 'ne peut pas être supprimé seul'"
-expect "D4b. deux choix : transférer le rôle / supprimer toute la famille" bash -c "$UI has 'Supprimer seulement mon compte' && $UI has 'Transférer le rôle' && $UI has 'Supprimer toute la famille'"
+expect "D4b. deux choix : transférer le rôle / supprimer toute la famille" bash -c "$UI has 'Supprimer seulement mon compte' && $UI has 'Transférer le rôle' && { $UI has 'Supprimer toute la famille' || { adb shell input swipe 540 1700 540 900 300; sleep 1; $UI has 'Supprimer toute la famille'; }; }"
+for _ in 1 2; do adb shell input swipe 540 900 540 1700 300; done; sleep 1   # retour en haut du panneau
 expect "D4c. candidat proposé : l'autre administrateur actif" $UI wait "(dadmin)" 10
 shot final-d3-principal-choix
 $UI tap "(dadmin)" >/dev/null; sleep 1
