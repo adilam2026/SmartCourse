@@ -18,7 +18,7 @@ PASS  C4. code faux refusé avec un message clair
 PASS  C4b. code expiré : message clair, proposition d'un nouveau code
 PASS  C4c. nouveau code envoyé (2 e-mails au total)
 PASS  C5. famille créée et utilisateur connecté : code famille affiché
-PASS  C5b. code famille généré (2ZPNHQ2V) affiché à l'écran
+PASS  C5b. code famille généré (Q2YUCZMF) affiché à l'écran
 PASS  C5c. serveur : une seule famille créée (1 → 2)
 PASS  C5d. serveur : administrateur principal, adresse vérifiée, ville, identifiant (attendu « true true Casablanca Anfa karim », obtenu « true true Casablanca Anfa karim »)
 PASS  C6. Copier : confirmation visible dans le panneau
@@ -67,7 +67,7 @@ PASS  P5. personnel : « Se déconnecter » dans Compte
 PASS  P5b. déconnecté
 ═══ J. Personnel : minuit, liste ouverte plusieurs jours, clôture par un parent (en ligne et hors connexion) ═══
 PASS  J1. sélection enregistrée sur la liste ouverte (Tomates 1.000 to_buy)
-PASS  J2. l'horloge du téléphone est passée minuit (2026-10-13 → 2026-10-14)
+PASS  J2. l'horloge du téléphone est passée minuit (2026-10-14 → 2026-10-15)
 PASS  J2b. après minuit, application ouverte : sélection toujours affichée (Enregistré · 1 kg)
 PASS  J2c. après minuit, application relancée : toujours sur Choisir, sélection conservée
 PASS  J2d. serveur : même liste, toujours ouverte
@@ -87,5 +87,48 @@ PASS  J6d. reste sur Choisir
 PASS  J7. reprise : demande (Tomates 1,5 kg) et brouillon (Carottes) repris dans la sélection
 PASS  J7b. serveur : nouvelle liste du jour avec les articles repris (Carottes 1.000 to_buy,Tomates 1.500 to_buy)
 PASS  J7c. les listes archivées restent intactes
-ECHECS=0
+═══ D. Suppression de compte et de famille (familles JETABLES de la recette) ═══
+PASS  D1. personnel connecté
+PASS  D1b. « Supprimer mon compte » dans le menu Compte (personnel)
+PASS  D1c. distinct de la déconnexion (Se déconnecter au-dessus)
+PASS  D2. écran explicite : ce qui est supprimé / ce qui reste
+PASS  D2b. bouton désactivé tant que le code et la confirmation manquent
+PASS  D2c. confirmation demandée
+FAIL  D3. retour à la connexion avec message de suppression
+      écran : "Close sheet"|"Supprimer mon compte"|"Ce qui est supprimé définitivement"|"Votre nom, votre identifiant, votre code d'accès, votre ville et vos réglages. Vos accès sont fermés sur tous vos téléphones ; ce téléphone oublie aussi vos données."|"Ce qui reste"|"Votre famille et ses autres membres. Dans les listes et l'historique de la famille, votre nom est remplacé par « Ancien profil »."|"••••••"|"Je comprends que la suppression est définitive"|"Je comprends que la suppression de mon compte est définitive."|"Code d'accès incorrect."|"Supprimer mon compte"|
+FAIL  D3b. serveur : profil anonymisé (Dina|false|Casablanca|true)
+      écran : "Close sheet"|"Supprimer mon compte"|"Ce qui est supprimé définitivement"|"Votre nom, votre identifiant, votre code d'accès, votre ville et vos réglages. Vos accès sont fermés sur tous vos téléphones ; ce téléphone oublie aussi vos données."|"Ce qui reste"|"Votre famille et ses autres membres. Dans les listes et l'historique de la famille, votre nom est remplacé par « Ancien profil »."|"••••••"|"Je comprends que la suppression est définitive"|"Je comprends que la suppression de mon compte est définitive."|"Code d'accès incorrect."|"Supprimer mon compte"|
+FAIL  D3c. serveur : aucune session ouverte
+      écran : "Close sheet"|"Supprimer mon compte"|"Ce qui est supprimé définitivement"|"Votre nom, votre identifiant, votre code d'accès, votre ville et vos réglages. Vos accès sont fermés sur tous vos téléphones ; ce téléphone oublie aussi vos données."|"Ce qui reste"|"Votre famille et ses autres membres. Dans les listes et l'historique de la famille, votre nom est remplacé par « Ancien profil »."|"••••••"|"Je comprends que la suppression est définitive"|"Je comprends que la suppression de mon compte est définitive."|"Code d'accès incorrect."|"Supprimer mon compte"|
+FAIL  D3d. l'autre session (autre téléphone) est fermée : 401
+      écran : "Close sheet"|"Supprimer mon compte"|"Ce qui est supprimé définitivement"|"Votre nom, votre identifiant, votre code d'accès, votre ville et vos réglages. Vos accès sont fermés sur tous vos téléphones ; ce téléphone oublie aussi vos données."|"Ce qui reste"|"Votre famille et ses autres membres. Dans les listes et l'historique de la famille, votre nom est remplacé par « Ancien profil »."|"••••••"|"Je comprends que la suppression est définitive"|"Je comprends que la suppression de mon compte est définitive."|"Code d'accès incorrect."|"Supprimer mon compte"|
+FAIL  D3e. reconnexion refusée (API : 401)
+      écran : "Close sheet"|"Supprimer mon compte"|"Ce qui est supprimé définitivement"|"Votre nom, votre identifiant, votre code d'accès, votre ville et vos réglages. Vos accès sont fermés sur tous vos téléphones ; ce téléphone oublie aussi vos données."|"Ce qui reste"|"Votre famille et ses autres membres. Dans les listes et l'historique de la famille, votre nom est remplacé par « Ancien profil »."|"••••••"|"Je comprends que la suppression est définitive"|"Je comprends que la suppression de mon compte est définitive."|"Code d'accès incorrect."|"Supprimer mon compte"|
+FAIL  D3f. reconnexion refusée dans l'application
+      écran : "Close sheet"|"Supprimer mon compte"|"Ce qui est supprimé définitivement"|"Votre nom, votre identifiant, votre code d'accès, votre ville et vos réglages. Vos accès sont fermés sur tous vos téléphones ; ce téléphone oublie aussi vos données."|"Ce qui reste"|"Votre famille et ses autres membres. Dans les listes et l'historique de la famille, votre nom est remplacé par « Ancien profil »."|"••••••"|"Je comprends que la suppression est définitive"|"Je comprends que la suppression de mon compte est définitive."|"Code d'accès incorrect."|"Supprimer mon compte"|
+FAIL  D3g. sa demande reste dans la liste, attribuée à « Ancien profil »
+      écran : "Close sheet"|"Supprimer mon compte"|"Ce qui est supprimé définitivement"|"Votre nom, votre identifiant, votre code d'accès, votre ville et vos réglages. Vos accès sont fermés sur tous vos téléphones ; ce téléphone oublie aussi vos données."|"Ce qui reste"|"Votre famille et ses autres membres. Dans les listes et l'historique de la famille, votre nom est remplacé par « Ancien profil »."|"••••••"|"Je comprends que la suppression est définitive"|"Je comprends que la suppression de mon compte est définitive."|"Code d'accès incorrect."|"Supprimer mon compte"|
+FAIL  D3h. les autres membres et la famille sont intacts
+      écran : "Close sheet"|"Supprimer mon compte"|"Ce qui est supprimé définitivement"|"Votre nom, votre identifiant, votre code d'accès, votre ville et vos réglages. Vos accès sont fermés sur tous vos téléphones ; ce téléphone oublie aussi vos données."|"Ce qui reste"|"Votre famille et ses autres membres. Dans les listes et l'historique de la famille, votre nom est remplacé par « Ancien profil »."|"••••••"|"Je comprends que la suppression est définitive"|"Je comprends que la suppression de mon compte est définitive."|"Code d'accès incorrect."|"Supprimer mon compte"|
+FAIL  D4. principal : suppression seule impossible, expliquée
+      écran : "Supprimer votre compte ?"|"Votre compte « Marie » sera supprimé définitivement. Cette action ne peut pas être annulée."|"Annuler"|"Supprimer"|
+FAIL  D4b. deux choix : transférer le rôle / supprimer toute la famille
+      écran : "Supprimer votre compte ?"|"Votre compte « Marie » sera supprimé définitivement. Cette action ne peut pas être annulée."|"Annuler"|"Supprimer"|
+FAIL  D4c. candidat proposé : l'autre administrateur actif
+      écran : "Supprimer votre compte ?"|"Votre compte « Marie » sera supprimé définitivement. Cette action ne peut pas être annulée."|"Annuler"|"Supprimer"|
+FAIL  D5. transfert confirmé à l'écran
+      écran : "Supprimer votre compte ?"|"Votre compte « Marie » sera supprimé définitivement. Cette action ne peut pas être annulée."|"Annuler"|"Supprimer"|
+FAIL  D5b. serveur : Driss est l'administrateur principal, adresse de l'ancien retirée
+      écran : "Supprimer votre compte ?"|"Votre compte « Marie » sera supprimé définitivement. Cette action ne peut pas être annulée."|"Annuler"|"Supprimer"|
+FAIL  D6. ancien principal : compte supprimé, retour à la connexion
+      écran : "Close sheet"|"Supprimer mon compte"|"Ce qui est supprimé définitivement"|"Votre nom, votre identifiant, votre code d'accès, votre ville et vos réglages. Vos accès sont fermés sur tous vos téléphones ; ce téléphone oublie aussi vos données."|"Ce qui reste"|"Votre famille et ses autres membres. Dans les listes et l'historique de la famille, votre nom est remplacé par « Ancien profil »."|"••••••"|"Je comprends que la suppression est définitive"|"Je comprends que la suppression de mon compte est définitive."|"Code d'accès incorrect."|"Supprimer mon compte"|
+FAIL  D6b. reconnexion refusée ; Driss et Lamiaa se connectent
+      écran : "Close sheet"|"Supprimer mon compte"|"Ce qui est supprimé définitivement"|"Votre nom, votre identifiant, votre code d'accès, votre ville et vos réglages. Vos accès sont fermés sur tous vos téléphones ; ce téléphone oublie aussi vos données."|"Ce qui reste"|"Votre famille et ses autres membres. Dans les listes et l'historique de la famille, votre nom est remplacé par « Ancien profil »."|"••••••"|"Je comprends que la suppression est définitive"|"Je comprends que la suppression de mon compte est définitive."|"Code d'accès incorrect."|"Supprimer mon compte"|
+PASS  D7. page web /suppression-compte servie (« Mes Courses »)
+PASS  D7b. page web : mauvais code refusé (401), rien ne change
+PASS  D7c. page web : suppression acceptée
+FAIL  D7d. page web : profil anonymisé, reconnexion refusée
+      écran : "Close sheet"|"Supprimer mon compte"|"Ce qui est supprimé définitivement"|"Votre nom, votre identifiant, votre code d'accès, votre ville et vos réglages. Vos accès sont fermés sur tous vos téléphones ; ce téléphone oublie aussi vos données."|"Ce qui reste"|"Votre famille et ses autres membres. Dans les listes et l'historique de la famille, votre nom est remplacé par « Ancien profil »."|"••••••"|"Je comprends que la suppression est définitive"|"Je comprends que la suppression de mon compte est définitive."|"Code d'accès incorrect."|"Supprimer mon compte"|
+(D8-D9 non joués : la famille de la section C n'existe pas dans ce lancement)
+ECHECS=16
 CRASH_APPLICATION=0
