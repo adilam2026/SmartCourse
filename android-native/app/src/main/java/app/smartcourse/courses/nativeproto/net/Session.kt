@@ -110,6 +110,8 @@ class Session(val storage: SessionStorage, val api: ApiClient, private val scope
                 }
                 // /api/auth/login ne renvoie ni la famille ni le rang « principal » : on complète tout de suite avec /api/me.
                 val full = (api.me() as? Outcome.Ok)?.value ?: r.value
+                // Le serveur ne renvoie le code famille qu'aux administrateurs : celui qui vient d'être saisi est mémorisé pour tous les rôles.
+                storage.lastFamily = familyCode.trim().uppercase()
                 online = true; remember(full); state = AuthState.SignedIn(full); null
             }
             is Outcome.Fail -> r.failure
