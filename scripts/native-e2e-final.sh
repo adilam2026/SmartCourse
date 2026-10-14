@@ -364,26 +364,52 @@ if [ "$(sql "SELECT count(*) FROM profiles WHERE family_id='$FID' AND login='dad
   login_api adil 482913
   api POST /api/profiles -d '{"displayName":"Driss","login":"dadmin","role":"admin","secret":"628351","secretConfirm":"628351","city":"Casablanca"}' >/dev/null
 fi
-# Administrateur principal : explication, transfert du rôle, puis suppression de son seul compte
-# Formulaire de connexion propre (application relancée), clavier refermé entre les champs, état vérifié avant l'envoi.
+# Saisies VÉRIFIÉES : chaque fill() doit réussir et le champ doit afficher la valeur tapée. Le code d'accès est contrôlé en clair avec
+# « Afficher le code » (recette jetable uniquement) puis remasqué avant toute capture. Un champ déjà rempli (essai refusé) est
+# retrouvé par son contenu masqué.
+T_ERR=""
+tf_text() { fill "$1" "$2" || { T_ERR="champ « $1 » introuvable"; return 1; }; hide_kb; $UI has "$2" || { T_ERR="« $2 » absent après saisie"; return 1; }; }
+tf_secret() {
+  local target="Code d'accès"; $UI has "Code d'accès" || target="•"
+  fill "$target" "$1" || { T_ERR="champ du code introuvable ($target)"; return 1; }; hide_kb
+  $UI tap "Afficher le code" >/dev/null || { T_ERR="bouton « Afficher le code » introuvable"; return 1; }; sleep 1
+  local r=0; $UI has "$1" || { r=1; T_ERR="code affiché différent de la saisie"; }
+  $UI tap "Masquer le code" >/dev/null; sleep 1; $UI has "$1" && { T_ERR="code resté visible"; r=1; }
+  return $r
+}
+tf_login() { # $1 famille, $2 identifiant, $3 code : formulaire rempli et vérifié, puis envoyé
+  tf_text "${PREV_FAMILY:-Code famille}" "$1" || return 1; PREV_FAMILY="$1"
+  tf_text "${PREV_LOGIN:-Identifiant}" "$2" || return 1; PREV_LOGIN="$2"
+  tf_secret "$3" || return 1
+  $UI tap "Se connecter" --last >/dev/null; sleep 4
+}
+t_ok=1
+check_or_stop() { local l=$1; shift; if [ "$t_ok" = 1 ] && "$@"; then ok "$l"; else ko "$l${T_ERR:+ — $T_ERR}"; t_ok=0; fi; T_ERR=""; }
 launch; $UI wait "Bienvenue" 25 >/dev/null
-fill "${PREV_FAMILY:-Code famille}" "$FAMILY"; hide_kb; fill "${PREV_LOGIN:-Identifiant}" adil; hide_kb; fill "Code d'accès" 482913; hide_kb
-expect "T0. formulaire rempli (code famille, adil, code saisi)" bash -c "$UI has '$FAMILY' && $UI has 'adil' && $UI has '••••••'"
-$UI tap "Se connecter" --last >/dev/null; sleep 4; PREV_FAMILY="$FAMILY"; PREV_LOGIN=adil
-expect "T0b. administrateur principal connecté" $UI wait "Compte" 25
+check_or_stop "T0. formulaire neuf : code famille, identifiant et code saisis et vérifiés ; envoi" tf_login "$FAMILY" adil 482913
+check_or_stop "T0b. administrateur principal connecté (formulaire neuf)" $UI wait "Compte" 25
+[ "$t_ok" = 1 ] && logout
+# Même contrôle juste après une connexion refusée (cas des échecs précédents) ; l'essai refusé ne vise aucun compte existant
+check_or_stop "T0c. essai refusé (identifiant inconnu) : saisies vérifiées ; envoi" tf_login "$FAMILY" inconnu 913482
+check_or_stop "T0d. refus affiché" $UI wait "Identifiants incorrects" 15
+check_or_stop "T0e. après le refus : saisies vérifiées (adil) ; envoi" tf_login "$FAMILY" adil 482913
+check_or_stop "T0f. administrateur principal connecté après un refus" $UI wait "Compte" 25
+if [ "$t_ok" != 1 ]; then
+  echo "ARRÊT de la section T : connexion de l'administrateur principal non établie, transfert et suppression non joués" | tee -a "$OUT/resultats.txt"
+else
 tapt "Compte"; $UI tap "Supprimer mon compte" --last >/dev/null; sleep 3
 expect "D4. principal : suppression seule impossible, expliquée" bash -c "$UI wait 'Vous êtes l' 10 && $UI has 'ne peut pas être supprimé seul'"
 expect "D4b. deux choix : transférer le rôle / supprimer toute la famille" bash -c "$UI has 'Supprimer seulement mon compte' && $UI has 'Transférer le rôle' && $UI has 'Supprimer toute la famille'"
 expect "D4c. candidat proposé : l'autre administrateur actif" $UI wait "(dadmin)" 10
 shot final-d3-principal-choix
 $UI tap "(dadmin)" >/dev/null; sleep 1
-fill "Votre code d'accès" 482913; hide_kb
+check_or_stop "T4d. code saisi pour le transfert" fill "Votre code d'accès" 482913; hide_kb
 $UI tap "Transférer le rôle" --last --scroll >/dev/null; sleep 2
 $UI tap "Transférer" --last >/dev/null; sleep 5
 expect "D5. transfert confirmé à l'écran" $UI wait "est maintenant l'administrateur principal" 15
 expect "D5b. serveur : Driss est l'administrateur principal, adresse de l'ancien retirée" test "$(sql "SELECT string_agg(login||':'||is_primary::text||':'||coalesce(recovery_email,'-'), ',' ORDER BY login) FROM profiles WHERE family_id='$FID' AND login IN ('adil','dadmin')")" = "adil:false:-,dadmin:true:-"
 shot final-d4-transfert
-fill "Votre code d'accès" 482913; hide_kb
+check_or_stop "T5c. code saisi pour la suppression" fill "Votre code d'accès" 482913; hide_kb
 $UI tap "Je comprends que la suppression" --scroll >/dev/null; sleep 1
 $UI tap "Supprimer mon compte" --last --scroll >/dev/null; sleep 2
 $UI tap "Supprimer" --last >/dev/null; sleep 5
@@ -394,6 +420,7 @@ expect "D6b. reconnexion refusée ; Driss et Lamiaa se connectent" bash -c "
   test \"\$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"$FAMILY\",\"login\":\"lamiaa\",\"secret\":\"573918\"}')\" = 200"
 
 
+fi
 fi
 echo "ECHECS=$FAILS" | tee -a "$OUT/resultats.txt"
 adb logcat -d -b crash > "$OUT/logcat-crash.txt" 2>&1 || true
