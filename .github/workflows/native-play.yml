@@ -52,6 +52,7 @@ jobs:
         run: |
           export NATIF_KEYSTORE_FILE=/tmp/test-final.p12 NATIF_KEYSTORE_PASSWORD=essai-final NATIF_KEY_ALIAS=essai NATIF_KEY_PASSWORD=essai-final
           keytool -genkeypair -noprompt -keystore $NATIF_KEYSTORE_FILE -storetype PKCS12 -alias essai -keyalg RSA -keysize 2048 -validity 2 -storepass essai-final -keypass essai-final -dname "CN=Essai version finale non distribuable"
+          ./gradlew --no-daemon testDebugUnitTest   # tests unitaires (règles, partage d'accès, codes) avant la compilation
           ./gradlew --no-daemon assembleRelease -Pfinal=1 -PserverUrl=http://10.0.2.2:3000 -PversionCode=1 -PversionName="$VERSION_NAME-test"
           mkdir -p ../dist && cp app/build/outputs/apk/release/*.apk ../dist/Courses-final-test.apk
       # Sauvegarde dès la compilation réussie, indépendamment du résultat des tests : le prochain rejeu reprend cet APK.
@@ -61,6 +62,19 @@ jobs:
         with:
           path: dist/
           key: ${{ steps.apk.outputs.cache-primary-key }}
+      - name: Application d'essai « WhatsApp » (identifiant com.whatsapp, sans code ; émulateur de recette uniquement)
+        run: |
+          set -e; D=/tmp/wa; mkdir -p $D; B="$ANDROID_HOME/build-tools/36.0.0"
+          printf '%s\n' '<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.whatsapp" android:versionCode="1" android:versionName="essai">' \
+            '  <application android:hasCode="false" android:label="WhatsApp (essai)">' \
+            '    <activity android:name="android.app.Activity" android:exported="true">' \
+            '      <intent-filter><action android:name="android.intent.action.SEND"/><category android:name="android.intent.category.DEFAULT"/><data android:mimeType="text/plain"/></intent-filter>' \
+            '    </activity>' '  </application>' '</manifest>' > $D/AndroidManifest.xml
+          "$B/aapt2" link --manifest $D/AndroidManifest.xml -I "$ANDROID_HOME/platforms/android-36/android.jar" --min-sdk-version 26 --target-sdk-version 36 -o $D/u.apk
+          "$B/zipalign" -f 4 $D/u.apk $D/a.apk
+          keytool -genkeypair -noprompt -keystore $D/k.p12 -storetype PKCS12 -alias s -keyalg RSA -keysize 2048 -validity 2 -storepass essai-wa -keypass essai-wa -dname "CN=Essai WhatsApp"
+          "$B/apksigner" sign --ks $D/k.p12 --ks-pass pass:essai-wa --out /tmp/whatsapp-essai.apk $D/a.apk
+          echo "WA_STUB=/tmp/whatsapp-essai.apk" >> "$GITHUB_ENV"
       - name: Niveau d'API cible (36 exigé par Google Play)
         run: |
           "$ANDROID_HOME/build-tools/36.0.0/aapt2" dump badging dist/Courses-final-test.apk | grep -E "^package:|application-label:|targetSdkVersion" | tee /tmp/badging.txt

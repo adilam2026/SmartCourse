@@ -85,8 +85,7 @@ private fun OwnAccountDeletion(me: Me, session: Session, onDone: () -> Unit) {
     Text("Ce qui reste", style = MaterialTheme.typography.titleSmall)
     Text("Votre famille et ses autres membres. Dans les listes et l'historique de la famille, votre nom est remplacé par « Ancien profil ».", style = MaterialTheme.typography.bodyMedium)
     Spacer(Modifier.height(12.dp))
-    FormField(secret, { secret = it.trim().take(6) }, "Votre code d'accès", leading = Icons.Rounded.Lock,
-        visual = PasswordVisualTransformation(), keyboard = KeyboardOptions(keyboardType = KeyboardType.Password))
+    CodeField(secret, { secret = it }, "Votre code d'accès", legacy = true)
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { understood = !understood }) {
         CheckBox(understood, { understood = it }, label = "Je comprends que la suppression est définitive")
         Text("Je comprends que la suppression de mon compte est définitive.", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
@@ -151,8 +150,7 @@ private fun PrimaryAdminChoices(me: Me, session: Session, onDeleteFamily: () -> 
                     Text("${a.displayName} (${a.login})", style = MaterialTheme.typography.bodyLarge)
                 }
             }
-            FormField(secret, { secret = it.trim().take(6) }, "Votre code d'accès", leading = Icons.Rounded.Lock,
-                visual = PasswordVisualTransformation(), keyboard = KeyboardOptions(keyboardType = KeyboardType.Password))
+            CodeField(secret, { secret = it }, "Votre code d'accès", legacy = true)
             error?.let { Text(it, color = C.Danger, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 6.dp)) }
             Spacer(Modifier.height(8.dp))
             PrimaryButton(if (busy) "Transfert…" else "Transférer le rôle", { confirm = true }, Modifier.fillMaxWidth(), enabled = chosen != null && secret.length == 6 && !busy)

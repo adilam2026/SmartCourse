@@ -17,6 +17,25 @@ st() { sql "SELECT string_agg(i.quantity||' '||i.unit||' '||i.status, ',') FROM 
 
 # Sections à jouer (variable SECTIONS, ex. « C » ou « C,G ») ; vide = toutes. Chaque section part de l'écran de connexion.
 want_s() { [ -z "${SECTIONS:-}" ] || [[ ",${SECTIONS// /}," == *",$1,"* ]]; }
+# Saisies VÉRIFIÉES : chaque fill() doit réussir et le champ doit afficher la valeur tapée. Le code d'accès est contrôlé en clair avec
+# « Afficher le code » (recette jetable uniquement) puis remasqué avant toute capture. Un champ déjà rempli (essai refusé) est
+# retrouvé par son contenu masqué.
+T_ERR=""
+tf_text() { fill "$1" "$2" || { T_ERR="champ « $1 » introuvable"; return 1; }; hide_kb; $UI has "$2" || { T_ERR="« $2 » absent après saisie"; return 1; }; }
+tf_secret() {
+  local target="Code d'accès"; $UI has "Code d'accès" || target="•"
+  fill "$target" "$1" || { T_ERR="champ du code introuvable ($target)"; return 1; }; hide_kb
+  $UI tap "Afficher le code" >/dev/null || { T_ERR="bouton « Afficher le code » introuvable"; return 1; }; sleep 1
+  local r=0; $UI has "$1" || { r=1; T_ERR="code affiché différent de la saisie"; }
+  $UI tap "Masquer le code" >/dev/null; sleep 1; $UI has "$1" && { T_ERR="code resté visible"; r=1; }
+  return $r
+}
+tf_login() { # $1 famille, $2 identifiant, $3 code : formulaire rempli et vérifié, puis envoyé
+  tf_text "${PREV_FAMILY:-Code famille}" "$1" || return 1; PREV_FAMILY="$1"
+  tf_text "${PREV_LOGIN:-Identifiant}" "$2" || return 1; PREV_LOGIN="$2"
+  tf_secret "$3" || return 1
+  $UI tap "Se connecter" --last >/dev/null; sleep 4
+}
 if want_s F; then
 echo "═══ F. Version finale : identifiant, nom, serveur fixe ═══" | tee -a "$OUT/resultats.txt"
 expect "F0. identifiant app.smartcourse.courses.natif installé" bash -c "adb shell pm list packages | grep -qx 'package:app.smartcourse.courses.natif'"
@@ -274,6 +293,173 @@ expect "J7c. les listes archivées restent intactes" test "$(items_of $LJ)" = "T
 adb shell settings put global auto_time 1 >/dev/null 2>&1; setclock "$(date -u +%s)"
 
 fi
+# ─── Outils des sections K, S, A ───
+ime_type() { adb shell dumpsys input_method | grep -m1 -oE "inputType=0x[0-9a-f]+" | cut -d= -f2; }   # 0x12 = chiffres masqués
+screen_grep() { adb shell uiautomator dump /sdcard/sg.xml >/dev/null 2>&1; adb exec-out cat /sdcard/sg.xml 2>/dev/null | grep -oE "$1" | head -1; }
+started() { adb logcat -d -s ActivityTaskManager:I | grep "START u0" | grep -c "$1"; }   # lancements d'activité correspondant à $1
+back_to_app() { for _ in 1 2 3; do adb shell dumpsys activity activities | grep -m1 "topResumedActivity" | grep -q "$PKG" && return 0; adb shell input keyevent KEYCODE_BACK; sleep 2; done; adb shell am start -n "$ACT" >/dev/null 2>&1; sleep 2; }
+show_desc() { screen_grep 'Affichage : [^"]*'; }
+
+if want_s K; then
+echo "═══ K. Clavier numérique des codes d'accès ═══" | tee -a "$OUT/resultats.txt"
+launch; $UI wait "Bienvenue" 25 >/dev/null
+$UI tap "Code d'accès" >/dev/null; sleep 2
+expect "K1. connexion : clavier numérique pour le code ($(ime_type))" test "$(ime_type)" = 0x12
+adb shell input text 047193; sleep 1
+$UI tap "Afficher le code" >/dev/null; sleep 2
+expect "K2. code affiché : zéro initial conservé (047193)" $UI has "047193"
+expect "K2b. clavier toujours numérique quand le code est affiché ($(ime_type))" test "$(ime_type)" = 0x12
+adb shell input text 9; sleep 1
+expect "K2c. 6 chiffres au plus (le 7e est ignoré)" bash -c "$UI has '047193' && ! $UI has '0471939'"
+shot final-k1-code-visible
+$UI tap "Masquer le code" >/dev/null; sleep 1
+expect "K3. code remasqué" bash -c "! $UI has '047193'"
+$UI tap "•" >/dev/null; clear_field; hide_kb
+fi
+
+if want_s S; then
+echo "═══ S. Partager l'accès d'un membre (famille JETABLE) ═══" | tee -a "$OUT/resultats.txt"
+FID=$(sql "SELECT id FROM families WHERE code='$FAMILY'")
+launch; $UI wait "Bienvenue" 25 >/dev/null
+check_or_stop() { local l=$1; shift; if "$@"; then ok "$l"; else ko "$l${T_ERR:+ — $T_ERR}"; fi; T_ERR=""; }
+check_or_stop "S0. administrateur connecté (saisies vérifiées)" tf_login "$FAMILY" adil 482913
+$UI wait "Compte" 25 >/dev/null
+tapt "Réglages"; tapt "Profils"
+expect "S1. code famille affiché avec « Partager le code famille » et « Copier »" bash -c "$UI wait 'Code famille : $FAMILY' 15 && $UI has 'Partager le code famille' && $UI has 'Copier'"
+expect "S1b. son propre profil : partage impossible" bash -c "$UI tap 'Actions pour Adil' >/dev/null; sleep 1; $UI has 'Partage impossible'"
+adb shell input keyevent KEYCODE_BACK; sleep 1
+# Création d'un membre (code commençant par zéro), clavier numérique, puis partage proposé tout de suite
+tapt "Ajouter un profil"
+fill "Nom affiché" "Zoe"; hide_kb; fill "Identifiant de connexion" zoe; hide_kb
+$UI tap "Personnel" >/dev/null; sleep 1
+expect "S1c. ville reprise de l'administrateur" $UI has "Ville : Casablanca"
+$UI tap "Code d'accès (6 chiffres)" --scroll >/dev/null; sleep 1
+expect "S2. création : clavier numérique ($(ime_type))" test "$(ime_type)" = 0x12
+adb shell input text 047193; hide_kb
+fill "Confirmer le code" 047193 --scroll; hide_kb
+$UI tap "Afficher le code" >/dev/null; sleep 1
+expect "S2b. code saisi avec son zéro initial (047193)" $UI has "047193"
+$UI tap "Masquer le code" >/dev/null; sleep 1
+$UI tap "Créer le profil" --scroll >/dev/null; sleep 5
+expect "S3. partage proposé dès la création" bash -c "$UI wait \"Partager l'accès de Zoe\" 15 && $UI has 'Code famille : $FAMILY' && $UI has 'Identifiant : zoe' && $UI has \"Code d'accès : 047193\""
+expect "S3b. serveur : profil créé, code non stocké en clair" bash -c "test \"\$(sql \"SELECT count(*) FROM profiles WHERE family_id='$FID' AND login='zoe' AND secret_hash NOT LIKE '%047193%'\")\" = 1"
+shot final-s1-partage-apres-creation
+adb logcat -c
+$UI tap "Partager l'accès" --last >/dev/null; sleep 3
+expect "S4. sans WhatsApp : partage Android ouvert (rien n'est envoyé)" test "$(started 'android.intent.action.CHOOSER')" -ge 1
+shot final-s2-partage-android
+back_to_app
+$UI tap "Copier les informations" >/dev/null; sleep 1
+expect "S4b. « Copier les informations »" $UI wait "Informations copiées" 5
+$UI tap "Fermer" --last >/dev/null; sleep 2
+expect "S5. le code partagé fonctionne (zéro initial) : connexion de Zoé" test "$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d "{\"familyCode\":\"$FAMILY\",\"login\":\"zoe\",\"secret\":\"047193\"}")" = 200
+# Profil existant : le code n'est pas récupérable ; annulation sans aucun changement
+HASH0=$(sql "SELECT secret_hash FROM profiles WHERE family_id='$FID' AND login='zoe'")
+$UI tap "Actions pour Zoe" >/dev/null; sleep 1
+expect "S6. menu : « Partager l'accès » (rien ne change à l'ouverture)" bash -c "$UI has \"Partager l'accès\" && test \"\$(sql \"SELECT secret_hash FROM profiles WHERE family_id='$FID' AND login='zoe'\")\" = '$HASH0'"
+$UI tap "Partager l'accès" >/dev/null; sleep 2
+expect "S6b. explication : code non conservé, l'ancien cessera de fonctionner" bash -c "$UI has 'pas conservé en clair' && $UI has \"L'ancien code cessera de fonctionner\""
+shot final-s3-nouveau-code-confirmation
+$UI tap "Annuler" >/dev/null; sleep 2
+expect "S6c. annulation : code inchangé (empreinte identique, connexion 047193 toujours valable)" bash -c "test \"\$(sql \"SELECT secret_hash FROM profiles WHERE family_id='$FID' AND login='zoe'\")\" = '$HASH0' && test \"\$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"$FAMILY\",\"login\":\"zoe\",\"secret\":\"047193\"}')\" = 200"
+# Avec WhatsApp (application d'essai portant l'identifiant com.whatsapp) : nouveau code après confirmation, puis partage
+if [ -n "${WA_STUB:-}" ] && adb install -r "$WA_STUB" >/dev/null 2>&1; then
+  $UI tap "Actions pour Zoe" >/dev/null; sleep 1; $UI tap "Partager l'accès" >/dev/null; sleep 2
+  $UI tap "Générer un nouveau code et partager" >/dev/null; sleep 5
+  NEWC=$(screen_grep "accès : [0-9]{6}" | grep -oE "[0-9]{6}")   # XML : l'apostrophe y est échappée
+  expect "S7. nouveau code généré et affiché ($NEWC)" bash -c "[[ '$NEWC' =~ ^[0-9]{6}$ ]] && test '$NEWC' != 047193"
+  expect "S7b. l'ancien code ne fonctionne plus ; le nouveau, si" bash -c "
+    test \"\$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"$FAMILY\",\"login\":\"zoe\",\"secret\":\"047193\"}')\" = 401 &&
+    test \"\$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"$FAMILY\",\"login\":\"zoe\",\"secret\":\"$NEWC\"}')\" = 200"
+  shot final-s4-nouveau-code-partage
+  adb logcat -c
+  $UI tap "Partager l'accès" --last >/dev/null; sleep 3
+  expect "S8. avec WhatsApp : WhatsApp s'ouvre avec le message (envoi par l'administrateur)" test "$(started 'com.whatsapp')" -ge 1
+  back_to_app
+  $UI tap "Fermer" --last >/dev/null; sleep 2
+  adb logcat -c
+  $UI tap "Partager le code famille" >/dev/null; sleep 3
+  expect "S9. code famille : WhatsApp s'ouvre" test "$(started 'com.whatsapp')" -ge 1
+  back_to_app
+  adb uninstall com.whatsapp >/dev/null 2>&1
+else
+  ko "S7. application d'essai WhatsApp non installée (WA_STUB=${WA_STUB:-absent})"
+fi
+$UI tap "Copier" --last >/dev/null; sleep 1
+expect "S9b. « Copier » le code famille" $UI wait "Copié" 5
+shot final-s5-profils-code-famille
+logout
+fi
+
+if want_s A; then
+echo "═══ A. Bouton « Affichage » : 3 présentations × 2 organisations, pour les 3 rôles ═══" | tee -a "$OUT/resultats.txt"
+check_or_stop() { local l=$1; shift; if "$@"; then ok "$l"; else ko "$l${T_ERR:+ — $T_ERR}"; fi; T_ERR=""; }
+y1() { $UI bounds "$1" | awk '{print $2}'; }
+set_display() { # $1 présentation, $2 organisation (libellés du panneau)
+  $UI tap "Affichage" >/dev/null; sleep 2
+  $UI tap "$1" >/dev/null; sleep 1; $UI tap "$2" >/dev/null; sleep 1
+  $UI tap "Fermer" --last >/dev/null; sleep 2
+}
+check_layout() { # $1 rôle, $2 présentation, $3 organisation
+  local a b exp="Affichage : $2, ${3,}"
+  if [ "$3" = "Par catégorie" ]; then a=Tomates; b="Pommes de terre"; else a=Ail; b=Assouplissant; fi
+  for _ in 1 2 3 4; do adb shell input swipe 540 700 540 1900 150; done; sleep 1
+  local d; d=$(show_desc)
+  local ya yb; ya=$(y1 "$a"); yb=$(y1 "$b")
+  local org_ok=1
+  if [ "$3" = "Par catégorie" ]; then $UI has "Légumes et herbes" || org_ok=0; else $UI has "Légumes et herbes" && org_ok=0; fi
+  local pres_ok=0
+  case "$2" in
+    "Petites cartes") [ -n "$ya" ] && [ "$ya" = "$yb" ] && pres_ok=1;;
+    Liste) [ -n "$ya" ] && [ -n "$yb" ] && [ $((yb - ya)) -gt 0 ] && [ $((yb - ya)) -lt 400 ] && pres_ok=1;;
+    "Grandes cartes") [ -n "$ya" ] && { [ -z "$yb" ] || [ $((yb - ya)) -gt 600 ]; } && pres_ok=1;;
+  esac
+  expect "A·$1 · $2 · $3 (repère : $d ; $a y=$ya, $b y=${yb:-hors écran})" test "$d" = "$exp" -a "$org_ok" = 1 -a "$pres_ok" = 1
+}
+run_role() { # $1 rôle (libellé), $2 identifiant, $3 code, $4 écran attendu
+  launch; $UI wait "Bienvenue" 25 >/dev/null
+  check_or_stop "A0. $1 connecté" tf_login "$FAMILY" "$2" "$3"
+  if [ "$4" = admin ]; then $UI wait "Compte" 25 >/dev/null; tapt "Ajouter des articles"; fi
+  $UI wait "Affichage" 20 >/dev/null
+  # sélection en cours : elle doit survivre à tous les changements d'affichage
+  for _ in 1 2 3 4; do adb shell input swipe 540 700 540 1900 150; done
+  $UI tap "Oignons" >/dev/null; sleep 2
+  for org in "Par catégorie" "Liste globale"; do
+    for pres in "Liste" "Petites cartes" "Grandes cartes"; do set_display "$pres" "$org"; check_layout "$1" "$pres" "$org"; done
+  done
+  expect "A1. $1 : sélection conservée après les 6 changements" $UI has "Terminer ma sélection (1)"
+}
+run_role "Personnel" marie 573918 staff
+shot final-a1-personnel-grandes-cartes-globale
+expect "A2. personnel : toujours sans recherche ni onglets" bash -c "! $UI has 'Rechercher un produit' && ! $UI has 'Liste du jour'"
+$UI tap "Affichage" >/dev/null; sleep 2; shot final-a2-panneau-affichage; $UI tap "Fermer" --last >/dev/null; sleep 1
+set_display "Liste" "Par catégorie"
+logout
+run_role "Parent" lamiaa 573918 admin
+expect "A3. parent : recherche disponible" $UI has "Rechercher un produit"
+set_display "Petites cartes" "Liste globale"
+shot final-a3-parent-petites-cartes-globale
+adb shell input keyevent KEYCODE_BACK; sleep 2; logout
+run_role "Administrateur" adil 482913 admin
+set_display "Grandes cartes" "Liste globale"
+shot final-a4-admin-grandes-cartes-globale
+# Mémorisation : autre écran, redémarrage, déconnexion / reconnexion, changement de compte
+adb shell input keyevent KEYCODE_BACK; sleep 2; tapt "Historique"; tapt "Liste"; tapt "Ajouter des articles"
+expect "A4. après un changement d'écran (administrateur)" test "$(show_desc)" = "Affichage : Grandes cartes, liste globale"
+adb shell am force-stop $PKG; adb shell am start -W -n "$ACT" >/dev/null 2>&1; sleep 4; $UI wait "Compte" 25 >/dev/null; tapt "Ajouter des articles"
+expect "A5. après fermeture et réouverture (administrateur)" test "$(show_desc)" = "Affichage : Grandes cartes, liste globale"
+adb shell input keyevent KEYCODE_BACK; sleep 2; logout
+tf_login "$FAMILY" marie 573918; $UI wait "Affichage" 25 >/dev/null
+expect "A6. changement de compte : préférences du personnel, pas celles de l'administrateur" test "$(show_desc)" = "Affichage : Liste, par catégorie"
+logout
+tf_login "$FAMILY" lamiaa 573918; $UI wait "Compte" 25 >/dev/null; tapt "Ajouter des articles"
+expect "A7. parent : ses propres préférences" test "$(show_desc)" = "Affichage : Petites cartes, liste globale"
+adb shell input keyevent KEYCODE_BACK; sleep 2; logout
+tf_login "$FAMILY" adil 482913; $UI wait "Compte" 25 >/dev/null; tapt "Ajouter des articles"
+expect "A8. reconnexion de l'administrateur : ses préférences retrouvées" test "$(show_desc)" = "Affichage : Grandes cartes, liste globale"
+adb shell input keyevent KEYCODE_BACK; sleep 2; logout
+fi
+
 if want_s D; then
 echo "═══ D. Suppression de compte et de famille (familles JETABLES de la recette) ═══" | tee -a "$OUT/resultats.txt"
 export -f sql   # utilisée aussi dans les contrôles « bash -c »
@@ -364,25 +550,6 @@ if [ "$(sql "SELECT count(*) FROM profiles WHERE family_id='$FID' AND login='dad
   login_api adil 482913
   api POST /api/profiles -d '{"displayName":"Driss","login":"dadmin","role":"admin","secret":"628351","secretConfirm":"628351","city":"Casablanca"}' >/dev/null
 fi
-# Saisies VÉRIFIÉES : chaque fill() doit réussir et le champ doit afficher la valeur tapée. Le code d'accès est contrôlé en clair avec
-# « Afficher le code » (recette jetable uniquement) puis remasqué avant toute capture. Un champ déjà rempli (essai refusé) est
-# retrouvé par son contenu masqué.
-T_ERR=""
-tf_text() { fill "$1" "$2" || { T_ERR="champ « $1 » introuvable"; return 1; }; hide_kb; $UI has "$2" || { T_ERR="« $2 » absent après saisie"; return 1; }; }
-tf_secret() {
-  local target="Code d'accès"; $UI has "Code d'accès" || target="•"
-  fill "$target" "$1" || { T_ERR="champ du code introuvable ($target)"; return 1; }; hide_kb
-  $UI tap "Afficher le code" >/dev/null || { T_ERR="bouton « Afficher le code » introuvable"; return 1; }; sleep 1
-  local r=0; $UI has "$1" || { r=1; T_ERR="code affiché différent de la saisie"; }
-  $UI tap "Masquer le code" >/dev/null; sleep 1; $UI has "$1" && { T_ERR="code resté visible"; r=1; }
-  return $r
-}
-tf_login() { # $1 famille, $2 identifiant, $3 code : formulaire rempli et vérifié, puis envoyé
-  tf_text "${PREV_FAMILY:-Code famille}" "$1" || return 1; PREV_FAMILY="$1"
-  tf_text "${PREV_LOGIN:-Identifiant}" "$2" || return 1; PREV_LOGIN="$2"
-  tf_secret "$3" || return 1
-  $UI tap "Se connecter" --last >/dev/null; sleep 4
-}
 t_ok=1
 check_or_stop() { local l=$1; shift; if [ "$t_ok" = 1 ] && "$@"; then ok "$l"; else ko "$l${T_ERR:+ — $T_ERR}"; t_ok=0; fi; T_ERR=""; }
 launch; $UI wait "Bienvenue" 25 >/dev/null

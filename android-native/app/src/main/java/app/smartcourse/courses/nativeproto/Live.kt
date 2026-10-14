@@ -82,18 +82,21 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
 
     private val catKey = "catalog|$scopeKey"
     private val modeKey = "selmode|$scopeKey"
+    private val orgKey = "selorg|$scopeKey"
 
     /** Compte supprimé : plus rien de ce profil ne reste sur le téléphone (copie de la liste, envois en attente, catalogue, réglages). */
     fun wipeLocal() {
         engine.wipeLocal()
-        for (k in listOf(catKey, modeKey, Notifier.key(scopeKey), Notifier.seenKey(scopeKey))) kv.remove(k)
+        for (k in listOf(catKey, modeKey, orgKey, Notifier.key(scopeKey), Notifier.seenKey(scopeKey))) kv.remove(k)
     }
 
     init {
         demo.data = this
         engine.trace = { android.util.Log.i("CoursesData", it) }
         kv.get(catKey)?.let { s -> try { parseCatalog(json.parseToJsonElement(s) as JsonObject) } catch (_: Exception) { null } }?.let { catalog = it.products }
-        kv.get(modeKey)?.let { m -> SelMode.entries.firstOrNull { it.name == m }?.let { demo.selMode = it } }
+        // Préférences d'affichage DE CE PROFIL (téléphone) : celles d'un profil précédent ne sont jamais reprises ; valeurs par défaut sinon.
+        demo.selMode = kv.get(modeKey)?.let { m -> SelMode.entries.firstOrNull { it.name == m } } ?: SelMode.GRID
+        demo.selOrg = kv.get(orgKey)?.let { o -> SelOrg.entries.firstOrNull { it.name == o } } ?: SelOrg.CATEGORY
         demo.listLoaded = engine.list != null
         applyPrefs(me.prefs)
         render()
@@ -179,6 +182,7 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
     fun dismissOrphans() { engine.takeOrphans(); demo.orphanCount = 0 }
 
     fun setSelMode(m: SelMode) { demo.selMode = m; kv.put(modeKey, m.name) }
+    fun setSelOrg(o: SelOrg) { demo.selOrg = o; kv.put(orgKey, o.name) }
 
     /* ───── Cycle de vie ───── */
 

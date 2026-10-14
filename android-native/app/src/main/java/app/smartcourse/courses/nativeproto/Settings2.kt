@@ -359,7 +359,7 @@ fun ResetFamilySheet(onDismiss: () -> Unit) {
             Spacer(Modifier.height(10.dp))
             if (!ready) Text("Vérifiez d'abord votre adresse e-mail de récupération (Réglages → Récupération).", color = C.Amber, style = MaterialTheme.typography.bodyMedium)
             else {
-                FormField(password, { password = it }, "Votre code d'accès", leading = Icons.Rounded.Lock, visual = PasswordVisualTransformation(), keyboard = KeyboardOptions(keyboardType = KeyboardType.Password))
+                CodeField(password, { password = it }, "Votre code d'accès", legacy = true)
                 Spacer(Modifier.height(8.dp))
                 FormField(code, { code = it.uppercase() }, "Tapez le code famille ${fam?.get("code")?.jsonPrimitive?.contentOrNull ?: ""}")
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { understood = !understood }) {

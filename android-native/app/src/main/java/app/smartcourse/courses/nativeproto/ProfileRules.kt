@@ -19,6 +19,12 @@ object ProfileRules {
     /** Ni l'administrateur principal, ni un administrateur (retirer d'abord le rôle), ni soi-même. */
     fun canDelete(p: ProfileDto, meId: String?) = !p.primary && p.role != "admin" && p.id != meId
 
+    /**
+     * Partager l'accès d'un membre (donc lui donner un nouveau code) : profil actif, ni soi-même (on se déconnecterait), ni
+     * l'administrateur principal.
+     */
+    fun canShareAccess(p: ProfileDto, meId: String?) = p.active && !p.primary && p.id != meId
+
     fun roleLabel(p: ProfileDto) = when {
         p.primary -> "Administrateur principal"
         p.role == "admin" -> "Administrateur"

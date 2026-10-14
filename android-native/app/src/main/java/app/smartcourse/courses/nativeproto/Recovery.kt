@@ -218,9 +218,9 @@ fun CreateFamilyForm(session: Session) {
     Spacer(Modifier.height(10.dp))
     FormField(email, { email = it.trim() }, "E-mail de récupération", leading = Icons.Rounded.Email, keyboard = KeyboardOptions(keyboardType = KeyboardType.Email))
     Spacer(Modifier.height(10.dp))
-    FormField(code, { code = it.filter { ch -> ch.isDigit() }.take(6) }, "Code d'accès (6 chiffres)", leading = Icons.Rounded.Lock, visual = PasswordVisualTransformation(), keyboard = KeyboardOptions(keyboardType = KeyboardType.NumberPassword))
+    CodeField(code, { code = it }, "Code d'accès (6 chiffres)")
     Spacer(Modifier.height(10.dp))
-    FormField(code2, { code2 = it.filter { ch -> ch.isDigit() }.take(6) }, "Confirmez le code d'accès", leading = Icons.Rounded.Lock, visual = PasswordVisualTransformation(), keyboard = KeyboardOptions(keyboardType = KeyboardType.NumberPassword))
+    CodeField(code2, { code2 = it }, "Confirmez le code d'accès")
     error?.let { Spacer(Modifier.height(8.dp)); Text(it, color = C.Danger, style = MaterialTheme.typography.bodyMedium) }
     Spacer(Modifier.height(16.dp))
     val ready = famName.isNotBlank() && name.isNotBlank() && login.length >= 2 && city != null && email.contains("@") && code.length == 6 && code2.length == 6

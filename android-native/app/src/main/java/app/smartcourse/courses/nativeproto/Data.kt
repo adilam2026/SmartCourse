@@ -78,7 +78,10 @@ fun defaultQty(p: Product): Int = when (p.unit) { UnitKind.MASS -> 1000; UnitKin
 /* ───────────── Données fictives ───────────── */
 
 enum class Role { ADMIN, STAFF }
-enum class SelMode(val label: String) { LIST("Liste"), GRID("Carrés"), CARDS("Grandes cartes") }
+/** Présentation des articles à choisir (le nom interne GRID est conservé : préférences déjà enregistrées). */
+enum class SelMode(val label: String) { LIST("Liste"), GRID("Petites cartes"), CARDS("Grandes cartes") }
+/** Organisation des articles à choisir : par catégorie (en-têtes) ou liste globale (A → Z, sans en-têtes). */
+enum class SelOrg(val label: String) { CATEGORY("Par catégorie"), GLOBAL("Liste globale") }
 enum class ProfRole(val label: String) { ADMIN("Administrateur"), PARENT("Parent"), STAFF("Personnel") }
 
 data class Line(
@@ -131,6 +134,7 @@ class Demo(initialRole: Role? = null, val live: Boolean = false) {
     var selMode by mutableStateOf(
         when (Launch.str("mode")) { "list" -> SelMode.LIST; "cards" -> SelMode.CARDS; else -> SelMode.GRID }
     )
+    var selOrg by mutableStateOf(SelOrg.CATEGORY)
     var toast by mutableStateOf<Toast?>(null)
     var pendingSheet: String? = null
 

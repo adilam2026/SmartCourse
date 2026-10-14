@@ -48,6 +48,10 @@ fun ProfilesScreenReal(session: Session, onBack: () -> Unit) {
     var deleteFor by remember { mutableStateOf<ProfileDto?>(null) }
     var deactivateFor by remember { mutableStateOf<ProfileDto?>(null) }
     var create by remember { mutableStateOf(false) }
+    // Accès à partager : le code n'est connu qu'ici, juste après sa création ; il n'est ni journalisé ni enregistré.
+    var shareFor by remember { mutableStateOf<AccessToShare?>(null) }
+    var regenFor by remember { mutableStateOf<ProfileDto?>(null) }
+    val familyCode = me?.family?.code
 
     suspend fun reload() {
         when (val r = repo.list()) {
@@ -81,6 +85,7 @@ fun ProfilesScreenReal(session: Session, onBack: () -> Unit) {
                 SecondaryButton("Réessayer", { scope.launch { loading = true; reload() } })
             }
         } else Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 4.dp)) {
+            if (familyCode != null) { FamilyCodeCard(familyCode); Spacer(Modifier.height(10.dp)) }
             SCard {
                 items.forEachIndexed { i, pr ->
                     if (i > 0) HorizontalDivider(color = C.Line.copy(alpha = 0.6f), modifier = Modifier.padding(start = 64.dp))
@@ -100,6 +105,12 @@ fun ProfilesScreenReal(session: Session, onBack: () -> Unit) {
                         Box {
                             IconButton({ menuFor = pr.id }, enabled = !busy) { Icon(Icons.Rounded.MoreVert, "Actions pour ${pr.displayName}", tint = C.Ink) }
                             DropdownMenu(menuFor == pr.id, { menuFor = null }, containerColor = Color.White, shape = RoundedCornerShape(16.dp)) {
+                                val canShare = ProfileRules.canShareAccess(pr, me?.id) && familyCode != null
+                                DropdownMenuItem(
+                                    text = { Text(if (canShare) "Partager l'accès" else "Partage impossible", color = if (canShare) C.Ink else C.Muted) },
+                                    leadingIcon = { Icon(Icons.Rounded.Share, null, tint = if (canShare) C.Ink else C.Muted) },
+                                    enabled = canShare, onClick = { menuFor = null; regenFor = pr },
+                                )
                                 DropdownMenuItem(text = { Text("Modifier") }, leadingIcon = { Icon(Icons.Rounded.Edit, null, tint = C.Ink) },
                                     onClick = { menuFor = null; editFor = pr })
                                 DropdownMenuItem(text = { Text("Modifier le code d'accès") }, leadingIcon = { Icon(Icons.Rounded.Key, null, tint = C.Ink) },
@@ -141,8 +152,41 @@ fun ProfilesScreenReal(session: Session, onBack: () -> Unit) {
     } }
     if (create) CreateProfileSheet(defaultCity = me?.city, onDismiss = { create = false }) { name, login, role, a, b, city ->
         create = false
-        act("Profil créé : $name.") { repo.create(name, login, role, a, b, city) }
+        scope.launch {
+            busy = true
+            when (val r = repo.create(name, login, role, a, b, city)) {
+                is Outcome.Ok -> {
+                    reload()
+                    // Partage proposé tout de suite : c'est le seul moment où le code est connu.
+                    if (familyCode != null) shareFor = AccessToShare(name, familyCode, login, a, "Profil créé. Transmettez maintenant son accès : son code d'accès ne pourra plus être affiché ensuite.")
+                    else demo.say("Profil créé : $name.")
+                }
+                is Outcome.Fail -> demo.say(explain(r))
+            }
+            busy = false
+        }
     }
+    regenFor?.let { p -> ConfirmDialog(
+        "Partager l'accès de ${p.displayName}",
+        "Son code d'accès actuel n'est pas conservé en clair : il ne peut pas être affiché. Pour partager son accès, un nouveau code va être généré. " +
+            "L'ancien code cessera de fonctionner et ${p.displayName} sera déconnecté de ses téléphones jusqu'à ce qu'il saisisse le nouveau.",
+        "Générer un nouveau code et partager",
+        {
+            regenFor = null
+            val fc = familyCode
+            if (fc != null) scope.launch {
+                busy = true
+                val code = AccessShare.generateCode()
+                when (val r = repo.resetSecret(p.id, code, code)) {
+                    is Outcome.Ok -> { reload(); shareFor = AccessToShare(p.displayName, fc, p.login, code, "Nouveau code créé : l'ancien ne fonctionne plus. Transmettez maintenant ce nouvel accès.") }
+                    is Outcome.Fail -> demo.say(explain(r))
+                }
+                busy = false
+            }
+        },
+        { regenFor = null },
+    ) }
+    shareFor?.let { a -> ShareAccessSheet(a) { shareFor = null } }
     deactivateFor?.let { p -> ConfirmDialog(
         "Désactiver ${p.displayName} ?",
         "Cette personne sera déconnectée de tous ses téléphones et ne pourra plus se connecter. Son historique est conservé ; vous pourrez la réactiver.",
@@ -185,11 +229,9 @@ private fun ResetCodeSheet(p: ProfileDto, onDismiss: () -> Unit, onSave: (String
         Spacer(Modifier.height(4.dp))
         Text("6 chiffres, saisis deux fois. Les téléphones de cette personne seront déconnectés.", style = MaterialTheme.typography.bodySmall)
         Spacer(Modifier.height(12.dp))
-        FormField(a, { a = it.filter(Char::isDigit).take(6) }, "Nouveau code (6 chiffres)", leading = Icons.Rounded.Lock,
-            visual = PasswordVisualTransformation(), keyboard = KeyboardOptions(keyboardType = KeyboardType.NumberPassword))
+        CodeField(a, { a = it }, "Nouveau code (6 chiffres)")
         Spacer(Modifier.height(10.dp))
-        FormField(b, { b = it.filter(Char::isDigit).take(6) }, "Confirmer le code", leading = Icons.Rounded.Lock,
-            visual = PasswordVisualTransformation(), keyboard = KeyboardOptions(keyboardType = KeyboardType.NumberPassword))
+        CodeField(b, { b = it }, "Confirmer le code")
         if (b.isNotEmpty() && a != b) Text("Les deux codes ne sont pas identiques.", color = C.Danger, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp))
         Spacer(Modifier.height(16.dp))
         PrimaryButton("Enregistrer le code", { onSave(a, b) }, Modifier.fillMaxWidth(), enabled = ok)
@@ -223,11 +265,9 @@ private fun CreateProfileSheet(defaultCity: String?, onDismiss: () -> Unit, onSa
             Spacer(Modifier.height(12.dp))
             SecondaryButton(city?.let { "Ville : $it" } ?: "Choisir la ville", { pickCity = true }, Modifier.fillMaxWidth(), height = 52.dp)
             Spacer(Modifier.height(10.dp))
-            FormField(a, { a = it.filter(Char::isDigit).take(6) }, "Code d'accès (6 chiffres)", leading = Icons.Rounded.Lock,
-                visual = PasswordVisualTransformation(), keyboard = KeyboardOptions(keyboardType = KeyboardType.NumberPassword))
+            CodeField(a, { a = it }, "Code d'accès (6 chiffres)")
             Spacer(Modifier.height(10.dp))
-            FormField(b, { b = it.filter(Char::isDigit).take(6) }, "Confirmer le code", leading = Icons.Rounded.Lock,
-                visual = PasswordVisualTransformation(), keyboard = KeyboardOptions(keyboardType = KeyboardType.NumberPassword))
+            CodeField(b, { b = it }, "Confirmer le code")
             if (b.isNotEmpty() && a != b) Text("Les deux codes ne sont pas identiques.", color = C.Danger, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp))
             Spacer(Modifier.height(16.dp))
             PrimaryButton("Créer le profil", { onSave(name.trim(), login, role, a, b, city) }, Modifier.fillMaxWidth(), enabled = ok)

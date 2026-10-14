@@ -141,12 +141,7 @@ fun LoginScreen(session: Session?, onSimulated: (Role) -> Unit) {
                 Spacer(Modifier.height(10.dp))
                 FormField(login, { login = it }, "Identifiant", leading = Icons.Rounded.Person)
                 Spacer(Modifier.height(10.dp))
-                FormField(
-                    code, { code = it }, "Code d'accès", leading = Icons.Rounded.Lock,
-                    visual = if (show) VisualTransformation.None else PasswordVisualTransformation(),
-                    keyboard = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    trailing = { IconButton({ show = !show }) { Icon(if (show) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility, if (show) "Masquer le code" else "Afficher le code", tint = C.Ink) } },
-                )
+                CodeField(code, { code = it }, "Code d'accès", legacy = true)
                 Spacer(Modifier.height(16.dp))
                 val notice = session?.notice
                 val farewell = session?.farewell
@@ -203,8 +198,7 @@ fun LoginScreen(session: Session?, onSimulated: (Role) -> Unit) {
                     Spacer(Modifier.height(10.dp))
                     FormField(login, { login = it }, "Votre prénom", leading = Icons.Rounded.Person)
                     Spacer(Modifier.height(10.dp))
-                    FormField(code, { code = it }, "Code d'accès à choisir", leading = Icons.Rounded.Lock,
-                        visual = PasswordVisualTransformation(), keyboard = KeyboardOptions(keyboardType = KeyboardType.NumberPassword))
+                    CodeField(code, { code = it }, "Code d'accès à choisir")
                     Spacer(Modifier.height(16.dp))
                     PrimaryButton("Rejoindre la famille", { demo.simulated("demande pour rejoindre une famille") }, Modifier.fillMaxWidth())
                 } else {
@@ -216,8 +210,7 @@ fun LoginScreen(session: Session?, onSimulated: (Role) -> Unit) {
                     Spacer(Modifier.height(10.dp))
                     FormField(login, { login = it }, "Votre identifiant (administrateur)", leading = Icons.Rounded.Person)
                     Spacer(Modifier.height(10.dp))
-                    FormField(code, { code = it }, "Code d'accès", leading = Icons.Rounded.Lock,
-                        visual = PasswordVisualTransformation(), keyboard = KeyboardOptions(keyboardType = KeyboardType.NumberPassword))
+                    CodeField(code, { code = it }, "Code d'accès")
                     Spacer(Modifier.height(16.dp))
                     PrimaryButton("Créer ma famille", { demo.simulated("création d'une famille") }, Modifier.fillMaxWidth())
                 }

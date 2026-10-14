@@ -97,9 +97,14 @@ fun DisplayScreen(onBack: () -> Unit) {
                 ) { val d = demo.data; if (d != null) d.setPrefs(demo.showPrices || it, it) else demo.showTotals = it }
             }
             SCard(padding = PaddingValues(16.dp)) {
-                Text("Mode de sélection préféré", style = MaterialTheme.typography.titleSmall)
+                // Mêmes réglages que le bouton « Affichage » de l'écran de sélection (mémorisés pour ce profil).
+                Text("Présentation des articles", style = MaterialTheme.typography.titleSmall)
                 Spacer(Modifier.height(10.dp))
                 SegTabs(SelMode.entries.map { it.label }, demo.selMode.ordinal, { val m = SelMode.entries[it]; demo.data?.setSelMode(m) ?: run { demo.selMode = m } })
+                Spacer(Modifier.height(12.dp))
+                Text("Organisation", style = MaterialTheme.typography.titleSmall)
+                Spacer(Modifier.height(10.dp))
+                SegTabs(SelOrg.entries.map { it.label }, demo.selOrg.ordinal, { val o = SelOrg.entries[it]; demo.data?.setSelOrg(o) ?: run { demo.selOrg = o } })
             }
             Row(Modifier.padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Icon(Icons.Rounded.Info, null, tint = C.Muted, modifier = Modifier.size(18.dp))
