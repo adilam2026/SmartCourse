@@ -355,6 +355,9 @@ expect "S4c. panneau de partage refermé sans rien envoyer, retour à l'applicat
 $UI tap "Copier les informations" >/dev/null; sleep 1
 expect "S4b. « Copier les informations »" $UI wait "Informations copiées" 5
 $UI tap "Fermer" --last >/dev/null; sleep 2
+# L'émulateur Google ouvre parfois, quelques secondes après le panneau de partage, l'accueil de Quick Share (hors application) :
+# il est refermé avant de continuer.
+sleep 6; back_to_app
 expect "S5. le code partagé fonctionne (zéro initial) : connexion de Zoé" test "$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d "{\"familyCode\":\"$FAMILY\",\"login\":\"zoe\",\"secret\":\"047193\"}")" = 200
 # Profil existant : le code n'est pas récupérable ; annulation sans aucun changement
 HASH0=$(sql "SELECT secret_hash FROM profiles WHERE family_id='$FID' AND login='zoe'")
@@ -367,6 +370,7 @@ $UI tap "Annuler" >/dev/null; sleep 2
 expect "S6c. annulation : code inchangé (empreinte identique, connexion 047193 toujours valable)" bash -c "test \"\$(sql \"SELECT secret_hash FROM profiles WHERE family_id='$FID' AND login='zoe'\")\" = '$HASH0' && test \"\$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"$FAMILY\",\"login\":\"zoe\",\"secret\":\"047193\"}')\" = 200"
 # Avec WhatsApp (application d'essai portant l'identifiant com.whatsapp) : nouveau code après confirmation, puis partage
 if [ -n "${WA_STUB:-}" ] && adb install -r "$WA_STUB" >/dev/null 2>&1; then
+  back_to_app
   $UI tap "Actions pour Zoe" >/dev/null; sleep 1; $UI tap "Partager l'accès" >/dev/null; sleep 2
   $UI tap "Générer un nouveau code et partager" >/dev/null; sleep 5
   NEWC=$(screen_grep "accès : [0-9]{6}" | grep -oE "[0-9]{6}")   # XML : l'apostrophe y est échappée
