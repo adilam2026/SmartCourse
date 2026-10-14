@@ -1,11 +1,14 @@
-═══ F. Version finale : identifiant, nom, serveur fixe ═══
-PASS  F0. identifiant app.smartcourse.courses.natif installé
-PASS  F0b. nom affiché « Mes Courses »
-PASS  F1. écran de connexion direct (aucune saisie de serveur)
-PASS  F1b. aucun bandeau ni fonction de démonstration
-PASS  F1c. aucun lien « Serveur … Modifier »
-PASS  F1d. accès de recette désactivés (écran simulé refusé)
-PASS  F1e. pas d'écrans de démonstration
+═══ A. Catalogue (contrôle rapide) : Tous les articles / Par catégories × Liste / Cartes ═══
+PASS  A0. démarrage, personnel connecté
+PASS  A1. icône Affichage dans l'en-tête, plus de rangée de boutons
+PASS  A2. Par catégories : grille des catégories (sans articles)
+PASS  A3. catégorie ouverte : ses articles et le retour
+PASS  A4. article choisi
+PASS  A5. retour à la grille, badge « choisi(s) » sur la catégorie
+PASS  A6. retour Android : grille, application toujours ouverte
+PASS  A7. Tous les articles en Liste : titres de catégorie, sélection conservée
+PASS  A8. préférence gardée après fermeture de l'application
+PASS  A9. préférence gardée après déconnexion / reconnexion
 ECHECS=0
 CRASH_APPLICATION=0
 TOTAL_ECHECS=0
