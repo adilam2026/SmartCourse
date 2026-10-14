@@ -22,3 +22,5 @@ code famille), bouton « Affichage » (présentation × organisation) mémorisé
 voir `tests-api36/`.
 
 Parcours de validation : 6 groupes en parallèle (F,G,H · C,D · F,P,J · K,S · A · T), chacun sur sa recette jetable.
+
+Validation de cette version : 6 groupes verts sur Android 16 (F,G,H · C,D · F,P,J · K,S · A · T), code de l’application inchangé depuis 200938e.
