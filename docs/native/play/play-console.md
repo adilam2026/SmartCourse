@@ -114,11 +114,11 @@ de permission spéciale n'est donc demandée par la Play Console.
 | Règles de confidentialité | `https://smartcourse-production-c7ce.up.railway.app/confidentialite` | 200, HTML, page lisible sans connexion |
 | Suppression de compte | `https://smartcourse-production-c7ce.up.railway.app/suppression-compte` | 200, HTML, formulaire sans connexion ; l'API répond `401 invalid_credentials` à des identifiants inexistants (aucune donnée modifiée). Suppression réelle vérifiée sur une famille jetable du serveur d'essai (section D du parcours final). |
 
-Points à corriger avant soumission (préparés, **non déployés** — votre accord est nécessaire) :
+Corrections déployées le 14 octobre 2026 (serveur 43445da) :
 1. Les pages s'intitulent encore « Courses » : Google demande que la page de suppression cite le **nom affiché sur la fiche**
-   (« Mes Courses »). Corrigé dans `web/public/*.html` sur la branche `claude/android-native`.
+   (« Mes Courses »). Corrigé et déployé.
 2. La page de confidentialité décrit les notifications de l'application web (Firebase Cloud Messaging) ; l'application Android
-   n'utilise aucun service de notification tiers. Corrigé dans la même modification.
+   n'utilise aucun service de notification tiers. Corrigé et déployé.
 3. Adresse de contact publique : **adilam.pro@gmail.com** (choisie par le propriétaire, affichée sur les deux pages ;
    une variable Railway `CONTACT_EMAIL` la remplacerait si elle était définie).
 
