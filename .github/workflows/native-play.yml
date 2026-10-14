@@ -27,10 +27,14 @@ env:
   PROD_URL: https://smartcourse-production-c7ce.up.railway.app
   VERSION_NAME: "1.0.1"
 jobs:
-  test-36:
+  # 1. Compilation UNE seule fois (tests unitaires, APK de test, application d'essai WhatsApp) et plan des parcours.
+  build:
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[play')
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 40
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      captures: ${{ steps.plan.outputs.captures }}
     steps:
       - uses: actions/checkout@v4
       - name: APK de test déjà compilé pour ce code et ces paramètres ?
@@ -74,11 +78,44 @@ jobs:
           "$B/zipalign" -f 4 $D/u.apk $D/a.apk
           keytool -genkeypair -noprompt -keystore $D/k.p12 -storetype PKCS12 -alias s -keyalg RSA -keysize 2048 -validity 2 -storepass essai-wa -keypass essai-wa -dname "CN=Essai WhatsApp"
           "$B/apksigner" sign --ks $D/k.p12 --ks-pass pass:essai-wa --out /tmp/whatsapp-essai.apk $D/a.apk
-          echo "WA_STUB=/tmp/whatsapp-essai.apk" >> "$GITHUB_ENV"
+          mkdir -p dist-e2e && cp dist/Courses-final-test.apk /tmp/whatsapp-essai.apk dist-e2e/
       - name: Niveau d'API cible (36 exigé par Google Play)
         run: |
           "$ANDROID_HOME/build-tools/36.0.0/aapt2" dump badging dist/Courses-final-test.apk | grep -E "^package:|application-label:|targetSdkVersion" | tee /tmp/badging.txt
           grep -q "targetSdkVersion:'36'" /tmp/badging.txt
+      - uses: actions/upload-artifact@v4
+        with: { name: apk-test, path: dist-e2e/ }
+      - name: Plan des parcours (groupes indépendants joués en parallèle)
+        id: plan
+        env: { MSG: "${{ github.event.head_commit.message }}", IN: "${{ inputs.sections }}" }
+        run: |
+          # Lancement manuel : champ « sections ». Envoi de commit : [sections:C,D] = parcours ciblé (un émulateur) ;
+          # [play-captures] = captures de la fiche (seulement sur demande). Sans précision : tous les groupes, en parallèle.
+          S="$IN"
+          if [ -z "$S" ]; then
+            M=$(echo "$MSG" | grep -oE '\[sections:[A-Z,]+\]' | head -1 | sed -E 's/\[sections:([A-Z,]+)\]/\1/')
+            if [ -n "$M" ]; then S="$M"; elif echo "$MSG" | grep -q '\[play-captures\]'; then S=aucune; fi
+          fi
+          # Chaque groupe part d'une recette neuve. F ferme la liste du jeu d'essai (attendu par G et P) ; D reprend la famille créée en C.
+          if [ "$S" = aucune ]; then MATRIX='[]'; elif [ -n "$S" ]; then MATRIX="[\"$S\"]"; else MATRIX='["F,G,H","C,D","F,P,J","K,S","A","T"]'; fi
+          CAP=0; if echo "$MSG" | grep -q '\[play-captures\]'; then CAP=1; fi
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"; echo "captures=$CAP" >> "$GITHUB_OUTPUT"
+          echo "Groupes : $MATRIX ; captures : $CAP"
+
+  # 2. Parcours sur Android 16 : un émulateur et une recette jetable par groupe, en parallèle.
+  e2e:
+    needs: build
+    if: needs.build.outputs.matrix != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        sections: ${{ fromJSON(needs.build.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: apk-test, path: dist }
       - name: Serveur local jetable (code identique au serveur permanent)
         run: |
           NO_TUNNEL=1 scripts/recette-locale.sh | tee /tmp/recette.out
@@ -87,18 +124,7 @@ jobs:
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
-      - name: Sections à jouer
-        env: { MSG: "${{ github.event.head_commit.message }}", IN: "${{ inputs.sections }}" }
-        run: |
-          # Lancement manuel : champ « sections ». Envoi de commit : [play-captures] = captures seules ; [sections:C,D] = parcours ciblé.
-          S="$IN"
-          if [ -z "$S" ]; then
-            if echo "$MSG" | grep -q '\[play-captures\]'; then S=aucune; fi
-            M=$(echo "$MSG" | grep -oE '\[sections:[A-Z,]+\]' | head -1 | sed -E 's/\[sections:([A-Z,]+)\]/\1/')
-            if [ -n "$M" ]; then S="$M"; fi
-          fi
-          echo "SECTIONS=$S" >> "$GITHUB_ENV"; echo "Sections : ${S:-toutes}"
-      - name: Parcours final puis captures, sur Android 16 (API 36)
+      - name: Parcours ${{ matrix.sections }} sur Android 16 (API 36)
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 36
@@ -107,39 +133,73 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
-          script: bash scripts/native-play-ci.sh dist/Courses-final-test.apk ${{ env.FAMILY_CODE }}
+          script: bash scripts/native-e2e-final.sh dist/Courses-final-test.apk ${{ env.FAMILY_CODE }} native-final-36
+        env:
+          SECTIONS: ${{ matrix.sections }}
+          WA_STUB: dist/whatsapp-essai.apk
       - uses: actions/upload-artifact@v4
         if: always()
-        with:
-          name: play-tests
-          path: |
-            native-final-36/
-            play-captures/
+        with: { name: "play-tests-${{ strategy.job-index }}", path: native-final-36/ }
       - run: scripts/recette-locale.sh --stop
         if: always()
 
+  # 3. Captures de la fiche Google Play : seulement sur demande ([play-captures]).
+  captures:
+    needs: build
+    if: needs.build.outputs.captures == '1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: apk-test, path: dist }
+      - run: SEED_PLAY=1 NO_TUNNEL=1 scripts/recette-locale.sh >/dev/null
+      - name: KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - name: Captures (famille fictive) sur Android 16
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
+          script: bash scripts/native-play-captures.sh dist/Courses-final-test.apk play-captures
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: play-captures, path: play-captures/ }
+
   publier-tests:
-    needs: test-36
-    if: always() && needs.test-36.result != 'skipped'
+    needs: [build, e2e, captures]
+    if: always() && needs.build.result == 'success'
     runs-on: ubuntu-latest
     permissions: { contents: write }
     steps:
       - uses: actions/checkout@v4
         with: { ref: "${{ github.ref_name }}" }
       - uses: actions/download-artifact@v4
-        with: { name: play-tests, path: play-tests }
+        with: { pattern: "play-*", path: play-tests }
       - run: |
           mkdir -p docs/native/play
-          rm -rf docs/native/play/captures-originales
-          [ -d play-tests/native-final-36 ] && { rm -rf docs/native/play/tests-api36; cp -r play-tests/native-final-36 docs/native/play/tests-api36; }
-          [ -d play-tests/play-captures ] && cp -r play-tests/play-captures docs/native/play/captures-originales
+          if ls -d play-tests/play-tests-* >/dev/null 2>&1; then
+            rm -rf docs/native/play/tests-api36; mkdir -p docs/native/play/tests-api36
+            for d in play-tests/play-tests-*; do
+              cat "$d/resultats.txt" >> docs/native/play/tests-api36/resultats.txt 2>/dev/null || true
+              find "$d" -type f ! -name resultats.txt -exec cp {} docs/native/play/tests-api36/ \;
+            done
+            echo "TOTAL_ECHECS=$(grep -c '^FAIL' docs/native/play/tests-api36/resultats.txt)" >> docs/native/play/tests-api36/resultats.txt
+          fi
+          if [ -d play-tests/play-captures ]; then rm -rf docs/native/play/captures-originales; cp -r play-tests/play-captures docs/native/play/captures-originales; fi
           git config user.name "github-actions"; git config user.email "github-actions@users.noreply.github.com"
-          git add docs/native/play && git commit -m "Google Play : résultats Android 16 et captures originales (run ${{ github.run_number }}) [skip ci]" || echo "rien à commiter"
+          git add docs/native/play && git commit -m "Google Play : résultats Android 16 (run ${{ github.run_number }}) [skip ci]" || echo "rien à commiter"
           git pull --rebase origin ${{ github.ref_name }} && git push origin HEAD:${{ github.ref_name }}
 
   bundle:
-    needs: test-36
-    if: inputs.livrer || contains(github.event.head_commit.message, '[play-livrer]')
+    needs: [build, e2e]
+    if: needs.e2e.result == 'success' && (inputs.livrer || contains(github.event.head_commit.message, '[play-livrer]'))
     runs-on: ubuntu-latest
     timeout-minutes: 40
     permissions: { contents: write }
