@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Courses — Confidentialité et suppression des données</title>
+<title>Mes Courses — Confidentialité et suppression des données</title>
 <style>
   :root { color-scheme: light dark; --bg: #faf6ef; --ink: #1f2a24; --muted: #5a665f; --link: #17613f; }
   @media (prefers-color-scheme: dark) { :root { --bg: #14201a; --ink: #eef3ef; --muted: #aab7ae; --link: #7fd1a6; } }
@@ -15,22 +15,23 @@
 </head>
 <body>
 <main>
-  <h1>Courses — Confidentialité et suppression des données</h1>
-  <p class="muted">Application « Courses — Liste familiale ». Dernière mise à jour : 12 octobre 2026 (prix indicatifs et partage facultatif des prix). Contact : <!--CONTACT-->.</p>
+  <h1>Mes Courses — Confidentialité et suppression des données</h1>
+  <p class="muted">Application Android « Mes Courses » (app.smartcourse.courses.natif) et application web « Courses — Liste familiale », qui partagent le même serveur. Dernière mise à jour : 14 octobre 2026 (application Android « Mes Courses », création de famille vérifiée par e-mail, suppression de compte et durées de conservation). Contact : <!--CONTACT-->.</p>
 
   <h2>À quoi sert l'application</h2>
-  <p>Courses est la liste de courses partagée d'une famille. Elle n'est destinée qu'aux membres d'une même famille ; elle ne contient aucune publicité, aucun traceur publicitaire et ne vend ni ne partage de données à des fins commerciales.</p>
+  <p>Mes Courses est la liste de courses partagée d'une famille. Elle n'est destinée qu'aux membres d'une même famille ; elle ne contient aucune publicité, aucun traceur publicitaire et ne vend ni ne partage de données à des fins commerciales.</p>
 
   <h2>Données enregistrées</h2>
   <ul>
     <li><b>Famille et profils</b> : nom de la famille, code famille, nom affiché, identifiant et rôle de chaque profil. Le code secret n'est jamais conservé en clair : seule une empreinte irréversible est enregistrée.</li>
-    <li><b>Adresse e-mail de récupération</b> (administrateur principal) : sert uniquement à envoyer le code famille et les liens de récupération ou de vérification.</li>
+    <li><b>Adresse e-mail de récupération</b> (administrateur principal) : sert uniquement à envoyer le code famille, le code de vérification à la création de la famille et les liens de récupération ou de vérification.</li>
+    <li><b>Création de la famille depuis l'application</b> : la demande (nom de la famille, prénom, identifiant, ville, adresse e-mail, empreinte du code d'accès et empreinte non réversible de l'adresse IP) est enregistrée pour vérifier l'adresse par un code à 6 chiffres et limiter les créations abusives. Rien n'est créé tant que le code n'est pas vérifié.</li>
     <li><b>Listes de courses</b> : articles demandés, quantités, achats, historique et statistiques de la famille ; photos d'articles ajoutées par la famille.</li>
-    <li><b>Notifications</b> (facultatives) : l'adresse technique d'abonnement de l'appareil, rattachée au profil, pour prévenir les parents et administrateurs d'une nouvelle liste.</li>
+    <li><b>Notifications</b> (facultatives) : dans l'application web, l'adresse technique d'abonnement de l'appareil, rattachée au profil, pour prévenir les parents et administrateurs d'une nouvelle liste. Dans l'application Android « Mes Courses », aucun abonnement n'est enregistré : le téléphone vérifie lui-même le serveur à intervalles réguliers (environ toutes les 15 minutes, au moment choisi par Android) ; les notifications ne sont donc pas instantanées.</li>
     <li><b>Prix indicatifs et préférences</b> : les prix de vos produits (propres à la famille) et vos choix d'affichage des prix (propres à chaque profil). Les favoris (modèles de liste) sont enregistrés pour la famille.</li>
     <li><b>Prix partagés (facultatif)</b> : si un administrateur choisit « Partager ce prix », sont envoyés : le produit du catalogue, son prix avec son unité ou son conditionnement, la date et, s'ils sont saisis, la ville et le magasin. <b>Jamais</b> le nom, l'e-mail, le code famille ni l'historique de courses. Une empreinte opaque de la famille, non réversible, sert seulement à limiter le nombre d'envois et à retirer ses contributions si la famille est supprimée. Les propositions affichées aux autres familles sont des médianes de plusieurs familles pour un même format ; rien n'est appliqué sans le choix d'un administrateur.</li>
-    <li><b>Appareil</b> : à l'activation des notifications, le type de navigateur de l'appareil (<i>user agent</i>) est enregistré avec l'abonnement.</li>
-    <li><b>Journaux techniques</b> : événements de sécurité et de fonctionnement du serveur (adresse IP de la requête, échecs de connexion), conservés temporairement, sans code secret. L'adresse IP sert aussi à limiter les tentatives abusives.</li>
+    <li><b>Appareil</b> : dans l'application web, à l'activation des notifications, le type de navigateur de l'appareil (<i>user agent</i>) est enregistré avec l'abonnement.</li>
+    <li><b>Journaux techniques</b> : événements de sécurité et de fonctionnement du serveur (adresse IP de la requête, échecs de connexion), conservés selon les règles de l'hébergeur (Railway), sans code secret. L'adresse IP sert aussi à limiter les tentatives abusives.</li>
   </ul>
   <p>Les identifiants que l'administrateur transmet à un membre de la famille (par WhatsApp ou par copie) sont envoyés par l'administrateur lui-même : l'application n'envoie rien à WhatsApp et ne conserve pas le code secret en clair.</p>
   <p>Aucune donnée de localisation, de contacts, de microphone ni d'appareil photo en continu n'est collectée. Une photo n'est envoyée que si vous choisissez d'en ajouter une à un article.</p>
@@ -39,21 +40,31 @@
   <ul>
     <li><b>Hébergement et base de données</b> : Railway (serveur de l'application, base de données et stockage des photos).</li>
     <li><b>Envoi d'e-mails</b> (récupération du code famille, vérification de l'adresse, nouveau code secret) : Brevo, qui reçoit l'adresse du destinataire et le contenu du message.</li>
-    <li><b>Notifications</b> : le service de notifications du téléphone (Google Firebase Cloud Messaging sur Android) transporte un message chiffré ; il ne contient pas de noms de produits.</li>
+    <li><b>Notifications de l'application web</b> : le service de notifications du navigateur (Google Firebase Cloud Messaging sur Android) transporte un message chiffré ; il ne contient pas de noms de produits. L'application Android « Mes Courses » n'utilise aucun service de notification tiers, aucune publicité ni aucun outil de mesure d'audience.</li>
   </ul>
   <p>Les échanges avec le serveur sont chiffrés (HTTPS).</p>
 
-  <h2>Conservation et sauvegardes</h2>
-  <p>Les données sont conservées tant que la famille existe. Des sauvegardes chiffrées de la base sont conservées pour la reprise après incident (7 jours, 4 semaines, 3 mois) puis supprimées automatiquement.</p>
+  <h2>Conservation</h2>
+  <ul>
+    <li><b>Famille, profils, listes, historique, favoris, prix</b> : conservés tant que la famille existe, jusqu'à leur suppression (voir plus bas).</li>
+    <li><b>Demandes de création de famille</b> (adresse e-mail, nom de la famille, prénom, identifiant, ville, empreinte de l'adresse IP) et journal des e-mails de code de vérification : le serveur efface les éléments de plus de 30 jours à son démarrage puis toutes les 6 heures, et immédiatement si le compte qui a créé la famille ou la famille est supprimé. Rien n'est créé tant que le code n'est pas vérifié ; un code expire au bout de 30 minutes.</li>
+    <li><b>Liens envoyés par e-mail</b> : vérification de l'adresse valable 48 heures, nouveau code d'accès 60 minutes ; seule une empreinte est conservée, effacée avec le compte.</li>
+    <li><b>Sessions</b> : une connexion reste ouverte 90 jours sans utilisation au plus ; elle est fermée immédiatement à la déconnexion, au changement de code d'accès ou à la suppression du compte.</li>
+    <li><b>Journal de sécurité</b> (actions sur les profils, sans nom ni adresse) : conservé avec la famille et effacé avec elle ; après la suppression d'une famille, il ne reste qu'une trace anonyme (empreinte non réversible du code famille et nombre d'éléments supprimés).</li>
+    <li><b>Journaux techniques du serveur</b> (adresse IP des requêtes) : conservés par l'hébergeur (Railway) selon ses propres règles ; nous n'en fixons pas la durée.</li>
+    <li><b>Sauvegardes</b> : des sauvegardes de la base peuvent exister pour la reprise après incident ; elles peuvent encore contenir des données supprimées jusqu'à leur propre suppression. Nous n'annonçons pas de durée tant qu'elle n'est pas vérifiée.</li>
+  </ul>
 
   <h2 id="suppression">Supprimer vos données</h2>
   <ul>
-    <li><b>Toute la famille</b> : l'administrateur principal ouvre <i>Réglages → Réinitialiser la famille</i>. Après vérification du mot de passe et du code famille, la famille, les profils, les listes, les achats, les historiques, les favoris, les prix de la famille, les prix qu'elle avait partagés, les photos de la famille, les abonnements aux notifications et l'adresse de récupération sont supprimés définitivement. Les sauvegardes existantes contiennent encore ces données jusqu'à leur expiration automatique (3 mois au plus).</li>
-    <li><b>Un seul compte, sans supprimer la famille</b> : chaque personne peut supprimer son propre profil, depuis l'application (<i>son profil → Supprimer mon compte</i>) ou depuis la <a href="/suppression-compte.html"><b>page publique de suppression de compte</b></a> (sans connexion préalable : code famille, identifiant et mot de passe). Son nom, son identifiant et son code sont effacés, ses accès fermés et ses abonnements aux notifications supprimés ; dans l'historique des achats de la famille, son nom devient « Ancien profil ». La famille et les autres profils ne changent pas. Le profil principal (qui détient l'adresse de récupération) ne se supprime qu'avec toute la famille.</li>
-    <li><b>Une liste clôturée</b> : un administrateur peut la supprimer depuis l'historique (<i>Supprimer la liste</i>). La liste et ses achats sont alors supprimés définitivement de l'application et les statistiques sont recalculées ; le catalogue, les favoris et les autres listes ne changent pas. Les sauvegardes déjà faites contiennent encore cette liste jusqu'à leur expiration automatique (3 mois au plus).</li>
-    <li><b>Un administrateur</b> peut aussi supprimer le profil d'un parent ou d'un membre du personnel (<i>Réglages → Famille et profils → Profil → Supprimer ce profil</i>).</li>
+    <li><b>Mon compte seulement</b> (tous les rôles) : dans l'application, <i>Compte (icône en haut à droite) → Supprimer mon compte</i>, avec votre code d'accès ; ou sur la <a href="/suppression-compte.html"><b>page publique de suppression de compte</b></a> (sans connexion préalable : code famille, identifiant et code d'accès). Sont effacés immédiatement : votre nom, votre identifiant, votre code d'accès, votre ville, vos réglages, votre adresse e-mail le cas échéant, les liens et le journal des e-mails qui vous concernent, et vos abonnements aux notifications. Vos accès sont fermés sur tous vos téléphones et la reconnexion est refusée. Restent, car ils appartiennent à la famille, <b>sans votre nom ni votre identifiant</b> : les articles que vous avez demandés et leurs quantités, vos achats (article, quantité, date et heure, prix indicatif), les modifications de la liste que vous avez faites (journal de la liste) et vos validations de sélection ; partout, votre nom est remplacé par « Ancien profil ». Le profil supprimé ne garde qu'un identifiant technique interne, sans lien avec votre nom ou votre identifiant, auquel ces éléments et le journal de sécurité restent rattachés. La famille et les autres membres ne changent pas. Désactiver un profil n'est pas le supprimer.</li>
+    <li><b>Administrateur principal</b> : son compte tient la famille (adresse de récupération, suppression de la famille). Pour supprimer seulement son compte, il confie d'abord ce rôle à un autre administrateur (<i>Compte → Supprimer mon compte → Transférer le rôle</i>) ; son adresse de récupération est alors <b>effacée immédiatement</b> (elle n'est pas transmise au nouvel administrateur principal), ainsi que les liens qui lui avaient été envoyés et pas encore utilisés. Le nouvel administrateur principal enregistre la sienne dans <i>Réglages → Récupération</i> et la confirme par le lien reçu (valable 48 heures). Tant qu'elle n'est pas confirmée, la famille n'a pas d'adresse de récupération : pas de rappel du code famille ni de nouveau code d'accès par e-mail, et la suppression de toute la famille est impossible.</li>
+    <li><b>Toute la famille</b> (administrateur principal uniquement) : <i>Compte → Supprimer mon compte → Supprimer toute la famille</i>, ou <i>Réglages → Supprimer toute la famille</i>. Après le code d'accès, le code famille et une confirmation, sont supprimés définitivement : la famille, tous les profils, les listes, les achats, l'historique, les favoris, les prix de la famille et ceux qu'elle avait partagés, les photos de la famille, les abonnements aux notifications, l'adresse de récupération et la demande de création de la famille. Plus aucun membre ne peut se connecter.</li>
+    <li><b>Une liste clôturée</b> : un administrateur peut la supprimer depuis l'historique (<i>Supprimer la liste</i>) ; la liste et ses achats sont supprimés définitivement et les statistiques recalculées.</li>
+    <li><b>Un administrateur</b> peut aussi supprimer le profil d'un parent ou d'un membre du personnel (<i>Réglages → Profils → ⋮ → Supprimer le profil</i>) : mêmes effets que « Supprimer mon compte ».</li>
     <li><b>Vous ne pouvez plus vous connecter</b> : demandez à l'administrateur de votre famille de supprimer votre profil, ou écrivez à <!--CONTACT-->.</li>
-    <li><b>Désinstaller l'application</b> n'efface pas les données de la famille sur le serveur ; elle efface seulement les données locales du téléphone.</li>
+    <li>Dans tous les cas, les sauvegardes déjà faites, s'il en existe, peuvent encore contenir les données supprimées jusqu'à leur propre suppression.</li>
+    <li><b>Désinstaller l'application</b> n'efface pas les données de la famille sur le serveur ; elle efface seulement les données du téléphone. Après la suppression d'un compte, l'application efface aussi les données de ce profil gardées sur le téléphone.</li>
   </ul>
 
   <h2>Vos droits</h2>

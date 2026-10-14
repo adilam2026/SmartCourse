@@ -144,11 +144,18 @@ async function erase(c: pg.PoolClient, familyId: string, t: Record<string, any>,
   if (t.is_primary) throw new HttpError(409, "primary_cannot_delete", "Le profil principal ne peut être supprimé qu'avec toute la famille (Réglages → Réinitialiser la famille)");
   if (t.role === "admin" && t.active && (await otherActiveAdmins(c, familyId, t.id)) === 0) throw new HttpError(409, "last_admin", "Impossible : c'est le dernier administrateur actif");
   await c.query(
-    "UPDATE profiles SET display_name = 'Ancien profil', login = $2, secret_hash = '!', active = false, failed_attempts = 0, locked_until = NULL, deleted_at = now() WHERE id = $1",
+    `UPDATE profiles SET display_name = 'Ancien profil', login = $2, secret_hash = '!', active = false, failed_attempts = 0, locked_until = NULL, deleted_at = now(),
+            city = NULL, recovery_email = NULL, recovery_email_verified_at = NULL, show_prices = false, show_totals = false WHERE id = $1`,
     [t.id, `supprime-${String(t.id).replace(/-/g, "").slice(0, 20)}`],
   );
   await revokeProfileSessions(c, t.id);
   await c.query("DELETE FROM push_subscriptions WHERE profile_id = $1", [t.id]);
+  // Rien de personnel ne reste rattaché au profil supprimé : jetons envoyés par e-mail, journal des envois (adresse masquée),
+  // demande de création de famille (adresse, prénom, identifiant) et journal technique des envois de l'application.
+  await c.query("DELETE FROM auth_tokens WHERE profile_id = $1", [t.id]);
+  await c.query("DELETE FROM email_log WHERE profile_id = $1", [t.id]);
+  await c.query("DELETE FROM family_signups WHERE profile_id = $1", [t.id]);
+  await c.query("DELETE FROM op_log WHERE profile_id = $1", [t.id]);
   await audit(c, familyId, by, "profile.deleted", t.id, { how });
 }
 
@@ -172,6 +179,27 @@ export async function deleteOwnAccount(db: Db, hub: SseHub, familyId: string, pr
     await erase(c, familyId, t, profileId, how);
   });
   hub.disconnectProfile(profileId);
+}
+
+/**
+ * L'administrateur principal confie ce rôle à un autre administrateur actif de la famille (code d'accès retapé). Son adresse de
+ * récupération lui est retirée (elle lui est personnelle) : le nouvel administrateur principal enregistre et vérifie la sienne.
+ * Ensuite seulement, l'ancien administrateur principal peut supprimer son propre compte sans supprimer la famille.
+ */
+export async function transferPrimary(db: Db, actor: AuthContext, toId: string): Promise<ProfileView> {
+  if (toId === actor.profileId) throw new HttpError(400, "same_profile", "Choisissez un autre administrateur");
+  return withTx(db, async (c) => {
+    await lockFamily(c, actor.familyId);
+    const me = await loadTarget(c, actor.familyId, actor.profileId);
+    if (!me.is_primary) throw new HttpError(403, "forbidden", "Seul l'administrateur principal peut transférer ce rôle");
+    const t = await loadTarget(c, actor.familyId, toId);
+    if (t.deleted_at || !t.active || t.role !== "admin") throw new HttpError(409, "target_not_admin", "Le nouvel administrateur principal doit être un administrateur actif de la famille");
+    await c.query("UPDATE profiles SET is_primary = false, recovery_email = NULL, recovery_email_verified_at = NULL WHERE id = $1", [me.id]);
+    const r = await c.query("UPDATE profiles SET is_primary = true WHERE id = $1 RETURNING *", [t.id]);
+    await c.query("DELETE FROM auth_tokens WHERE profile_id = $1 AND used_at IS NULL", [me.id]);
+    await audit(c, actor.familyId, actor.profileId, "profile.primary_transferred", t.id);
+    return toView(r.rows[0]);
+  });
 }
 
 /** La personne change SA ville (profil). */
