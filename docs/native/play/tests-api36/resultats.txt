@@ -1,18 +1,10 @@
-═══ T. Administrateur principal : transfert du rôle puis suppression de son seul compte (famille JETABLE) ═══
-PASS  T0. formulaire neuf : code famille, identifiant et code saisis et vérifiés ; envoi
-PASS  T0b. administrateur principal connecté (formulaire neuf)
-PASS  T0c. essai refusé (identifiant inconnu) : saisies vérifiées ; envoi
-PASS  T0d. refus affiché
-PASS  T0e. après le refus : saisies vérifiées (adil) ; envoi
-PASS  T0f. administrateur principal connecté après un refus
-PASS  D4. principal : suppression seule impossible, expliquée
-PASS  D4b. deux choix : transférer le rôle / supprimer toute la famille
-PASS  D4c. candidat proposé : l'autre administrateur actif
-PASS  T4d. code saisi pour le transfert
-PASS  D5. transfert confirmé à l'écran
-PASS  D5b. serveur : Driss est l'administrateur principal, adresse de l'ancien retirée
-PASS  T5c. code saisi pour la suppression
-PASS  D6. ancien principal : compte supprimé, retour à la connexion
-PASS  D6b. reconnexion refusée ; Driss et Lamiaa se connectent
+═══ F. Version finale : identifiant, nom, serveur fixe ═══
+PASS  F0. identifiant app.smartcourse.courses.natif installé
+PASS  F0b. nom affiché « Mes Courses »
+PASS  F1. écran de connexion direct (aucune saisie de serveur)
+PASS  F1b. aucun bandeau ni fonction de démonstration
+PASS  F1c. aucun lien « Serveur … Modifier »
+PASS  F1d. accès de recette désactivés (écran simulé refusé)
+PASS  F1e. pas d'écrans de démonstration
 ECHECS=0
 CRASH_APPLICATION=0
