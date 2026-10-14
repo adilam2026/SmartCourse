@@ -315,6 +315,7 @@ expect "D3g. sa demande reste dans la liste, attribuée à « Ancien profil »" 
 expect "D3h. les autres membres et la famille sont intacts" bash -c "test \"\$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"$FAMILY\",\"login\":\"lamiaa\",\"secret\":\"573918\"}')\" = 200 && test \"\$(sql \"SELECT count(*) FROM profiles WHERE family_id='$FID' AND login IN ('adil','lamiaa','marie','dadmin') AND deleted_at IS NULL\")\" = 4"
 
 # Administrateur principal : explication, transfert du rôle, puis suppression de son seul compte
+sleep 61   # limite de 20 connexions par minute et par adresse : les contrôles ci-dessus en ont fait beaucoup
 signin "$FAMILY" adil 482913
 $UI wait "Compte" 25 >/dev/null
 tapt "Compte"; $UI tap "Supprimer mon compte" --last >/dev/null; sleep 3
@@ -349,10 +350,11 @@ expect "D7c. page web : suppression acceptée" test "$(curl -s -o /dev/null -w '
 expect "D7d. page web : profil anonymisé, reconnexion refusée" bash -c "test \"\$(sql \"SELECT display_name FROM profiles WHERE id='$DWEB'\")\" = 'Ancien profil' && test \"\$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"$FAMILY\",\"login\":\"dweb\",\"secret\":\"846203\"}')\" = 401"
 
 # Toute la famille (administrateur principal) : la famille créée dans l'application en section C
-BCODE=$(sql "SELECT code FROM families WHERE name='Famille Benali'")
+BCODE=${NEWCODE:-}   # famille créée dans l'application en section C (adresse $NEWMAIL)
 if [ -n "$BCODE" ]; then
   BFID=$(sql "SELECT id FROM families WHERE code='$BCODE'")
   SIGN_BEFORE=$(sql "SELECT count(*) FROM family_signups WHERE email='$NEWMAIL'")
+  sleep 61
   signin "$BCODE" karim 274915
   $UI wait "Compte" 25 >/dev/null
   tapt "Compte"; $UI tap "Supprimer mon compte" --last >/dev/null; sleep 3
