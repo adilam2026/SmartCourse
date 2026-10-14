@@ -10,17 +10,19 @@ PASS  S3b. serveur : profil créé, code non stocké en clair
 PASS  S4. sans WhatsApp : partage Android ouvert (rien n'est envoyé)
 PASS  S4c. panneau de partage refermé sans rien envoyer, retour à l'application
 PASS  S4b. « Copier les informations »
+PASS  S4d. panneau de partage de l'application fermé
 PASS  S5. le code partagé fonctionne (zéro initial) : connexion de Zoé
-PASS  S6. menu : « Partager l'accès » (rien ne change à l'ouverture)
+FAIL  S6. menu : « Partager l'accès » (rien ne change à l'ouverture)
+      écran : "Choose your account and privacy settings"|"Who can share with you"|"No one can share with you until you make yourself visible"|"How you’ll appear"|"sdk_gphone64_x86_64"|"Tap to choose an account"|"Back"|"Set up Quick Share"|"Continue"|
 FAIL  S6b. explication : code non conservé, l'ancien cessera de fonctionner
-      écran : "Close sheet"|"Partager l'accès de Zoe"|"Profil créé. Transmettez maintenant son accès : son code d'accès ne pourra plus être affiché ensuite."|"Code famille : 8DUZ4DVY"|"Identifiant : zoe"|"Code d'accès : 047193"|"Rien n'est envoyé automatiquement : vous choisissez le destinataire dans WhatsApp (ou une autre application) et vous envoyez vous-même. Ce code n'est affiché qu'ici : notez-le ou partagez-le maintenant."|"Partager l'accès"|"Informations copiées"|"Copié dans le presse-papiers."|"Fermer"|
+      écran : "Choose your account and privacy settings"|"Who can share with you"|"No one can share with you until you make yourself visible"|"How you’ll appear"|"sdk_gphone64_x86_64"|"Tap to choose an account"|"Back"|"Set up Quick Share"|"Continue"|
 PASS  S6c. annulation : code inchangé (empreinte identique, connexion 047193 toujours valable)
 FAIL  S7. nouveau code généré et affiché (047193)
-      écran : "Close sheet"|"Partager l'accès de Zoe"|"Profil créé. Transmettez maintenant son accès : son code d'accès ne pourra plus être affiché ensuite."|"Code famille : 8DUZ4DVY"|"Identifiant : zoe"|"Code d'accès : 047193"|"Rien n'est envoyé automatiquement : vous choisissez le destinataire dans WhatsApp (ou une autre application) et vous envoyez vous-même. Ce code n'est affiché qu'ici : notez-le ou partagez-le maintenant."|"Partager l'accès"|"Informations copiées"|"Copié dans le presse-papiers."|"Fermer"|
+      écran : "Close sheet"|"Partager l'accès de Zoe"|"Profil créé. Transmettez maintenant son accès : son code d'accès ne pourra plus être affiché ensuite."|"Code famille : K5ENEXD7"|"Identifiant : zoe"|"Code d'accès : 047193"|"Rien n'est envoyé automatiquement : vous choisissez le destinataire dans WhatsApp (ou une autre application) et vous envoyez vous-même. Ce code n'est affiché qu'ici : notez-le ou partagez-le maintenant."|"Partager l'accès"|"Informations copiées"|"Copié dans le presse-papiers."|"Fermer"|
 FAIL  S7b. l'ancien code ne fonctionne plus ; le nouveau, si
-      écran : "Close sheet"|"Partager l'accès de Zoe"|"Profil créé. Transmettez maintenant son accès : son code d'accès ne pourra plus être affiché ensuite."|"Code famille : 8DUZ4DVY"|"Identifiant : zoe"|"Code d'accès : 047193"|"Rien n'est envoyé automatiquement : vous choisissez le destinataire dans WhatsApp (ou une autre application) et vous envoyez vous-même. Ce code n'est affiché qu'ici : notez-le ou partagez-le maintenant."|"Partager l'accès"|"Informations copiées"|"Copié dans le presse-papiers."|"Fermer"|
+      écran : "Close sheet"|"Partager l'accès de Zoe"|"Profil créé. Transmettez maintenant son accès : son code d'accès ne pourra plus être affiché ensuite."|"Code famille : K5ENEXD7"|"Identifiant : zoe"|"Code d'accès : 047193"|"Rien n'est envoyé automatiquement : vous choisissez le destinataire dans WhatsApp (ou une autre application) et vous envoyez vous-même. Ce code n'est affiché qu'ici : notez-le ou partagez-le maintenant."|"Partager l'accès"|"Informations copiées"|"Copié dans le presse-papiers."|"Fermer"|
 PASS  S8. avec WhatsApp : WhatsApp s'ouvre avec le message (envoi par l'administrateur)
 PASS  S9. code famille : WhatsApp s'ouvre
 PASS  S9b. « Copier » le code famille
-ECHECS=3
+ECHECS=4
 CRASH_APPLICATION=0
