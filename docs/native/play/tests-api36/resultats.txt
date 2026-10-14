@@ -1,9 +1,3 @@
-═══ K. Clavier numérique des codes d'accès ═══
-PASS  K1. connexion : clavier numérique pour le code (0x12)
-PASS  K2. code affiché : zéro initial conservé (047193)
-PASS  K2b. clavier toujours numérique quand le code est affiché (0x12)
-PASS  K2c. 6 chiffres au plus (le 7e est ignoré)
-PASS  K3. code remasqué
 ═══ S. Partager l'accès d'un membre (famille JETABLE) ═══
 PASS  S0. administrateur connecté (saisies vérifiées)
 PASS  S1. code famille affiché avec « Partager le code famille » et « Copier »
@@ -12,17 +6,16 @@ PASS  S1c. ville reprise de l'administrateur
 PASS  S2. création : clavier numérique (0x12)
 PASS  S2b. code saisi avec son zéro initial (047193)
 PASS  S3. partage proposé dès la création
-FAIL  S3b. serveur : profil créé, code non stocké en clair
-      écran : "Close sheet"|"Partager l'accès de Zoe"|"Profil créé. Transmettez maintenant son accès : son code d'accès ne pourra plus être affiché ensuite."|"Code famille : CNAZSGUQ"|"Identifiant : zoe"|"Code d'accès : 047193"|"Rien n'est envoyé automatiquement : vous choisissez le destinataire dans WhatsApp (ou une autre application) et vous envoyez vous-même. Ce code n'est affiché qu'ici : notez-le ou partagez-le maintenant."|"Partager l'accès"|"Copier les informations"|"Fermer"|
+PASS  S3b. serveur : profil créé, code non stocké en clair
 PASS  S4. sans WhatsApp : partage Android ouvert (rien n'est envoyé)
+PASS  S4c. panneau de partage refermé sans rien envoyer, retour à l'application
 PASS  S4b. « Copier les informations »
 PASS  S5. le code partagé fonctionne (zéro initial) : connexion de Zoé
 FAIL  S6. menu : « Partager l'accès » (rien ne change à l'ouverture)
       écran : "Choose your account and privacy settings"|"Who can share with you"|"No one can share with you until you make yourself visible"|"How you’ll appear"|"sdk_gphone64_x86_64"|"Tap to choose an account"|"Back"|"Set up Quick Share"|"Continue"|
 FAIL  S6b. explication : code non conservé, l'ancien cessera de fonctionner
       écran : "Choose your account and privacy settings"|"Who can share with you"|"No one can share with you until you make yourself visible"|"How you’ll appear"|"sdk_gphone64_x86_64"|"Tap to choose an account"|"Back"|"Set up Quick Share"|"Continue"|
-FAIL  S6c. annulation : code inchangé (empreinte identique, connexion 047193 toujours valable)
-      écran : "Choose your account and privacy settings"|"Who can share with you"|"No one can share with you until you make yourself visible"|"How you’ll appear"|"sdk_gphone64_x86_64"|"Tap to choose an account"|"Back"|"Set up Quick Share"|"Continue"|
+PASS  S6c. annulation : code inchangé (empreinte identique, connexion 047193 toujours valable)
 FAIL  S7. nouveau code généré et affiché ()
       écran : "Choose your account and privacy settings"|"Who can share with you"|"No one can share with you until you make yourself visible"|"How you’ll appear"|"sdk_gphone64_x86_64"|"Tap to choose an account"|"Back"|"Set up Quick Share"|"Continue"|
 FAIL  S7b. l'ancien code ne fonctionne plus ; le nouveau, si
@@ -31,37 +24,5 @@ FAIL  S8. avec WhatsApp : WhatsApp s'ouvre avec le message (envoi par l'administ
       écran : "Choose your account and privacy settings"|"Who can share with you"|"No one can share with you until you make yourself visible"|"How you’ll appear"|"sdk_gphone64_x86_64"|"Tap to choose an account"|"Back"|"Set up Quick Share"|"Continue"|
 PASS  S9. code famille : WhatsApp s'ouvre
 PASS  S9b. « Copier » le code famille
-═══ A. Bouton « Affichage » : 3 présentations × 2 organisations, pour les 3 rôles ═══
-PASS  A0. Personnel connecté
-PASS  A·Personnel · Liste · Par catégorie (repère : Affichage : Liste, par catégorie ; Tomates y=620, Pommes de terre y=853)
-PASS  A·Personnel · Petites cartes · Par catégorie (repère : Affichage : Petites cartes, par catégorie ; Tomates y=1024, Pommes de terre y=1024)
-PASS  A·Personnel · Grandes cartes · Par catégorie (repère : Affichage : Grandes cartes, par catégorie ; Tomates y=1146, Pommes de terre y=1900)
-PASS  A·Personnel · Liste · Liste globale (repère : Affichage : Liste, liste globale ; Ail y=518, Assouplissant y=751)
-PASS  A·Personnel · Petites cartes · Liste globale (repère : Affichage : Petites cartes, liste globale ; Ail y=911, Assouplissant y=911)
-PASS  A·Personnel · Grandes cartes · Liste globale (repère : Affichage : Grandes cartes, liste globale ; Ail y=1027, Assouplissant y=1781)
-PASS  A1. Personnel : sélection conservée après les 6 changements
-PASS  A2. personnel : toujours sans recherche ni onglets
-PASS  A0. Parent connecté
-PASS  A·Parent · Liste · Par catégorie (repère : Affichage : Liste, par catégorie ; Tomates y=620, Pommes de terre y=853)
-PASS  A·Parent · Petites cartes · Par catégorie (repère : Affichage : Petites cartes, par catégorie ; Tomates y=1024, Pommes de terre y=1024)
-PASS  A·Parent · Grandes cartes · Par catégorie (repère : Affichage : Grandes cartes, par catégorie ; Tomates y=1146, Pommes de terre y=1900)
-PASS  A·Parent · Liste · Liste globale (repère : Affichage : Liste, liste globale ; Ail y=518, Assouplissant y=751)
-PASS  A·Parent · Petites cartes · Liste globale (repère : Affichage : Petites cartes, liste globale ; Ail y=911, Assouplissant y=911)
-PASS  A·Parent · Grandes cartes · Liste globale (repère : Affichage : Grandes cartes, liste globale ; Ail y=1027, Assouplissant y=1781)
-PASS  A1. Parent : sélection conservée après les 6 changements
-PASS  A3. parent : recherche disponible
-PASS  A0. Administrateur connecté
-PASS  A·Administrateur · Liste · Par catégorie (repère : Affichage : Liste, par catégorie ; Tomates y=620, Pommes de terre y=853)
-PASS  A·Administrateur · Petites cartes · Par catégorie (repère : Affichage : Petites cartes, par catégorie ; Tomates y=1024, Pommes de terre y=1024)
-PASS  A·Administrateur · Grandes cartes · Par catégorie (repère : Affichage : Grandes cartes, par catégorie ; Tomates y=1146, Pommes de terre y=1900)
-PASS  A·Administrateur · Liste · Liste globale (repère : Affichage : Liste, liste globale ; Ail y=518, Assouplissant y=751)
-PASS  A·Administrateur · Petites cartes · Liste globale (repère : Affichage : Petites cartes, liste globale ; Ail y=911, Assouplissant y=911)
-PASS  A·Administrateur · Grandes cartes · Liste globale (repère : Affichage : Grandes cartes, liste globale ; Ail y=1027, Assouplissant y=1781)
-PASS  A1. Administrateur : sélection conservée après les 6 changements
-PASS  A4. après un changement d'écran (administrateur)
-PASS  A5. après fermeture et réouverture (administrateur)
-PASS  A6. changement de compte : préférences du personnel, pas celles de l'administrateur
-PASS  A7. parent : ses propres préférences
-PASS  A8. reconnexion de l'administrateur : ses préférences retrouvées
-ECHECS=7
+ECHECS=5
 CRASH_APPLICATION=0
