@@ -297,7 +297,9 @@ fi
 ime_type() { adb shell dumpsys input_method | grep -m1 -oE "inputType=0x[0-9a-f]+" | cut -d= -f2; }   # 0x12 = chiffres masqués
 screen_grep() { adb shell uiautomator dump /sdcard/sg.xml >/dev/null 2>&1; adb exec-out cat /sdcard/sg.xml 2>/dev/null | grep -oE "$1" | head -1; }
 started() { adb logcat -d -s ActivityTaskManager:I | grep "START u0" | grep -c "$1"; }   # lancements d'activité correspondant à $1
-back_to_app() { for _ in 1 2 3; do adb shell dumpsys activity activities | grep -m1 "topResumedActivity" | grep -q "$PKG" && return 0; adb shell input keyevent KEYCODE_BACK; sleep 2; done; adb shell am start -n "$ACT" >/dev/null 2>&1; sleep 2; }
+# Retour à l'application : la fenêtre qui a le focus (le panneau de partage d'Android 16 laisse l'activité de l'application « au premier plan »).
+focused() { adb shell dumpsys window | grep -m1 "mCurrentFocus" | tr -d '\r'; }
+back_to_app() { for _ in 1 2 3 4; do focused | grep -q "$PKG" && return 0; adb shell input keyevent KEYCODE_BACK; sleep 2; done; focused | grep -q "$PKG"; }
 show_desc() { screen_grep 'Affichage : [^"]*'; }
 
 if want_s K; then
@@ -319,6 +321,7 @@ fi
 
 if want_s S; then
 echo "═══ S. Partager l'accès d'un membre (famille JETABLE) ═══" | tee -a "$OUT/resultats.txt"
+export -f sql   # utilisée dans les contrôles « bash -c »
 FID=$(sql "SELECT id FROM families WHERE code='$FAMILY'")
 launch; $UI wait "Bienvenue" 25 >/dev/null
 check_or_stop() { local l=$1; shift; if "$@"; then ok "$l"; else ko "$l${T_ERR:+ — $T_ERR}"; fi; T_ERR=""; }
@@ -348,7 +351,7 @@ adb logcat -c
 $UI tap "Partager l'accès" --last >/dev/null; sleep 3
 expect "S4. sans WhatsApp : partage Android ouvert (rien n'est envoyé)" test "$(started 'android.intent.action.CHOOSER')" -ge 1
 shot final-s2-partage-android
-back_to_app
+expect "S4c. panneau de partage refermé sans rien envoyer, retour à l'application" back_to_app
 $UI tap "Copier les informations" >/dev/null; sleep 1
 expect "S4b. « Copier les informations »" $UI wait "Informations copiées" 5
 $UI tap "Fermer" --last >/dev/null; sleep 2
