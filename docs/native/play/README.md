@@ -20,3 +20,5 @@
 Clavier numérique pour les codes d'accès, partage de l'accès d'un membre (WhatsApp ou partage Android, nouveau code confirmé,
 code famille), bouton « Affichage » (présentation × organisation) mémorisé par profil. Parcours K, S, A sur Android 16 :
 voir `tests-api36/`.
+
+Parcours de validation : 6 groupes en parallèle (F,G,H · C,D · F,P,J · K,S · A · T), chacun sur sa recette jetable.
