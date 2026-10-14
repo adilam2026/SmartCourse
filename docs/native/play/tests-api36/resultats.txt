@@ -10,7 +10,7 @@ PASS  C4. code faux refusé avec un message clair
 PASS  C4b. code expiré : message clair, proposition d'un nouveau code
 PASS  C4c. nouveau code envoyé (2 e-mails au total)
 PASS  C5. famille créée et utilisateur connecté : code famille affiché
-PASS  C5b. code famille généré (Y7NC8M7S) affiché à l'écran
+PASS  C5b. code famille généré (Q2AGZFTQ) affiché à l'écran
 PASS  C5c. serveur : une seule famille créée (1 → 2)
 PASS  C5d. serveur : administrateur principal, adresse vérifiée, ville, identifiant (attendu « true true Casablanca Anfa karim », obtenu « true true Casablanca Anfa karim »)
 PASS  C6. Copier : confirmation visible dans le panneau
@@ -37,23 +37,28 @@ PASS  D3f. reconnexion refusée dans l'application
 PASS  D3g. sa demande reste dans la liste, attribuée à « Ancien profil »
 PASS  D3h. les autres membres et la famille sont intacts
 FAIL  D4. principal : suppression seule impossible, expliquée
-      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Y7NC8M7S"|"adil"|"Code d'accès"|"Afficher le code"|"Identifiants incorrects ou accès temporairement bloqué. Vérifiez le code famille, l'identifiant et le code d'accès."|"Se connecter"|"Besoin d'aide ?"|
+      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Q2AGZFTQ"|"adil"|"Code d'accès"|"Afficher le code"|"Identifiants incorrects ou accès temporairement bloqué. Vérifiez le code famille, l'identifiant et le code d'accès."|"Se connecter"|"Besoin d'aide ?"|
 FAIL  D4b. deux choix : transférer le rôle / supprimer toute la famille
-      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Y7NC8M7S"|"adil"|"Code d'accès"|"Afficher le code"|"Identifiants incorrects ou accès temporairement bloqué. Vérifiez le code famille, l'identifiant et le code d'accès."|"Se connecter"|"Besoin d'aide ?"|
+      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Q2AGZFTQ"|"adil"|"Code d'accès"|"Afficher le code"|"Identifiants incorrects ou accès temporairement bloqué. Vérifiez le code famille, l'identifiant et le code d'accès."|"Se connecter"|"Besoin d'aide ?"|
 FAIL  D4c. candidat proposé : l'autre administrateur actif
-      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Y7NC8M7S"|"adil"|"Code d'accès"|"Afficher le code"|"Identifiants incorrects ou accès temporairement bloqué. Vérifiez le code famille, l'identifiant et le code d'accès."|"Se connecter"|"Besoin d'aide ?"|
+      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Q2AGZFTQ"|"adil"|"Code d'accès"|"Afficher le code"|"Identifiants incorrects ou accès temporairement bloqué. Vérifiez le code famille, l'identifiant et le code d'accès."|"Se connecter"|"Besoin d'aide ?"|
 FAIL  D5. transfert confirmé à l'écran
-      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Y7NC8M7S"|"adil"|"Code d'accès"|"Afficher le code"|"Identifiants incorrects ou accès temporairement bloqué. Vérifiez le code famille, l'identifiant et le code d'accès."|"Se connecter"|"Besoin d'aide ?"|
+      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Q2AGZFTQ"|"adil"|"Code d'accès"|"Afficher le code"|"Identifiants incorrects ou accès temporairement bloqué. Vérifiez le code famille, l'identifiant et le code d'accès."|"Se connecter"|"Besoin d'aide ?"|
 FAIL  D5b. serveur : Driss est l'administrateur principal, adresse de l'ancien retirée
-      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Y7NC8M7S"|"adil"|"Code d'accès"|"Afficher le code"|"Identifiants incorrects ou accès temporairement bloqué. Vérifiez le code famille, l'identifiant et le code d'accès."|"Se connecter"|"Besoin d'aide ?"|
+      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Q2AGZFTQ"|"adil"|"Code d'accès"|"Afficher le code"|"Identifiants incorrects ou accès temporairement bloqué. Vérifiez le code famille, l'identifiant et le code d'accès."|"Se connecter"|"Besoin d'aide ?"|
 FAIL  D6. ancien principal : compte supprimé, retour à la connexion
-      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Y7NC8M7S"|"adil"|"Code d'accès"|"Afficher le code"|"Identifiants incorrects ou accès temporairement bloqué. Vérifiez le code famille, l'identifiant et le code d'accès."|"Se connecter"|"Besoin d'aide ?"|
+      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Q2AGZFTQ"|"adil"|"Code d'accès"|"Afficher le code"|"Identifiants incorrects ou accès temporairement bloqué. Vérifiez le code famille, l'identifiant et le code d'accès."|"Se connecter"|"Besoin d'aide ?"|
 FAIL  D6b. reconnexion refusée ; Driss et Lamiaa se connectent
-      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Y7NC8M7S"|"adil"|"Code d'accès"|"Afficher le code"|"Identifiants incorrects ou accès temporairement bloqué. Vérifiez le code famille, l'identifiant et le code d'accès."|"Se connecter"|"Besoin d'aide ?"|
+      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Q2AGZFTQ"|"adil"|"Code d'accès"|"Afficher le code"|"Identifiants incorrects ou accès temporairement bloqué. Vérifiez le code famille, l'identifiant et le code d'accès."|"Se connecter"|"Besoin d'aide ?"|
 PASS  D7. page web /suppression-compte servie (« Mes Courses »)
 PASS  D7b. page web : mauvais code refusé (401), rien ne change
 PASS  D7c. page web : suppression acceptée
 PASS  D7d. page web : profil anonymisé, reconnexion refusée
-(D8-D9 non joués : la famille de la section C n'existe pas dans ce lancement)
+PASS  D8. suppression de la famille : conséquences explicites
+PASS  D8b. bouton désactivé sans la case « Je comprends »
+PASS  D8c. confirmation explicite
+PASS  D9. famille supprimée : retour à la connexion avec message
+PASS  D9b. serveur : famille, profils, listes et demande de création effacés (demande avant : 1)
+PASS  D9c. reconnexion refusée ; l'autre famille reste
 ECHECS=7
 CRASH_APPLICATION=0
