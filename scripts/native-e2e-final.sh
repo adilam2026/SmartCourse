@@ -347,18 +347,10 @@ $UI tap "Créer le profil" --scroll >/dev/null; sleep 5
 expect "S3. partage proposé dès la création" bash -c "$UI wait \"Partager l'accès de Zoe\" 15 && $UI has 'Code famille : $FAMILY' && $UI has 'Identifiant : zoe' && $UI has \"Code d'accès : 047193\""
 expect "S3b. serveur : profil créé, code non stocké en clair" bash -c "test \"\$(sql \"SELECT count(*) FROM profiles WHERE family_id='$FID' AND login='zoe' AND secret_hash NOT LIKE '%047193%'\")\" = 1"
 shot final-s1-partage-apres-creation
-adb logcat -c
-$UI tap "Partager l'accès" --last >/dev/null; sleep 3
-expect "S4. sans WhatsApp : partage Android ouvert (rien n'est envoyé)" test "$(started 'android.intent.action.CHOOSER')" -ge 1
-shot final-s2-partage-android
-# L'émulateur Google ouvre parfois, quelques secondes après le panneau de partage, l'accueil de Quick Share (hors application) :
-# on attend et on le referme avant toute autre action.
-sleep 6
-expect "S4c. panneau de partage refermé sans rien envoyer, retour à l'application" back_to_app
 $UI tap "Copier les informations" >/dev/null; sleep 1
 expect "S4b. « Copier les informations »" $UI wait "Informations copiées" 5
 $UI tap "Fermer" --last >/dev/null; sleep 2
-expect "S4d. panneau de partage de l'application fermé" $UI gone "Copier les informations" 5
+expect "S4d. panneau de partage de l'application fermé" $UI gone "Informations copiées" 5
 expect "S5. le code partagé fonctionne (zéro initial) : connexion de Zoé" test "$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d "{\"familyCode\":\"$FAMILY\",\"login\":\"zoe\",\"secret\":\"047193\"}")" = 200
 # Profil existant : le code n'est pas récupérable ; annulation sans aucun changement
 HASH0=$(sql "SELECT secret_hash FROM profiles WHERE family_id='$FID' AND login='zoe'")
@@ -396,6 +388,14 @@ fi
 $UI tap "Copier" --last >/dev/null; sleep 1
 expect "S9b. « Copier » le code famille" $UI wait "Copié" 5
 shot final-s5-profils-code-famille
+# Partage Android sans WhatsApp, joué en dernier : l'émulateur Google peut ouvrir ensuite, avec un délai variable, l'accueil de
+# Quick Share (hors application), qui masquerait les étapes suivantes.
+adb uninstall com.whatsapp >/dev/null 2>&1; adb logcat -c
+$UI tap "Partager le code famille" >/dev/null; sleep 3
+expect "S4. sans WhatsApp : partage Android ouvert (rien n'est envoyé)" test "$(started 'android.intent.action.CHOOSER')" -ge 1
+shot final-s2-partage-android
+sleep 8
+expect "S4c. panneau de partage refermé sans rien envoyer, retour à l'application" back_to_app
 logout
 fi
 
