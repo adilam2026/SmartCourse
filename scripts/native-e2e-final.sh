@@ -276,6 +276,7 @@ adb shell settings put global auto_time 1 >/dev/null 2>&1; setclock "$(date -u +
 fi
 if want_s D; then
 echo "═══ D. Suppression de compte et de famille (familles JETABLES de la recette) ═══" | tee -a "$OUT/resultats.txt"
+export -f sql   # utilisée aussi dans les contrôles « bash -c »
 launch; $UI wait "Bienvenue" 25 >/dev/null
 FID=$(sql "SELECT id FROM families WHERE code='$FAMILY'")
 login_api adil 482913
@@ -301,7 +302,7 @@ $UI tap "Je comprends que la suppression" --scroll >/dev/null; sleep 1
 $UI tap "Supprimer mon compte" --last --scroll >/dev/null; sleep 2
 expect "D2c. confirmation demandée" $UI wait "Supprimer votre compte ?" 8
 $UI tap "Supprimer" --last >/dev/null; sleep 5
-expect "D3. retour à la connexion avec message de suppression" bash -c "$UI wait 'Votre compte a été supprimé' 20 && $UI has 'Bienvenue'"
+expect "D3. retour à la connexion avec message de suppression (essais refusés : $(sql "SELECT failed_attempts FROM profiles WHERE id='$DPERS'"))" bash -c "$UI wait 'Votre compte a été supprimé' 20 && $UI has 'Bienvenue'"
 shot final-d2-compte-supprime
 expect "D3b. serveur : profil anonymisé ($(sql "SELECT display_name||'|'||(deleted_at IS NOT NULL)::text||'|'||coalesce(city,'-')||'|'||active::text FROM profiles WHERE id='$DPERS'"))" \
   test "$(sql "SELECT display_name||'|'||(deleted_at IS NOT NULL)::text||'|'||coalesce(city,'-')||'|'||active::text FROM profiles WHERE id='$DPERS'")" = "Ancien profil|true|-|false"
