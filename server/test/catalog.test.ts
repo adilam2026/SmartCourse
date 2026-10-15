@@ -58,6 +58,7 @@ describe("catalogue initial", () => {
       Boissons: 2,
       Maison: 9,
       Hygiène: 6,
+      Autres: 0, // catégorie des produits créés sans catégorie (022)
     });
     expect(cats.flatMap((c) => c.products).length).toBe(80);
     expect(cats[0]!.products.map((p) => p.name).slice(0, 3)).toEqual(["Tomates", "Pommes de terre", "Oignons"]);

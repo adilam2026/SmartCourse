@@ -62,7 +62,7 @@ setInterval(() => void purgeSignups(), 6 * 3_600_000).unref();
 const external = config.BACKUP_MODE === "external";
 const backup = config.BACKUP_KEY || external ? createBackupStorage(config) : null;
 const assetLinks = existsSync("./assetlinks.json") ? JSON.parse(readFileSync("./assetlinks.json", "utf8")) : undefined;
-const app = await buildApp({ db, assetLinks, loginRateLimit: { max: config.LOGIN_RATE_MAX, timeWindow: "1 minute" }, store: photoStore, webDir: existsSync(config.WEB_DIR) ? config.WEB_DIR : undefined, backupStorage: external ? "s3" : backup?.kind ?? null, backupMode: config.BACKUP_MODE, brevoWebhookSecret: process.env.BREVO_WEBHOOK_SECRET, contactEmail: config.CONTACT_EMAIL });
+const app = await buildApp({ db, assetLinks, loginRateLimit: { max: config.LOGIN_RATE_MAX, timeWindow: "1 minute" }, store: photoStore, webDir: existsSync(config.WEB_DIR) ? config.WEB_DIR : undefined, backupStorage: external ? "s3" : backup?.kind ?? null, backupMode: config.BACKUP_MODE, brevoWebhookSecret: process.env.BREVO_WEBHOOK_SECRET, contactEmail: config.CONTACT_EMAIL, catalogManagers: (process.env.CATALOG_MANAGERS ?? "").split(/[\s,;]+/).filter((x) => /^[0-9a-f-]{36}$/i.test(x)) });
 await app.listen({ port: config.PORT, host: "0.0.0.0" });
 
 if (external) {

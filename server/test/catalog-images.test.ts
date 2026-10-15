@@ -74,7 +74,7 @@ async function seedOldCatalogue(keys: string[]) {
 describe("le pack de 80 visuels", () => {
   it("le manifeste du dépôt : 80 clés uniques, noms exacts, aucune marque, provenance « générée »", async () => {
     const all = JSON.parse(await readFile(MANIFEST, "utf8"));
-    expect(all.items.filter((i: any) => i.target === "extended")).toHaveLength(163); // pack du catalogue complémentaire
+    expect(all.items.filter((i: any) => i.target === "extended")).toHaveLength(166); // pack du catalogue complémentaire (+ 3 références de 022)
     const m = { ...all, items: all.items.filter((i: any) => i.target === "initial") };
     expect(m.items).toHaveLength(80);
     expect(new Set(m.items.map((i: any) => i.key)).size).toBe(80);
@@ -82,8 +82,12 @@ describe("le pack de 80 visuels", () => {
     expect(ref).toHaveLength(80);
     for (const it of m.items) {
       expect(ref.find((r) => r.key === it.key)?.name).toBe(it.name); // association exacte clé ↔ nom
-      expect(it.license).toBe("GENERATED");
-      expect(it.sourceName).toBe("Image générée avec ChatGPT");
+      // Semoule fine : visuel fourni par l'éditeur (022) ; toutes les autres images de départ sont générées.
+      if (it.key === "semoule-fine") expect([it.license, it.sourceName]).toEqual(["OWN", "Visuel fourni par l'éditeur de Mes Courses"]);
+      else {
+        expect(it.license).toBe("GENERATED");
+        expect(it.sourceName).toBe("Image générée avec ChatGPT");
+      }
       expect(it.brand).toBeUndefined();
       const bytes = await readFile(path.resolve("catalog-photos", it.file));
       expect(sha(bytes)).toBe(it.sha256);
@@ -125,13 +129,14 @@ describe("remplacement des anciennes images", () => {
   let freedExpected = 0;
   it("la synchronisation remplace les 80 références sans doublon ni changement d'identifiant", async () => {
     const r = await syncCatalogPhotos(db, store, MANIFEST);
-    expect(r.imported).toHaveLength(243); // 80 de départ + 163 du catalogue complémentaire
+    expect(r.imported).toHaveLength(246); // 80 de départ + 163 du catalogue complémentaire
     const ic = (await db.query("SELECT i.key, a.generated, a.source_sha256, a.license, a.source_name, a.author FROM initial_catalog i JOIN photo_assets a ON a.id = i.photo_asset_id")).rows;
     expect(ic).toHaveLength(80);
     const m = JSON.parse(await readFile(MANIFEST, "utf8"));
     for (const it of m.items.filter((x: any) => x.target === "initial")) {
       const row = ic.find((x) => x.key === it.key)!;
-      expect(row).toMatchObject({ generated: true, source_sha256: it.sha256, license: "GENERATED", source_name: "Image générée avec ChatGPT", author: null });
+      if (it.key === "semoule-fine") expect(row).toMatchObject({ generated: false, source_sha256: it.sha256, license: "OWN", author: null }); // visuel fourni (022)
+      else expect(row).toMatchObject({ generated: true, source_sha256: it.sha256, license: "GENERATED", source_name: "Image générée avec ChatGPT", author: null });
     }
     for (const fam of [A, B]) {
       const rows = (await db.query("SELECT id, name, catalog_key, photo_asset_id, brand FROM products WHERE family_id = $1", [fam.familyId])).rows;
@@ -185,7 +190,7 @@ describe("remplacement des anciennes images", () => {
     for (let i = 0; i < 3; i++) {
       const r = await syncCatalogPhotos(db, store, MANIFEST);
       expect(r.imported).toEqual([]);
-      expect(r.skipped).toHaveLength(243);
+      expect(r.skipped).toHaveLength(246);
       const p = await purgeOrphanAssets(db, store, { minAgeMinutes: 0 });
       expect(p.assets).toBe(0);
     }
@@ -451,7 +456,7 @@ describe("traitement de l'image et provenance", () => {
     const F = await newFamily();
     const res = (await app.inject({ method: "GET", url: "/api/credits", cookies: F.staff })).json();
     expect(res.generated).toMatchObject({ source: "Image générée avec ChatGPT" });
-    expect(res.generated.count).toBeGreaterThanOrEqual(80);
+    expect(res.generated.count).toBeGreaterThanOrEqual(79); // Semoule fine : visuel fourni, plus une image générée
     expect(res.credits.some((c: any) => c.license === "GENERATED")).toBe(false);
     expect(JSON.stringify(res)).not.toMatch(/Wikimedia|CC BY|CC0/); // cette famille n'a aucune archive avec une ancienne image
   });

@@ -49,6 +49,10 @@ const productView = (r: any, price: PriceView | null = null) => ({
   unit: r.unit as Unit,
   photoUrl: photoUrl(r.photo_asset_id),
   price,
+  // Produit créé par la famille (aucune référence commune) : il peut être proposé au catalogue commun.
+  own: r.catalog_key == null && r.extended_id == null,
+  // Mots de recherche de la référence commune (ex. « chocolat à tartiner » pour Nutella), sans accents.
+  keywords: (r.keywords as string | undefined) ?? "",
 });
 
 export function catalogRoutes(app: FastifyInstance, { db, store, guard, hub }: Deps): void {
@@ -68,7 +72,9 @@ export function catalogRoutes(app: FastifyInstance, { db, store, guard, hub }: D
     const [cats, prods] = await Promise.all([
       db.query("SELECT key, label FROM categories ORDER BY position"),
       db.query(
-        `SELECT * FROM products WHERE family_id = $1 ${withInactive ? "" : "AND active"} ORDER BY position, lower(name)`,
+        `SELECT p.*, coalesce(i.name || ' ' || i.aliases, e.search_text, '') AS keywords
+           FROM products p LEFT JOIN initial_catalog i ON i.key = p.catalog_key LEFT JOIN extended_catalog e ON e.id = p.extended_id
+          WHERE p.family_id = $1 ${withInactive ? "" : "AND p.active"} ORDER BY p.position, lower(p.name)`,
         [a.familyId],
       ),
     ]);

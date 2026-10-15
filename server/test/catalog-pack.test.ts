@@ -34,12 +34,12 @@ describe("pack d'images du catalogue complémentaire", () => {
     await db.query("INSERT INTO products (family_id, category, name, photo_asset_id, position) VALUES ($1,'fruits','Pêches',$2,92)", [fam, pId]);
     await db.query("UPDATE extended_catalog SET photo_asset_id = NULL"); // état d'avant le pack
     const r = await syncCatalogPhotos(db, store, MANIFEST);
-    expect(r.imported).toHaveLength(163);
+    expect(r.imported).toHaveLength(166); // + Farine fino, Farine force, Pâte à tartiner Nutella (022)
     expect(r.imported.every((x) => x.startsWith("extended:"))).toBe(true);
     // chaque entrée visible du catalogue complémentaire a sa photo ; « Salade verte » (absorbée) n'en a pas besoin
     const missing = (await db.query("SELECT key FROM extended_catalog WHERE photo_asset_id IS NULL AND merged_into IS NULL")).rows;
     expect(missing).toEqual([]);
-    expect((await db.query("SELECT count(DISTINCT photo_asset_id)::int AS n FROM extended_catalog WHERE photo_asset_id IS NOT NULL")).rows[0].n).toBe(163);
+    expect((await db.query("SELECT count(DISTINCT photo_asset_id)::int AS n FROM extended_catalog WHERE photo_asset_id IS NOT NULL")).rows[0].n).toBe(166);
     // les 80 de départ n'ont pas bougé
     expect((await db.query("SELECT key, photo_asset_id FROM initial_catalog ORDER BY key")).rows).toEqual(initialBefore);
     // Papier cuisson : l'éponge commune est remplacée par la bonne photo ; les photos personnelles sont intactes
@@ -54,6 +54,6 @@ describe("pack d'images du catalogue complémentaire", () => {
     // idempotent
     const again = await syncCatalogPhotos(db, store, MANIFEST);
     expect(again.imported).toEqual([]);
-    expect(again.skipped).toHaveLength(243);
+    expect(again.skipped).toHaveLength(246);
   });
 });
