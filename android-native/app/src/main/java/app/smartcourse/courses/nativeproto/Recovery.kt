@@ -214,7 +214,7 @@ fun CreateFamilyForm(session: Session) {
     Spacer(Modifier.height(10.dp))
     FormField(login, { login = it.trim().lowercase().filter { ch -> ch.isLetterOrDigit() || ch in "._-" }.take(30) }, "Votre identifiant", leading = Icons.Rounded.Person)
     Spacer(Modifier.height(10.dp))
-    SecondaryButton("Ville : ${city ?: "à choisir"}", { citySheet = true }, Modifier.fillMaxWidth(), height = 54.dp)
+    SecondaryButton(if (city == null) "Ville : à choisir (obligatoire)" else "Ville : $city", { citySheet = true }, Modifier.fillMaxWidth(), height = 54.dp)
     Spacer(Modifier.height(10.dp))
     FormField(email, { email = it.trim() }, "E-mail de récupération", leading = Icons.Rounded.Email, keyboard = KeyboardOptions(keyboardType = KeyboardType.Email))
     Spacer(Modifier.height(10.dp))
@@ -223,8 +223,19 @@ fun CreateFamilyForm(session: Session) {
     CodeField(code2, { code2 = it }, "Confirmez le code d'accès")
     error?.let { Spacer(Modifier.height(8.dp)); Text(it, color = C.Danger, style = MaterialTheme.typography.bodyMedium) }
     Spacer(Modifier.height(16.dp))
-    val ready = famName.isNotBlank() && name.isNotBlank() && login.length >= 2 && city != null && email.contains("@") && code.length == 6 && code2.length == 6
+    // Le bouton n'est jamais grisé sans explication : un appui dit précisément ce qui manque (ex. la ville, souvent oubliée).
+    val missing = buildList {
+        if (famName.isBlank()) add("le nom de la famille")
+        if (name.isBlank()) add("votre prénom")
+        if (login.length < 2) add("votre identifiant (2 caractères au moins)")
+        if (city == null) add("votre ville")
+        if (!email.contains("@") || !email.substringAfter("@").contains(".")) add("une adresse e-mail valide")
+        if (code.length != 6) add("un code d'accès de 6 chiffres")
+        if (code2.length != 6) add("la confirmation du code d'accès")
+    }
+    if (missing.isNotEmpty()) Text("Il manque : ${missing.joinToString(", ")}.", style = MaterialTheme.typography.bodySmall, color = C.Muted, modifier = Modifier.padding(bottom = 8.dp))
     PrimaryButton(if (busy) "Envoi du code…" else "Recevoir le code par e-mail", {
+        if (missing.isNotEmpty()) { error = "Pour continuer, renseignez ${missing.joinToString(", ")}."; if (city == null) citySheet = true; return@PrimaryButton }
         if (code != code2) { error = "Les deux codes d'accès ne sont pas identiques."; return@PrimaryButton }
         busy = true; error = null
         scope.launch {
@@ -243,6 +254,6 @@ fun CreateFamilyForm(session: Session) {
             }
             busy = false
         }
-    }, Modifier.fillMaxWidth(), enabled = ready && !busy)
-    if (citySheet) CityPickerSheet(city, { city = it; citySheet = false }, { citySheet = false })
+    }, Modifier.fillMaxWidth(), enabled = !busy)
+    if (citySheet) CityPickerSheet(city, { city = it; citySheet = false; error = null }, { citySheet = false })
 }

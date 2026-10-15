@@ -441,6 +441,26 @@ expect "A9. préférence gardée après déconnexion / reconnexion" test "$(show
 logout
 fi
 
+if want_s V; then
+echo "═══ V. Créer ma famille : le bouton dit ce qui manque (ville oubliée) — contrôle rapide ═══" | tee -a "$OUT/resultats.txt"
+launch; $UI wait "Bienvenue" 25 >/dev/null
+$UI tap "Première connexion" >/dev/null; sleep 1; $UI tap "Créer ma famille" >/dev/null; sleep 2
+fill "Nom de la famille" "Famille Test" --scroll; hide_kb
+fill "Votre prénom" "Test" --scroll; hide_kb
+fill "Votre identifiant" "testv" --scroll; hide_kb
+fill "E-mail de récupération" "v.$(date +%s)@example.org" --scroll; hide_kb
+fill "Code d'accès (6" 274915 --scroll; hide_kb
+fill "Confirmez le code" 274915 --scroll; hide_kb
+expect "V1. ville non choisie : « Il manque : votre ville » affiché" $UI has "Il manque : votre ville"
+expect "V2. bouton actif (jamais grisé sans explication)" $UI enabled "Recevoir le code par e-mail"
+$UI tap "Recevoir le code par e-mail" --scroll >/dev/null; sleep 2
+expect "V3. appui : choix de la ville ouvert, rien n'est envoyé" bash -c "$UI wait 'Rechercher une ville' 6 && test \"\$(docker exec sc-recette-pg psql -U smart -d smartcourse -tAc \"SELECT count(*) FROM family_signups WHERE login='testv'\")\" = 0"
+shot final-v1-ville-manquante
+fill "Rechercher une ville" "rabat"; hide_kb; $UI tap "Rabat" --last >/dev/null; sleep 2
+expect "V4. ville choisie : plus rien ne manque" bash -c "$UI has 'Ville : Rabat' && ! $UI has 'Il manque'"
+shot final-v2-formulaire-complet
+fi
+
 if want_s R; then
 echo "═══ R. Recommander puis « Ajouter des articles » : sélection reprise, sans doublon — contrôle rapide ═══" | tee -a "$OUT/resultats.txt"
 login_api adil 482913
