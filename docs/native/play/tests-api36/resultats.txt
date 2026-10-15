@@ -1,21 +1,13 @@
-═══ N. Produit introuvable : actif, masqué, disponible, réellement absent, catalogue inaccessible — contrôle rapide ═══
-PASS  N1. six références avec leur visuel fourni (6/6)
-PASS  N2. personnel connecté
-PASS  N3. personnel : produit masqué introuvable, renvoi vers un administrateur, aucune création
-PASS  N4. administrateur : plus de bouton de création directe, « Rechercher dans le catalogue complet »
-PASS  N5. catalogue ouvert avec la recherche transmise ; masqué → « Réactiver »
-PASS  N6. autre onglet : vérifié dans tout le catalogue, « Masqué » + « Réactiver », aucune création
-PASS  N7. réactivé puis choisi, retour à la sélection
-PASS  N8. disponible mais absent : « Ajouter » depuis la référence existante
-PASS  N9. ajouté depuis la référence (avec sa photo) et choisi
-PASS  N10. actif : trouvé directement dans la sélection
-PASS  N11. actif vu depuis l'onglet « À ajouter » : « Déjà dans mon catalogue », aucune création
-PASS  N12. réellement absent : « Créer un nouveau produit »
-PASS  N13. formulaire prérempli
-PASS  N14. créé pour cette famille seulement, proposition possible
-PASS  N15. hors connexion : explication + Réessayer, aucune création
-PASS  N16. après reconnexion : vérification aboutie
-PASS  N17. /gestion : page servie, données protégées
+═══ R. Recommander puis « Ajouter des articles » : sélection reprise, sans doublon — contrôle rapide ═══
+PASS  R1. recommandée dans la liste en cours (Oignons:1.000:to_buy,Tomates:3.000:to_buy)
+PASS  R2. catégorie : badge des 2 articles déjà dans la liste
+PASS  R3. Tomates cochée avec sa quantité actuelle (3 kg), rien à terminer
+PASS  R4. aller-retour sans modification : liste strictement inchangée
+PASS  R5. un seul changement à confirmer
+PASS  R6. confirmé sans doublon ni cumul (Carottes:1.000:to_buy,Oignons:1.000:to_buy,Tomates:3.000:to_buy)
+PASS  R7. commande d'origine intacte
+PASS  R8. liste non vide : choix explicite Ajouter / Remplacer (aucune fusion silencieuse)
+PASS  R9. annulé : liste inchangée
 ECHECS=0
 CRASH_APPLICATION=0
 TOTAL_ECHECS=0
