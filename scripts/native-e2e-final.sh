@@ -442,42 +442,64 @@ logout
 fi
 
 if want_s N; then
-echo "═══ N. Catalogue (six références) et produit créé par la famille — contrôle rapide ═══" | tee -a "$OUT/resultats.txt"
+echo "═══ N. Produit introuvable : actif, masqué, disponible, réellement absent, catalogue inaccessible — contrôle rapide ═══" | tee -a "$OUT/resultats.txt"
 REFS="SELECT count(*) FROM (SELECT c.photo_asset_id FROM extended_catalog c WHERE c.key IN ('farine-fino','farine-force','pate-a-tartiner-nutella','couscous','farine-complete') UNION ALL SELECT photo_asset_id FROM initial_catalog WHERE key='semoule-fine') r JOIN photo_assets a ON a.id=r.photo_asset_id WHERE a.source_name='Visuel fourni par l''éditeur de Mes Courses'"
 expect "N1. six références avec leur visuel fourni ($(sql "$REFS")/6)" test "$(sql "$REFS")" = 6
-expect "N1b. noms et unités (kilo / pot)" test "$(sql "SELECT string_agg(name||':'||unit, ',' ORDER BY name) FROM extended_catalog WHERE key IN ('farine-fino','farine-force','pate-a-tartiner-nutella','couscous','farine-complete')")" = "Farine complète:kg,Farine fino:kg,Farine force:kg,Pâte à tartiner Nutella:pot,Semoule couscous:kg"
+login_api adil 482913
+BEURRE=$(sql "SELECT p.id FROM products p JOIN families f ON f.id=p.family_id WHERE f.code='$FAMILY' AND p.name='Beurre'")
+api PATCH "/api/products/$BEURRE" -d '{"active":false}' >/dev/null   # produit MASQUÉ par un administrateur
+api GET /api/lists/active >/dev/null; LID=$(jq -r '.list.id // empty' /tmp/api.out); [ -n "$LID" ] && api POST "/api/lists/$LID/close" -d '{}' >/dev/null
+search() { fill "Rechercher un produit" "$1"; hide_kb; sleep 3; }
+# --- Personnel : jamais de création ni de contournement du masquage
 launch; $UI wait "Bienvenue" 25 >/dev/null
 expect "N2. personnel connecté" tf_login "$FAMILY" marie 573918
 $UI wait "Affichage" 20 >/dev/null
-expect "N3. recherche ouverte au personnel" $UI has "Rechercher un produit"
-fill "Rechercher un produit" "nutella"; hide_kb; sleep 3
-expect "N4. « Nutella » trouve la référence commune" $UI wait "Pâte à tartiner Nutella" 10
-shot final-n1-recherche-nutella
-$UI tap "Pâte à tartiner Nutella" >/dev/null; sleep 4
-NUT=$(sql "SELECT count(*) FROM products p JOIN families f ON f.id=p.family_id WHERE f.code='$FAMILY' AND p.name='Pâte à tartiner Nutella' AND p.photo_asset_id IS NOT NULL AND p.extended_id IS NOT NULL")
-expect "N5. ajoutée à la sélection (avec sa photo de référence : $NUT)" bash -c "$UI has 'Terminer ma sélection (1)' && test '$NUT' = 1"
-fill "Rechercher un produit" "Bsissa"; hide_kb; sleep 3
-expect "N6. recherche sans résultat : « Ajouter « Bsissa » »" bash -c "$UI has 'Aucun article ne correspond' && $UI has 'Bsissa'"
-shot final-n2-recherche-sans-resultat
-$UI tap "Ajouter un produit" >/dev/null; sleep 2
-expect "N7. formulaire : nom prérempli, catégorie Autres" bash -c "$UI wait 'Nouveau produit' 8 && $UI has 'Bsissa' && $UI has 'Autres'"
-shot final-n3-formulaire
+search beurre
+expect "N3. personnel : produit masqué introuvable, renvoi vers un administrateur, aucune création" bash -c "$UI has 'Un administrateur peut' && ! $UI has 'Rechercher dans le catalogue complet' && ! $UI has 'Créer' && ! $UI has 'Beurre'"
+shot final-n1-personnel-introuvable
+logout
+# --- Administrateur : « Ajouter des articles » → catalogue complet avec la recherche transmise
+signin "$FAMILY" adil 482913; $UI wait "Compte" 25 >/dev/null
+tapt "Créer une liste"; $UI wait "Rechercher un produit" 15 >/dev/null
+search beurre
+expect "N4. administrateur : plus de bouton de création directe, « Rechercher dans le catalogue complet »" bash -c "$UI has 'Rechercher dans le catalogue complet' && ! $UI has 'Ajouter « beurre »'"
+tapt "Rechercher dans le catalogue complet"; sleep 3
+expect "N5. catalogue ouvert avec la recherche transmise ; masqué → « Réactiver »" bash -c "$UI wait 'Catalogue' 10 && $UI has 'beurre' && $UI has 'Beurre' && $UI has 'Réactiver'"
+$UI tap "Dans mon catalogue" >/dev/null; sleep 4
+expect "N6. autre onglet : vérifié dans tout le catalogue, « Masqué » + « Réactiver », aucune création" bash -c "$UI has 'Trouvé dans tout le catalogue' && $UI has 'Masqué' && $UI has 'Réactiver' && ! $UI has 'Créer un nouveau produit'"
+shot final-n2-masque-autre-onglet
+$UI tap "Réactiver" >/dev/null; sleep 5
+expect "N7. réactivé puis choisi, retour à la sélection" bash -c "$UI has 'Terminer ma sélection (1)' && test \"\$(docker exec sc-recette-pg psql -U smart -d smartcourse -tAc \"SELECT active FROM products WHERE id='$BEURRE'\")\" = t"
+search nutella; tapt "Rechercher dans le catalogue complet"; sleep 3
+$UI tap "Dans mon catalogue" >/dev/null; sleep 4
+expect "N8. disponible mais absent : « Ajouter » depuis la référence existante" bash -c "$UI has 'Pâte à tartiner Nutella' && $UI has 'Disponible' && $UI has 'Ajouter' && ! $UI has 'Créer un nouveau produit'"
+shot final-n3-disponible
+$UI tap "Ajouter" --last >/dev/null; sleep 5
+NUT=$(sql "SELECT count(*) FROM products p JOIN families f ON f.id=p.family_id WHERE f.code='$FAMILY' AND p.name='Pâte à tartiner Nutella' AND p.extended_id IS NOT NULL AND p.photo_asset_id IS NOT NULL")
+expect "N9. ajouté depuis la référence (avec sa photo) et choisi" bash -c "$UI has 'Terminer ma sélection (2)' && test '$NUT' = 1"
+search tomate; sleep 1
+expect "N10. actif : trouvé directement dans la sélection" bash -c "$UI has 'Tomates' && ! $UI has 'Rechercher dans le catalogue complet'"
+search zzzz; tapt "Rechercher dans le catalogue complet"; sleep 2
+fill "Rechercher un produit" "tomates"; hide_kb; $UI tap "À ajouter" >/dev/null; sleep 4
+expect "N11. actif vu depuis l'onglet « À ajouter » : « Déjà dans mon catalogue », aucune création" bash -c "$UI has 'Déjà dans mon catalogue' && ! $UI has 'Créer un nouveau produit'"
+$UI tap "Tous" >/dev/null; sleep 2
+fill "Rechercher un produit" "Bsissa"; hide_kb; sleep 4
+expect "N12. réellement absent : « Créer un nouveau produit »" bash -c "$UI has 'Aucune référence ne correspond' && $UI has 'Créer un nouveau produit'"
+shot final-n4-absent
+tapt "Créer un nouveau produit"
+expect "N13. formulaire prérempli" bash -c "$UI wait 'Nouveau produit' 8 && $UI has 'Bsissa' && $UI has 'Autres'"
 $UI tap "Créer et ajouter à ma sélection" >/dev/null; sleep 5
-expect "N8. créé et choisi tout de suite" bash -c "$UI has 'créé et ajouté' && $UI has 'Terminer ma sélection (2)'"
-shot final-n4-produit-cree
-expect "N9. produit de cette famille seulement (Autres, sans photo)" test "$(sql "SELECT string_agg(f.code||':'||p.category||':'||coalesce(p.photo_asset_id::text,'aucune'), ',') FROM products p JOIN families f ON f.id=p.family_id WHERE p.name='Bsissa'")" = "$FAMILY:autres:aucune"
-$UI tap "Proposer" >/dev/null; sleep 2
-expect "N10. proposition facultative" $UI wait "Proposer au catalogue commun" 8
-shot final-n5-proposition
-$UI tap "Envoyer la proposition" >/dev/null; sleep 4
-expect "N10b. proposition reçue (en attente, rien de publié)" test "$(sql "SELECT count(*) FROM catalog_proposals WHERE name='Bsissa' AND status='pending'"):$(sql "SELECT count(*) FROM extended_catalog WHERE name='Bsissa'")" = "1:0"
-expect "N11. /gestion : page servie, données protégées sans connexion" test "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/gestion"):$(curl -s -o /dev/null -w '%{http_code}' "$BASE/api/gestion/proposals")" = "200:401"
-login_api adil 482913
-expect "N12. /gestion refusé à un administrateur de famille" test "$(api GET /api/gestion/proposals)" = 403
-sql "INSERT INTO catalog_managers (profile_id) SELECT p.id FROM profiles p JOIN families f ON f.id=p.family_id WHERE f.code='$FAMILY' AND p.login='adil' ON CONFLICT DO NOTHING" >/dev/null
-GC=$(api GET /api/gestion/proposals)
-expect "N13. gestionnaire inscrit : la proposition arrive, sans la famille ($GC)" bash -c "test '$GC' = 200 && jq -e '.proposals[] | select(.name==\"Bsissa\")' /tmp/api.out >/dev/null && ! grep -q '$FAMILY' /tmp/api.out"
-sql "DELETE FROM catalog_managers" >/dev/null
+expect "N14. créé pour cette famille seulement, proposition possible" bash -c "$UI has 'créé et ajouté' && $UI has 'Proposer' && test \"\$(docker exec sc-recette-pg psql -U smart -d smartcourse -tAc \"SELECT string_agg(f.code||':'||p.category, ',') FROM products p JOIN families f ON f.id=p.family_id WHERE p.name='Bsissa'\")\" = '$FAMILY:autres'"
+shot final-n5-cree
+# Catalogue inaccessible : jamais « inexistant », aucune création
+adb shell cmd connectivity airplane-mode enable; sleep 4
+fill "Rechercher un produit" "Harissa"; hide_kb; sleep 6
+expect "N15. hors connexion : explication + Réessayer, aucune création" bash -c "$UI has 'Impossible de vérifier le catalogue complet' && $UI has 'Réessayer' && ! $UI has 'Créer un nouveau produit'"
+shot final-n6-hors-connexion
+adb shell cmd connectivity airplane-mode disable; sleep 8
+$UI tap "Réessayer" >/dev/null; sleep 5
+expect "N16. après reconnexion : vérification aboutie" bash -c "$UI has 'Créer un nouveau produit' || $UI has 'Trouvé dans tout le catalogue'"
+expect "N17. /gestion : page servie, données protégées" test "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/gestion"):$(curl -s -o /dev/null -w '%{http_code}' "$BASE/api/gestion/proposals")" = "200:401"
 logout
 fi
 

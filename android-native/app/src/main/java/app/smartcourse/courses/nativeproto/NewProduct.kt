@@ -85,7 +85,7 @@ fun SuggestionRow(s: Suggestion, canUse: Boolean, onUse: () -> Unit) {
  * unité proposée selon la catégorie, références proches rappelées avant création. Un seul envoi à la fois ; en cas d'erreur, la saisie reste.
  */
 @Composable
-fun NewProductSheet(initialName: String, onDismiss: () -> Unit, onCreated: (String) -> Unit) {
+fun NewProductSheet(initialName: String, onDismiss: () -> Unit, onCreated: (String) -> Unit, addToSelection: Boolean = true) {
     val demo = LocalDemo.current
     val data = demo.data
     val scope = rememberCoroutineScope()
@@ -106,7 +106,7 @@ fun NewProductSheet(initialName: String, onDismiss: () -> Unit, onCreated: (Stri
     }
     fun finish(id: String?, err: String?) {
         busy = false
-        if (id != null) { demo.byId[id]?.let { p -> if (demo.selQty(id) == null) demo.setSel(id, defaultQty(p)) }; onCreated(id) } else error = err
+        if (id != null) { if (addToSelection) demo.byId[id]?.let { p -> if (demo.selQty(id) == null) demo.setSel(id, defaultQty(p)) }; onCreated(id) } else error = err
     }
     AppSheet(onDismiss) {
         Text("Nouveau produit", style = MaterialTheme.typography.titleLarge)
@@ -138,7 +138,7 @@ fun NewProductSheet(initialName: String, onDismiss: () -> Unit, onCreated: (Stri
                     Text("Déjà dans le catalogue ?", style = MaterialTheme.typography.titleSmall)
                 }
                 if (same != null) ChoosePlainRow(same.name, "Dans votre catalogue") {
-                    if (demo.selQty(same.id) == null) demo.setSel(same.id, defaultQty(same)); onDismiss()
+                    if (addToSelection && demo.selQty(same.id) == null) demo.setSel(same.id, defaultQty(same)); onDismiss()
                 }
                 refs.forEach { s ->
                     val canUse = s.status == "absent" || isAdmin
@@ -152,7 +152,7 @@ fun NewProductSheet(initialName: String, onDismiss: () -> Unit, onCreated: (Stri
         }
         error?.let { Spacer(Modifier.height(8.dp)); Text(it, color = C.Danger, style = MaterialTheme.typography.bodyMedium) }
         Spacer(Modifier.height(14.dp))
-        PrimaryButton(if (busy) "Création…" else "Créer et ajouter à ma sélection", {
+        PrimaryButton(if (busy) "Création…" else if (addToSelection) "Créer et ajouter à ma sélection" else "Créer le produit", {
             if (busy) return@PrimaryButton
             if (data == null) { demo.say("Création de produit : disponible avec votre famille connectée."); return@PrimaryButton }
             busy = true; error = null
@@ -176,12 +176,12 @@ private fun ChoosePlainRow(title: String, sub: String, onChoose: () -> Unit) {
 
 /** Bandeau après création : produit ajouté, et proposition facultative au catalogue commun. */
 @Composable
-fun CreatedBanner(name: String, onPropose: () -> Unit, onClose: () -> Unit, modifier: Modifier = Modifier) {
+fun CreatedBanner(name: String, onPropose: () -> Unit, onClose: () -> Unit, modifier: Modifier = Modifier, inSelection: Boolean = true) {
     Row(
         modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(C.Navy).padding(start = 14.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("« $name » créé et ajouté à votre sélection.", color = Color.White, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f).padding(vertical = 8.dp))
+        Text(if (inSelection) "« $name » créé et ajouté à votre sélection." else "« $name » créé dans votre catalogue.", color = Color.White, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f).padding(vertical = 8.dp))
         TextButton(onPropose) { Text("Proposer", color = Color(0xFF7FE3DD), fontWeight = FontWeight.Bold) }
         Box(Modifier.size(44.dp).clickable(onClick = onClose), contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Close, "Fermer", tint = Color.White) }
     }
@@ -227,5 +227,17 @@ fun ProposeSheet(p: Product, onDismiss: () -> Unit) {
         }, Modifier.fillMaxWidth(), enabled = !busy, leading = Icons.Rounded.Send)
         Spacer(Modifier.height(8.dp))
         SecondaryButton("Plus tard", onDismiss, Modifier.fillMaxWidth())
+    }
+}
+
+/** Encadré d'information neutre. */
+@Composable
+fun NoteCard(text: String) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color.White).border(BorderStroke(1.dp, C.Line), RoundedCornerShape(14.dp)).padding(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Icon(Icons.Rounded.Info, null, tint = C.TealDark, modifier = Modifier.size(20.dp))
+        Text(text, style = MaterialTheme.typography.bodyMedium)
     }
 }

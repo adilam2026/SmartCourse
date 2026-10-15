@@ -159,6 +159,9 @@ class Demo(initialRole: Role? = null, val live: Boolean = false) {
     var selOrg by mutableStateOf(SelOrg.CATEGORY)
     var toast by mutableStateOf<Toast?>(null)
     var pendingSheet: String? = null
+    /** Recherche transmise de « Ajouter des articles » vers le catalogue complet (et retour attendu vers la sélection). */
+    var catalogQuery: String? = null
+    var catalogFromSelection = false
 
     val inCatalog = mutableStateMapOf<String, Boolean>().apply { products.forEach { put(it.id, it.inCatalog) } }
     val prices = mutableStateMapOf<String, Int>().apply { products.forEach { p -> p.basePrice?.let { put(p.id, it) } } }
