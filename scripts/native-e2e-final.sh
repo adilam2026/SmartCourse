@@ -454,7 +454,8 @@ fill "Rechercher un produit" "nutella"; hide_kb; sleep 3
 expect "N4. « Nutella » trouve la référence commune" $UI wait "Pâte à tartiner Nutella" 10
 shot final-n1-recherche-nutella
 $UI tap "Pâte à tartiner Nutella" >/dev/null; sleep 4
-expect "N5. ajoutée à la sélection (avec sa photo de référence)" bash -c "$UI has 'Terminer ma sélection (1)' && test \"\$(sql \"SELECT count(*) FROM products p JOIN families f ON f.id=p.family_id WHERE f.code='$FAMILY' AND p.name='Pâte à tartiner Nutella' AND p.photo_asset_id IS NOT NULL AND p.extended_id IS NOT NULL\")\" = 1"
+NUT=$(sql "SELECT count(*) FROM products p JOIN families f ON f.id=p.family_id WHERE f.code='$FAMILY' AND p.name='Pâte à tartiner Nutella' AND p.photo_asset_id IS NOT NULL AND p.extended_id IS NOT NULL")
+expect "N5. ajoutée à la sélection (avec sa photo de référence : $NUT)" bash -c "$UI has 'Terminer ma sélection (1)' && test '$NUT' = 1"
 fill "Rechercher un produit" "Bsissa"; hide_kb; sleep 3
 expect "N6. recherche sans résultat : « Ajouter « Bsissa » »" bash -c "$UI has 'Aucun article ne correspond' && $UI has 'Bsissa'"
 shot final-n2-recherche-sans-resultat
@@ -474,7 +475,8 @@ expect "N11. /gestion : page servie, données protégées sans connexion" test "
 login_api adil 482913
 expect "N12. /gestion refusé à un administrateur de famille" test "$(api GET /api/gestion/proposals)" = 403
 sql "INSERT INTO catalog_managers (profile_id) SELECT p.id FROM profiles p JOIN families f ON f.id=p.family_id WHERE f.code='$FAMILY' AND p.login='adil' ON CONFLICT DO NOTHING" >/dev/null
-expect "N13. gestionnaire inscrit : la proposition arrive, sans la famille" bash -c "test \"\$(api GET /api/gestion/proposals)\" = 200 && jq -e '.proposals[] | select(.name==\"Bsissa\")' /tmp/api.out >/dev/null && ! grep -q '$FAMILY' /tmp/api.out"
+GC=$(api GET /api/gestion/proposals)
+expect "N13. gestionnaire inscrit : la proposition arrive, sans la famille ($GC)" bash -c "test '$GC' = 200 && jq -e '.proposals[] | select(.name==\"Bsissa\")' /tmp/api.out >/dev/null && ! grep -q '$FAMILY' /tmp/api.out"
 sql "DELETE FROM catalog_managers" >/dev/null
 logout
 fi
