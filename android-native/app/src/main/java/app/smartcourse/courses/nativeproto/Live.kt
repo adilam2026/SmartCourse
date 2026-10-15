@@ -381,7 +381,7 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
      * Personnel : enregistre les modifications de « Choisir mes articles » SANS quitter l'écran. La quantité choisie remplace la quantité
      * enregistrée (pas de cumul, pas de doublon) ; 0 = retirer. Hors connexion : file « Envoi en attente ». Refus : la sélection est rendue.
      */
-    fun submitStaffSelection() {
+    fun submitStaffSelection(after: (() -> Unit)? = null) {
         val entries = demo.selection.toMap()
         val lines = engine.effective()
         val ops = entries.mapNotNull { (pid, q) ->
@@ -397,10 +397,11 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
                 else -> engine.op("set_qty", productId = pid, quantity = sq, baseRev = if (cur.itemId != null) cur.rev else 1, name = p.name, unit = p.serverUnit)
             }
         }
-        if (ops.isEmpty()) { demo.selection.clear(); render(); return }
+        if (ops.isEmpty()) { demo.selection.clear(); render(); after?.invoke(); return }
         engine.enqueue(ops)
         demo.selection.clear()
         render()
+        after?.invoke()
         scope.launch {
             val rep = engine.flush()
             if (!rep.networkDown) engine.refresh()
@@ -412,7 +413,7 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
                     entries.forEach { (pid, q) -> val now = demo.savedQty(pid); if (if (q <= 0) now != null else now != q) demo.selection[pid] = q }
                     demo.say("Sélection non enregistrée : ${rep.messages.joinToString(" ")} Réessayez.")
                 }
-                else -> demo.say("Sélection enregistrée")
+                else -> demo.say(if (me.role == "staff") "Sélection enregistrée" else "Liste mise à jour.")
             }
             syncDraft()
         }
@@ -442,6 +443,45 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
             if (rep.networkDown) demo.say("Envoi en attente : $before modification${if (before > 1) "s" else ""} partiront au retour du réseau.")
             else if (rep.messages.isNotEmpty()) demo.say(rep.messages.joinToString(" "))
             else demo.say(if (me.role == "staff") "Demande envoyée." else "Articles ajoutés à la liste.")
+            if (!rep.networkDown) engine.refresh()
+            render(); syncDraft()
+        }
+    }
+
+    /**
+     * « Recommander » vers une liste en cours qui contient déjà des articles (règle prévue : Ajouter à la liste actuelle / Remplacer son
+     * contenu). Ajouter : pas de doublon, quantités additionnées seulement pour une même unité. Remplacer : les articles non achetés prennent
+     * les quantités de la commande, ceux qui n'y sont pas sont retirés. Les articles déjà achetés et la commande d'origine ne changent jamais.
+     */
+    fun reorderInto(entries: Map<String, Int>, replace: Boolean, after: () -> Unit = {}) {
+        val lines = engine.effective()
+        var otherUnit = 0
+        val ops = ArrayList<app.smartcourse.courses.nativeproto.net.Op>()
+        entries.forEach { (pid, q) ->
+            val p = demo.byId[pid] ?: return@forEach
+            if (!p.inCatalog) return@forEach
+            val sq = toServer(p.serverUnit, q).coerceIn(0.001, 999.0)
+            val cur = lines.firstOrNull { it.productId == pid }
+            when {
+                cur == null -> ops += engine.op("add", productId = pid, quantity = sq, name = p.name, unit = p.serverUnit, category = p.category, photoUrl = p.photoUrl)
+                cur.bought -> ops += engine.op("request_again", productId = pid, quantity = sq, name = p.name, unit = p.serverUnit, category = p.category, photoUrl = p.photoUrl)
+                replace -> if (cur.quantity != sq) ops += engine.op("set_qty", productId = pid, quantity = sq, baseRev = if (cur.itemId != null) cur.rev else 1, name = p.name, unit = p.serverUnit)
+                cur.unit != p.serverUnit -> otherUnit++
+                else -> ops += engine.op("set_qty", productId = pid, quantity = (cur.quantity + sq).coerceAtMost(999.0), baseRev = if (cur.itemId != null) cur.rev else 1, name = p.name, unit = p.serverUnit)
+            }
+        }
+        if (replace) lines.filter { !it.bought && it.productId !in entries }.forEach { l ->
+            ops += engine.op("remove", productId = l.productId, baseRev = if (l.itemId != null) l.rev else 1, name = l.name)
+        }
+        if (ops.isEmpty()) { demo.say("La liste en cours contient déjà ces articles."); after(); return }
+        engine.enqueue(ops)
+        render(); after()
+        scope.launch {
+            val rep = engine.flush()
+            if (rep.networkDown) demo.say("Envoi en attente : la commande sera reprise au retour du réseau.")
+            else if (rep.messages.isNotEmpty()) demo.say(rep.messages.joinToString(" "))
+            else demo.say((if (replace) "Liste remplacée par la commande." else "Commande ajoutée à la liste en cours.") +
+                if (otherUnit > 0) " $otherUnit article(s) déjà présent(s) dans une autre unité n'ont pas été modifiés." else "")
             if (!rep.networkDown) engine.refresh()
             render(); syncDraft()
         }

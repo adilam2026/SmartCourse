@@ -145,7 +145,7 @@ fun SelectionScreen(nav: (String) -> Unit, onBack: () -> Unit) {
                 if (count == 0) "Terminer ma sélection" else "Terminer ma sélection ($count)",
                 {
                     val d = demo.data
-                    if (d != null) { if (admin) d.submitSelection { nav("v02") } else d.submitStaffSelection() }
+                    if (d != null) { if (admin) d.submitStaffSelection { nav("v02") } else d.submitStaffSelection() }
                     else {
                         demo.selection.forEach { (id, q) ->
                             val i = demo.lines.indexOfFirst { it.productId == id }
@@ -183,9 +183,9 @@ fun SelectionScreen(nav: (String) -> Unit, onBack: () -> Unit) {
     val saved = demo.savedQty(p.id) ?: return
     val s = demo.selection[p.id]
     val (t, c) = when {
-        s == null -> "Enregistré · ${qtyText(p, saved)}" to C.TealDark
+        s == null -> "Dans la liste · ${qtyText(p, saved)}" to C.TealDark
         s <= 0 -> "Sera retiré à l'enregistrement" to C.Amber
-        else -> "Modifié (enregistré : ${qtyText(p, saved)})" to C.Amber
+        else -> "Modifié (dans la liste : ${qtyText(p, saved)})" to C.Amber
     }
     Text(t, style = MaterialTheme.typography.labelSmall, color = c, maxLines = 1, overflow = TextOverflow.Ellipsis)
 }

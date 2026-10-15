@@ -55,9 +55,39 @@ private fun reorder(demo: Demo, lines: List<PastLine>, nav: (String) -> Unit) {
     val data = demo.data ?: return
     val usable = lines.filter { demo.byId[it.productId]?.inCatalog == true }
     if (usable.isEmpty()) { demo.say("Aucun de ces articles n'est dans votre catalogue actuel."); return }
-    data.submit(usable.associate { it.productId to toBase(it.unit, it.qty) }, clearSelection = false)
+    val entries = usable.associate { it.productId to toBase(it.unit, it.qty) }
+    // Liste en cours déjà commencée : choix explicite (Ajouter / Remplacer), jamais de fusion ni de remplacement silencieux.
+    if (demo.lines.any { !it.bought }) { demo.reorderAsk = entries; return }
+    data.submit(entries, clearSelection = false)
     if (usable.size < lines.size) demo.say("${lines.size - usable.size} article(s) retiré(s) du catalogue n'ont pas été recommandés.")
     nav("v02")
+}
+
+/** Choix « Recommander » quand la liste en cours contient déjà des articles. */
+@Composable
+private fun ReorderChoice(nav: (String) -> Unit) {
+    val demo = LocalDemo.current
+    val entries = demo.reorderAsk ?: return
+    val data = demo.data ?: return
+    var confirmReplace by remember { mutableStateOf(false) }
+    val current = demo.lines.filter { !it.bought }
+    val common = current.count { it.productId in entries }
+    AppSheet({ demo.reorderAsk = null }) {
+        Text("La liste en cours n'est pas vide", style = MaterialTheme.typography.titleLarge)
+        Spacer(Modifier.height(8.dp))
+        Text("Elle contient ${current.size} article${if (current.size > 1) "s" else ""} à acheter" + (if (common > 0) ", dont $common aussi dans cette commande." else ".") +
+            " Que voulez-vous faire ? La commande d'origine ne sera pas modifiée.", style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.height(14.dp))
+        PrimaryButton("Ajouter à la liste actuelle", { demo.reorderAsk = null; data.reorderInto(entries, replace = false) { nav("v02") } }, Modifier.fillMaxWidth())
+        Text("Sans doublon : une quantité déjà présente est additionnée (même unité).", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp, bottom = 10.dp))
+        SecondaryButton("Remplacer son contenu…", { confirmReplace = true }, Modifier.fillMaxWidth())
+        Spacer(Modifier.height(8.dp))
+        SecondaryButton("Annuler", { demo.reorderAsk = null }, Modifier.fillMaxWidth())
+    }
+    if (confirmReplace) ConfirmDialog(
+        "Remplacer le contenu de la liste ?", "Les articles non achetés prendront les quantités de cette commande ; ceux qui n'y sont pas seront retirés. Les articles déjà achetés restent.",
+        "Remplacer", { confirmReplace = false; demo.reorderAsk = null; data.reorderInto(entries, replace = true) { nav("v02") } }, { confirmReplace = false },
+    )
 }
 
 private suspend fun loadLines(demo: Demo, id: String): Outcome<List<PastLine>> {
@@ -142,6 +172,7 @@ private fun HistoryReal(nav: (String) -> Unit) {
             if (more) item { SecondaryButton("Afficher les commandes plus anciennes", { load(orders?.lastOrNull()?.closedAt) }, Modifier.fillMaxWidth()) }
         }
     }
+    ReorderChoice(nav)
     deleteFor?.let { o ->
         ConfirmDialog(
             "Supprimer cette commande ?", "La commande du ${frenchDate(o.closedAt)} sera retirée de l'historique. Les statistiques seront recalculées.",
@@ -211,6 +242,7 @@ private fun HistoryDetailReal(id: String, nav: (String) -> Unit, onBack: () -> U
             PrimaryButton("Recommander", { lines?.let { reorder(demo, it, nav) } }, Modifier.fillMaxWidth(), leading = Icons.Rounded.Replay, enabled = lines?.isNotEmpty() == true)
         }
     }
+    ReorderChoice(nav)
     if (confirm) ConfirmDialog(
         "Supprimer cette commande ?", "La commande du $title sera retirée de l'historique. Les statistiques seront recalculées.",
         "Supprimer", {

@@ -172,7 +172,11 @@ class Demo(initialRole: Role? = null, val live: Boolean = false) {
      * [selection] ne garde que les MODIFICATIONS (nouvelle quantité, ou 0 = à retirer). Administrateur : rien d'enregistré n'est montré,
      * la sélection s'ajoute à la liste comme avant.
      */
-    fun savedQty(pid: String): Int? = if (role == Role.STAFF) lines.firstOrNull { it.productId == pid && !it.bought }?.qty else null
+    /** Quantité déjà dans la liste en cours (article non acheté), pour TOUS les rôles : l'écran d'ajout reflète toute la liste
+     *  (recommandation, favoris ou ajout manuel) et la sélection ne garde que les modifications. Données de démonstration : personnel seulement. */
+    fun savedQty(pid: String): Int? = if (role == Role.STAFF || data != null) lines.firstOrNull { it.productId == pid && !it.bought }?.qty else null
+    /** « Recommander » sur une liste en cours non vide : choix explicite (ajouter ou remplacer), jamais de fusion silencieuse. */
+    var reorderAsk by mutableStateOf<Map<String, Int>?>(null)
     fun selQty(pid: String): Int? { val s = selection[pid] ?: return savedQty(pid); return if (s <= 0) null else s }
     fun setSel(pid: String, q: Int) { if (q == savedQty(pid)) selection.remove(pid) else selection[pid] = q }
     fun selRemove(pid: String) { if (savedQty(pid) != null) selection[pid] = 0 else selection.remove(pid) }

@@ -441,6 +441,48 @@ expect "A9. préférence gardée après déconnexion / reconnexion" test "$(show
 logout
 fi
 
+if want_s R; then
+echo "═══ R. Recommander puis « Ajouter des articles » : sélection reprise, sans doublon — contrôle rapide ═══" | tee -a "$OUT/resultats.txt"
+login_api adil 482913
+api GET /api/lists/active >/dev/null; LID=$(jq -r '.list.id // empty' /tmp/api.out); [ -n "$LID" ] && api POST "/api/lists/$LID/close" -d '{}' >/dev/null
+pid() { sql "SELECT p.id FROM products p JOIN families f ON f.id=p.family_id WHERE f.code='$FAMILY' AND p.name='$1'"; }
+TOM=$(pid Tomates); OIG=$(pid Oignons)
+uuid() { cat /proc/sys/kernel/random/uuid; }
+# Commande passée : Tomates 3 kg et Oignons 1 kg, achetées puis archivées
+api POST /api/lists/active/ops -d "{\"ops\":[{\"opId\":\"$(uuid)\",\"type\":\"add\",\"productId\":\"$TOM\",\"quantity\":3},{\"opId\":\"$(uuid)\",\"type\":\"add\",\"productId\":\"$OIG\",\"quantity\":1}]}" >/dev/null
+api GET /api/lists/active >/dev/null; OLD=$(jq -r '.list.id' /tmp/api.out)
+for it in $(jq -r '.list.items[].id' /tmp/api.out); do api POST "/api/lists/$OLD/ops" -d "{\"ops\":[{\"opId\":\"$(uuid)\",\"type\":\"purchase\",\"itemId\":\"$it\"}]}" >/dev/null; done
+api POST "/api/lists/$OLD/close" -d '{}' >/dev/null
+OLDSTATE() { sql "SELECT string_agg(p.name||':'||i.quantity||':'||i.status, ',' ORDER BY p.name) FROM list_items i JOIN products p ON p.id=i.product_id WHERE i.list_id='$OLD'"; }
+OLD0=$(OLDSTATE)
+ACTIVE() { sql "SELECT coalesce(string_agg(p.name||':'||i.quantity||':'||i.status, ',' ORDER BY p.name),'') FROM list_items i JOIN products p ON p.id=i.product_id JOIN lists l ON l.id=i.list_id JOIN families f ON f.id=l.family_id WHERE f.code='$FAMILY' AND l.status='active' AND i.status<>'removed'"; }
+launch; $UI wait "Bienvenue" 25 >/dev/null
+signin "$FAMILY" adil 482913; $UI wait "Compte" 25 >/dev/null
+tapt "Historique"; $UI wait "Recommander" 15 >/dev/null
+$UI tap "Recommander" >/dev/null; sleep 6
+expect "R1. recommandée dans la liste en cours ($(ACTIVE))" test "$(ACTIVE)" = "Oignons:1.000:to_buy,Tomates:3.000:to_buy"
+tapt "Ajouter des articles"; sleep 3
+expect "R2. catégorie : badge des 2 articles déjà dans la liste" $UI has "2 choisis"
+fill "Rechercher un produit" "tomates"; hide_kb; sleep 2
+expect "R3. Tomates cochée avec sa quantité actuelle (3 kg), rien à terminer" bash -c "$UI has 'Dans la liste · 3 kg' && $UI has 'Sélectionné' && ! $UI has 'Terminer ma sélection ('"
+shot final-r1-selection-reprise
+$UI tap "Retour" >/dev/null; sleep 3
+expect "R4. aller-retour sans modification : liste strictement inchangée" test "$(ACTIVE)" = "Oignons:1.000:to_buy,Tomates:3.000:to_buy"
+tapt "Ajouter des articles"; sleep 3
+fill "Rechercher un produit" "carottes"; hide_kb; sleep 2
+$UI tap "Carottes" --last >/dev/null; sleep 2
+expect "R5. un seul changement à confirmer" $UI has "Terminer ma sélection (1)"
+tapt "Terminer ma sélection"; sleep 6
+expect "R6. confirmé sans doublon ni cumul ($(ACTIVE))" test "$(ACTIVE)" = "Carottes:1.000:to_buy,Oignons:1.000:to_buy,Tomates:3.000:to_buy"
+expect "R7. commande d'origine intacte" test "$(OLDSTATE)" = "$OLD0"
+tapt "Historique"; $UI wait "Recommander" 15 >/dev/null; $UI tap "Recommander" >/dev/null; sleep 3
+expect "R8. liste non vide : choix explicite Ajouter / Remplacer (aucune fusion silencieuse)" bash -c "$UI has 'La liste en cours n' && $UI has 'Ajouter à la liste actuelle' && $UI has 'Remplacer son contenu'"
+shot final-r2-choix-recommander
+$UI tap "Annuler" --last >/dev/null; sleep 2
+expect "R9. annulé : liste inchangée" test "$(ACTIVE)" = "Carottes:1.000:to_buy,Oignons:1.000:to_buy,Tomates:3.000:to_buy"
+logout
+fi
+
 if want_s N; then
 echo "═══ N. Produit introuvable : actif, masqué, disponible, réellement absent, catalogue inaccessible — contrôle rapide ═══" | tee -a "$OUT/resultats.txt"
 REFS="SELECT count(*) FROM (SELECT c.photo_asset_id FROM extended_catalog c WHERE c.key IN ('farine-fino','farine-force','pate-a-tartiner-nutella','couscous','farine-complete') UNION ALL SELECT photo_asset_id FROM initial_catalog WHERE key='semoule-fine') r JOIN photo_assets a ON a.id=r.photo_asset_id WHERE a.source_name='Visuel fourni par l''éditeur de Mes Courses'"
