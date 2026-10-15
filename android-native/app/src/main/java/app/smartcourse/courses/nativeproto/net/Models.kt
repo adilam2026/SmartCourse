@@ -47,16 +47,23 @@ fun parsePrice(o: JsonElement?): PriceRef? {
 data class CatProduct(
     val id: String, val category: String, val categoryLabel: String, val name: String, val brand: String?,
     val active: Boolean, val unit: String, val photoUrl: String?, val price: PriceRef?,
+    /** Créé par la famille (aucune référence commune) : peut être proposé au catalogue commun. */
+    val own: Boolean = false,
+    /** Mots de recherche de la référence commune (sans accents), ex. « chocolat a tartiner » pour Nutella. */
+    val keywords: String = "",
 )
 
-data class CatalogData(val rev: Long, val products: List<CatProduct>)
+/** [categories] : toutes les catégories (clé, libellé), même vides — pour le choix de catégorie d'un nouveau produit. */
+data class CatalogData(val rev: Long, val products: List<CatProduct>, val categories: List<Pair<String, String>> = emptyList())
 
 fun parseCatalog(o: JsonObject): CatalogData? = try {
     val out = ArrayList<CatProduct>()
+    val cats = ArrayList<Pair<String, String>>()
     for (c in o["categories"]!!.jsonArray) {
         val co = c.jsonObject
         val key = co["key"]!!.jsonPrimitive.content
         val label = co["label"]!!.jsonPrimitive.content
+        cats += key to label
         for (p in co["products"]!!.jsonArray) {
             val x = p.jsonObject
             out += CatProduct(
@@ -64,10 +71,11 @@ fun parseCatalog(o: JsonObject): CatalogData? = try {
                 name = x["name"]!!.jsonPrimitive.content, brand = x["brand"]?.jsonPrimitive?.contentOrNull,
                 active = x["active"]?.jsonPrimitive?.booleanOrNull ?: true, unit = x["unit"]?.jsonPrimitive?.contentOrNull ?: "piece",
                 photoUrl = x["photoUrl"]?.jsonPrimitive?.contentOrNull, price = parsePrice(x["price"]),
+                own = x["own"]?.jsonPrimitive?.booleanOrNull ?: false, keywords = x["keywords"]?.jsonPrimitive?.contentOrNull ?: "",
             )
         }
     }
-    CatalogData(o["rev"]?.jsonPrimitive?.doubleOrNull?.toLong() ?: 0L, out)
+    CatalogData(o["rev"]?.jsonPrimitive?.doubleOrNull?.toLong() ?: 0L, out, cats)
 } catch (_: Exception) { null }
 
 /* ───────────── Liste ───────────── */

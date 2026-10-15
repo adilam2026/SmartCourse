@@ -39,6 +39,7 @@ import androidx.compose.ui.res.painterResource
 import kotlin.math.roundToInt
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 
@@ -60,9 +61,31 @@ fun SelectionScreen(nav: (String) -> Unit, onBack: () -> Unit) {
         if (sp != null && Launch.flag("selected") && demo.selection[sp.id] == null) demo.selection[sp.id] = Launch.str("qty")?.toIntOrNull() ?: defaultQty(sp)
         0
     }
-    // Personnel : pas de recherche (et aucune recherche précédente ne masque d'article) ; tous les articles par catégorie.
-    val q = if (admin) query else ""
-    val items = demo.products.filter { demo.inCatalog[it.id] == true && (q.isBlank() || it.name.contains(q.trim(), ignoreCase = true)) }
+    // Recherche ouverte à tous les rôles (sans accents ni majuscules ; noms et mots de la référence commune, ex. « chocolat à tartiner »).
+    val q = query
+    val items = demo.products.filter { demo.inCatalog[it.id] == true && (q.isBlank() || matchesSearch(it, q)) }
+    // Produit qui manque : création pour la famille, puis proposition facultative au catalogue commun.
+    var newProduct by remember { mutableStateOf<String?>(null) }
+    var created by remember { mutableStateOf<String?>(null) }
+    var proposeFor by remember { mutableStateOf<String?>(null) }
+    var suggestions by remember { mutableStateOf<List<Suggestion>>(emptyList()) }
+    LaunchedEffect(q, items.isEmpty()) {
+        suggestions = emptyList()
+        val d = demo.data
+        if (d == null || q.trim().length < 2 || items.isNotEmpty()) return@LaunchedEffect
+        delay(350)
+        suggestions = d.suggest(q).filter { it.status != "active" }
+    }
+    LaunchedEffect(created) { if (created != null) { delay(12_000); created = null } }
+    val scope = rememberCoroutineScope()
+    fun useSuggestion(sg: Suggestion) {
+        val d = demo.data ?: return
+        scope.launch {
+            val (id, err) = d.createProduct(null, null, null, sg)
+            if (id != null) { demo.byId[id]?.let { p -> if (demo.selQty(id) == null) demo.setSel(id, defaultQty(p)) }; demo.say("« ${sg.name} » ajouté à votre sélection.") }
+            else err?.let { demo.say(it) }
+        }
+    }
     // Organisation : « Tous les articles » (blocs titrés par catégorie, tous dépliés) ou « Par catégories » (grille de catégories,
     // puis les articles d'une seule catégorie). La présentation (Liste / Cartes) s'applique aux articles. Changer d'affichage, ouvrir
     // une catégorie ou revenir à la grille ne touche jamais à la sélection en cours.
@@ -72,7 +95,10 @@ fun SelectionScreen(nav: (String) -> Unit, onBack: () -> Unit) {
     // Une recherche affiche directement ses résultats en blocs ; sans recherche, la grille des catégories.
     val showGrid = byCategory && openCat == null && q.isBlank()
     val shown: Map<String, List<Product>> = if (byCategory && openCat != null && q.isBlank()) mapOf(openCat!! to groups[openCat].orEmpty()) else groups
-    val entries: List<Any> = buildList { shown.forEach { (c, ps) -> if (!(byCategory && openCat != null && q.isBlank())) add(c); addAll(ps) } }
+    val entries: List<Any> = buildList {
+        shown.forEach { (c, ps) -> if (!(byCategory && openCat != null && q.isBlank())) add(c); addAll(ps) }
+        if (q.isNotBlank() && items.isNotEmpty()) add(AddMarker)
+    }
     if (openCat != null && (!byCategory || groups[openCat] == null) && q.isBlank()) openCat = null
     androidx.activity.compose.BackHandler(enabled = byCategory && openCat != null && q.isBlank()) { openCat = null }
     var display by remember { mutableStateOf(false) }
@@ -86,7 +112,7 @@ fun SelectionScreen(nav: (String) -> Unit, onBack: () -> Unit) {
             onBack = if (admin) ({ if (byCategory && openCat != null && q.isBlank()) openCat = null else onBack() }) else null,
         ) { DisplayIcon { display = true } }
         Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            if (admin) SearchBox(query, { query = it }, "Rechercher un produit…", Modifier.fillMaxWidth())
+            SearchBox(query, { query = it }, "Rechercher un produit…", Modifier.fillMaxWidth())
             if (demo.orphanCount > 0) SCard(padding = PaddingValues(12.dp)) {
                 Text("${demo.orphanCount} article${if (demo.orphanCount > 1) "s" else ""} d'une liste terminée", style = MaterialTheme.typography.titleSmall)
                 Text("Ils n'ont pas été ajoutés. Voulez-vous les reprendre dans votre sélection ?", style = MaterialTheme.typography.bodySmall)
@@ -97,10 +123,18 @@ fun SelectionScreen(nav: (String) -> Unit, onBack: () -> Unit) {
                 }
             }
         }
-        if (admin || demo.orphanCount > 0) Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(6.dp))
         if (byCategory && openCat != null && q.isBlank()) CategoryBar(openCat!!, groups[openCat].orEmpty().size) { openCat = null }
         Box(Modifier.weight(1f)) {
-            if (showGrid) LazyVerticalGrid(
+            if (q.isNotBlank() && items.isEmpty()) LazyColumn(contentPadding = PaddingValues(16.dp, 4.dp, 16.dp, 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                item(key = "none") { Text("Aucun article ne correspond à « ${q.trim()} ».", style = MaterialTheme.typography.bodyMedium, color = C.Muted, modifier = Modifier.padding(bottom = 4.dp)) }
+                if (suggestions.isNotEmpty()) {
+                    item(key = "sg-h") { Text("Dans le catalogue commun", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 4.dp)) }
+                    items(suggestions, key = { "sg-${it.origin}-${it.key}" }) { sg -> SuggestionRow(sg, sg.status == "absent" || admin) { useSuggestion(sg) } }
+                }
+                item(key = "add") { Box(Modifier.padding(top = 8.dp)) { AddProductCard(q) { newProduct = q } } }
+            }
+            else if (showGrid) LazyVerticalGrid(
                 GridCells.Fixed(2), contentPadding = PaddingValues(16.dp, 4.dp, 16.dp, 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -108,8 +142,10 @@ fun SelectionScreen(nav: (String) -> Unit, onBack: () -> Unit) {
             }
             else when (demo.selMode) {
                 SelMode.LIST -> LazyColumn(contentPadding = PaddingValues(16.dp, 4.dp, 16.dp, 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(entries, key = { if (it is Product) it.id else "h-$it" }) { e ->
-                        if (e is Product) SelListRow(e) { sheetFor = e.id } else Header(e as String, groups[e].orEmpty().size)
+                    items(entries, key = { if (it is Product) it.id else if (it === AddMarker) "add" else "h-$it" }) { e ->
+                        if (e is Product) SelListRow(e) { sheetFor = e.id }
+                        else if (e === AddMarker) Box(Modifier.padding(top = 6.dp)) { AddProductCard(q) { newProduct = q } }
+                        else Header(e as String, groups[e].orEmpty().size)
                     }
                 }
                 SelMode.GRID -> LazyVerticalGrid(
@@ -118,10 +154,14 @@ fun SelectionScreen(nav: (String) -> Unit, onBack: () -> Unit) {
                 ) {
                     entries.forEach { e ->
                         if (e is Product) item(key = e.id) { SelTile(e) { sheetFor = e.id } }
+                        else if (e === AddMarker) item(key = "add", span = { GridItemSpan(maxLineSpan) }) { Box(Modifier.padding(top = 6.dp)) { AddProductCard(q) { newProduct = q } } }
                         else item(key = "h-$e", span = { GridItemSpan(maxLineSpan) }) { Header(e as String, groups[e].orEmpty().size) }
                     }
                 }
             }
+        }
+        created?.let { id ->
+            demo.byId[id]?.let { p -> CreatedBanner(p.name, { proposeFor = id; created = null }, { created = null }, Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) }
         }
         // Une seule action finale
         Column(
@@ -150,6 +190,8 @@ fun SelectionScreen(nav: (String) -> Unit, onBack: () -> Unit) {
     }
 
     if (display) DisplaySheet { display = false }
+    newProduct?.let { n -> NewProductSheet(n, onDismiss = { newProduct = null }, onCreated = { id -> newProduct = null; query = ""; created = id }) }
+    proposeFor?.let { id -> demo.byId[id]?.let { p -> ProposeSheet(p) { proposeFor = null } } ?: run { proposeFor = null } }
     sheetFor?.let { id ->
         val p = demo.byId[id]
         if (p != null) QuantitySheet(
@@ -158,6 +200,7 @@ fun SelectionScreen(nav: (String) -> Unit, onBack: () -> Unit) {
             onConfirm = { demo.setSel(id, it); sheetFor = null },
             onRemove = { demo.selRemove(id); sheetFor = null },
             removeLabel = if (demo.savedQty(id) != null) "Retirer de la liste" else "Retirer de la sélection",
+            extra = if (p.own && demo.data != null) ({ TextButton({ sheetFor = null; proposeFor = id }, Modifier.fillMaxWidth()) { Text("Proposer au catalogue commun", color = C.TealDark, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold) } }) else null,
         )
     }
 }
@@ -174,6 +217,9 @@ fun SelectionScreen(nav: (String) -> Unit, onBack: () -> Unit) {
     }
     Text(t, style = MaterialTheme.typography.labelSmall, color = c, maxLines = 1, overflow = TextOverflow.Ellipsis)
 }
+
+/** Dernière entrée des résultats d'une recherche : « Ajouter « … » ». */
+private object AddMarker
 
 @Composable private fun Header(text: String, total: Int) {
     Row(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 2.dp).semantics(mergeDescendants = true) {}, verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -342,6 +388,7 @@ fun QuantitySheet(
     p: Product, current: Int?, showPrice: Boolean, priceLabel: String?, focusInput: Boolean,
     onDismiss: () -> Unit, onConfirm: (Int) -> Unit, onRemove: () -> Unit,
     removeLabel: String = "Retirer de la sélection", confirmLabel: String? = null,
+    extra: (@Composable () -> Unit)? = null,
 ) {
     var qty by remember { mutableIntStateOf(current ?: defaultQty(p)) }
     var big by remember { mutableStateOf(p.unit != UnitKind.COUNT && qty >= 1000) }
@@ -403,6 +450,7 @@ fun QuantitySheet(
         )
         Spacer(Modifier.height(14.dp))
         PrimaryButton(confirmLabel ?: if (current == null) "Ajouter à ma sélection" else "Mettre à jour", { onConfirm(qty) }, Modifier.fillMaxWidth(), enabled = valid)
+        extra?.let { Spacer(Modifier.height(4.dp)); it() }
         if (current != null) {
             Spacer(Modifier.height(8.dp))
             TextButton(onRemove, Modifier.align(Alignment.CenterHorizontally)) { Text(removeLabel, color = C.Danger, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold) }

@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.ShoppingBasket
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -39,10 +40,10 @@ val LocalImageLoader = compositionLocalOf<ImageLoader?> { null }
 fun RemotePhoto(path: String?, size: Dp, radius: Dp = 10.dp, modifier: Modifier = Modifier) {
     val base = LocalSession.current?.serverAddress
     val loader = LocalImageLoader.current
-    Box(modifier.size(size).clip(RoundedCornerShape(radius)).background(Color(0xFFEFF4F8))) {
+    Box(modifier.size(size).clip(RoundedCornerShape(radius)).background(if (path == null) C.TealSoft else Color(0xFFEFF4F8)), contentAlignment = Alignment.Center) {
         if (path != null && base != null && loader != null) {
             AsyncImage(model = base + path, imageLoader = loader, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-        }
+        } else if (path == null) NeutralIcon(Modifier.fillMaxSize(0.55f))
     }
 }
 
@@ -91,10 +92,16 @@ fun ProductImage(p: Product, modifier: Modifier, contentScale: ContentScale = Co
     } else {
         val base = LocalSession.current?.serverAddress
         val loader = LocalImageLoader.current
-        Box(modifier.background(Color(0xFFEFF4F8))) {
+        Box(modifier.background(if (p.photoUrl == null) C.TealSoft else Color(0xFFEFF4F8)), contentAlignment = Alignment.Center) {
             if (p.photoUrl != null && base != null && loader != null) {
                 AsyncImage(model = base + p.photoUrl, imageLoader = loader, contentDescription = null, contentScale = contentScale, modifier = Modifier.fillMaxSize())
-            }
+            } else if (p.photoUrl == null) NeutralIcon(Modifier.fillMaxSize(0.42f))
         }
     }
+}
+
+/** Icône par défaut d'un produit sans photo (produit créé par la famille) : un panier, neutre. */
+@Composable
+fun NeutralIcon(modifier: Modifier = Modifier) {
+    Icon(Icons.Rounded.ShoppingBasket, null, tint = C.TealDark.copy(alpha = 0.85f), modifier = modifier)
 }

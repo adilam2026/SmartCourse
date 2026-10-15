@@ -46,7 +46,20 @@ data class Product(
     val photoUrl: String? = null,     // données réelles : photo du serveur
     val serverUnit: String = "",      // données réelles : unité du serveur (kg, litre, piece, paquet…)
     val price: PriceRef? = null,      // données réelles : prix indicatif en vigueur
+    val own: Boolean = false,         // données réelles : produit créé par la famille (proposable au catalogue commun)
+    val keywords: String = "",        // données réelles : mots de recherche de la référence commune
 )
+
+/** Texte comparable pour la recherche : minuscules, sans accents ni ligatures (« Pâte » = « pate », « Œufs » = « oeufs »). */
+fun flatSearch(s: String): String =
+    java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD).replace(Regex("\\p{M}+"), "").lowercase()
+        .replace("œ", "oe").replace("æ", "ae").replace('’', '\'').replace(Regex("\\s+"), " ").trim()
+
+/** Le produit correspond-il à la recherche (nom ou mots de la référence commune) ? */
+fun matchesSearch(p: Product, q: String): Boolean {
+    val n = flatSearch(q); if (n.isEmpty()) return true
+    return flatSearch(p.name).contains(n) || (p.keywords.isNotEmpty() && flatSearch(p.keywords).contains(n))
+}
 
 fun fmtNum(v: Double): String {
     val s = String.format(Locale.US, "%.3f", v).trimEnd('0').trimEnd('.')
@@ -203,6 +216,8 @@ class Demo(initialRole: Role? = null, val live: Boolean = false) {
     var pendingOps by mutableStateOf(0)
     var orphanCount by mutableStateOf(0)
     var listLoaded by mutableStateOf(!live)
+    /** Catégories (clé, libellé), même vides : choix de la catégorie d'un nouveau produit. */
+    var categoryList by mutableStateOf(listOf("autres" to "Autres"))
     var hasList by mutableStateOf(true)
     var listDate by mutableStateOf("Lundi 12 mai")
 

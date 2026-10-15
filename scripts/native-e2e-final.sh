@@ -441,6 +441,44 @@ expect "A9. préférence gardée après déconnexion / reconnexion" test "$(show
 logout
 fi
 
+if want_s N; then
+echo "═══ N. Catalogue (six références) et produit créé par la famille — contrôle rapide ═══" | tee -a "$OUT/resultats.txt"
+REFS="SELECT count(*) FROM (SELECT c.photo_asset_id FROM extended_catalog c WHERE c.key IN ('farine-fino','farine-force','pate-a-tartiner-nutella','couscous','farine-complete') UNION ALL SELECT photo_asset_id FROM initial_catalog WHERE key='semoule-fine') r JOIN photo_assets a ON a.id=r.photo_asset_id WHERE a.source_name='Visuel fourni par l''éditeur de Mes Courses'"
+expect "N1. six références avec leur visuel fourni ($(sql "$REFS")/6)" test "$(sql "$REFS")" = 6
+expect "N1b. noms et unités (kilo / pot)" test "$(sql "SELECT string_agg(name||':'||unit, ',' ORDER BY name) FROM extended_catalog WHERE key IN ('farine-fino','farine-force','pate-a-tartiner-nutella','couscous','farine-complete')")" = "Farine complète:kg,Farine fino:kg,Farine force:kg,Pâte à tartiner Nutella:pot,Semoule couscous:kg"
+launch; $UI wait "Bienvenue" 25 >/dev/null
+expect "N2. personnel connecté" tf_login "$FAMILY" marie 573918
+$UI wait "Affichage" 20 >/dev/null
+expect "N3. recherche ouverte au personnel" $UI has "Rechercher un produit"
+fill "Rechercher un produit" "nutella"; hide_kb; sleep 3
+expect "N4. « Nutella » trouve la référence commune" $UI wait "Pâte à tartiner Nutella" 10
+shot final-n1-recherche-nutella
+$UI tap "Pâte à tartiner Nutella" >/dev/null; sleep 4
+expect "N5. ajoutée à la sélection (avec sa photo de référence)" bash -c "$UI has 'Terminer ma sélection (1)' && test \"\$(sql \"SELECT count(*) FROM products p JOIN families f ON f.id=p.family_id WHERE f.code='$FAMILY' AND p.name='Pâte à tartiner Nutella' AND p.photo_asset_id IS NOT NULL AND p.extended_id IS NOT NULL\")\" = 1"
+fill "Rechercher un produit" "Bsissa"; hide_kb; sleep 3
+expect "N6. recherche sans résultat : « Ajouter « Bsissa » »" bash -c "$UI has 'Aucun article ne correspond' && $UI has 'Bsissa'"
+shot final-n2-recherche-sans-resultat
+$UI tap "Ajouter un produit" >/dev/null; sleep 2
+expect "N7. formulaire : nom prérempli, catégorie Autres" bash -c "$UI wait 'Nouveau produit' 8 && $UI has 'Bsissa' && $UI has 'Autres'"
+shot final-n3-formulaire
+$UI tap "Créer et ajouter à ma sélection" >/dev/null; sleep 5
+expect "N8. créé et choisi tout de suite" bash -c "$UI has 'créé et ajouté' && $UI has 'Terminer ma sélection (2)'"
+shot final-n4-produit-cree
+expect "N9. produit de cette famille seulement (Autres, sans photo)" test "$(sql "SELECT string_agg(f.code||':'||p.category||':'||coalesce(p.photo_asset_id::text,'aucune'), ',') FROM products p JOIN families f ON f.id=p.family_id WHERE p.name='Bsissa'")" = "$FAMILY:autres:aucune"
+$UI tap "Proposer" >/dev/null; sleep 2
+expect "N10. proposition facultative" $UI wait "Proposer au catalogue commun" 8
+shot final-n5-proposition
+$UI tap "Envoyer la proposition" >/dev/null; sleep 4
+expect "N10b. proposition reçue (en attente, rien de publié)" test "$(sql "SELECT count(*) FROM catalog_proposals WHERE name='Bsissa' AND status='pending'"):$(sql "SELECT count(*) FROM extended_catalog WHERE name='Bsissa'")" = "1:0"
+expect "N11. /gestion : page servie, données protégées sans connexion" test "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/gestion"):$(curl -s -o /dev/null -w '%{http_code}' "$BASE/api/gestion/proposals")" = "200:401"
+login_api adil 482913
+expect "N12. /gestion refusé à un administrateur de famille" test "$(api GET /api/gestion/proposals)" = 403
+sql "INSERT INTO catalog_managers (profile_id) SELECT p.id FROM profiles p JOIN families f ON f.id=p.family_id WHERE f.code='$FAMILY' AND p.login='adil' ON CONFLICT DO NOTHING" >/dev/null
+expect "N13. gestionnaire inscrit : la proposition arrive, sans la famille" bash -c "test \"\$(api GET /api/gestion/proposals)\" = 200 && jq -e '.proposals[] | select(.name==\"Bsissa\")' /tmp/api.out >/dev/null && ! grep -q '$FAMILY' /tmp/api.out"
+sql "DELETE FROM catalog_managers" >/dev/null
+logout
+fi
+
 if want_s D; then
 echo "═══ D. Suppression de compte et de famille (familles JETABLES de la recette) ═══" | tee -a "$OUT/resultats.txt"
 export -f sql   # utilisée aussi dans les contrôles « bash -c »

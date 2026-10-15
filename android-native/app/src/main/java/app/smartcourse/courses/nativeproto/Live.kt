@@ -56,8 +56,11 @@ fun clockTime(iso: String?): String? = try {
 private fun CatProduct.toProduct() = Product(
     id = id, name = if (brand.isNullOrBlank()) name else "$name $brand", photo = 0, category = categoryLabel,
     unit = unitKindOf(unit), countLabel = countLabelOf(unit), basePrice = null, inCatalog = active,
-    photoUrl = photoUrl, serverUnit = unit, price = price,
+    photoUrl = photoUrl, serverUnit = unit, price = price, own = own, keywords = keywords,
 )
+
+/** Référence du catalogue commun proposée pendant une recherche (absente de la famille, ou retirée par un administrateur). */
+data class Suggestion(val origin: String, val key: String, val name: String, val categoryLabel: String, val photoUrl: String?, val status: String, val productId: String?)
 
 /**
  * Pont entre les données réelles (serveur, copie locale, file d'attente) et les écrans : il remplit l'état [Demo] que les écrans lisent déjà
@@ -93,7 +96,7 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
     init {
         demo.data = this
         engine.trace = { android.util.Log.i("CoursesData", it) }
-        kv.get(catKey)?.let { s -> try { parseCatalog(json.parseToJsonElement(s) as JsonObject) } catch (_: Exception) { null } }?.let { catalog = it.products }
+        kv.get(catKey)?.let { s -> try { parseCatalog(json.parseToJsonElement(s) as JsonObject) } catch (_: Exception) { null } }?.let { catalog = it.products; if (it.categories.isNotEmpty()) demo.categoryList = it.categories }
         // Préférences d'affichage DE CE PROFIL (téléphone) : celles d'un profil précédent ne sont jamais reprises ; valeurs par défaut sinon.
         demo.selMode = SelMode.parse(kv.get(modeKey))
         demo.selOrg = SelOrg.parse(kv.get(orgKey))
@@ -242,6 +245,7 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
             is Outcome.Ok -> {
                 val c = parseCatalog(r.value) ?: return
                 catalog = c.products; catalogRevLoaded = c.rev
+                if (c.categories.isNotEmpty()) demo.categoryList = c.categories
                 kv.put(catKey, r.value.toString())
                 render(); syncDraft()
             }
@@ -263,6 +267,56 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
             android.util.Log.i("CoursesNotif", "repère mis à jour au premier plan : ${l.validations.size} demande(s) vue(s)")
         }
     }
+
+    /* ───── Produits créés par la famille ───── */
+
+    /** Références proches (catalogue commun) pour une recherche : jamais bloquant, vide hors connexion. */
+    suspend fun suggest(q: String): List<Suggestion> {
+        val r = session.api.call("GET", "/api/catalog/suggest?q=" + java.net.URLEncoder.encode(q.trim(), "UTF-8"))
+        if (r !is Outcome.Ok) return emptyList()
+        val labels = demo.categoryList.toMap()
+        return try {
+            r.value["results"]!!.let { it as kotlinx.serialization.json.JsonArray }.map { e ->
+                val o = e as JsonObject
+                fun str(k: String) = (o[k] as? kotlinx.serialization.json.JsonPrimitive)?.let { if (it.isString) it.content else null }
+                Suggestion(str("origin") ?: "", str("key") ?: "", str("name") ?: "", str("category")?.let { labels[it] } ?: "", str("photoUrl"), str("status") ?: "absent", str("productId"))
+            }
+        } catch (_: Exception) { emptyList() }
+    }
+
+    /**
+     * Crée un produit pour la famille (ou prend la référence commune choisie / de même nom), puis recharge le catalogue.
+     * Renvoie l'identifiant du produit, ou un message d'erreur (la saisie reste dans le formulaire).
+     */
+    suspend fun createProduct(name: String?, category: String?, unit: String?, ref: Suggestion?): Pair<String?, String?> {
+        val body = buildJsonObject {
+            if (ref != null) put("ref", buildJsonObject { put("origin", ref.origin); put("key", ref.key) })
+            else { put("name", name!!.trim()); if (category != null) put("category", category); if (unit != null) put("unit", unit) }
+        }
+        return when (val r = session.api.call("POST", "/api/products/family", body)) {
+            is Outcome.Ok -> {
+                val id = ((r.value["product"] as? JsonObject)?.get("id") as? kotlinx.serialization.json.JsonPrimitive)?.content
+                refreshCatalog()
+                id to null
+            }
+            is Outcome.Fail -> null to when {
+                r.code == "product_hidden" -> "Ce produit a été retiré du catalogue par un administrateur de la famille."
+                r.failure == Failure.NETWORK || r.failure == Failure.TIMEOUT -> "Pas de réseau : le produit n'est pas créé. Réessayez quand la connexion est revenue."
+                else -> explain(r)
+            }
+        }
+    }
+
+    /** Proposition volontaire au catalogue commun : seuls le nom, la catégorie, l'unité et la description partent. */
+    suspend fun propose(productId: String, description: String): String? =
+        when (val r = session.api.call("POST", "/api/products/$productId/propose", buildJsonObject { if (description.isNotBlank()) put("description", description.trim()) })) {
+            is Outcome.Ok -> null
+            is Outcome.Fail -> when {
+                r.code == "already_common" -> "Ce produit fait déjà partie du catalogue commun."
+                r.failure == Failure.NETWORK || r.failure == Failure.TIMEOUT -> "Pas de réseau : la proposition n'est pas envoyée."
+                else -> explain(r)
+            }
+        }
 
     /* ───── Actions ───── */
 
