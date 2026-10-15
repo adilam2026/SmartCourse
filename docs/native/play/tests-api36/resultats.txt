@@ -1,13 +1,8 @@
-═══ R. Recommander puis « Ajouter des articles » : sélection reprise, sans doublon — contrôle rapide ═══
-PASS  R1. recommandée dans la liste en cours (Oignons:1.000:to_buy,Tomates:3.000:to_buy)
-PASS  R2. catégorie : badge des 2 articles déjà dans la liste
-PASS  R3. Tomates cochée avec sa quantité actuelle (3 kg), rien à terminer
-PASS  R4. aller-retour sans modification : liste strictement inchangée
-PASS  R5. un seul changement à confirmer
-PASS  R6. confirmé sans doublon ni cumul (Carottes:1.000:to_buy,Oignons:1.000:to_buy,Tomates:3.000:to_buy)
-PASS  R7. commande d'origine intacte
-PASS  R8. liste non vide : choix explicite Ajouter / Remplacer (aucune fusion silencieuse)
-PASS  R9. annulé : liste inchangée
+═══ V. Créer ma famille : le bouton dit ce qui manque (ville oubliée) — contrôle rapide ═══
+PASS  V1. ville non choisie : « Il manque : votre ville » affiché
+PASS  V2. bouton actif (jamais grisé sans explication)
+PASS  V3. appui : choix de la ville ouvert, rien n'est envoyé
+PASS  V4. ville choisie : plus rien ne manque
 ECHECS=0
 CRASH_APPLICATION=0
 TOTAL_ECHECS=0
