@@ -13,11 +13,9 @@ PASS  N11. actif vu depuis l'onglet « À ajouter » : « Déjà dans mon catalo
 PASS  N12. réellement absent : « Créer un nouveau produit »
 PASS  N13. formulaire prérempli
 PASS  N14. créé pour cette famille seulement, proposition possible
-FAIL  N15. hors connexion : explication + Réessayer, aucune création
-      écran : "Hors connexion : session et dernières données conservées sur ce téléphone."|"Retour"|"Catalogue"|"Harissa"|"Rechercher un produit…"|"Effacer la recherche"|"Tous (1)"|"Dans mon catalogue (1)"|"À ajouter (0)"|"Toutes les catégories"|"Choisir une catégorie"|"« Bsissa » créé et ajouté à votre sélection."|"Proposer"|"Fermer"|"Bsissa"|"Dans mon catalogue"|"Retirer"|"Liste"|"Liste"|"Historique"|"Historique"|"Statistiques"|"Statistiques"|"Réglages"|"Réglages"|
-FAIL  N16. après reconnexion : vérification aboutie
-      écran : "Retour"|"Catalogue"|"Harissa"|"Rechercher un produit…"|"Effacer la recherche"|"Tous (1)"|"Dans mon catalogue (1)"|"À ajouter (0)"|"Toutes les catégories"|"Choisir une catégorie"|"« Bsissa » créé et ajouté à votre sélection."|"Proposer"|"Fermer"|"Bsissa"|"Dans mon catalogue"|"Retirer"|"Liste"|"Liste"|"Historique"|"Historique"|"Statistiques"|"Statistiques"|"Réglages"|"Réglages"|
+PASS  N15. hors connexion : explication + Réessayer, aucune création
+PASS  N16. après reconnexion : vérification aboutie
 PASS  N17. /gestion : page servie, données protégées
-ECHECS=2
+ECHECS=0
 CRASH_APPLICATION=0
-TOTAL_ECHECS=2
+TOTAL_ECHECS=0
