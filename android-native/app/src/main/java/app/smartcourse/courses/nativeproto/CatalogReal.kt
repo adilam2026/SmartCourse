@@ -68,7 +68,8 @@ fun CatalogScreenReal(session: Session, onBack: () -> Unit) {
                 r.value.counts?.let { counts = it }
                 error = null
             }
-            is Outcome.Fail -> error = explain(r)
+            // Échec d'une NOUVELLE recherche : ne jamais laisser affichés les résultats d'une recherche précédente.
+            is Outcome.Fail -> { if (reset) { items.clear(); total = 0 }; error = explain(r) }
         }
         loading = false
         loadingMore = false
