@@ -1,14 +1,21 @@
-═══ A. Catalogue (contrôle rapide) : Tous les articles / Par catégories × Liste / Cartes ═══
-PASS  A0. démarrage, personnel connecté
-PASS  A1. icône Affichage dans l'en-tête, plus de rangée de boutons
-PASS  A2. Par catégories : grille des catégories (sans articles)
-PASS  A3. catégorie ouverte : ses articles et le retour
-PASS  A4. article choisi
-PASS  A5. retour à la grille, badge « choisi(s) » sur la catégorie
-PASS  A6. retour Android : grille, application toujours ouverte
-PASS  A7. Tous les articles en Liste : titres de catégorie, sélection conservée
-PASS  A8. préférence gardée après fermeture de l'application
-PASS  A9. préférence gardée après déconnexion / reconnexion
-ECHECS=0
+═══ N. Catalogue (six références) et produit créé par la famille — contrôle rapide ═══
+PASS  N1. six références avec leur visuel fourni (6/6)
+PASS  N1b. noms et unités (kilo / pot)
+PASS  N2. personnel connecté
+PASS  N3. recherche ouverte au personnel
+PASS  N4. « Nutella » trouve la référence commune
+FAIL  N5. ajoutée à la sélection (avec sa photo de référence)
+      écran : "Choisir mes articles"|"Affichage : Cartes, par catégories"|"Compte"|"nutella"|"Rechercher un produit…"|"Effacer la recherche"|"Épicerie"|"1 article"|"Sélectionné"|"Pâte à tartiner Nutella"|"à l'unité"|"1 pot"|"Modifier la quantité : Pâte à tartiner Nutella"|"Ajouter un produit : nutella"|"Ajouter « nutella »"|"Nouveau produit de votre famille, utilisable tout de suite."|"Terminer ma sélection (1)"|
+PASS  N6. recherche sans résultat : « Ajouter « Bsissa » »
+PASS  N7. formulaire : nom prérempli, catégorie Autres
+PASS  N8. créé et choisi tout de suite
+PASS  N9. produit de cette famille seulement (Autres, sans photo)
+PASS  N10. proposition facultative
+PASS  N10b. proposition reçue (en attente, rien de publié)
+PASS  N11. /gestion : page servie, données protégées sans connexion
+PASS  N12. /gestion refusé à un administrateur de famille
+FAIL  N13. gestionnaire inscrit : la proposition arrive, sans la famille
+      écran : "Choisir mes articles"|"Affichage : Cartes, par catégories"|"Compte"|"Rechercher un produit…"|"Légumes et herbes, 15 articles"|"Légumes et herbes"|"15 articles"|"Fruits, 10 articles"|"Fruits"|"10 articles"|"Laitages et œufs, 10 articles"|"Laitages et œufs"|"10 articles"|"Épicerie, 16 articles, 1 choisi"|"1"|"Épicerie"|"16 articles"|"Viandes et poisson, 5 articles"|"Viandes et poisson"|"5 articles"|"Surgelés, 2 articles"|"Surgelés"|"2 articles"|"Terminer ma sélection (2)"|
+ECHECS=2
 CRASH_APPLICATION=0
-TOTAL_ECHECS=0
+TOTAL_ECHECS=2
