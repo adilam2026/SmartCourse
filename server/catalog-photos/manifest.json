@@ -594,14 +594,13 @@
       "name": "Semoule fine",
       "category": "Épicerie",
       "file": "files/semoule-fine.webp",
-      "sha256": "24696b42732606fe3a5f07feb508b6c0d2ce72936ad3eaf7920ea6bf73c6e4f7",
-      "bytes": 39326,
+      "sha256": "61d9fc20340582934e9d0d31a949bd6c906c103de0efdb88e32d18eba65877b9",
+      "bytes": 26636,
       "width": 512,
       "height": 512,
-      "sourceName": "Image générée avec ChatGPT",
-      "source": "Image generated using ChatGPT",
-      "license": "GENERATED",
-      "generated": true
+      "sourceName": "Visuel fourni par l'éditeur de Mes Courses",
+      "source": "Visual supplied by the Mes Courses publisher",
+      "license": "OWN"
     },
     {
       "target": "initial",
@@ -2121,17 +2120,16 @@
     {
       "target": "extended",
       "key": "couscous",
-      "name": "Couscous",
+      "name": "Semoule couscous",
       "category": "Épicerie",
       "file": "files/couscous.webp",
-      "sha256": "10b69d1c2599858fe75831aaedd64176633e27859eb654c51675ba9e748b885a",
-      "bytes": 36590,
+      "sha256": "57bcd44344724109f811a827f95bc288d5a88bf11e482d36ceded99d1fe45136",
+      "bytes": 28446,
       "width": 512,
       "height": 512,
-      "sourceName": "Image générée avec ChatGPT",
-      "source": "Image generated using ChatGPT",
-      "license": "GENERATED",
-      "generated": true
+      "sourceName": "Visuel fourni par l'éditeur de Mes Courses",
+      "source": "Visual supplied by the Mes Courses publisher",
+      "license": "OWN"
     },
     {
       "target": "extended",
@@ -2169,14 +2167,13 @@
       "name": "Farine complète",
       "category": "Épicerie",
       "file": "files/farine-complete.webp",
-      "sha256": "513aabf860626fead646e3c50088abe8c11630b4767d3990457ba6c81bf9fe3e",
-      "bytes": 31814,
+      "sha256": "a2793fdcf3d5ae7a3909d963c12a9775d89948abff7d3d8ba7d84f487a3aa657",
+      "bytes": 34962,
       "width": 512,
       "height": 512,
-      "sourceName": "Image générée avec ChatGPT",
-      "source": "Image generated using ChatGPT",
-      "license": "GENERATED",
-      "generated": true
+      "sourceName": "Visuel fourni par l'éditeur de Mes Courses",
+      "source": "Visual supplied by the Mes Courses publisher",
+      "license": "OWN"
     },
     {
       "target": "extended",
@@ -3647,6 +3644,48 @@
       "source": "Image generated using ChatGPT",
       "license": "GENERATED",
       "generated": true
+    },
+    {
+      "target": "extended",
+      "key": "pate-a-tartiner-nutella",
+      "name": "Pâte à tartiner Nutella",
+      "category": "Épicerie",
+      "file": "files/pate-a-tartiner-nutella.webp",
+      "sha256": "c3fb87b7e860124b0e9d0c31fe6ed92753b9113da46f7115bd5dab12f02804db",
+      "bytes": 31048,
+      "width": 512,
+      "height": 512,
+      "sourceName": "Visuel fourni par l'éditeur de Mes Courses",
+      "source": "Visual supplied by the Mes Courses publisher",
+      "license": "OWN"
+    },
+    {
+      "target": "extended",
+      "key": "farine-fino",
+      "name": "Farine fino",
+      "category": "Épicerie",
+      "file": "files/farine-fino.webp",
+      "sha256": "274cd85ca0f172e2a34a28f0b9b5ccca2be0c27a22c8911cb54822f9039efb9d",
+      "bytes": 28330,
+      "width": 512,
+      "height": 512,
+      "sourceName": "Visuel fourni par l'éditeur de Mes Courses",
+      "source": "Visual supplied by the Mes Courses publisher",
+      "license": "OWN"
+    },
+    {
+      "target": "extended",
+      "key": "farine-force",
+      "name": "Farine force",
+      "category": "Épicerie",
+      "file": "files/farine-force.webp",
+      "sha256": "c5bd0a6e1cfca51f8f6ea974ef6c7d267d810a92401b2f72ad45e01d87e9ccff",
+      "bytes": 27878,
+      "width": 512,
+      "height": 512,
+      "sourceName": "Visuel fourni par l'éditeur de Mes Courses",
+      "source": "Visual supplied by the Mes Courses publisher",
+      "license": "OWN"
     }
   ]
 }

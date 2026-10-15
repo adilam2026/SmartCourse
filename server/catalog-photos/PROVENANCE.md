@@ -9,3 +9,8 @@ Les 80 illustrations de `files/` sont des **images générées avec ChatGPT** (�
 
 ## Catalogue complémentaire (163 images)
 Les 163 images `extended` du manifeste (même provenance : **images générées avec ChatGPT**, fond blanc, WebP 512 × 512, sans marque) ont été livrées par pack (`catalogue-163-images-pour-claude.zip`), vérifiées avant import : mêmes 163 clés et noms de fichiers que la liste stabilisée, aucun fichier manquant ou en trop, WebP 512 × 512, empreintes SHA-256 conformes. Aucune licence externe n'est revendiquée. Association par `target` + `key` uniquement.
+
+## Visuels fournis par l'éditeur (migration 022)
+
+Farine fino, Farine force, Semoule fine, Semoule couscous, Farine complète et Pâte à tartiner Nutella : visuels fournis par
+l'éditeur de Mes Courses (licence `OWN`), réduits à 512 × 512 px sur fond blanc, sans rognage ni retouche du texte.

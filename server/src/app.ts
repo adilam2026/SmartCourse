@@ -9,6 +9,7 @@ import { ZodError, z } from "zod";
 import { authenticate, confirmPassword, login, revokeSession, setupFamily, type AuthContext, SESSION_DAYS } from "./auth.js";
 import { backupStatus } from "./backup.js";
 import { catalogRoutes } from "./catalog-routes.js";
+import { familyProductRoutes } from "./family-products.js";
 import { COOKIE, makeGuard } from "./guard.js";
 import { listRoutes } from "./list-routes.js";
 import { statsRoutes } from "./stats-routes.js";
@@ -35,6 +36,8 @@ export interface AppDeps {
   store: PhotoStore;
   /** Contact address printed on the public privacy / deletion pages (CONTACT_EMAIL). Absent: the pages say so instead of inventing one. */
   contactEmail?: string;
+  /** Gestionnaires du catalogue commun (identifiants de profils, variable CATALOG_MANAGERS), en plus de la table catalog_managers. */
+  catalogManagers?: string[];
   /** Built PWA (web/dist). When set, the server also serves the app and falls back to index.html. */
   webDir?: string;
   /** Digital Asset Links (Android app ↔ this site), served at /.well-known/assetlinks.json: lets the Android app open the site without an address bar. Public data (certificate fingerprints). */
@@ -385,6 +388,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.get("/api/admin/backup-status", { preHandler: guard("family.manage") }, async () => backupStatus(db, deps.backupStorage ?? null, deps.backupMode ?? "internal"));
 
   catalogRoutes(app, { db, store: deps.store, guard, hub });
+  familyProductRoutes(app, { db, store: deps.store, guard, hub, managers: deps.catalogManagers });
   listRoutes(app, { db, hub, guard, push });
   priceRoutes(app, { db, guard, hub });
   templateRoutes(app, { db, guard });
