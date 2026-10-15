@@ -1,19 +1,23 @@
-═══ N. Catalogue (six références) et produit créé par la famille — contrôle rapide ═══
+═══ N. Produit introuvable : actif, masqué, disponible, réellement absent, catalogue inaccessible — contrôle rapide ═══
 PASS  N1. six références avec leur visuel fourni (6/6)
-PASS  N1b. noms et unités (kilo / pot)
 PASS  N2. personnel connecté
-PASS  N3. recherche ouverte au personnel
-PASS  N4. « Nutella » trouve la référence commune
-PASS  N5. ajoutée à la sélection (avec sa photo de référence : 1)
-PASS  N6. recherche sans résultat : « Ajouter « Bsissa » »
-PASS  N7. formulaire : nom prérempli, catégorie Autres
-PASS  N8. créé et choisi tout de suite
-PASS  N9. produit de cette famille seulement (Autres, sans photo)
-PASS  N10. proposition facultative
-PASS  N10b. proposition reçue (en attente, rien de publié)
-PASS  N11. /gestion : page servie, données protégées sans connexion
-PASS  N12. /gestion refusé à un administrateur de famille
-PASS  N13. gestionnaire inscrit : la proposition arrive, sans la famille (200)
-ECHECS=0
+PASS  N3. personnel : produit masqué introuvable, renvoi vers un administrateur, aucune création
+PASS  N4. administrateur : plus de bouton de création directe, « Rechercher dans le catalogue complet »
+PASS  N5. catalogue ouvert avec la recherche transmise ; masqué → « Réactiver »
+PASS  N6. autre onglet : vérifié dans tout le catalogue, « Masqué » + « Réactiver », aucune création
+PASS  N7. réactivé puis choisi, retour à la sélection
+PASS  N8. disponible mais absent : « Ajouter » depuis la référence existante
+PASS  N9. ajouté depuis la référence (avec sa photo) et choisi
+PASS  N10. actif : trouvé directement dans la sélection
+PASS  N11. actif vu depuis l'onglet « À ajouter » : « Déjà dans mon catalogue », aucune création
+PASS  N12. réellement absent : « Créer un nouveau produit »
+PASS  N13. formulaire prérempli
+PASS  N14. créé pour cette famille seulement, proposition possible
+FAIL  N15. hors connexion : explication + Réessayer, aucune création
+      écran : "Hors connexion : session et dernières données conservées sur ce téléphone."|"Retour"|"Catalogue"|"Harissa"|"Rechercher un produit…"|"Effacer la recherche"|"Tous (1)"|"Dans mon catalogue (1)"|"À ajouter (0)"|"Toutes les catégories"|"Choisir une catégorie"|"« Bsissa » créé et ajouté à votre sélection."|"Proposer"|"Fermer"|"Bsissa"|"Dans mon catalogue"|"Retirer"|"Liste"|"Liste"|"Historique"|"Historique"|"Statistiques"|"Statistiques"|"Réglages"|"Réglages"|
+FAIL  N16. après reconnexion : vérification aboutie
+      écran : "Retour"|"Catalogue"|"Harissa"|"Rechercher un produit…"|"Effacer la recherche"|"Tous (1)"|"Dans mon catalogue (1)"|"À ajouter (0)"|"Toutes les catégories"|"Choisir une catégorie"|"« Bsissa » créé et ajouté à votre sélection."|"Proposer"|"Fermer"|"Bsissa"|"Dans mon catalogue"|"Retirer"|"Liste"|"Liste"|"Historique"|"Historique"|"Statistiques"|"Statistiques"|"Réglages"|"Réglages"|
+PASS  N17. /gestion : page servie, données protégées
+ECHECS=2
 CRASH_APPLICATION=0
-TOTAL_ECHECS=0
+TOTAL_ECHECS=2
