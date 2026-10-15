@@ -59,6 +59,16 @@ SIMPLE ET PRIVÉ
 • Sans publicité ni traceur publicitaire. Vos données ne sont ni vendues ni partagées à des fins commerciales.
 ```
 
+## Notes de version — 1.0.2 (500 caractères max)
+
+```
+• Catalogue : « Tous les articles » (par blocs de catégorie) ou « Par catégories » (grille, puis les articles d'une catégorie), en Liste ou en Cartes.
+• Réglage Affichage dans l'en-tête, mémorisé pour chaque profil.
+• Codes d'accès au clavier numérique.
+• Partage de l'accès d'un membre et du code famille (WhatsApp ou partage Android).
+• Le code famille est retenu à la connexion.
+```
+
 ## Notes de version — 1.0.1 (500 caractères max)
 
 ```
