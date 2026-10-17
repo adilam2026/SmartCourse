@@ -83,11 +83,11 @@ fg.save(os.path.join(OUT, "banniere-1024x500.png"), optimize=True)
 # 3. Captures originales (pixels inchangés, PNG 24 bits) et proposition habillée
 CAPTIONS = {
     "play-1-liste-partagee": "Une liste partagée par toute la famille",
-    "play-2-listes-en-cours": "Plusieurs listes en cours, chacune son nom",
+    "play-2-listes-en-cours": "En option : plusieurs listes en cours",
     "play-3-selection-photos": "Choisissez vos articles en photos",
     "play-4-articles-achetes": "Chacun voit ce qui est déjà acheté",
-    "play-5-budget": "Suivez les dépenses de la famille",
-    "play-6-budgets-mensuels": "Un budget par catégorie, chaque mois",
+    "play-5-budget": "Budget facultatif : suivez vos dépenses",
+    "play-6-budgets-mensuels": "Budget facultatif : vos budgets du mois",
     "play-7-historique": "Vos courses passées, à refaire en un geste",
     "play-8-rappels": "Un rappel s'il reste des achats",
 }
