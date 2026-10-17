@@ -21,8 +21,7 @@ Effet immédiat pour les familles : aucun. Les deux options avancées sont désa
 
 1. **Restauration de contrôle réussie d'une sauvegarde récente**, dans un serveur PostgreSQL isolé et jetable — jamais la production :
    workflow « Sauvegarde de production — restauration de contrôle dans une base isolée » (`.github/workflows/verif-sauvegarde.yml`).
-   Il exige six secrets GitHub (Settings → Secrets and variables → Actions), à copier depuis les variables Railway du service, **sans jamais les écrire dans la conversation** :
-   `SAUVEGARDE_BACKUP_KEY` (= `BACKUP_KEY`), `SAUVEGARDE_S3_BUCKET`, `SAUVEGARDE_S3_ENDPOINT`, `SAUVEGARDE_S3_REGION`, `SAUVEGARDE_S3_ACCESS_KEY_ID`, `SAUVEGARDE_S3_SECRET_ACCESS_KEY` (= `S3_*`).
+   Il lit les secrets GitHub du dépôt (Actions → Repository secrets) portant les mêmes noms que les variables Railway : `BACKUP_KEY`, `S3_BUCKET`, `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` et, s'il existe, `S3_FORCE_PATH_STYLE`. Leurs valeurs ne sont jamais affichées.
    Le programme ne reçoit aucune adresse de la base de production et refuse toute cible autre que le serveur jetable local.
    Bilan attendu (sans secret) : date de la sauvegarde la plus récente, résultat, nombre de tables conformes, migrations, invariants, photos.
 2. **Accord explicite** du propriétaire, après lecture de ce bilan.
