@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Captures de la fiche Google Play : écrans RÉELS de la version finale (même code que l'APK livré, -Pfinal=1), sur un serveur de
 # recette LOCAL et jetable rempli de données FICTIVES (Famille Martin : Sophie, Karim, Léa, Nadia ; adresse example.org).
-# Version 1166 : trois listes en cours nommées, Budget en MAD (magasins génériques), rappels d'achat. 8 captures (maximum Play).
+# Version 1166 : trois listes en cours nommées, Budget en MAD (magasins génériques), rappels d'achat, statistiques.
+# 9 écrans capturés ; la fiche Play en retient 8 (maximum autorisé), voir play-visuels.py.
 # Aucun e-mail personnel, aucun code famille réel, aucune donnée de production.
 # Format Play : 1080 × 1920 (9:16 ; le côté long ne dépasse pas deux fois le côté court).
 # Usage : native-play-captures.sh APK SORTIE   (le serveur de recette doit avoir été lancé avec SEED_PLAY=1)
@@ -63,6 +64,11 @@ tapt "Historique"
 expect "S7. historique des courses" $UI wait "Recommander" 15
 sleep 1; shot play-7-historique
 
+# Statistiques : achats du mois, par catégorie, produits les plus achetés
+tapt "Statistiques"
+expect "S9. statistiques du mois" bash -c "$UI wait 'Achats par catégorie' 20 && $UI has 'Produits différents'"
+sleep 2; shot play-9-statistiques
+
 # Budget : vue d'ensemble du mois (solde, dépenses, entrées, budgets)
 tapt "Budget"
 expect "S5. budget du mois" $UI wait "Solde de mon compte" 20
@@ -95,5 +101,5 @@ sleep 2; shot play-3-selection-photos
 
 adb shell am broadcast -a com.android.systemui.demo -e command exit >/dev/null
 adb shell wm size reset >/dev/null; adb shell wm density reset >/dev/null
-echo "Captures : $(ls "$OUT"/play-*.png 2>/dev/null | wc -l) / 8 ; échecs : $FAILS" | tee -a "$OUT/resultats.txt"
+echo "Captures : $(ls "$OUT"/play-*.png 2>/dev/null | wc -l) / 9 ; échecs : $FAILS" | tee -a "$OUT/resultats.txt"
 exit $FAILS

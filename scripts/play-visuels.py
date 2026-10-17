@@ -90,6 +90,7 @@ CAPTIONS = {
     "play-6-budgets-mensuels": "Budget facultatif : vos budgets du mois",
     "play-7-historique": "Vos courses passées, à refaire en un geste",
     "play-8-rappels": "Un rappel s'il reste des achats",
+    "play-9-statistiques": "Vos achats en statistiques, mois par mois",
 }
 for sub in ("captures", "captures-habillees"):  # une seule série à jour (les anciennes captures ne traînent pas)
     for old in glob.glob(os.path.join(OUT, sub, "play-*.png")):
