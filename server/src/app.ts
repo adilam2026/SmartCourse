@@ -23,6 +23,7 @@ import { can, type Action } from "./permissions.js";
 import { canonicalCity } from "./cities.js";
 import { COUNTRIES, isCountry } from "./countries.js";
 import { familyLocation, locationRoutes } from "./location.js";
+import { familyFeatures, featureRoutes } from "./features.js";
 import { priceRoutes } from "./prices.js";
 import { templateRoutes } from "./templates.js";
 import { priceCommunityRoutes } from "./price-community.js";
@@ -240,6 +241,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     me.city = pr?.city ?? null;
     me.prefs = { showPrices: !!pr?.show_prices, showTotals: !!pr?.show_totals, rev: Number(pr?.prefs_rev ?? 0) };
     me.location = await familyLocation(db, a.familyId, can(a.role, "family.manage"));
+    me.features = await familyFeatures(db, a.familyId);
     if (can(a.role, "family.manage")) {
       const f = await db.query("SELECT code, name FROM families WHERE id = $1", [a.familyId]);
       me.family = { code: f.rows[0].code, name: f.rows[0].name };
@@ -402,6 +404,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   catalogRoutes(app, { db, store: deps.store, guard, hub });
   familyProductRoutes(app, { db, store: deps.store, guard, hub, managers: deps.catalogManagers });
   locationRoutes(app, { db, guard, hub, resolveCity: (c) => resolveCity(c, true)! });
+  featureRoutes(app, { db, guard, hub });
   app.get("/api/countries", async () => ({ countries: COUNTRIES }));
   listRoutes(app, { db, hub, guard, push });
   priceRoutes(app, { db, guard, hub });
