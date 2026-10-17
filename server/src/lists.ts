@@ -360,7 +360,7 @@ const stripDetail = (r: OpResult): OpResult => {
  * jamais deux listes en cours (l'index unique de la base les départage) et aucune demande n'est perdue : les deux lots s'appliquent à la même liste.
  */
 export async function ensureActiveList(db: Db, hub: SseHub, a: AuthContext): Promise<string> {
-  const find = async () => (await db.query<{ id: string }>("SELECT id FROM lists WHERE family_id = $1 AND status = 'active'", [a.familyId])).rows[0]?.id;
+  const find = async () => (await db.query<{ id: string }>("SELECT id FROM lists WHERE family_id = $1 AND status = 'active' ORDER BY created_at DESC, id", [a.familyId])).rows[0]?.id;
   const cur = await find();
   if (cur) return cur;
   try {
@@ -383,7 +383,7 @@ export async function createList(db: Db, hub: SseHub, a: AuthContext): Promise<{
     return r.rows[0]!;
   } catch (e: any) {
     if (e.code === "23505") {
-      const cur = await db.query("SELECT id FROM lists WHERE family_id = $1 AND status = 'active'", [a.familyId]);
+      const cur = await db.query("SELECT id FROM lists WHERE family_id = $1 AND status = 'active' ORDER BY created_at DESC, id", [a.familyId]);
       throw new HttpError(409, "active_exists", "Une liste est déjà en cours");
     }
     throw e;
@@ -585,7 +585,7 @@ export async function getListView(db: Db, a: AuthContext, listId: string) {
 }
 
 export async function getActiveListView(db: Db, a: AuthContext) {
-  const r = await db.query("SELECT id FROM lists WHERE family_id = $1 AND status = 'active'", [a.familyId]);
+  const r = await db.query("SELECT id FROM lists WHERE family_id = $1 AND status = 'active' ORDER BY created_at DESC, id", [a.familyId]);
   return r.rows[0] ? getListView(db, a, r.rows[0].id) : null;
 }
 
