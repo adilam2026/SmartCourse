@@ -86,7 +86,11 @@ Proposées et appliquées sauf avis contraire :
 - 17/10/2026 : production `/health` = `f460829`, migration `022`. Référence Git créée (`reference/android-1.0.2-1144`, `reference/serveur-022`). Analyse du code (listes, notifications, localisation, codes, prix, sauvegardes, rôles, authentification).
 
 - 17/10/2026 : tests serveur ciblés sur base de test locale (données fictives) : codes / inscription / récupération 71, localisation 3, plusieurs listes 2, quantités et migrations 37, listes 93, catalogue 58 — tous réussis.
-- 17/10/2026 : Android compilé et tests unitaires par l'intégration continue (branche `claude/evolutions-avancees`, run 48 : voir ci-dessous).
+- 17/10/2026 : Android (branche `claude/evolutions-avancees`, serveur de recette jetable construit depuis la même branche, émulateur Android 16) :
+  - compilation et tests unitaires réussis (runs 48 à 53) ;
+  - contrôle V (pays puis ville à la création de la famille) : réussi (run 50) ;
+  - contrôle M (plusieurs listes actives : désactivée par défaut, activation par l'administrateur, nouvelle liste nommée, changement de liste, désactivation refusée avec message clair, aucune liste supprimée) : réussi (run 53). Le run 52 avait révélé un message générique au refus de désactivation, corrigé.
+  - Non contrôlé sur émulateur : déclenchement réel d'un rappel à l'heure choisie (dépend d'Android ; à vérifier sur téléphone), Recommander vers une liste choisie, rappel groupé sur plusieurs listes.
 
 ## 6. Points bloquants / à valider
 1. **Sauvegarde vérifiée avant toute migration de production** : une sauvegarde récente doit être restaurée sur une base isolée et comparée (la seule présence de variables S3 ne suffit pas). Commande prévue côté serveur : `npm run backup -- verify` : elle restaure la dernière sauvegarde dans une base de contrôle **isolée** (variable `VERIFY_DATABASE_URL`, base vide distincte de la production) et compare les comptages au manifeste. À exécuter dans l'environnement Railway (secrets non partagés). Aucune migration de production avant ce résultat.
