@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Captures de la fiche Google Play : écrans RÉELS de la version finale (même code que l'APK livré, -Pfinal=1), sur un serveur de
 # recette LOCAL et jetable rempli de données FICTIVES (Famille Martin : Sophie, Karim, Léa, Nadia ; adresse example.org).
+# Version 1166 : trois listes en cours nommées, Budget en MAD (magasins génériques), rappels d'achat. 8 captures (maximum Play).
 # Aucun e-mail personnel, aucun code famille réel, aucune donnée de production.
 # Format Play : 1080 × 1920 (9:16 ; le côté long ne dépasse pas deux fois le côté court).
 # Usage : native-play-captures.sh APK SORTIE   (le serveur de recette doit avoir été lancé avec SEED_PLAY=1)
@@ -23,7 +24,7 @@ FAMILY=$(sql -c "SELECT code FROM families WHERE name='Famille Martin'")
 [ -n "$FAMILY" ] || { echo "Famille Martin absente : lancer la recette avec SEED_PLAY=1"; exit 1; }
 python3 "$HERE/play-seed.py" "$BASE" "$FAMILY" /tmp/play-dates.sql | tee -a "$OUT/resultats.txt" || exit 1
 sql < /tmp/play-dates.sql >/dev/null || exit 1
-expect "S0. données fictives : 3 courses passées, 1 liste en cours" test "$(sql -c "SELECT count(*) FILTER (WHERE status='archived')||'/'||count(*) FILTER (WHERE status='active') FROM lists l JOIN families f ON f.id=l.family_id WHERE f.code='$FAMILY'")" = "3/1"
+expect "S0. données fictives : 3 courses passées, 3 listes en cours" test "$(sql -c "SELECT count(*) FILTER (WHERE status='archived')||'/'||count(*) FILTER (WHERE status='active') FROM lists l JOIN families f ON f.id=l.family_id WHERE f.code='$FAMILY'")" = "3/3"
 
 # Écran au format Play, barre d'état propre (mode démonstration d'Android : heure fixe, réseau et batterie pleins, aucune notification)
 adb shell wm size 1080x1920 >/dev/null; adb shell wm density 420 >/dev/null
@@ -42,7 +43,7 @@ $UI wait "Bienvenue" 25 >/dev/null
 # Écran de 1920 px : le clavier masque les champs suivants, il est refermé après chaque saisie.
 fill "Code famille" "$FAMILY"; hide_kb; fill "Identifiant" sophie; hide_kb; fill "Code d'accès" 482913; hide_kb
 $UI tap "Se connecter" --last >/dev/null; sleep 4
-expect "S1. liste partagée affichée" $UI wait "Ma liste" 25
+expect "S1. liste partagée affichée (liste de la semaine, sélecteur de listes)" bash -c "$UI wait 'Ma liste' 25 && $UI wait 'Courses de la semaine' 10"
 sleep 3; shot play-1-liste-partagee
 
 # Articles achetés : la section « Déjà achetés » (achats de Karim)
@@ -51,31 +52,48 @@ expect "S4. articles achetés visibles (« Acheté par Karim »)" $UI wait "Ache
 sleep 1; shot play-4-articles-achetes
 for _ in 1 2 3 4; do adb shell input swipe 540 600 540 1600 200; done; sleep 1
 
-# Quantité : panneau de quantité des tomates (1,5 kg)
-$UI tap "1,5 kg" >/dev/null; sleep 2
-expect "S3. panneau de quantité" $UI wait "Mettre à jour" 10
-sleep 1; shot play-3-quantite
+# Plusieurs listes en cours : le sélecteur ouvre les trois listes de la famille
+tapt "listes en cours"
+expect "S2. listes en cours (3 listes nommées)" bash -c "$UI wait 'Anniversaire de Léa' 15 && $UI has 'Produits ménagers'"
+sleep 2; shot play-2-listes-en-cours
 adb shell input keyevent KEYCODE_BACK; sleep 2
 
 # Historique : trois courses passées
 tapt "Historique"
-expect "S5. historique des courses" $UI wait "Recommander" 15
-sleep 1; shot play-5-historique
+expect "S7. historique des courses" $UI wait "Recommander" 15
+sleep 1; shot play-7-historique
 
-# Profils et droits : Réglages → Profils
-tapt "Réglages"; tapt "Profils"
-expect "S6. profils de la famille" bash -c "$UI wait 'Nadia' 15 && $UI has 'Léa'"
-sleep 1; shot play-6-profils
+# Budget : vue d'ensemble du mois (solde, dépenses, entrées, budgets)
+tapt "Budget"
+expect "S5. budget du mois" $UI wait "Solde de mon compte" 20
+sleep 2; shot play-5-budget
+
+# Budgets mensuels par catégorie
+for _ in 1 2 3 4 5; do $UI has "Budgets mensuels" && break; adb shell input swipe 540 1500 540 700 400; sleep 1; done
+tapt "Budgets mensuels"
+expect "S6. budgets mensuels" bash -c "$UI wait 'Transport' 15 && $UI has 'Maison'"
+sleep 2; shot play-6-budgets-mensuels
 adb shell input keyevent KEYCODE_BACK; sleep 2
 
-# Sélection avec photos : « Ajouter des articles », affichage en carrés, deux articles choisis
+# Rappels d'achat : Réglages → Notifications et rappels, rappel activé du lundi au samedi à 18:00
+tapt "Réglages"
+for _ in 1 2 3; do $UI has "Notifications et rappels" && break; adb shell input swipe 540 1500 540 700 400; sleep 1; done
+tapt "Notifications et rappels"
+$UI wait "Me rappeler les articles restants" 15 >/dev/null
+tapt "Me rappeler les articles restants"
+tapt "Dim"
+expect "S8. rappels d'achat activés" bash -c "$UI wait '18:00' 10 && $UI has 'Ajouter un horaire'"
+sleep 1; shot play-8-rappels
+adb shell input keyevent KEYCODE_BACK; sleep 2
+
+# Sélection avec photos : « Ajouter des articles », affichage en carrés
 tapt "Liste"; tapt "Ajouter des articles"
-expect "S2. sélection avec photos" $UI wait "Terminer ma sélection" 15
+expect "S3. sélection avec photos" $UI wait "Terminer ma sélection" 15
 $UI tap "Carrés" >/dev/null 2>&1; sleep 2
 for _ in 1 2 3 4; do adb shell input swipe 540 600 540 1600 200; done; sleep 1
-sleep 2; shot play-2-selection-photos
+sleep 2; shot play-3-selection-photos
 
 adb shell am broadcast -a com.android.systemui.demo -e command exit >/dev/null
 adb shell wm size reset >/dev/null; adb shell wm density reset >/dev/null
-echo "Captures : $(ls "$OUT"/play-*.png 2>/dev/null | wc -l) / 6 ; échecs : $FAILS" | tee -a "$OUT/resultats.txt"
+echo "Captures : $(ls "$OUT"/play-*.png 2>/dev/null | wc -l) / 8 ; échecs : $FAILS" | tee -a "$OUT/resultats.txt"
 exit $FAILS
