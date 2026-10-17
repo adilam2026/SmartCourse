@@ -240,6 +240,8 @@ private fun HistoryDetailReal(id: String, nav: (String) -> Unit, onBack: () -> U
                     }
                 }
             }
+            // Budget : paiements de cette liste (dates réelles), état, saisie ultérieure sans rouvrir la commande.
+            item { ListPaymentsSection(id, "Commande du $title") }
         }
         Column(Modifier.fillMaxWidth().background(Color.White).navigationBarsPadding().padding(16.dp, 10.dp)) {
             PrimaryButton("Recommander", { lines?.let { reorder(demo, it, nav) } }, Modifier.fillMaxWidth(), leading = Icons.Rounded.Replay, enabled = lines?.isNotEmpty() == true)

@@ -160,6 +160,11 @@ class Demo(initialRole: Role? = null, val live: Boolean = false) {
     var listName by mutableStateOf<String?>(null)
     /** « Recommander » avec plusieurs listes : destination à choisir (nouvelle liste ou liste existante). */
     var reorderDestination by mutableStateOf<Map<String, Int>?>(null)
+    /** Module Budget pour CE profil (null : option désactivée ou état pas encore lu) ; budgetRev change à chaque mise à jour du serveur. */
+    var budget by mutableStateOf<BudgetInfo?>(null)
+    var budgetRev by mutableStateOf(0)
+    /** Identifiant de la liste consultée (paiements de courses rattachés automatiquement). */
+    var currentListId by mutableStateOf<String?>(null)
     var showTotals by mutableStateOf(false)
     var selMode by mutableStateOf(
         when (Launch.str("mode")) { "list" -> SelMode.LIST; else -> SelMode.GRID }

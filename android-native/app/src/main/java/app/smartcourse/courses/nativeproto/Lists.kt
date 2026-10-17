@@ -46,19 +46,27 @@ fun AdminListScreen(nav: (String) -> Unit) {
     val noList = demo.live && demo.listLoaded && !demo.hasList && total == 0
     val canClose = !demo.live || demo.hasList
     val canShare = total > bought
+    // Budget activé et profil autorisé : action discrète « Saisir un paiement » (la liste courante est associée automatiquement).
+    val canPay = demo.live && demo.hasList && canRecordPayments(demo)
+    var payment by remember { mutableStateOf(false) }
     // À acheter, groupés par catégorie ; les articles achetés passent dans « Déjà achetés », après toutes les catégories.
     val groups = demo.lines.filter { !it.bought }.groupBy { demo.byId[it.productId]?.category ?: "" }
     val boughtLines = demo.lines.filter { it.bought }
 
     Column(Modifier.fillMaxSize()) {
         TopBar("Ma liste", if (noList) "" else demo.listDate, actions = {
-            if (canClose || canShare) Box {
+            if (canClose || canShare || canPay) Box {
                 IconButton({ menu = true }) { Icon(Icons.Rounded.MoreVert, "Plus d'actions", tint = C.Ink) }
                 DropdownMenu(menu, { menu = false }, containerColor = Color.White, shape = RoundedCornerShape(16.dp)) {
                     if (canClose) DropdownMenuItem(
                         text = { Text("Clôturer la liste") },
                         leadingIcon = { Icon(Icons.Rounded.Check, null, tint = C.Ink) },
                         onClick = { menu = false; confirmClose = true },
+                    )
+                    if (canPay) DropdownMenuItem(
+                        text = { Text("Saisir un paiement") },
+                        leadingIcon = { Icon(Icons.Rounded.Payments, null, tint = C.Ink) },
+                        onClick = { menu = false; payment = true },
                     )
                     if (canShare) DropdownMenuItem(
                         text = { Text("Partager la liste") },
@@ -156,7 +164,15 @@ fun AdminListScreen(nav: (String) -> Unit) {
         }
     }
 
-    if (confirmClose) {
+    val label = demo.listName ?: "Liste du ${demo.listDate}"
+    if (payment) demo.currentListId?.let { id -> PaymentSheet(id, label, { payment = false }, { payment = false }) }
+    // Budget activé : la clôture montre d'abord les paiements déjà saisis (rien n'est redemandé ni déduit deux fois).
+    if ((confirmClose || confirmFinish) && canPay) demo.currentListId?.let { id ->
+        CloseWithPaymentsSheet(id, label, total - bought, onClose = {
+            confirmClose = false; confirmFinish = false
+            demo.data?.closeList { ok -> if (ok) nav("v06") }
+        }, onDismiss = { confirmClose = false; confirmFinish = false })
+    } else if (confirmClose) {
         val left = total - bought
         ConfirmDialog(
             "Clôturer la liste ?",
@@ -164,7 +180,7 @@ fun AdminListScreen(nav: (String) -> Unit) {
             "Clôturer", { confirmClose = false; val d = demo.data; if (d != null) d.closeList { ok -> if (ok) nav("v06") } else { demo.simulated("clôture de la liste"); nav("v06") } }, { confirmClose = false },
         )
     }
-    if (confirmFinish) {
+    if (confirmFinish && !canPay) {
         ConfirmDialog(
             "Terminer les courses ?", "Tout est acheté. La liste sera archivée dans l'historique.",
             "Terminer", { confirmFinish = false; val d = demo.data; if (d != null) d.closeList { ok -> if (ok) nav("v06") } else { demo.simulated("fin des courses"); nav("v06") } }, { confirmFinish = false },
@@ -245,7 +261,12 @@ fun StaffListScreen(nav: (String) -> Unit) {
     val shownEmpty = todo.isEmpty() && done.isEmpty()
 
     Column(Modifier.fillMaxSize()) {
-        TopBar("Liste du jour", if (noList) "" else demo.listDate)
+        val canPay = demo.live && demo.hasList && canRecordPayments(demo)
+        var payment by remember { mutableStateOf(false) }
+        TopBar("Liste du jour", if (noList) "" else demo.listDate, actions = {
+            if (canPay) IconButton({ payment = true }) { Icon(Icons.Rounded.Payments, "Saisir un paiement", tint = C.Ink) }
+        })
+        if (payment) demo.currentListId?.let { id -> PaymentSheet(id, demo.listName ?: "Liste du jour", { payment = false }, { payment = false }) }
         ListSwitcher(canCreate = false)
         if (total == 0) {
             Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {

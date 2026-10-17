@@ -158,6 +158,7 @@ private val ADMIN_TABS = listOf(
     NavItem("v12", "Statistiques", Icons.Rounded.BarChart),
     NavItem("v07", "Réglages", Icons.Rounded.Settings),
 )
+private val BUDGET_TAB = NavItem("b1", "Budget", Icons.Rounded.AccountBalanceWallet)
 private val STAFF_TABS = listOf(
     NavItem("v04", "Choisir", Icons.Rounded.GridView),
     NavItem("v03", "Liste du jour", Icons.Rounded.Checklist),
@@ -167,6 +168,7 @@ private val STAFF_TABS = listOf(
 private fun tabFor(route: String?): String? = when {
     route == null -> null
     route.startsWith("v06") -> "v06"
+    route.startsWith("b") -> "b1"
     route in listOf("v08", "v09", "v10", "v11") || route.startsWith("stub") -> "v07"
     else -> route
 }
@@ -215,12 +217,15 @@ fun App(session: Session, me: Me?) {
 
     val go: (String) -> Unit = { r ->
         val staff = demo.role == Role.STAFF
-        val tab = if (staff) STAFF_TABS.any { it.route == r } else ADMIN_TABS.any { it.route == r }
+        val tab = if (staff) STAFF_TABS.any { it.route == r } else ADMIN_TABS.any { it.route == r } || r == BUDGET_TAB.route
         // Personnel : l'écran Choisir (mode, recherche, défilement) est conservé quand on passe par Liste du jour.
         nav.navigate(r) { if (tab) { if (staff) popUpTo(nav.graph.startDestinationId) { inclusive = false } else popUpTo("v02") { inclusive = false }; launchSingleTop = true } }
     }
     val back: () -> Unit = { nav.popBackStack() }
-    val tabs = if (demo.role == Role.ADMIN) (if (me?.role == "parent") ADMIN_TABS.filter { it.route != "v07" } else ADMIN_TABS) else STAFF_TABS
+    val baseTabs = if (demo.role == Role.ADMIN) (if (me?.role == "parent") ADMIN_TABS.filter { it.route != "v07" } else ADMIN_TABS) else STAFF_TABS
+    // Onglet Budget : seulement si l'option est activée ET que ce profil peut consulter le suivi financier (droit vérifié par le serveur).
+    val tabs = if (demo.role == Role.ADMIN && demo.budget?.let { it.enabled && it.rights.view } == true)
+        baseTabs.flatMap { if (it.route == "v12") listOf(it, BUDGET_TAB) else listOf(it) } else baseTabs
     val showBar = route != null && route != "v01" &&
         // Personnel : aucune barre d'onglets (ni son conteneur ni son espace) ; « Choisir mes articles » est l'unique écran principal.
         demo.role == Role.ADMIN && route != "v04"
@@ -258,7 +263,15 @@ fun App(session: Session, me: Me?) {
                         composable("v11") { DisplayScreen(back) }
                         composable("v12") { StatsScreen() }
                         composable("v15") { LocationScreen(back) }
-                        composable("v17") { AdvancedSettingsScreen(back) }
+                        composable("v17") { AdvancedSettingsScreen(back, go) }
+                        // Module Budget (option familiale) : vue d'ensemble, historique, opération, budgets, Mon compte, réglages, droits.
+                        composable("b1") { BudgetScreen(go) }
+                        composable("b2") { OperationsScreen(back) }
+                        composable("b3") { AddOperationScreen(back) }
+                        composable("b4") { BudgetsScreen(back) }
+                        composable("b5") { AccountScreen(back) }
+                        composable("b6") { BudgetSettingsScreen(go, back) }
+                        composable("b7") { FinanceRightsScreen(back) }
                         composable("stub/{name}") { StubScreen(it.arguments?.getString("name") ?: "", back) }
                     }
                     if (showBar) BottomNav(tabs, tabFor(route) ?: "", go)

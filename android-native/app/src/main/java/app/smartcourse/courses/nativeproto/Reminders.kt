@@ -32,8 +32,8 @@ import java.time.ZonedDateTime
 
 /**
  * Rappels d'achat personnels (propres à chaque profil, sur ce téléphone) : jours et horaires choisis.
- * Pas d'alarme exacte (permission restreinte par Google Play) : Android déclenche le rappel dans une fenêtre d'environ 10 minutes après
- * l'horaire, parfois plus tard en économie de batterie. Au déclenchement, la liste est vérifiée : aucun rappel s'il ne reste rien à acheter.
+ * Pas d'alarme exacte (permission restreinte par Google Play) : le rappel est demandé dans une fenêtre de 10 minutes après l'horaire,
+ * mais Android peut le différer davantage (économie de batterie, veille) : aucun délai n'est garanti. Au déclenchement, la liste est vérifiée : aucun rappel s'il ne reste rien à acheter.
  */
 data class ReminderPrefs(val enabled: Boolean = false, val days: Set<Int> = setOf(1, 2, 3, 4, 5, 6, 7), val times: List<String> = listOf("18:00")) {
     fun encode() = "${if (enabled) 1 else 0}|${days.sorted().joinToString(",")}|${times.joinToString(",")}"

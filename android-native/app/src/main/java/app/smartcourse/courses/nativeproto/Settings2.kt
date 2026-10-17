@@ -452,7 +452,7 @@ private fun ReminderSettings(allowed: Boolean, refresh: () -> Unit) {
             ctx.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, ctx.packageName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }, Modifier.fillMaxWidth(), height = 52.dp)
     }
-    if (prefs.enabled) InfoRow("Heure locale du téléphone. Android peut retarder un rappel de quelques minutes, davantage en économie de batterie : l'horaire n'est pas garanti à la minute près. Un rappel n'affiche jamais de montant.")
+    if (prefs.enabled) InfoRow("Heure locale du téléphone. Les rappels peuvent être différés par Android (économie de batterie, mise en veille, mode Ne pas déranger…) : l'heure de réception n'est pas garantie. Un rappel n'affiche jamais de montant.")
     editing?.let { idx ->
         val initial = if (idx >= 0) prefs.times.getOrNull(idx)?.let { ReminderPrefs.parseTime(it) } else null
         val state = rememberTimePickerState(initial?.hour ?: 18, initial?.minute ?: 0, is24Hour = true)

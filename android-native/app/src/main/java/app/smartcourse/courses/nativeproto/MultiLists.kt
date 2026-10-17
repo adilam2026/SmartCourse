@@ -141,7 +141,7 @@ fun ReorderDestination(nav: (String) -> Unit) {
 
 /** Paramètres avancés de la famille : options désactivées par défaut, modifiables par un administrateur seulement. */
 @Composable
-fun AdvancedSettingsScreen(onBack: () -> Unit) {
+fun AdvancedSettingsScreen(onBack: () -> Unit, nav: (String) -> Unit = {}) {
     val demo = LocalDemo.current
     val data = demo.data
     val me = data?.session?.signedMe
@@ -150,6 +150,8 @@ fun AdvancedSettingsScreen(onBack: () -> Unit) {
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var confirmOff by remember { mutableStateOf(false) }
+    var activate by remember { mutableStateOf(false) }
+    var confirmBudgetOff by remember { mutableStateOf(false) }
     fun apply(on: Boolean) {
         val d = data ?: return
         busy = true; error = null
@@ -172,12 +174,85 @@ fun AdvancedSettingsScreen(onBack: () -> Unit) {
                     TealSwitch(demo.multiLists, { on -> if (on) apply(true) else confirmOff = true }, enabled = admin && !busy)
                 }
             }
+            val budgetOn = me?.features?.budget == true
+            SCard(padding = PaddingValues(16.dp)) {
+                Row(Modifier.clickable(enabled = admin && !busy) { if (budgetOn) confirmBudgetOff = true else activate = true }, verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                        Text("Gestion du budget", style = MaterialTheme.typography.titleSmall)
+                        Text(if (budgetOn) "Activée · onglet Budget et saisie des paiements pour les profils autorisés" else "Suivre les dépenses réelles de la famille, saisies à la main. Désactivée : aucun onglet Budget ni saisie de paiement.", style = MaterialTheme.typography.bodySmall)
+                    }
+                    TealSwitch(budgetOn, { on -> if (on) activate = true else confirmBudgetOff = true }, enabled = admin && !busy)
+                }
+                if (budgetOn && demo.budget?.rights?.manage == true) {
+                    Spacer(Modifier.height(8.dp))
+                    SecondaryButton("Réglages du budget", { nav("b6") }, Modifier.fillMaxWidth())
+                }
+            }
             error?.let { Text(it, color = C.Danger, style = MaterialTheme.typography.bodyMedium) }
         }
     }
+    if (activate) BudgetActivationSheet({ activate = false }) { cur ->
+        val d = data ?: return@BudgetActivationSheet
+        busy = true; error = null
+        scope.launch {
+            when (val r = d.session.api.call("PUT", "/api/family/features", kotlinx.serialization.json.buildJsonObject { put("budget", kotlinx.serialization.json.JsonPrimitive(true)); put("currency", kotlinx.serialization.json.JsonPrimitive(cur)) })) {
+                is app.smartcourse.courses.nativeproto.net.Outcome.Ok -> { activate = false; d.session.verify(); d.loadBudget(); demo.say("Gestion du budget activée.") }
+                is app.smartcourse.courses.nativeproto.net.Outcome.Fail -> error = explain(r)
+            }
+            busy = false
+        }
+    }
+    if (confirmBudgetOff) ConfirmDialog(
+        "Désactiver la gestion du budget ?",
+        "L'onglet Budget et la saisie des paiements disparaissent pour toute la famille. Les opérations déjà saisies sont conservées et réapparaîtront si l'option est réactivée.",
+        "Désactiver", {
+            confirmBudgetOff = false
+            val d = data ?: return@ConfirmDialog
+            scope.launch {
+                when (val r = d.session.api.call("PUT", "/api/family/features", kotlinx.serialization.json.buildJsonObject { put("budget", kotlinx.serialization.json.JsonPrimitive(false)) })) {
+                    is app.smartcourse.courses.nativeproto.net.Outcome.Ok -> { d.session.verify(); demo.budget = null }
+                    is app.smartcourse.courses.nativeproto.net.Outcome.Fail -> error = explain(r)
+                }
+            }
+        }, { confirmBudgetOff = false },
+    )
     if (confirmOff) ConfirmDialog(
         "Revenir à une seule liste ?",
         "Possible seulement quand une seule liste est en cours : clôturez ou supprimez d'abord les autres listes.",
         "Désactiver", { confirmOff = false; apply(false) }, { confirmOff = false },
     )
+}
+
+/** Activation : devise proposée selon le pays, à confirmer ; elle sera figée dès la première opération. */
+@Composable
+fun BudgetActivationSheet(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+    val demo = LocalDemo.current
+    val data = demo.data ?: return
+    var info by remember { mutableStateOf<BudgetInfo?>(null) }
+    var cur by remember { mutableStateOf<String?>(null) }
+    var pick by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        (Fin.call(data, "GET", "/api/budget", BudgetInfo.serializer()) as? FinR.Ok)?.let { info = it.v; cur = it.v.currency ?: it.v.proposedCurrency }
+    }
+    AppSheet(onDismiss) {
+        Text("Activer la gestion du budget", style = MaterialTheme.typography.titleLarge)
+        Spacer(Modifier.height(6.dp))
+        Text("Suivez les dépenses réelles de la famille. Rien n'est débité : les montants sont saisis à la main, sans connexion bancaire.", style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.height(12.dp))
+        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(C.TealSoft).clickable { pick = true }.heightIn(min = 56.dp).padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Devise de la famille", style = MaterialTheme.typography.labelMedium, color = C.Muted)
+                Text(cur?.let { it + if (it == info?.proposedCurrency) " — proposée pour votre pays" else "" } ?: "Choisir la devise", style = MaterialTheme.typography.bodyLarge)
+            }
+            Icon(Icons.Rounded.ExpandMore, "Changer de devise", tint = C.TealDark)
+        }
+        Text("Une seule devise par famille. Elle ne pourra plus être changée dès qu'une opération sera enregistrée.", style = MaterialTheme.typography.bodySmall, color = C.Muted, modifier = Modifier.padding(top = 6.dp))
+        Spacer(Modifier.height(8.dp))
+        Text("Dépenses et entrées : toujours incluses. Budgets mensuels et Mon compte (solde) : facultatifs, à activer ensuite dans Réglages du budget. Les autres membres n'ont aucun accès financier tant que vous ne leur en donnez pas.", style = MaterialTheme.typography.bodySmall)
+        Spacer(Modifier.height(14.dp))
+        PrimaryButton("Confirmer la devise et activer", { cur?.let(onConfirm) }, Modifier.fillMaxWidth(), enabled = cur != null)
+        Spacer(Modifier.height(8.dp))
+        SecondaryButton("Annuler", onDismiss, Modifier.fillMaxWidth())
+    }
+    if (pick) CurrencySheet(cur, info?.currencies ?: emptyMap(), { cur = it; pick = false }, { pick = false })
 }

@@ -15,6 +15,12 @@ nodemo() { # aucun bandeau ni fonction de démonstration / technique visible
 }
 st() { sql "SELECT string_agg(i.quantity||' '||i.unit||' '||i.status, ',') FROM list_items i JOIN products p ON p.id=i.product_id JOIN lists l ON l.id=i.list_id JOIN families f ON f.id=l.family_id WHERE f.code='$FAMILY' AND l.status='active' AND p.name='$1' AND i.status<>'removed'"; }
 
+# Recette : toutes les listes en cours de la famille clôturées par l'API (départ propre d'une section).
+closeall_api() { api GET /api/lists/open >/dev/null; for l in $(jq -r '.lists[]?.id' /tmp/api.out); do api POST "/api/lists/$l/close" -d '{}' >/dev/null; done
+  api GET /api/lists/active >/dev/null; local l; l=$(jq -r '.list.id // empty' /tmp/api.out); [ -n "$l" ] && api POST "/api/lists/$l/close" -d '{}' >/dev/null; true; }
+pid_of() { sql "SELECT p.id FROM products p JOIN families f ON f.id=p.family_id WHERE f.code='$FAMILY' AND p.name='$1'"; }
+add_api() { api POST "${3:-/api/lists/active/ops}" -d "{\"ops\":[{\"opId\":\"$(cat /proc/sys/kernel/random/uuid)\",\"type\":\"add\",\"productId\":\"$(pid_of "$1")\",\"quantity\":$2}]}" >/dev/null; }
+
 # Sections à jouer (variable SECTIONS, ex. « C » ou « C,G ») ; vide = toutes. Chaque section part de l'écran de connexion.
 want_s() { [ -z "${SECTIONS:-}" ] || [[ ",${SECTIONS// /}," == *",$1,"* ]]; }
 # Saisies VÉRIFIÉES : chaque fill() doit réussir et le champ doit afficher la valeur tapée. Le code d'accès est contrôlé en clair avec
@@ -738,6 +744,102 @@ expect "D6b. reconnexion refusée ; Driss et Lamiaa se connectent" bash -c "
 
 fi
 fi
+if want_s B; then
+echo "═══ B. Budget : activation, paiements pendant les courses, clôture sans double débit, vue d'ensemble — contrôle court ═══" | tee -a "$OUT/resultats.txt"
+login_api adil 482913
+closeall_api; api PUT /api/family/features -d '{"multiLists":false,"budget":false}' >/dev/null
+add_api Tomates 2
+LISTB=$(api GET /api/lists/active >/dev/null; jq -r '.list.id' /tmp/api.out)
+OPS() { sql "SELECT coalesce(string_agg(m.name||':'||o.amount_minor, ',' ORDER BY m.name),'') FROM finance_operations o JOIN finance_merchants m ON m.id=o.merchant_id WHERE o.list_id='$LISTB' AND o.voided_at IS NULL"; }
+launch; $UI wait "Bienvenue" 25 >/dev/null
+signin "$FAMILY" adil 482913; $UI wait "Ma liste" 25 >/dev/null
+expect "B0. option désactivée : aucun onglet Budget ni « Saisir un paiement »" bash -c "! $UI has 'Budget' && ! $UI has 'Saisir un paiement'"
+tapt "Réglages"; $UI tap "Paramètres avancés" --scroll >/dev/null; sleep 2
+$UI tap "Gestion du budget" >/dev/null; sleep 3
+$UI has "Choisir la devise" && { $UI tap "Choisir la devise" >/dev/null; sleep 2; $UI tap "MAD" --scroll >/dev/null; sleep 2; }
+expect "B1. activation : devise à confirmer, figée dès la première opération" bash -c "$UI has 'MAD' && $UI has 'ne pourra plus être changée'"
+shot final-b1-activation
+$UI tap "Confirmer la devise et activer" >/dev/null; sleep 5
+expect "B1b. activée côté serveur, devise MAD" test "$(sql "SELECT f.budget_enabled||':'||s.currency FROM families f JOIN finance_settings s ON s.family_id=f.id WHERE f.code='$FAMILY'")" = "true:MAD"
+adb shell input keyevent KEYCODE_BACK; sleep 2; tapt "Liste"; sleep 3
+$UI tap "Plus d'actions" >/dev/null; sleep 2
+expect "B2. menu de la liste : « Saisir un paiement »" $UI has "Saisir un paiement"
+$UI tap "Saisir un paiement" >/dev/null; sleep 3
+$UI tap "Carrefour" >/dev/null; sleep 1
+fill "Montant payé" "450"; hide_kb
+shot final-b2-paiement
+$UI tap "Enregistrer la dépense" --scroll >/dev/null; sleep 5
+expect "B3. dépense Courses enregistrée et rattachée à la liste en cours ($(OPS))" test "$(OPS)" = "Carrefour:45000"
+$UI tap "Plus d'actions" >/dev/null; sleep 2; $UI tap "Saisir un paiement" >/dev/null; sleep 3
+$UI tap "BIM" >/dev/null; sleep 1; fill "Montant payé" "320"; hide_kb
+$UI tap "Enregistrer la dépense" --scroll >/dev/null; sleep 5
+$UI tap "Plus d'actions" >/dev/null; sleep 2; $UI tap "Clôturer la liste" >/dev/null; sleep 4
+expect "B4. clôture : paiements déjà saisis et total de la liste (770,00 DH), rien à ressaisir" bash -c "$UI has 'Paiements enregistrés' && $UI has 'Total de la liste' && $UI has '770,00 DH' && $UI has 'Confirmer et clôturer'"
+shot final-b3-cloture
+$UI tap "Confirmer et clôturer" --scroll >/dev/null; sleep 6
+expect "B5. liste clôturée, paiements confirmés complets, aucun débit supplémentaire ($(OPS))" bash -c "test \"\$(docker exec sc-recette-pg psql -U smart -d smartcourse -tAc \"SELECT status FROM lists WHERE id='$LISTB'\")\" = archived && test \"\$(docker exec sc-recette-pg psql -U smart -d smartcourse -tAc \"SELECT count(*) FROM list_payment_status WHERE list_id='$LISTB'\")\" = 1" && test "$(OPS)" = "BIM:32000,Carrefour:45000"
+tapt "Budget"; sleep 4
+expect "B6. vue d'ensemble : dépenses du mois 770,00 DH (Courses), entrées séparées" bash -c "$UI has 'Dépenses du mois' && $UI has '770,00 DH' && $UI has 'Entrées du mois'"
+shot final-b4-vue-ensemble
+api PUT /api/family/features -d '{"budget":false}' >/dev/null
+logout
+fi
+
+if want_s W; then
+echo "═══ W. Recommander vers une liste choisie (plusieurs listes actives) — contrôle ciblé ═══" | tee -a "$OUT/resultats.txt"
+login_api adil 482913
+closeall_api; api PUT /api/family/features -d '{"multiLists":true}' >/dev/null
+# Commande passée : Tomates 3 et Oignons 1, achetées puis archivées
+add_api Tomates 3; add_api Oignons 1
+api GET /api/lists/active >/dev/null; OLDW=$(jq -r '.list.id' /tmp/api.out)
+for it in $(jq -r '.list.items[].id' /tmp/api.out); do api POST "/api/lists/$OLDW/ops" -d "{\"ops\":[{\"opId\":\"$(cat /proc/sys/kernel/random/uuid)\",\"type\":\"purchase\",\"itemId\":\"$it\"}]}" >/dev/null; done
+api POST "/api/lists/$OLDW/close" -d '{}' >/dev/null
+# Deux listes en cours : « Souk » (Carottes) et « Epicerie » (vide, consultée en dernier)
+api POST /api/lists -d '{"name":"Souk"}' >/dev/null; SOUK=$(jq -r '.list.id' /tmp/api.out); add_api Carottes 1 "/api/lists/$SOUK/ops"
+api POST /api/lists -d '{"name":"Epicerie"}' >/dev/null; EPI=$(jq -r '.list.id' /tmp/api.out)
+CONTENT() { sql "SELECT coalesce(string_agg(p.name||':'||i.quantity, ',' ORDER BY p.name),'') FROM list_items i JOIN products p ON p.id=i.product_id WHERE i.list_id='$1' AND i.status<>'removed'"; }
+OLDW0=$(CONTENT "$OLDW")
+launch; $UI wait "Bienvenue" 25 >/dev/null
+signin "$FAMILY" adil 482913; $UI wait "Ma liste" 25 >/dev/null
+tapt "Historique"; $UI wait "Recommander" 15 >/dev/null
+$UI tap "Recommander" >/dev/null; sleep 4
+expect "W1. destination demandée : listes en cours et nouvelle liste" bash -c "$UI has 'Recommander dans' && $UI has 'Souk' && $UI has 'Epicerie' && $UI has 'Nouvelle liste'"
+shot final-w1-destination
+$UI tap "Souk" --last >/dev/null; sleep 5
+expect "W2. liste choisie non vide : Ajouter / Remplacer proposé" $UI has "Ajouter à la liste actuelle"
+$UI tap "Ajouter à la liste actuelle" >/dev/null; sleep 6
+expect "W3. articles ajoutés à « Souk » seulement ($(CONTENT "$SOUK"))" bash -c "test \"$(CONTENT "$SOUK")\" = 'Carottes:1.000,Oignons:1.000,Tomates:3.000' && test -z \"$(CONTENT "$EPI")\""
+expect "W4. commande d'origine intacte" test "$(CONTENT "$OLDW")" = "$OLDW0"
+closeall_api; api PUT /api/family/features -d '{"multiLists":false}' >/dev/null
+logout
+fi
+
+if want_s Q; then
+echo "═══ Q. Rappel d'achat : programmé puis reçu à l'horaire (horloge de l'émulateur avancée) — contrôle court ═══" | tee -a "$OUT/resultats.txt"
+login_api adil 482913
+closeall_api; api PUT /api/family/features -d '{"multiLists":false}' >/dev/null
+add_api Tomates 2
+adb shell pm grant $PKG android.permission.POST_NOTIFICATIONS 2>/dev/null
+launch; $UI wait "Bienvenue" 25 >/dev/null
+signin "$FAMILY" adil 482913; $UI wait "Ma liste" 25 >/dev/null
+tapt "Réglages"; $UI tap "Notifications et rappels" --scroll >/dev/null; sleep 3
+$UI tap "Me rappeler les articles restants" --scroll >/dev/null; sleep 3
+expect "Q1. rappel activé (18:00, tous les jours), limite affichée : peut être différé par Android" bash -c "$UI has '18:00' && $UI has 'différés par Android'"
+shot final-q1-rappel
+expect "Q2. réveil programmé auprès d'Android (sans alarme exacte)" bash -c "adb shell dumpsys alarm | grep -q 'app.smartcourse.courses.natif'"
+adb shell input keyevent KEYCODE_HOME; sleep 1
+adb root >/dev/null 2>&1; sleep 3; adb wait-for-device
+adb shell settings put global auto_time 0
+D=$(adb shell date +%m%d%Y | tr -d '\r')
+adb shell date "${D:0:4}1759${D:4:4}.50" >/dev/null
+GOT=""
+for i in $(seq 1 70); do adb shell dumpsys notification --noredact 2>/dev/null | grep -q "Il reste 1 article à acheter" && { GOT=1; break; }; sleep 10; done
+echo "      reçu après environ $(( i * 10 )) s (horloge réglée à 17:59:50 ; Android peut différer)" | tee -a "$OUT/resultats.txt"
+expect "Q3. notification reçue : « Il reste 1 article à acheter », sans montant" bash -c "test -n '$GOT' && ! adb shell dumpsys notification --noredact | grep -A3 'Il reste 1 article' | grep -q 'DH'"
+adb shell cmd statusbar expand-notifications; sleep 2; shot final-q2-notification; adb shell cmd statusbar collapse
+adb shell settings put global auto_time 1
+fi
+
 echo "ECHECS=$FAILS" | tee -a "$OUT/resultats.txt"
 adb logcat -d -b crash > "$OUT/logcat-crash.txt" 2>&1 || true
 echo "CRASH_APPLICATION=$(grep -c app.smartcourse "$OUT/logcat-crash.txt")" | tee -a "$OUT/resultats.txt"

@@ -115,6 +115,15 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
     fun applyFeatures(f: app.smartcourse.courses.nativeproto.net.FamilyFeatures?) {
         demo.multiLists = f?.multiLists == true
         if (demo.multiLists) scope.launch { loadOpenLists() } else demo.openLists = emptyList()
+        if (f?.budget == true) scope.launch { loadBudget() } else demo.budget = null
+    }
+
+    /** État du module Budget pour ce profil (droits compris, décidés par le serveur). */
+    suspend fun loadBudget() {
+        when (val r = Fin.call(this, "GET", "/api/budget", BudgetInfo.serializer())) {
+            is FinR.Ok -> { demo.budget = r.v; demo.budgetRev++ }
+            is FinR.Err -> if (!r.network) demo.budget = null
+        }
     }
 
     suspend fun loadOpenLists() {
@@ -190,6 +199,7 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
         demo.hasList = engine.list != null
         demo.listDate = frenchDate(engine.list?.createdAt ?: java.time.OffsetDateTime.now().toString())
         demo.listName = engine.list?.name
+        demo.currentListId = engine.list?.id
         online = engine.online
     }
 
@@ -298,6 +308,7 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
             "list.updated", "list.closed", "list.created", "list.deleted" -> { if (demo.multiLists) loadOpenLists(); flushAndRefresh() }
             "catalog.updated" -> refreshCatalog()
             "prefs.updated" -> session.verify()
+            "budget.updated" -> if (demo.budget != null) loadBudget()
         }
     }
 
