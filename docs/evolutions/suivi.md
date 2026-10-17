@@ -77,6 +77,7 @@ Le serveur fait une sauvegarde chiffrée quotidienne (pg_dump + manifeste + phot
 7. **Montants** : enregistrés en centimes entiers ; chaque saisie porte un identifiant de requête pour éviter les doublons.
 
 ## 5. Contrôles effectués
+- 17/10/2026 : maquettes des nouveaux parcours (22 écrans) : https://claude.ai/artifact/B1cei82u74Zfo3upEbrs7h — en attente de validation.
 - 17/10/2026 : production `/health` = `f460829`, migration `022`. Référence Git créée (`reference/android-1.0.2-1144`, `reference/serveur-022`). Analyse du code (listes, notifications, localisation, codes, prix, sauvegardes, rôles, authentification).
 
 ## 6. Points bloquants / à valider
