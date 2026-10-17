@@ -1,0 +1,19 @@
+{"liste": "d5d257a9-b8fc-4d47-98bf-2e059bf2f740", "articles": ["Tomates", "Pommes de terre", "Courgettes", "Bananes", "Yaourt nature", "Riz", "Lait", "Œufs", "Pain"], "achetes": ["Lait", "Œufs", "Pain"], "autres_listes": ["Anniversaire de Léa", "Produits ménagers"]}
+PASS  S0. données fictives : 3 courses passées, 3 listes en cours
+PASS  S1. liste partagée affichée (liste de la semaine, sélecteur de listes)
+capture play-1-liste-partagee
+PASS  S4. articles achetés visibles (« Acheté par Karim »)
+capture play-4-articles-achetes
+PASS  S2. listes en cours (3 listes nommées)
+capture play-2-listes-en-cours
+PASS  S7. historique des courses
+capture play-7-historique
+PASS  S5. budget du mois
+capture play-5-budget
+PASS  S6. budgets mensuels
+capture play-6-budgets-mensuels
+PASS  S8. rappels d'achat activés
+capture play-8-rappels
+PASS  S3. sélection avec photos
+capture play-3-selection-photos
+Captures : 8 / 8 ; échecs : 0
