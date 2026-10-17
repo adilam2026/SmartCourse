@@ -154,6 +154,12 @@ class Demo(initialRole: Role? = null, val live: Boolean = false) {
     var showPrices by mutableStateOf(Launch.flag("prices"))
     /** Prix indicatifs disponibles pour la famille (Maroc, ou pays non confirmé). Hors du Maroc : prix et réglages de prix masqués. */
     var pricesAvailable by mutableStateOf(true)
+    /** Option familiale « Plusieurs listes actives » et listes en cours (nom, articles restants, liste consultée). */
+    var multiLists by mutableStateOf(false)
+    var openLists by mutableStateOf<List<OpenList>>(emptyList())
+    var listName by mutableStateOf<String?>(null)
+    /** « Recommander » avec plusieurs listes : destination à choisir (nouvelle liste ou liste existante). */
+    var reorderDestination by mutableStateOf<Map<String, Int>?>(null)
     var showTotals by mutableStateOf(false)
     var selMode by mutableStateOf(
         when (Launch.str("mode")) { "list" -> SelMode.LIST; else -> SelMode.GRID }
@@ -274,3 +280,6 @@ fun toServer(serverUnit: String, base: Int): Double = if (unitKindOf(serverUnit)
 /** Quantité en texte décimal exact pour le calcul des prix. */
 fun serverQtyText(serverUnit: String, base: Int): String =
     if (unitKindOf(serverUnit) == UnitKind.COUNT) base.toString() else java.math.BigDecimal(base).movePointLeft(3).stripTrailingZeros().toPlainString()
+
+/** Liste en cours de la famille (option « plusieurs listes »). */
+data class OpenList(val id: String, val name: String?, val createdAt: String, val remaining: Int, val purchased: Int, val current: Boolean)

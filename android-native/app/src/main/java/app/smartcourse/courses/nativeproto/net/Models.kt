@@ -86,7 +86,7 @@ data class ListItem(
     val purchaseId: String?, val purchasedAt: String?, val purchasedBy: String?, val addedBy: String?,
 )
 
-data class ListData(val id: String, val status: String, val createdAt: String, val closedAt: String?, val items: List<ListItem>, val validations: List<ValidationInfo>)
+data class ListData(val id: String, val status: String, val createdAt: String, val closedAt: String?, val items: List<ListItem>, val validations: List<ValidationInfo>, val name: String? = null)
 
 data class ValidationInfo(val id: String, val at: String, val by: String)
 
@@ -110,7 +110,7 @@ fun parseList(o: JsonObject): ListData? = try {
         val x = v.jsonObject
         ValidationInfo(x["id"]!!.jsonPrimitive.content, x["at"]!!.jsonPrimitive.content, (x["by"] as? JsonObject)?.get("displayName")?.jsonPrimitive?.contentOrNull ?: "")
     } ?: emptyList()
-    ListData(o["id"]!!.jsonPrimitive.content, o["status"]!!.jsonPrimitive.content, o["createdAt"]!!.jsonPrimitive.content, o["closedAt"]?.jsonPrimitive?.contentOrNull, items, vals)
+    ListData(o["id"]!!.jsonPrimitive.content, o["status"]!!.jsonPrimitive.content, o["createdAt"]!!.jsonPrimitive.content, o["closedAt"]?.jsonPrimitive?.contentOrNull, items, vals, o["name"]?.jsonPrimitive?.contentOrNull)
 } catch (_: Exception) { null }
 
 /* ───────────── Opérations en attente ───────────── */

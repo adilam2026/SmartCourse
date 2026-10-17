@@ -102,6 +102,7 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
         demo.selOrg = SelOrg.parse(kv.get(orgKey))
         demo.listLoaded = engine.list != null
         applyLocation(me.location)
+        applyFeatures(me.features)
         applyPrefs(me.prefs)
         render()
         syncDraft()
@@ -110,6 +111,52 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
     /* ───── Affichage ───── */
 
     fun applyPrefs(p: Prefs?) { if (p != null) { demo.showPrices = p.showPrices && demo.pricesAvailable; demo.showTotals = p.showTotals && demo.pricesAvailable } }
+    /** Options avancées de la famille : à l'activation, les listes en cours sont chargées pour le sélecteur. */
+    fun applyFeatures(f: app.smartcourse.courses.nativeproto.net.FamilyFeatures?) {
+        demo.multiLists = f?.multiLists == true
+        if (demo.multiLists) scope.launch { loadOpenLists() } else demo.openLists = emptyList()
+    }
+
+    suspend fun loadOpenLists() {
+        val r = session.api.call("GET", "/api/lists/open")
+        if (r !is Outcome.Ok) return
+        demo.openLists = try {
+            (r.value["lists"] as kotlinx.serialization.json.JsonArray).map { e ->
+                val o = e as JsonObject
+                fun str(k: String) = (o[k] as? kotlinx.serialization.json.JsonPrimitive)?.let { if (it.isString) it.content else null }
+                fun int(k: String) = (o[k] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toIntOrNull() ?: 0
+                OpenList(str("id") ?: "", str("name"), str("createdAt") ?: "", int("remaining"), int("purchased"), (o["current"] as? kotlinx.serialization.json.JsonPrimitive)?.content == "true")
+            }
+        } catch (_: Exception) { demo.openLists }
+    }
+
+    /** Consulter une autre liste en cours : rien n'est déplacé ; la sélection en cours (brouillon) suit sa propre liste. */
+    fun switchList(listId: String, after: () -> Unit = {}) {
+        scope.launch {
+            if (engine.pendingOps > 0) engine.flush()
+            when (val r = engine.switchTo(listId)) {
+                is Outcome.Ok -> { render(); syncDraft(); loadOpenLists(); after() }
+                is Outcome.Fail -> demo.say(if (r.failure == Failure.NETWORK || r.failure == Failure.TIMEOUT) networkMessage() else explain(r))
+            }
+        }
+    }
+
+    /** Nouvelle liste nommée (option « plusieurs listes ») : elle devient la liste consultée ; les autres listes ne changent pas. */
+    fun createNamedList(name: String, after: () -> Unit = {}) {
+        scope.launch {
+            when (val r = engine.createList(name)) {
+                is Outcome.Ok -> { render(); syncDraft(); loadOpenLists(); after() }
+                is Outcome.Fail -> demo.say(if (r.code == "active_exists") "Une liste est déjà en cours." else if (r.failure == Failure.NETWORK || r.failure == Failure.TIMEOUT) networkMessage() else explain(r))
+            }
+        }
+    }
+
+    /** Paramètres avancés (administrateurs) : renvoie un message d'erreur, ou null si c'est enregistré. */
+    suspend fun setMultiLists(on: Boolean): String? = when (val r = session.api.call("PUT", "/api/family/features", buildJsonObject { put("multiLists", on) })) {
+        is Outcome.Ok -> { session.verify(); demo.multiLists = on; if (on) loadOpenLists(); null }
+        is Outcome.Fail -> if (r.failure == Failure.NETWORK || r.failure == Failure.TIMEOUT) networkMessage() else explain(r)
+    }
+
     /** Localisation de la famille : hors du Maroc, aucun prix indicatif n'est affiché (les préférences enregistrées sont conservées). */
     fun applyLocation(l: app.smartcourse.courses.nativeproto.net.FamilyLocation?) {
         demo.pricesAvailable = l?.pricesAvailable ?: true
@@ -141,6 +188,7 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
         demo.orphanCount = engine.orphans.size
         demo.hasList = engine.list != null
         demo.listDate = frenchDate(engine.list?.createdAt ?: java.time.OffsetDateTime.now().toString())
+        demo.listName = engine.list?.name
         online = engine.online
     }
 
@@ -236,7 +284,7 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
     private suspend fun onEvent(name: String) {
         when (name) {
             "ready" -> { backoff = 1000; online = true; refreshAll() }
-            "list.updated", "list.closed", "list.created", "list.deleted" -> flushAndRefresh()
+            "list.updated", "list.closed", "list.created", "list.deleted" -> { flushAndRefresh(); if (demo.multiLists) loadOpenLists() }
             "catalog.updated" -> refreshCatalog()
             "prefs.updated" -> session.verify()
         }
@@ -244,7 +292,7 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
 
     /* ───── Synchronisation ───── */
 
-    suspend fun refreshAll() { refreshCatalog(); flushAndRefresh() }
+    suspend fun refreshAll() { refreshCatalog(); flushAndRefresh(); if (demo.multiLists) loadOpenLists() }
 
     suspend fun refreshCatalog() {
         when (val r = session.api.call("GET", "/api/catalog")) {

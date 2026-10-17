@@ -56,6 +56,8 @@ private fun reorder(demo: Demo, lines: List<PastLine>, nav: (String) -> Unit) {
     val usable = lines.filter { demo.byId[it.productId]?.inCatalog == true }
     if (usable.isEmpty()) { demo.say("Aucun de ces articles n'est dans votre catalogue actuel."); return }
     val entries = usable.associate { it.productId to toBase(it.unit, it.qty) }
+    // Plusieurs listes actives : la destination est choisie (nouvelle liste ou liste en cours).
+    if (demo.multiLists) { demo.reorderDestination = entries; return }
     // Liste en cours déjà commencée : choix explicite (Ajouter / Remplacer), jamais de fusion ni de remplacement silencieux.
     if (demo.lines.any { !it.bought }) { demo.reorderAsk = entries; return }
     data.submit(entries, clearSelection = false)
@@ -173,6 +175,7 @@ private fun HistoryReal(nav: (String) -> Unit) {
         }
     }
     ReorderChoice(nav)
+    ReorderDestination(nav)
     deleteFor?.let { o ->
         ConfirmDialog(
             "Supprimer cette commande ?", "La commande du ${frenchDate(o.closedAt)} sera retirée de l'historique. Les statistiques seront recalculées.",
@@ -243,6 +246,7 @@ private fun HistoryDetailReal(id: String, nav: (String) -> Unit, onBack: () -> U
         }
     }
     ReorderChoice(nav)
+    ReorderDestination(nav)
     if (confirm) ConfirmDialog(
         "Supprimer cette commande ?", "La commande du $title sera retirée de l'historique. Les statistiques seront recalculées.",
         "Supprimer", {

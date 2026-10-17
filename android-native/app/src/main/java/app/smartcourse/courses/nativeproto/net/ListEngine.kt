@@ -238,8 +238,17 @@ class ListEngine(
         }
     }
 
-    suspend fun createList(): Outcome<ListData?> {
-        val r = api.call("POST", "/api/lists", kotlinx.serialization.json.JsonObject(emptyMap()))
+    /** Liste consultée par ce profil (option « plusieurs listes ») : le serveur la mémorise, puis on la recharge. */
+    suspend fun switchTo(listId: String): Outcome<ListData?> {
+        val r = api.call("PUT", "/api/me/current-list", kotlinx.serialization.json.buildJsonObject { put("listId", kotlinx.serialization.json.JsonPrimitive(listId)) })
+        return when (r) {
+            is Outcome.Ok -> { setList(r.value["list"] as? kotlinx.serialization.json.JsonObject); online = true; Outcome.Ok(list) }
+            is Outcome.Fail -> { noteFailure(r); r }
+        }
+    }
+
+    suspend fun createList(name: String? = null): Outcome<ListData?> {
+        val r = api.call("POST", "/api/lists", if (name.isNullOrBlank()) kotlinx.serialization.json.JsonObject(emptyMap()) else kotlinx.serialization.json.buildJsonObject { put("name", kotlinx.serialization.json.JsonPrimitive(name.trim())) })
         return when (r) {
             is Outcome.Ok -> { setList(r.value["list"] as? kotlinx.serialization.json.JsonObject); online = true; Outcome.Ok(list) }
             is Outcome.Fail -> { noteFailure(r); r }

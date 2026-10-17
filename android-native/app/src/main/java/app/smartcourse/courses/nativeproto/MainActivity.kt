@@ -194,7 +194,7 @@ fun App(session: Session, me: Me?) {
         data?.onForeground()
         onDispose { data?.onBackground(); if (LiveHolder.current === data) LiveHolder.current = null }
     }
-    LaunchedEffect(me?.prefs, me?.location) { data?.applyLocation(me?.location); data?.applyPrefs(me?.prefs) }
+    LaunchedEffect(me?.prefs, me?.location, me?.features) { data?.applyLocation(me?.location); data?.applyFeatures(me?.features); data?.applyPrefs(me?.prefs) }
     // Rappels d'achat du profil connecté : reprogrammés à chaque connexion (annulés à la déconnexion).
     val appCtx = androidx.compose.ui.platform.LocalContext.current
     LaunchedEffect(me?.id) { Reminders.schedule(appCtx) }
@@ -258,6 +258,7 @@ fun App(session: Session, me: Me?) {
                         composable("v11") { DisplayScreen(back) }
                         composable("v12") { StatsScreen() }
                         composable("v15") { LocationScreen(back) }
+                        composable("v17") { AdvancedSettingsScreen(back) }
                         composable("stub/{name}") { StubScreen(it.arguments?.getString("name") ?: "", back) }
                     }
                     if (showBar) BottomNav(tabs, tabFor(route) ?: "", go)

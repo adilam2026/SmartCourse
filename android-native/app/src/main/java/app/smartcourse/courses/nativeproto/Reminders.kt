@@ -117,20 +117,25 @@ object Reminders {
         if (!load(kv, scope).enabled) return
         val slotKey = slot.toString()
         if (kv.get(lastKey(scope)) == slotKey) return
-        // Liste à jour si le réseau répond, sinon la dernière liste connue sur ce téléphone.
-        val fresh = (ApiClient(EncryptedStorage(ctx)).call("GET", "/api/lists/active") as? Outcome.Ok)?.value?.get("list") as? JsonObject
+        // Toutes les listes en cours (une seule sans l'option « plusieurs listes ») : un seul rappel groupé.
+        val api = ApiClient(EncryptedStorage(ctx))
+        val open = ((api.call("GET", "/api/lists/open") as? Outcome.Ok)?.value?.get("lists") as? kotlinx.serialization.json.JsonArray)
+            ?.mapNotNull { ((it as? JsonObject)?.get("remaining") as? kotlinx.serialization.json.JsonPrimitive)?.content?.toIntOrNull() }
+        // Sinon la liste à jour si le réseau répond, ou la dernière liste connue sur ce téléphone.
+        val fresh = if (open != null) null else (api.call("GET", "/api/lists/active") as? Outcome.Ok)?.value?.get("list") as? JsonObject
         val list = fresh?.let { parseList(it) }
             ?: kv.get("list|$scope")?.let { s -> try { parseList(json.parseToJsonElement(s) as JsonObject) } catch (_: Exception) { null } }
-        val remaining = list?.takeIf { it.status == "active" }?.items?.count { it.status == "to_buy" } ?: 0
+        val remaining = open?.sum() ?: list?.takeIf { it.status == "active" }?.items?.count { it.status == "to_buy" } ?: 0
+        val lists = open?.count { it > 0 } ?: 1
         kv.put(lastKey(scope), slotKey)
         if (remaining <= 0) { android.util.Log.i("CoursesRappel", "rien à acheter : pas de rappel"); return }
         if (!Notifier.canPost(ctx)) { android.util.Log.i("CoursesRappel", "notifications refusées par Android"); return }
         ensureChannel(ctx)
-        val open = PendingIntent.getActivity(ctx, 4202, Intent(ctx, MainActivity::class.java).putExtra("open", "list").addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-        val text = if (me.role == "staff") "Ouvrez la liste du jour." else "Ouvrez votre liste de courses."
+        val tap = PendingIntent.getActivity(ctx, 4202, Intent(ctx, MainActivity::class.java).putExtra("open", "list").addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        val text = if (lists > 1) "Réparti sur $lists listes en cours." else if (me.role == "staff") "Ouvrez la liste du jour." else "Ouvrez votre liste de courses."
         val n = NotificationCompat.Builder(ctx, CHANNEL).setSmallIcon(R.drawable.ic_notif)
             .setContentTitle(if (remaining == 1) "Il reste 1 article à acheter" else "Il reste $remaining articles à acheter")
-            .setContentText(text).setContentIntent(open).setAutoCancel(true).build()
+            .setContentText(text).setContentIntent(tap).setAutoCancel(true).build()
         try { NotificationManagerCompat.from(ctx).notify(1002, n) } catch (_: SecurityException) { }
     }
 }

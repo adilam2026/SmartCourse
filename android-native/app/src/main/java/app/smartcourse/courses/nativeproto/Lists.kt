@@ -68,6 +68,7 @@ fun AdminListScreen(nav: (String) -> Unit) {
                 }
             }
         })
+        ListSwitcher(canCreate = true)
         LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             item {
                 if (total > 0) {
@@ -245,6 +246,7 @@ fun StaffListScreen(nav: (String) -> Unit) {
 
     Column(Modifier.fillMaxSize()) {
         TopBar("Liste du jour", if (noList) "" else demo.listDate)
+        ListSwitcher(canCreate = false)
         if (total == 0) {
             Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                 Box(Modifier.size(88.dp).clip(CircleShape).background(C.TealSoft), contentAlignment = Alignment.Center) {
