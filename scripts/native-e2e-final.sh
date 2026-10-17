@@ -315,11 +315,11 @@ adb shell input text 047193; sleep 1
 $UI tap "Afficher le code" >/dev/null; sleep 2
 expect "K2. code affiché : zéro initial conservé (047193)" $UI has "047193"
 expect "K2b. clavier toujours numérique quand le code est affiché ($(ime_type))" test "$(ime_type)" = 0x12
-adb shell input text 9; sleep 1
-expect "K2c. 6 chiffres au plus (le 7e est ignoré)" bash -c "$UI has '047193' && ! $UI has '0471939'"
+adb shell input text 288; sleep 1
+expect "K2c. 8 chiffres au plus (le 9e est ignoré)" bash -c "$UI has '04719328' && ! $UI has '047193288'"
 shot final-k1-code-visible
 $UI tap "Masquer le code" >/dev/null; sleep 1
-expect "K3. code remasqué" bash -c "! $UI has '047193'"
+expect "K3. code remasqué" bash -c "! $UI has '04719328'"
 $UI tap "•" >/dev/null; clear_field; hide_kb
 fi
 
@@ -340,7 +340,7 @@ tapt "Ajouter un profil"
 fill "Nom affiché" "Zoe"; hide_kb; fill "Identifiant de connexion" zoe; hide_kb
 $UI tap "Personnel" >/dev/null; sleep 1
 expect "S1c. ville reprise de l'administrateur" $UI has "Ville : Casablanca"
-$UI tap "Code d'accès (6 chiffres)" --scroll >/dev/null; sleep 1
+$UI tap "Code d'accès" --scroll >/dev/null; sleep 1
 expect "S2. création : clavier numérique ($(ime_type))" test "$(ime_type)" = 0x12
 adb shell input text 047193; hide_kb
 fill "Confirmer le code" 047193 --scroll; hide_kb
