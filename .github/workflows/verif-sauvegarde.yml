@@ -2,7 +2,8 @@ name: Sauvegarde de production — restauration de contrôle dans une base isol�
 # Lit la plus récente sauvegarde CHIFFRÉE de production dans son stockage, la restaure dans un serveur PostgreSQL JETABLE créé
 # pour ce contrôle (conteneur local de cette exécution, détruit à la fin), puis compare au manifeste : lignes de chaque table,
 # migrations, invariants métier, photos de la famille. La base de production n'est JAMAIS une destination : son adresse n'est pas
-# fournie et le programme refuse toute cible autre que le serveur jetable local. Aucune écriture dans le stockage.
+# fournie et le programme refuse toute cible autre que le serveur jetable local. Seule écriture, sur demande : une copie protégée
+# (backups-conservees/) de sauvegardes désignées ; rien n'est jamais supprimé ni modifié.
 # Journal public : dates, nombres et résultats seulement (aucun hôte, nom de stockage ni secret).
 # Secrets GitHub nécessaires (Settings → Secrets and variables → Actions), copiés depuis les variables Railway du service :
 #   BACKUP_KEY, S3_BUCKET, S3_ENDPOINT, S3_REGION,
@@ -11,6 +12,15 @@ name: Sauvegarde de production — restauration de contrôle dans une base isol�
 # Lancement : un envoi sur claude/evolutions-avancees dont le message contient [verif-sauvegarde] (ou lancement manuel).
 on:
   workflow_dispatch:
+    inputs:
+      conserver:
+        description: "Sauvegardes à copier hors élagage (fragments d'horodatage séparés par des virgules, ex. 2026-10-17T09-18)"
+        required: false
+        default: ""
+      conserver_verifiee:
+        description: "Copier aussi la plus récente, si sa restauration réussit"
+        type: boolean
+        default: false
   push:
     branches: [claude/evolutions-avancees]
 permissions:
@@ -50,9 +60,11 @@ jobs:
           S3_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
           S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
           S3_FORCE_PATH_STYLE: ${{ secrets.S3_FORCE_PATH_STYLE }}
+          KEEP: ${{ inputs.conserver }}
+          KEEP_LATEST: ${{ inputs.conserver_verifiee && '1' || '' }}
         run: |
           set -o pipefail # un échec de la restauration ne doit jamais être masqué par « tee »
-          docker run --rm --network verif-net -e BACKUP_KEY -e S3_BUCKET -e S3_ENDPOINT -e S3_REGION -e S3_ACCESS_KEY_ID -e S3_SECRET_ACCESS_KEY -e S3_FORCE_PATH_STYLE \
+          docker run --rm --network verif-net -e BACKUP_KEY -e S3_BUCKET -e S3_ENDPOINT -e S3_REGION -e S3_ACCESS_KEY_ID -e S3_SECRET_ACCESS_KEY -e S3_FORCE_PATH_STYLE -e KEEP -e KEEP_LATEST \
             -e RESTORE_TARGET_URL=postgres://verif:verif@restore-pg:5432/verif smartcourse:verif node dist/backup-isolated.js | tee bilan.txt
       - name: Nettoyage (serveur jetable détruit)
         if: always()

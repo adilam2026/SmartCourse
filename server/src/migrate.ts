@@ -9,6 +9,15 @@ export const MIGRATIONS_DIR = path.resolve(here, "../migrations");
 // Arbitrary constant: serialises concurrent migrators (several instances starting together).
 const LOCK_KEY = 727_001;
 
+/** Migrations not applied yet. An empty or brand-new database has nothing to protect: [] (nothing to back up before migrating). */
+export async function pendingMigrations(db: Db, dir = MIGRATIONS_DIR): Promise<string[]> {
+  const exists = (await db.query("SELECT to_regclass('schema_migrations') IS NOT NULL AS ok")).rows[0].ok as boolean;
+  if (!exists) return [];
+  const done = new Set((await db.query<{ name: string }>("SELECT name FROM schema_migrations")).rows.map((r) => r.name));
+  if (done.size === 0) return [];
+  return (await readdir(dir)).filter((f) => f.endsWith(".sql") && !done.has(f)).sort();
+}
+
 /** Applies pending *.sql files in name order, each in its own transaction. Returns applied names. */
 export async function migrate(db: Db, dir = MIGRATIONS_DIR): Promise<string[]> {
   await ensureSchema(db); // own schema on a shared database; nothing for "public"

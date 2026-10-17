@@ -5,9 +5,9 @@ import path from "node:path";
 import { loadConfig } from "./config.js";
 import { createPoolFromConfig, toolsDatabaseUrl } from "./db.js";
 import { hardenApiRoles } from "./harden.js";
-import { migrate } from "./migrate.js";
+import { migrate, pendingMigrations } from "./migrate.js";
 import { createBackupStorage } from "./backup-store.js";
-import { startBackupScheduler } from "./backup.js";
+import { backupAndVerify, startBackupScheduler } from "./backup.js";
 import { purgeOldSignups } from "./signup.js";
 import { photoBackupHooks } from "./backup-photos.js";
 import { createPhotoStore } from "./photos.js";
@@ -15,6 +15,23 @@ import { purgeOrphanAssets, syncCatalogPhotos } from "./photos-import.js";
 
 const config = loadConfig();
 const db = createPoolFromConfig(config);
+// Sauvegarde de sécurité JUSTE AVANT d'appliquer des migrations en attente sur une base existante : créée, puis restaurée dans une
+// base temporaire et comparée à son manifeste. Si elle n'est pas exploitable, le serveur s'arrête AVANT toute migration : avec le
+// contrôle de santé Railway, la version précédente reste en service. Rien n'est supprimé (pas d'élagage ici).
+const pending = await pendingMigrations(db);
+if (pending.length > 0 && config.BACKUP_MODE !== "external") {
+  const storage = config.BACKUP_KEY ? createBackupStorage(config) : null;
+  if (!storage || !config.BACKUP_KEY) {
+    console.error(`Migrations en attente (${pending.join(", ")}) mais aucune sauvegarde possible (BACKUP_KEY ou stockage absent) : arrêt avant migration.`);
+    process.exit(1);
+  }
+  const r = await backupAndVerify({ db, databaseUrl: toolsDatabaseUrl(config), store: storage.store, passphrase: config.BACKUP_KEY, ...photoBackupHooks(db, createPhotoStore(config), storage.store) });
+  if (!r.verify.ok) {
+    console.error(`Sauvegarde avant migration NON exploitable (${r.backup.key}) : ${r.verify.problems.join(" ; ")}. Arrêt avant migration.`);
+    process.exit(1);
+  }
+  console.log(`Sauvegarde avant migration : ${r.backup.key}, restaurée et conforme (${r.verify.restoredTables} tables). Migrations à appliquer : ${pending.join(", ")}.`);
+}
 await migrate(db);
 // Managed PostgreSQL with a public Data API (Supabase): our tables must be reachable only through this server. Throws if not closed.
 const hardened = await hardenApiRoles(db);

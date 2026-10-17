@@ -24,7 +24,7 @@ export interface BackupStore {
 export class LocalBackupStore implements BackupStore {
   constructor(private dir: string) {}
   private file(key: string) {
-    if (!/^(backups|backup-photos)\/[\w.-]+$/.test(key)) throw new Error(`Invalid backup key: ${key}`);
+    if (!/^(backups|backup-photos|backups-conservees)\/[\w.-]+$/.test(key)) throw new Error(`Invalid backup key: ${key}`);
     return path.join(this.dir, key);
   }
   async put(key: string, data: Buffer) {
@@ -388,12 +388,11 @@ async function record(db: Db, kind: "backup" | "verify", ok: boolean, backupKey:
   await db.query("INSERT INTO backup_runs (kind, ok, backup_key, detail) VALUES ($1,$2,$3,$4)", [kind, ok, backupKey, JSON.stringify(detail)]);
 }
 
-/** Backup → restore check → prune (only if the new backup restored correctly). */
-export async function backupVerifyPrune(ctx: BackupCtx, policy: Policy = DEFAULT_POLICY) {
+/** Backup → restore check, WITHOUT deleting anything (also used just before applying migrations). */
+export async function backupAndVerify(ctx: BackupCtx) {
   const before = ctx.beforeSnapshot ? await ctx.beforeSnapshot().catch((e) => [`copie préalable des photos en échec : ${(e as Error).message}`]) : [];
   const b = await createBackup(ctx);
   await record(ctx.db, "backup", true, b.key, { bytes: b.bytes, tables: b.manifest.tables });
-  // Pictures the snapshot lists are copied AFTER it was taken (see backup-photos.ts): a picture that cannot be found invalidates it.
   const extra = ctx.afterSnapshot ? await ctx.afterSnapshot(b.manifest).catch((e) => [`copie des photos en échec : ${(e as Error).message}`]) : [];
   const v = await verifyBackup(ctx, b.key);
   extra.push(...before);
@@ -402,6 +401,35 @@ export async function backupVerifyPrune(ctx: BackupCtx, policy: Policy = DEFAULT
     v.ok = false;
   }
   await record(ctx.db, "verify", v.ok, b.key, { problems: v.problems, restoredTables: v.restoredTables });
+  return { backup: b, verify: v };
+}
+
+/** Protected copies (dump + manifest) live outside « backups/ » : the retention policy never lists, hence never deletes, them. */
+export const KEPT_PREFIX = "backups-conservees/";
+export async function keepBackup(store: BackupStore, dumpKey: string): Promise<{ kept: string; bytes: number; already: boolean }> {
+  const base = dumpKey.replace(/^backups\//, "");
+  const target = KEPT_PREFIX + base;
+  const pairs = [[dumpKey, target], [dumpKey.replace(/\.dump\.enc$/, ".manifest.json"), target.replace(/\.dump\.enc$/, ".manifest.json")]] as const;
+  let bytes = 0;
+  let already = true;
+  for (const [from, to] of pairs) {
+    const src = await store.get(from);
+    if (!src) throw new Error(`fichier introuvable : ${from}`);
+    const existing = await store.get(to);
+    if (!existing || !existing.equals(src)) {
+      already = false;
+      await store.put(to, src);
+      const back = await store.get(to);
+      if (!back || !back.equals(src)) throw new Error(`copie relue différente : ${to}`);
+    }
+    bytes += src.length;
+  }
+  return { kept: target, bytes, already };
+}
+
+/** Backup → restore check → prune (only if the new backup restored correctly). */
+export async function backupVerifyPrune(ctx: BackupCtx, policy: Policy = DEFAULT_POLICY) {
+  const { backup: b, verify: v } = await backupAndVerify(ctx);
   const pruned = v.ok ? await pruneBackups(ctx.store, policy) : []; // never delete older good backups on a bad one
   return { backup: b, verify: v, pruned };
 }
