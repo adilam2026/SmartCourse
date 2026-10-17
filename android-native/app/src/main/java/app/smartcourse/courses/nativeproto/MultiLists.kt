@@ -164,7 +164,7 @@ fun AdvancedSettingsScreen(onBack: () -> Unit) {
                 style = MaterialTheme.typography.bodyMedium, color = C.Muted,
             )
             SCard(padding = PaddingValues(16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.clickable(enabled = admin && !busy) { if (!demo.multiLists) apply(true) else confirmOff = true }, verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f).padding(end = 12.dp)) {
                         Text("Plusieurs listes actives", style = MaterialTheme.typography.titleSmall)
                         Text("Préparer plusieurs listes en même temps (marché, supermarché…). Chacun choisit la liste qu'il consulte.", style = MaterialTheme.typography.bodySmall)

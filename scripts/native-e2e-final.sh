@@ -77,7 +77,7 @@ $UI tap "Pays : " --scroll >/dev/null; sleep 2; fill "Rechercher un pays" "maroc
 $UI tap "Ville : " --scroll >/dev/null; sleep 2; fill "Rechercher une ville" "anfa"; hide_kb; $UI tap "$NEWCITY" --last >/dev/null; sleep 2
 expect "C1b. ville choisie affichée dans le formulaire" $UI has "Ville : $NEWCITY"
 fill "E-mail de récupération" "$NEWMAIL" --scroll; hide_kb
-fill "Code d'accès (6" 274915 --scroll; hide_kb
+fill "Code d'accès" 274915 --scroll; hide_kb
 fill "Confirmez le code" 274915 --scroll; hide_kb
 shot final-c1-formulaire
 expect "C2. bouton « Recevoir le code par e-mail » activé" $UI enabled "Recevoir le code par e-mail"
@@ -137,7 +137,7 @@ $UI tap "Première connexion" >/dev/null; sleep 1; $UI tap "Créer ma famille" >
 fill "Nom de la famille" "Famille Plafond" --scroll; hide_kb; fill "Votre prénom" "Nadia" --scroll; hide_kb; fill "Votre identifiant" "nadia" --scroll; hide_kb
 $UI tap "Pays : " --scroll >/dev/null; sleep 2; fill "Rechercher un pays" "maroc"; hide_kb; $UI tap "Maroc" --last >/dev/null; sleep 2
 $UI tap "Ville : " --scroll >/dev/null; sleep 2; fill "Rechercher une ville" "rabat"; hide_kb; $UI tap "Rabat" --last >/dev/null; sleep 2
-fill "E-mail de récupération" "$CAPMAIL" --scroll; hide_kb; fill "Code d'accès (6" 583014 --scroll; hide_kb; fill "Confirmez le code" 583014 --scroll; hide_kb
+fill "E-mail de récupération" "$CAPMAIL" --scroll; hide_kb; fill "Code d'accès" 583014 --scroll; hide_kb; fill "Confirmez le code" 583014 --scroll; hide_kb
 $UI tap "Recevoir le code par e-mail" --scroll >/dev/null; sleep 4
 expect "C11. plafond atteint : « limite temporaire de créations », aucun code envoyé" bash -c "$UI wait 'La limite temporaire de créations est atteinte' 10 && [ \"\$(docker exec sc-recette-app node -e \"fetch('http://127.0.0.1:3199/__sent?to=$CAPMAIL').then(r=>r.json()).then(j=>console.log(j.length))\")\" = 0 ]"
 shot final-c5-plafond
@@ -451,7 +451,7 @@ fill "Nom de la famille" "Famille Test" --scroll; hide_kb
 fill "Votre prénom" "Test" --scroll; hide_kb
 fill "Votre identifiant" "testv" --scroll; hide_kb
 fill "E-mail de récupération" "v.$(date +%s)@example.org" --scroll; hide_kb
-fill "Code d'accès (6" 274915 --scroll; hide_kb
+fill "Code d'accès" 274915 --scroll; hide_kb
 fill "Confirmez le code" 274915 --scroll; hide_kb
 expect "V1. pays non choisi : « Il manque : le pays » affiché" $UI has "Il manque : le pays"
 expect "V2. bouton actif (jamais grisé sans explication)" $UI enabled "Recevoir le code par e-mail"
@@ -505,6 +505,42 @@ expect "R8. liste non vide : choix explicite Ajouter / Remplacer (aucune fusion 
 shot final-r2-choix-recommander
 $UI tap "Annuler" --last >/dev/null; sleep 2
 expect "R9. annulé : liste inchangée" test "$(ACTIVE)" = "Carottes:1.000:to_buy,Oignons:1.000:to_buy,Tomates:3.000:to_buy"
+logout
+fi
+
+if want_s M; then
+echo "═══ M. Option « Plusieurs listes actives » : activation, nouvelle liste nommée, changement de liste, désactivation refusée — contrôle rapide ═══" | tee -a "$OUT/resultats.txt"
+login_api adil 482913
+closeall() { api GET /api/lists/open >/dev/null; for l in $(jq -r '.lists[]?.id' /tmp/api.out); do api POST "/api/lists/$l/close" -d '{}' >/dev/null; done; }
+closeall; api PUT /api/family/features -d '{"multiLists":false}' >/dev/null
+TOM=$(sql "SELECT p.id FROM products p JOIN families f ON f.id=p.family_id WHERE f.code='$FAMILY' AND p.name='Tomates'")
+api POST /api/lists/active/ops -d "{\"ops\":[{\"opId\":\"$(cat /proc/sys/kernel/random/uuid)\",\"type\":\"add\",\"productId\":\"$TOM\",\"quantity\":2}]}" >/dev/null
+OPT() { sql "SELECT multi_lists_enabled FROM families WHERE code='$FAMILY'"; }
+NACT() { sql "SELECT count(*) FROM lists l JOIN families f ON f.id=l.family_id WHERE f.code='$FAMILY' AND l.status='active'"; }
+launch; $UI wait "Bienvenue" 25 >/dev/null
+signin "$FAMILY" adil 482913; $UI wait "Ma liste" 25 >/dev/null
+expect "M1. option désactivée par défaut : présentation habituelle (pas de sélecteur)" bash -c "test \"\$(docker exec sc-recette-pg psql -U smart -d smartcourse -tAc \"SELECT multi_lists_enabled FROM families WHERE code='$FAMILY'\")\" = f && ! $UI has 'liste en cours'"
+tapt "Réglages"; $UI tap "Paramètres avancés" --scroll >/dev/null; sleep 2
+expect "M2. Paramètres avancés : option visible" $UI wait "Plusieurs listes actives" 10
+shot final-m1-parametres-avances
+$UI tap "Plusieurs listes actives" >/dev/null; sleep 4
+expect "M3. activée par l'administrateur (enregistrée côté serveur)" test "$(OPT)" = t
+adb shell input keyevent KEYCODE_BACK; sleep 2; tapt "Liste"; sleep 2
+expect "M4. sélecteur affiché : 1 liste en cours" $UI wait "1 liste en cours" 10
+$UI tap "1 liste en cours" >/dev/null; sleep 2; tapt "Nouvelle liste" --last
+fill "Ex. : Marché" "Marché"; hide_kb; $UI tap "Créer" --last >/dev/null; sleep 5
+expect "M5. nouvelle liste « Marché » créée et consultée ; l'autre reste ouverte" bash -c "test \"\$(docker exec sc-recette-pg psql -U smart -d smartcourse -tAc \"SELECT count(*) FROM lists l JOIN families f ON f.id=l.family_id WHERE f.code='$FAMILY' AND l.status='active'\")\" = 2 && $UI has 'Marché' && $UI has '2 listes en cours' && ! $UI has 'Tomates'"
+shot final-m2-liste-marche
+$UI tap "2 listes en cours" >/dev/null; sleep 3
+expect "M6. liste des listes en cours avec leurs articles restants" $UI has "1 à acheter"
+$UI tap "1 à acheter" >/dev/null; sleep 5
+expect "M7. retour à la première liste : Tomates affichées" $UI wait "Tomates" 10
+tapt "Réglages"; $UI tap "Paramètres avancés" --scroll >/dev/null; sleep 2
+$UI tap "Plusieurs listes actives" >/dev/null; sleep 2; $UI tap "Désactiver" --last >/dev/null; sleep 4
+expect "M8. désactivation refusée tant que 2 listes sont en cours (rien fusionné ni supprimé)" bash -c "$UI has 'listes sont en cours' && test \"\$(docker exec sc-recette-pg psql -U smart -d smartcourse -tAc \"SELECT multi_lists_enabled FROM families WHERE code='$FAMILY'\")\" = t"
+shot final-m3-desactivation-refusee
+expect "M9. aucune liste supprimée ($(NACT) en cours)" test "$(NACT)" = 2
+closeall; api PUT /api/family/features -d '{"multiLists":false}' >/dev/null
 logout
 fi
 
