@@ -187,7 +187,7 @@ fun LoginScreen(session: Session?, onSimulated: (Role) -> Unit) {
                     SCard(padding = PaddingValues(16.dp)) {
                         Text("Votre profil est créé par un administrateur", style = MaterialTheme.typography.titleMedium)
                         Spacer(Modifier.height(6.dp))
-                        Text("Demandez à un administrateur de la famille de créer votre profil : il vous donnera le code famille, votre identifiant et un code d'accès à 6 chiffres. Vous pourrez alors vous connecter.", style = MaterialTheme.typography.bodyMedium)
+                        Text("Demandez à un administrateur de la famille de créer votre profil : il vous donnera le code famille, votre identifiant et un code d'accès (entre 6 et 8 chiffres). Vous pourrez alors vous connecter.", style = MaterialTheme.typography.bodyMedium)
                         Spacer(Modifier.height(12.dp))
                         PrimaryButton("Aller à la connexion", { tab = 0 }, Modifier.fillMaxWidth())
                     }

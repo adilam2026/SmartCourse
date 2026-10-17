@@ -4,7 +4,7 @@ import { createFamilyRecords, createSession, type AuthContext } from "./auth.js"
 import { HttpError } from "./errors.js";
 import type { Role } from "./permissions.js";
 import { maskEmail, normalizeEmail, type RecoveryService } from "./recovery.js";
-import { hashSecret, isValidNewSecret, isWeakSecret } from "./security.js";
+import { hashSecret, isValidNewSecret, isWeakSecret, NEW_SECRET_RULE } from "./security.js";
 
 /**
  * Création de famille autonome depuis l'application, sans jeton d'installation :
@@ -113,7 +113,7 @@ export async function purgeOldSignups(db: Pick<Db, "query">): Promise<void> {
 }
 
 export async function startSignup(db: Db, recovery: RecoveryService, input: SignupInput, ipHash: string | null, limits: SignupLimits): Promise<SignupView> {
-  if (!isValidNewSecret(input.secret)) throw new HttpError(400, "invalid_secret", "Le code d'accès doit comporter exactement 6 chiffres");
+  if (!isValidNewSecret(input.secret)) throw new HttpError(400, "invalid_secret", NEW_SECRET_RULE);
   if (isWeakSecret(input.secret)) throw new HttpError(400, "weak_secret", "Code d'accès trop simple (évitez 123456, 111111…)");
   const email = normalizeEmail(input.email);
   const eh = emailKey(email);

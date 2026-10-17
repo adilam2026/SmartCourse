@@ -4,7 +4,7 @@ import { revokeProfileSessions, type AuthContext } from "./auth.js";
 import { HttpError } from "./errors.js";
 import type { SseHub } from "./hub.js";
 import type { Role } from "./permissions.js";
-import { generateSecret, hashSecret, isValidNewSecret, isWeakSecret } from "./security.js";
+import { generateSecret, hashSecret, isValidNewSecret, isWeakSecret, NEW_SECRET_RULE } from "./security.js";
 
 export interface ProfileView {
   id: string;
@@ -75,7 +75,7 @@ export interface CreateProfileInput {
 
 /** Same rules everywhere a code is chosen by a person: exactly 6 digits (leading zeros kept), typed twice, not trivially guessable. */
 export function checkChosenSecret(secret: string, confirm: string): void {
-  if (!isValidNewSecret(secret)) throw new HttpError(400, "invalid_secret", "Le code secret doit comporter exactement 6 chiffres");
+  if (!isValidNewSecret(secret)) throw new HttpError(400, "invalid_secret", NEW_SECRET_RULE);
   if (secret !== confirm) throw new HttpError(400, "secret_mismatch", "Les deux codes secrets ne sont pas identiques");
   if (isWeakSecret(secret)) throw new HttpError(400, "weak_secret", "Code secret trop simple (évitez 123456, 111111…)");
 }

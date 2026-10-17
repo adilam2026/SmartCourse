@@ -223,13 +223,13 @@ private fun EditProfileSheet(p: ProfileDto, roleEditable: Boolean, onDismiss: ()
 private fun ResetCodeSheet(p: ProfileDto, onDismiss: () -> Unit, onSave: (String, String) -> Unit) {
     var a by remember { mutableStateOf("") }
     var b by remember { mutableStateOf("") }
-    val ok = a.length == 6 && a.all { it.isDigit() } && a == b
+    val ok = isNewCode(a) && a == b
     AppSheet(onDismiss) {
         Text("Code d'accès de ${p.displayName}", style = MaterialTheme.typography.titleLarge)
         Spacer(Modifier.height(4.dp))
-        Text("6 chiffres, saisis deux fois. Les téléphones de cette personne seront déconnectés.", style = MaterialTheme.typography.bodySmall)
+        Text("Entre 6 et 8 chiffres, saisis deux fois. Les téléphones de cette personne seront déconnectés.", style = MaterialTheme.typography.bodySmall)
         Spacer(Modifier.height(12.dp))
-        CodeField(a, { a = it }, "Nouveau code (6 chiffres)")
+        CodeField(a, { a = it }, "Nouveau code d'accès", rule = true)
         Spacer(Modifier.height(10.dp))
         CodeField(b, { b = it }, "Confirmer le code")
         if (b.isNotEmpty() && a != b) Text("Les deux codes ne sont pas identiques.", color = C.Danger, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp))
@@ -248,7 +248,7 @@ private fun CreateProfileSheet(defaultCity: String?, onDismiss: () -> Unit, onSa
     var b by remember { mutableStateOf("") }
     var pickCity by remember { mutableStateOf(false) }
     val loginOk = Regex("^[a-z0-9._-]{2,30}$").matches(login)
-    val ok = name.isNotBlank() && loginOk && a.length == 6 && a == b && city != null
+    val ok = name.isNotBlank() && loginOk && isNewCode(a) && a == b && city != null
     AppSheet(onDismiss) {
         Column(Modifier.verticalScroll(rememberScrollState())) {
             Text("Nouveau profil", style = MaterialTheme.typography.titleLarge)
@@ -265,7 +265,7 @@ private fun CreateProfileSheet(defaultCity: String?, onDismiss: () -> Unit, onSa
             Spacer(Modifier.height(12.dp))
             SecondaryButton(city?.let { "Ville : $it" } ?: "Choisir la ville", { pickCity = true }, Modifier.fillMaxWidth(), height = 52.dp)
             Spacer(Modifier.height(10.dp))
-            CodeField(a, { a = it }, "Code d'accès (6 chiffres)")
+            CodeField(a, { a = it }, "Code d'accès", rule = true)
             Spacer(Modifier.height(10.dp))
             CodeField(b, { b = it }, "Confirmer le code")
             if (b.isNotEmpty() && a != b) Text("Les deux codes ne sont pas identiques.", color = C.Danger, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp))

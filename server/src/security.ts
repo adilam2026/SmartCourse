@@ -35,21 +35,23 @@ export function dummyHash(): Promise<string> {
 export const newToken = (): string => randomBytes(32).toString("base64url");
 export const hashToken = (token: string): string => createHash("sha256").update(token).digest("hex");
 
-/** Mot de passe : exactement 6 caractères visibles (chiffres, lettres, symboles) ; les codes à 6 chiffres actuels en font partie. */
-export const SECRET_PATTERN = /^[^\s\p{C}]{6}$/u;
+/** Code accepté à la CONNEXION : ancien code de 6 caractères visibles (chiffres, lettres, symboles), ou code numérique de 6 à 8 chiffres. */
+export const SECRET_PATTERN = /^(?:[^\s\p{C}]{6}|\d{7,8})$/u;
 export const isValidSecret = (s: string): boolean => SECRET_PATTERN.test(s);
 
-/** A NEW code (installation, new profile, change of code) is exactly 6 digits, chosen by hand and typed twice. Existing codes with letters or
- *  symbols keep working at login (SECRET_PATTERN) ; they are never converted nor rejected, only replaced when somebody sets a new code. */
-export const NEW_SECRET_PATTERN = /^\d{6}$/;
+/** A NEW code (installation, new profile, change of code) is 6 to 8 digits (leading zeros kept), chosen by hand and typed twice. Existing codes
+ *  with letters or symbols keep working at login (SECRET_PATTERN) ; they are never converted nor rejected, only replaced when somebody sets a new code. */
+export const NEW_SECRET_PATTERN = /^\d{6,8}$/;
+/** Message unique (application, serveur, site) pour un nouveau code invalide. */
+export const NEW_SECRET_RULE = "Le code d'accès doit contenir entre 6 et 8 chiffres";
 export const isValidNewSecret = (s: string): boolean => NEW_SECRET_PATTERN.test(s);
 
 export function isWeakSecret(s: string): boolean {
-  if (/^(.)\1{5}$/u.test(s)) return true; // même caractère six fois
-  if (!/^\d{6}$/.test(s)) return false;
+  if (/^(.)\1{5,7}$/u.test(s)) return true; // même caractère répété sur toute la longueur
+  if (!/^\d{6,8}$/.test(s)) return false;
   const d = [...s].map(Number);
   const step = (d[1] ?? 0) - (d[0] ?? 0);
-  return Math.abs(step) === 1 && d.every((v, i) => i === 0 || v - (d[i - 1] ?? 0) === step); // 123456, 654321…
+  return Math.abs(step) === 1 && d.every((v, i) => i === 0 || v - (d[i - 1] ?? 0) === step); // 123456, 654321, 1234567, 87654321…
 }
 
 export function generateSecret(): string {

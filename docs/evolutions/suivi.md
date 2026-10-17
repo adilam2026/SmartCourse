@@ -39,7 +39,7 @@ Le serveur fait une sauvegarde chiffrée quotidienne (pg_dump + manifeste + phot
 | 3 | Paramètres avancés : Plusieurs listes actives, Gestion du budget (désactivées par défaut, administrateurs, synchronisées) | Maquette |
 | 4 | Pays / ville de la famille, prix indicatifs seulement au Maroc, devise du budget | Maquette |
 | 5 | Codes d'accès de 6 à 8 chiffres | À développer (pas de maquette nécessaire) |
-| 6 | Connexion / inscription avec Google | Maquette ; configuration Google requise |
+| 6 | Connexion / inscription avec Google | **Retiré de cette livraison** (décision du 17/10/2026) : ni bouton, ni SDK, ni configuration OAuth. Authentification classique conservée. |
 | 7 | Notifications d'activité et rappels d'achat personnels | Maquette |
 | 8 | Plusieurs listes actives (option) | Maquette |
 | 9 | Affichage : conserver les choix validés | Déjà livré, à conserver |
@@ -60,33 +60,37 @@ Le serveur fait une sauvegarde chiffrée quotidienne (pg_dump + manifeste + phot
 | Localisation | Ville par profil (`profiles.city`), Maroc seulement, pas de pays | Pays + ville **de la famille**, héritage par les membres | Colonnes `families.country`, `families.city` ; reprise prudente ; formulaires |
 | Prix | Affichés selon préférence par profil, partout | Seulement au Maroc | Masquage selon le pays (application et serveur) |
 | Codes | Exactement 6 chiffres (serveur et application) | 6 à 8 chiffres pour les nouveaux codes | `NEW_SECRET_PATTERN`, règle « code faible », champs, textes |
-| Google | Aucun | Connexion Google réelle, liaison sécurisée | Vérification du jeton Google côté serveur, table de liaison, écrans ; identifiants Google à créer |
+| Google | Aucun | Hors livraison | Rien |
 | Notifications | Activité seulement, réglage local par profil | + rappels personnels (jours, horaires) | Alarmes Android, réglages, état système |
 | Budget | Aucun | Module complet facultatif | Tables d'opérations, budgets, compte ; droits ; écrans |
 | Permissions | Rôles fixes admin / parent / personnel | + droits financiers distincts | Table de droits par profil, contrôles serveur |
 | Sauvegarde | Planifiée si S3 configuré | Sauvegarde restaurable avant migration | Confirmation (§ 6) |
 
-## 4. Décisions proposées (à valider avec les maquettes)
+## 4. Décisions
 
-1. **Ordre des étapes** : (a) codes 6-8 chiffres ; (b) pays/ville et prix ; (c) paramètres avancés + rappels ; (d) plusieurs listes ; (e) budget ; (f) Google dès que la configuration Google existe. Chaque étape : migration additive, contrôle ciblé, une seule livraison finale identifiée.
-2. **Familles existantes (localisation)** : pays = Maroc et ville = ville de l'administrateur principal quand elle est renseignée et reconnue ; sinon rien n'est affecté et l'administrateur est invité à compléter. Les villes déjà saisies par profil ne sont pas effacées.
-3. **Solde de Mon compte** : le solde initial est l'argent disponible **au début** de la date de référence ; les opérations datées de ce jour-là sont comptées dans le solde. Les opérations antérieures restent visibles mais ne modifient pas le solde.
-4. **Rappels** : alarme Android à fenêtre courte (environ ±10 min), sans permission d'alarme exacte (restreinte par Google Play) ; la liste est revérifiée au déclenchement ; hors connexion, la dernière liste connue sert.
-5. **Personnel et finances** : aucun accès par défaut ; un administrateur peut lui accorder « saisir les paiements des courses », qui ne montre ni le solde, ni les entrées, ni les autres dépenses ; il peut corriger seulement ses propres saisies du jour.
-6. **Devise** : proposée selon le pays (MAD pour le Maroc, EUR, USD…), confirmée à l'activation, unique par famille, non modifiable dès qu'une opération existe (sauf procédure explicite future).
-7. **Montants** : enregistrés en centimes entiers ; chaque saisie porte un identifiant de requête pour éviter les doublons.
+Validées le 17/10/2026 :
+1. **Codes d'accès** : 6 à 8 chiffres pour tout nouveau code, consigne « Entre 6 et 8 chiffres » visible partout où un code est choisi ; anciens codes (6 caractères, lettres comprises) toujours acceptés à la connexion ; personne n'est obligé de changer de code.
+2. **Mon compte** : le solde initial est l'argent disponible **au début** de la date de référence ; les opérations datées de ce jour et des jours suivants sont comptées.
+3. **Finances et personnel** : droits financiers distincts par profil ; aucun accès par défaut pour le personnel ; un administrateur peut accorder « saisir les paiements des courses » sans voir solde, entrées ni autres dépenses.
+4. **Devise** : proposée selon le pays, confirmée à l'activation, figée dès la première opération.
+5. **Rappels** : sans permission d'alarme exacte ; décalage possible de quelques minutes, indiqué à l'écran.
+6. **Familles existantes** : le Maroc n'est jamais supposé. Si la ville déjà connue est reconnue, pays et ville sont préremplis ; dans tous les cas l'administrateur confirme. Sans confirmation, pas de pays : les prix restent affichés comme aujourd'hui (aucun changement de comportement imposé).
+7. **Google** : retiré de cette livraison.
+
+Proposées et appliquées sauf avis contraire :
+8. Ordre : (a) codes 6-8 ; (b) pays/ville et prix ; (c) paramètres avancés + rappels ; (d) plusieurs listes ; (e) budget (après validation visuelle de ses maquettes).
+9. Montants en centimes entiers ; identifiant de requête sur chaque saisie financière (pas de doublon en cas de relance).
 
 ## 5. Contrôles effectués
-- 17/10/2026 : maquettes des nouveaux parcours (22 écrans) : https://claude.ai/artifact/B1cei82u74Zfo3upEbrs7h — en attente de validation.
+- 17/10/2026 : maquettes des nouveaux parcours (22 écrans, puis 21 après retrait de Google) : https://claude.ai/artifact/B1cei82u74Zfo3upEbrs7h — en attente de validation.
 - 17/10/2026 : production `/health` = `f460829`, migration `022`. Référence Git créée (`reference/android-1.0.2-1144`, `reference/serveur-022`). Analyse du code (listes, notifications, localisation, codes, prix, sauvegardes, rôles, authentification).
 
 ## 6. Points bloquants / à valider
-1. **Sauvegarde restaurable** : confirmer que la sauvegarde automatique est active (Railway : variables `BACKUP_S3_*` ou `S3_*` renseignées, état « Sauvegarde » visible pour un administrateur). Aucune migration de production avant cette confirmation.
-2. **Google** : créer dans Google Cloud (projet de l'éditeur) un écran de consentement OAuth et deux identifiants : client **Android** (paquet `app.smartcourse.courses.natif` + empreinte SHA-1 de la clé de signature, et celle de la clé Google Play si l'app est distribuée par Play) et client **Web** (son identifiant, non secret, sert au serveur pour vérifier les jetons). Sans eux, le bouton Google n'est pas inclus.
-3. Validation des maquettes et des décisions du § 4.
+1. **Sauvegarde vérifiée avant toute migration de production** : une sauvegarde récente doit être restaurée sur une base isolée et comparée (la seule présence de variables S3 ne suffit pas). Commande prévue côté serveur : `npm run backup -- verify` : elle restaure la dernière sauvegarde dans une base de contrôle **isolée** (variable `VERIFY_DATABASE_URL`, base vide distincte de la production) et compare les comptages au manifeste. À exécuter dans l'environnement Railway (secrets non partagés). Aucune migration de production avant ce résultat.
+2. **Validation visuelle des maquettes** (21 écrans, Google retiré) : https://claude.ai/artifact/B1cei82u74Zfo3upEbrs7h. Le module Budget n'est pas développé avant cette validation.
 
 ## 7. Retour arrière
 - **Revenir à l'ancien code (application)** : réinstaller l'APK de référence n'est possible qu'en désinstallant (versionCode inférieur) ; préférer une nouvelle version construite depuis `reference/android-1.0.2-1144` avec un versionCode supérieur.
 - **Revenir à l'ancien code (serveur)** : redéployer `reference/serveur-022` sur Railway. Les migrations sont additives : l'ancien serveur ignore les nouvelles tables et colonnes. Exception à prévoir : si l'index « une liste active » est levé, l'ancien serveur suppose une seule liste ; il faut d'abord clôturer les listes en trop (procédure documentée à l'étape multi-listes).
-- **Désactiver une fonction** : décocher l'option dans Paramètres avancés (données conservées) ; pour Google, retirer la variable de l'identifiant client (le bouton disparaît, les liaisons restent).
+- **Désactiver une fonction** : décocher l'option dans Paramètres avancés (données conservées).
 - **Restaurer la base** : uniquement sur décision explicite ; une restauration perd tout ce qui a été saisi depuis la sauvegarde. Jamais automatique.

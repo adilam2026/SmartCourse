@@ -28,7 +28,7 @@ import { createProfile, deleteOwnAccount, deleteProfile, listProfiles, resetSecr
 import { mailerFromEnv } from "./mail.js";
 import { countFamilyData, identifyFamily, purgeFamily } from "./family-purge.js";
 import { RecoveryService, secretMatches } from "./recovery.js";
-import { NEW_SECRET_PATTERN, SECRET_PATTERN } from "./security.js";
+import { NEW_SECRET_PATTERN, NEW_SECRET_RULE, SECRET_PATTERN } from "./security.js";
 
 export interface AppDeps {
   db: Db;
@@ -75,8 +75,8 @@ const loginSchema = z.object({
   secret: z.string().regex(SECRET_PATTERN),
 });
 const loginField = z.string().trim().toLowerCase().regex(/^[a-z0-9._-]{2,30}$/);
-/** Un NOUVEAU code : exactement 6 chiffres (les anciens mots de passe à lettres restent acceptés à la connexion seulement). */
-const secretField = z.string().regex(NEW_SECRET_PATTERN, "6 chiffres");
+/** Un NOUVEAU code : 6 à 8 chiffres (les anciens mots de passe à lettres restent acceptés à la connexion seulement). */
+const secretField = z.string().regex(NEW_SECRET_PATTERN, "entre 6 et 8 chiffres");
 const emailField = z.string().trim().toLowerCase().email().max(254);
 const roleField = z.enum(["admin", "parent", "staff"]);
 const nameField = z.string().trim().min(1).max(40);
@@ -114,7 +114,11 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
   app.setErrorHandler((err, _req, reply) => {
     if (err instanceof HttpError) return reply.code(err.status).send({ error: err.code, message: err.message });
-    if (err instanceof ZodError) return reply.code(400).send({ error: "invalid_request", issues: err.issues });
+    if (err instanceof ZodError) {
+      // Nouveau code d'accès mal formé : message précis et identique partout (application, site, serveur).
+      if (err.issues.some((i) => i.message === "entre 6 et 8 chiffres")) return reply.code(400).send({ error: "invalid_secret", message: NEW_SECRET_RULE });
+      return reply.code(400).send({ error: "invalid_request", issues: err.issues });
+    }
     const status = (err as { statusCode?: number }).statusCode;
     if (status && status < 500) return reply.code(status).send({ error: "bad_request", message: (err as Error).message });
     app.log.error(err);

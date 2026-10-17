@@ -140,7 +140,7 @@ fun serverMessage(f: Outcome.Fail, general: (Failure) -> String): String = when 
     "login_taken" -> "Cet identifiant existe déjà dans la famille."
     "city_required" -> "Choisissez une ville."
     "invalid_city" -> "Choisissez une ville dans la liste."
-    "invalid_secret" -> "Le code d'accès doit comporter exactement 6 chiffres."
+    "invalid_secret" -> "Le code d'accès doit contenir entre 6 et 8 chiffres."
     "secret_mismatch" -> "Les deux codes d'accès ne sont pas identiques."
     "weak_secret" -> "Code d'accès trop simple (évitez 123456, 111111…)."
     "product_exists" -> "Cet article existe déjà dans le catalogue."

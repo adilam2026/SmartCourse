@@ -11,7 +11,7 @@ const BY_CODE: Record<string, string> = {
   code_mismatch: "Le code famille saisi ne correspond pas.",
   weak_secret: "Code secret trop simple (évitez 123456, 111111…).",
   secret_mismatch: "Les deux codes secrets ne sont pas identiques.",
-  invalid_secret: "Le code secret doit comporter exactement 6 chiffres.",
+  invalid_secret: "Le code d'accès doit contenir entre 6 et 8 chiffres.",
   login_taken: "Cet identifiant existe déjà.",
   last_admin: "Impossible : c'est le dernier administrateur actif.",
   admin_cannot_deactivate: "Un administrateur ne peut pas être désactivé.",

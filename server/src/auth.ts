@@ -2,7 +2,7 @@ import type pg from "pg";
 import { withTx, type Db } from "./db.js";
 import { HttpError, invalidCredentials } from "./errors.js";
 import type { Role } from "./permissions.js";
-import { dummyHash, generateFamilyCode, hashSecret, hashToken, isValidNewSecret, isWeakSecret, newToken, verifySecret } from "./security.js";
+import { dummyHash, generateFamilyCode, hashSecret, hashToken, isValidNewSecret, isWeakSecret, NEW_SECRET_RULE, newToken, verifySecret } from "./security.js";
 
 export interface AuthContext {
   sessionId: string;
@@ -149,7 +149,7 @@ export interface SetupInput {
  * Everything happens in one transaction, so a failure after consumption gives the token back.
  */
 export async function setupFamily(db: Db, input: SetupInput): Promise<{ token: string; familyCode: string; auth: AuthContext }> {
-  if (!isValidNewSecret(input.admin.secret)) throw new HttpError(400, "invalid_secret", "Le code secret doit comporter exactement 6 chiffres");
+  if (!isValidNewSecret(input.admin.secret)) throw new HttpError(400, "invalid_secret", NEW_SECRET_RULE);
   if (isWeakSecret(input.admin.secret)) throw new HttpError(400, "weak_secret", "Code secret trop simple (évitez 123456, 111111…)");
   const secretHash = await hashSecret(input.admin.secret);
   return withTx(db, async (c) => {

@@ -92,7 +92,7 @@ private fun OwnAccountDeletion(me: Me, session: Session, onDone: () -> Unit) {
     }
     error?.let { Text(it, color = C.Danger, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 6.dp)) }
     Spacer(Modifier.height(6.dp))
-    PrimaryButton(if (busy) "Suppression…" else "Supprimer mon compte", { confirm = true }, Modifier.fillMaxWidth(), enabled = secret.length == 6 && understood && !busy)
+    PrimaryButton(if (busy) "Suppression…" else "Supprimer mon compte", { confirm = true }, Modifier.fillMaxWidth(), enabled = isEnteredCode(secret) && understood && !busy)
     if (confirm) ConfirmDialog("Supprimer votre compte ?", "Votre compte « ${me.displayName} » sera supprimé définitivement. Cette action ne peut pas être annulée.", "Supprimer", {
         confirm = false; busy = true; error = null
         scope.launch {
@@ -153,7 +153,7 @@ private fun PrimaryAdminChoices(me: Me, session: Session, onDeleteFamily: () -> 
             CodeField(secret, { secret = it }, "Votre code d'accès", legacy = true)
             error?.let { Text(it, color = C.Danger, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 6.dp)) }
             Spacer(Modifier.height(8.dp))
-            PrimaryButton(if (busy) "Transfert…" else "Transférer le rôle", { confirm = true }, Modifier.fillMaxWidth(), enabled = chosen != null && secret.length == 6 && !busy)
+            PrimaryButton(if (busy) "Transfert…" else "Transférer le rôle", { confirm = true }, Modifier.fillMaxWidth(), enabled = chosen != null && isEnteredCode(secret) && !busy)
         }
     }
     Spacer(Modifier.height(20.dp))

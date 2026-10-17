@@ -227,12 +227,12 @@ function EditProfile({ profile, onClose, run }: { profile: Profile; onClose(): v
   );
 }
 
-/** Un NOUVEAU code secret : exactement 6 chiffres, choisi à la main, saisi deux fois, clavier numérique, saisie masquée. */
+/** Un NOUVEAU code secret : 6 à 8 chiffres, choisi à la main, saisi deux fois, clavier numérique, saisie masquée. */
 function PasswordFields({ secret, again, setSecret, setAgain, prefix }: { secret: string; again: string; setSecret(v: string): void; setAgain(v: string): void; prefix: string }) {
   const mismatch = again.length > 0 && secret !== again;
   return (
     <>
-      <label className="field">Code secret — 6 chiffres<SecretInput kind="new" value={secret} onChange={setSecret} testid={`${prefix}-secret`} /></label>
+      <label className="field">Code secret — entre 6 et 8 chiffres<SecretInput kind="new" value={secret} onChange={setSecret} testid={`${prefix}-secret`} /></label>
       <label className="field">Confirmer le code secret<SecretInput kind="new" value={again} onChange={setAgain} testid={`${prefix}-secret2`} /></label>
       {mismatch && <p className="error" data-testid={`${prefix}-mismatch`}>Les deux codes secrets ne sont pas identiques.</p>}
     </>
@@ -296,7 +296,7 @@ function AddProfile({ defaultCity, onClose, onCreated }: { defaultCity: string; 
         </label>
         <CityPicker key={defaultCity} value={city} onChange={setCity} testid="np-city" />
         <PasswordFields secret={secret} again={again} setSecret={setSecret} setAgain={setAgain} prefix="np" />
-        <p className="muted">Vous choisissez ce code : 6 chiffres. Rien n'est généré automatiquement.</p>
+        <p className="muted">Vous choisissez ce code : entre 6 et 8 chiffres. Rien n'est généré automatiquement.</p>
         {error && <p className="error" role="alert" data-testid="np-error">{error}</p>}
         <button className="btn btn--primary btn--big" disabled={!isNewSecret(secret) || secret !== again || !displayName.trim() || !login.trim() || !city} data-testid="np-submit">Créer</button>
         <button type="button" className="btn btn--ghost" onClick={onClose}>Annuler</button>

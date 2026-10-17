@@ -43,13 +43,13 @@ object AccessShare {
         "Rejoignez notre famille sur $APP.\nCode famille : $familyCode\n\n" +
             "Votre identifiant et votre code d'accès vous seront donnés par un administrateur de la famille."
 
-    /** Même règle que le serveur : 6 chiffres, ni six fois le même, ni une suite (123456, 654321…). */
+    /** Même règle que le serveur : 6 à 8 chiffres, ni le même chiffre partout, ni une suite (123456, 654321, 1234567…). */
     fun isWeak(s: String): Boolean {
-        if (s.length == 6 && s.all { it == s[0] }) return true
-        if (s.length != 6 || !s.all(Char::isDigit)) return false
+        if (s.length in 6..8 && s.all { it == s[0] }) return true
+        if (s.length !in 6..8 || !s.all(Char::isDigit)) return false
         val d = s.map { it - '0' }
         val step = d[1] - d[0]
-        return kotlin.math.abs(step) == 1 && (1 until 6).all { d[it] - d[it - 1] == step }
+        return kotlin.math.abs(step) == 1 && (1 until d.size).all { d[it] - d[it - 1] == step }
     }
 
     /** Nouveau code tiré au hasard (générateur cryptographique), zéros initiaux conservés. */

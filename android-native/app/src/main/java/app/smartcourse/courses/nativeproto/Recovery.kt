@@ -218,7 +218,7 @@ fun CreateFamilyForm(session: Session) {
     Spacer(Modifier.height(10.dp))
     FormField(email, { email = it.trim() }, "E-mail de récupération", leading = Icons.Rounded.Email, keyboard = KeyboardOptions(keyboardType = KeyboardType.Email))
     Spacer(Modifier.height(10.dp))
-    CodeField(code, { code = it }, "Code d'accès (6 chiffres)")
+    CodeField(code, { code = it }, "Code d'accès", rule = true)
     Spacer(Modifier.height(10.dp))
     CodeField(code2, { code2 = it }, "Confirmez le code d'accès")
     error?.let { Spacer(Modifier.height(8.dp)); Text(it, color = C.Danger, style = MaterialTheme.typography.bodyMedium) }
@@ -230,8 +230,8 @@ fun CreateFamilyForm(session: Session) {
         if (login.length < 2) add("votre identifiant (2 caractères au moins)")
         if (city == null) add("votre ville")
         if (!email.contains("@") || !email.substringAfter("@").contains(".")) add("une adresse e-mail valide")
-        if (code.length != 6) add("un code d'accès de 6 chiffres")
-        if (code2.length != 6) add("la confirmation du code d'accès")
+        if (!isNewCode(code)) add("un code d'accès de 6 à 8 chiffres")
+        if (code2.isEmpty()) add("la confirmation du code d'accès")
     }
     if (missing.isNotEmpty()) Text("Il manque : ${missing.joinToString(", ")}.", style = MaterialTheme.typography.bodySmall, color = C.Muted, modifier = Modifier.padding(bottom = 8.dp))
     PrimaryButton(if (busy) "Envoi du code…" else "Recevoir le code par e-mail", {
