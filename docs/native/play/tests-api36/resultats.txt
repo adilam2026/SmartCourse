@@ -1,24 +1,14 @@
-═══ V. Créer ma famille : le bouton dit ce qui manque (ville oubliée) — contrôle rapide ═══
-PASS  V1. pays non choisi : « Il manque : le pays » affiché
-PASS  V2. bouton actif (jamais grisé sans explication)
-PASS  V3. appui : choix du pays ouvert, rien n'est envoyé
-PASS  V3b. Maroc : la ville est demandée
-PASS  V4. ville choisie : plus rien ne manque
 ═══ M. Option « Plusieurs listes actives » : activation, nouvelle liste nommée, changement de liste, désactivation refusée — contrôle rapide ═══
 PASS  M1. option désactivée par défaut : présentation habituelle (pas de sélecteur)
 PASS  M2. Paramètres avancés : option visible
 PASS  M3. activée par l'administrateur (enregistrée côté serveur)
 PASS  M4. sélecteur affiché : 1 liste en cours
-FAIL  M5. nouvelle liste « Marché » créée et consultée ; l'autre reste ouverte
-      écran : "Nouvelle liste"|"Donnez-lui un nom pour la retrouver facilement (40 caractères au plus)."|"Ex. : Marché du samedi"|"Annuler"|"Créer"|
-FAIL  M6. liste des listes en cours avec leurs articles restants
-      écran : "Nouvelle liste"|"Donnez-lui un nom pour la retrouver facilement (40 caractères au plus)."|"Ex. : Marché du samedi"|"Annuler"|"Créer"|
-FAIL  M7. retour à la première liste : Tomates affichées
-      écran : "Nouvelle liste"|"Donnez-lui un nom pour la retrouver facilement (40 caractères au plus)."|"Ex. : Marché du samedi"|"Annuler"|"Créer"|
+PASS  M5. nouvelle liste « Souk » créée et consultée ; l'autre reste ouverte
+PASS  M6. liste des listes en cours avec leurs articles restants
+PASS  M7. retour à la première liste : Tomates affichées
 FAIL  M8. désactivation refusée tant que 2 listes sont en cours (rien fusionné ni supprimé)
-      écran : "Nouvelle liste"|"Donnez-lui un nom pour la retrouver facilement (40 caractères au plus)."|"Ex. : Marché du samedi"|"Annuler"|"Créer"|
-FAIL  M9. aucune liste supprimée (1 en cours)
-      écran : "Nouvelle liste"|"Donnez-lui un nom pour la retrouver facilement (40 caractères au plus)."|"Ex. : Marché du samedi"|"Annuler"|"Créer"|
-ECHECS=5
+      écran : "Retour"|"Paramètres avancés"|"Options de la famille"|"Ces options sont désactivées par défaut. Elles s'appliquent à toute la famille."|"Plusieurs listes actives"|"Préparer plusieurs listes en même temps (marché, supermarché…). Chacun choisit la liste qu'il consulte."|"Action impossible dans l'état actuel. Actualisez l'écran."|"Liste"|"Liste"|"Historique"|"Historique"|"Statistiques"|"Statistiques"|"Réglages"|"Réglages"|
+PASS  M9. aucune liste supprimée (2 en cours)
+ECHECS=1
 CRASH_APPLICATION=0
-TOTAL_ECHECS=5
+TOTAL_ECHECS=1
