@@ -96,6 +96,8 @@ Proposées et appliquées sauf avis contraire :
 - 17/10/2026 : émulateur Android 16, contrôles courts : B (budget : activation, deux paiements, clôture 770,00 DH sans débit supplémentaire, vue d'ensemble) réussi au run 60 après correction d'un panneau coupé (run 58) ; W (Recommander vers une liste choisie) réussi ; Q (rappel reçu environ 30 s après l'horaire, sans montant) réussi.
 - Sauvegarde : restauration de contrôle isolée prête (`verif-sauvegarde.yml`), testée localement ; **pas encore exécutée sur la sauvegarde de production** (secrets GitHub à ajouter par le propriétaire).
 
+- 17/10/2026 : **livraison de recette** — pré-version GitHub `courses-natif-play-1.0.2-61` (commit `600e41a`, versionCode 1161, versionName 1.0.2, identifiant `app.smartcourse.courses.natif`, clé durable SHA-256 `c2cbce5e…669c88e`) : AAB `6427176c…cdaea5e0`, APK généré depuis le bundle `169eb581…77549b49`. Contrôles B et W rejoués avant construction, APK ouvert sur Android 16. Non publié sur Google Play.
+
 ## 6. Points bloquants / à valider
 1. **Sauvegarde vérifiée avant toute migration de production** : une sauvegarde récente doit être restaurée sur une base isolée et comparée (la seule présence de variables S3 ne suffit pas). Commande prévue côté serveur : `npm run backup -- verify` : elle restaure la dernière sauvegarde dans une base de contrôle **isolée** (variable `VERIFY_DATABASE_URL`, base vide distincte de la production) et compare les comptages au manifeste. À exécuter dans l'environnement Railway (secrets non partagés). Aucune migration de production avant ce résultat.
 2. **Validation visuelle des maquettes** (21 écrans, Google retiré) : https://claude.ai/artifact/B1cei82u74Zfo3upEbrs7h. Le module Budget n'est pas développé avant cette validation.
