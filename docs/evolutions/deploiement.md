@@ -1,6 +1,6 @@
 # Déploiement des évolutions avancées — plan réversible
 
-État : **préparé, non exécuté**. Rien n'est déployé en production sans l'accord explicite du propriétaire.
+État : **exécuté le 17/10/2026** (production `64af689`, migration `025_budget.sql`), recette 1166 validée ; référence stable : `reference/serveur-025` et `reference/android-1.0.2-1166`. Toute nouvelle mise en production reste soumise à l'accord explicite du propriétaire.
 Aucune publication sur Google Play.
 
 ## 1. Ce qui sera déployé
