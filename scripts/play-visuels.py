@@ -82,13 +82,18 @@ fg.save(os.path.join(OUT, "banniere-1024x500.png"), optimize=True)
 
 # 3. Captures originales (pixels inchangés, PNG 24 bits) et proposition habillée
 CAPTIONS = {
-    "play-1-liste-partagee": "Une seule liste pour toute la famille",
-    "play-2-selection-photos": "Choisissez vos articles en photos",
-    "play-3-quantite": "La bonne quantité, au kilo ou à la pièce",
+    "play-1-liste-partagee": "Une liste partagée par toute la famille",
+    "play-2-listes-en-cours": "Plusieurs listes en cours, chacune son nom",
+    "play-3-selection-photos": "Choisissez vos articles en photos",
     "play-4-articles-achetes": "Chacun voit ce qui est déjà acheté",
-    "play-5-historique": "Vos courses passées, à refaire en un geste",
-    "play-6-profils": "Un profil et des droits pour chacun",
+    "play-5-budget": "Suivez les dépenses de la famille",
+    "play-6-budgets-mensuels": "Un budget par catégorie, chaque mois",
+    "play-7-historique": "Vos courses passées, à refaire en un geste",
+    "play-8-rappels": "Un rappel s'il reste des achats",
 }
+for sub in ("captures", "captures-habillees"):  # une seule série à jour (les anciennes captures ne traînent pas)
+    for old in glob.glob(os.path.join(OUT, sub, "play-*.png")):
+        os.remove(old)
 for key, caption in CAPTIONS.items():
     src = os.path.join(SRC, key + ".png")
     if not os.path.exists(src):
