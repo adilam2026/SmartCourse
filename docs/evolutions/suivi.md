@@ -100,6 +100,8 @@ Proposées et appliquées sauf avis contraire :
 
 - 17/10/2026 : recette 1161 sur téléphone — deux blocages expliqués. L'APK utilise la production, encore en migration 022 (`/health`, commit `f460829`) : les routes des nouvelles fonctions y répondent 404, affiché à tort « Élément introuvable » ; et la liste des devises venait uniquement du serveur (vide sur 022). Corrigé : niveau du serveur lu sur `/health`, options inactives avec « nécessite la mise à jour du serveur », devises fournies par l'application.
 
+- 17/10/2026 : contrôle ciblé X (run 63) réussi : « Plusieurs listes actives » activée sans erreur, choix de devise ouvert et sélection (EUR), activation du budget confirmée, réglages conservés après fermeture et réouverture. Restauration de contrôle lancée : arrêtée faute des secrets GitHub (aucune donnée lue).
+
 ## 6. Points bloquants / à valider
 1. **Sauvegarde vérifiée avant toute migration de production** : une sauvegarde récente doit être restaurée sur une base isolée et comparée (la seule présence de variables S3 ne suffit pas). Commande prévue côté serveur : `npm run backup -- verify` : elle restaure la dernière sauvegarde dans une base de contrôle **isolée** (variable `VERIFY_DATABASE_URL`, base vide distincte de la production) et compare les comptages au manifeste. À exécuter dans l'environnement Railway (secrets non partagés). Aucune migration de production avant ce résultat.
 2. **Validation visuelle des maquettes** (21 écrans, Google retiré) : https://claude.ai/artifact/B1cei82u74Zfo3upEbrs7h. Le module Budget n'est pas développé avant cette validation.
