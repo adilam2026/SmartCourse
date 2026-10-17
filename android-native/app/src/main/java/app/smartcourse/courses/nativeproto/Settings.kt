@@ -37,7 +37,7 @@ fun AdminHubScreen(nav: (String) -> Unit) {
         "Produits et prix" to (listOf(Entry("Catalogue", Icons.Rounded.Inventory2, "v09")) + if (demo.pricesAvailable) listOf(Entry("Gestion des prix", Icons.Rounded.LocalOffer, "v10")) else emptyList()),
         "Famille et accès" to listOf(Entry("Profils", Icons.Rounded.Groups, "v08"), Entry("Récupération", Icons.Rounded.Key, "stub/Récupération")),
         "Famille" to listOf(Entry("Pays et ville", Icons.Rounded.Public, "v15")),
-        "Préférences" to listOf(Entry("Affichage", Icons.Rounded.Palette, "v11"), Entry("Notifications", Icons.Rounded.Notifications, "stub/Notifications")),
+        "Préférences" to listOf(Entry("Affichage", Icons.Rounded.Palette, "v11"), Entry("Notifications et rappels", Icons.Rounded.Notifications, "stub/Notifications")),
         "Application" to listOf(Entry("Sauvegarde", Icons.Rounded.Cloud, "stub/Sauvegarde"), Entry("À propos", Icons.Rounded.Info, "stub/À propos")),
     )
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
