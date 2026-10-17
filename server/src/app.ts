@@ -24,6 +24,7 @@ import { canonicalCity } from "./cities.js";
 import { COUNTRIES, isCountry } from "./countries.js";
 import { familyLocation, locationRoutes } from "./location.js";
 import { familyFeatures, featureRoutes } from "./features.js";
+import { budgetRoutes } from "./budget.js";
 import { priceRoutes } from "./prices.js";
 import { templateRoutes } from "./templates.js";
 import { priceCommunityRoutes } from "./price-community.js";
@@ -405,6 +406,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   familyProductRoutes(app, { db, store: deps.store, guard, hub, managers: deps.catalogManagers });
   locationRoutes(app, { db, guard, hub, resolveCity: (c) => resolveCity(c, true)! });
   featureRoutes(app, { db, guard, hub });
+  budgetRoutes(app, { db, guard, hub });
   app.get("/api/countries", async () => ({ countries: COUNTRIES }));
   listRoutes(app, { db, hub, guard, push });
   priceRoutes(app, { db, guard, hub });

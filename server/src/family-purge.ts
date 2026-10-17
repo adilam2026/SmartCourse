@@ -6,7 +6,7 @@ import { HttpError } from "./errors.js";
 import type { PhotoStore } from "./photos.js";
 
 /** Tables carrying family_id : counted for identification, deleted, and compared before/after for the OTHER families. */
-const FAMILY_TABLES = ["profiles", "products", "lists", "list_items", "purchases", "validations", "list_events", "push_subscriptions", "push_events", "family_prices", "list_templates", "audit_log"] as const;
+const FAMILY_TABLES = ["profiles", "products", "lists", "list_items", "purchases", "validations", "list_events", "push_subscriptions", "push_events", "family_prices", "list_templates", "audit_log", "finance_operations", "finance_operation_history", "finance_budgets", "finance_account_history", "finance_categories", "finance_merchants", "finance_rights", "list_payment_status"] as const;
 
 export interface FamilyIdentity {
   id: string;
@@ -122,6 +122,16 @@ export async function purgeFamily(db: Db, store: PhotoStore, familyId: string, e
     const others = await snapshot(c, familyId);
     const mine = "(SELECT id FROM profiles WHERE family_id = $1)";
     const steps: string[] = [
+      // Budget de la famille (avant les listes et les profils qu'il référence)
+      "DELETE FROM list_payment_status WHERE family_id = $1",
+      "DELETE FROM finance_operation_history WHERE family_id = $1",
+      "DELETE FROM finance_operations WHERE family_id = $1",
+      "DELETE FROM finance_budgets WHERE family_id = $1",
+      "DELETE FROM finance_account_history WHERE family_id = $1",
+      "DELETE FROM finance_categories WHERE family_id = $1",
+      "DELETE FROM finance_merchants WHERE family_id = $1",
+      "DELETE FROM finance_rights WHERE family_id = $1",
+      "DELETE FROM finance_settings WHERE family_id = $1",
       "DELETE FROM push_events WHERE family_id = $1",
       "DELETE FROM push_subscriptions WHERE family_id = $1",
       "DELETE FROM list_events WHERE family_id = $1",
