@@ -1,13 +1,26 @@
-═══ M. Option « Plusieurs listes actives » : activation, nouvelle liste nommée, changement de liste, désactivation refusée — contrôle rapide ═══
-PASS  M1. option désactivée par défaut : présentation habituelle (pas de sélecteur)
-PASS  M2. Paramètres avancés : option visible
-PASS  M3. activée par l'administrateur (enregistrée côté serveur)
-PASS  M4. sélecteur affiché : 1 liste en cours
-PASS  M5. nouvelle liste « Souk » créée et consultée ; l'autre reste ouverte
-PASS  M6. liste des listes en cours avec leurs articles restants
-PASS  M7. retour à la première liste : Tomates affichées
-PASS  M8. désactivation refusée tant que 2 listes sont en cours (rien fusionné ni supprimé)
-PASS  M9. aucune liste supprimée (2 en cours)
+═══ B. Budget : activation, paiements pendant les courses, clôture sans double débit, vue d'ensemble — contrôle court ═══
+PASS  B0. option désactivée : aucun onglet Budget ni « Saisir un paiement »
+PASS  B1. activation : devise à confirmer, figée dès la première opération
+PASS  B1b. activée côté serveur, devise MAD
+PASS  B2. menu de la liste : « Saisir un paiement »
+PASS  B3. dépense Courses enregistrée et rattachée à la liste en cours (Carrefour:45000)
+FAIL  B4. clôture : paiements déjà saisis et total de la liste (770,00 DH), rien à ressaisir
+      écran : "Close sheet"|"Terminer les courses"|"Il reste 1 article non acheté. La liste sera archivée."|"Paiements enregistrés"|"Carrefour"|"17 oct. · par Adil"|"450,00 DH"|"Corriger"|
+FAIL  B5. liste clôturée, paiements confirmés complets, aucun débit supplémentaire (BIM:32000,Carrefour:45000)
+      écran : "Ma liste"|"Samedi 17 octobre"|"Plus d'actions"|"Compte"|"0 sur 1 achetés"|"0 %"|"Ajouter des articles"|"Favoris"|"Légumes et herbes"|"Replier"|"Tomates"|"2 kg"|"Acheté : Tomates"|"Liste"|"Liste"|"Historique"|"Historique"|"Statistiques"|"Statistiques"|"Budget"|"Budget"|"Réglages"|"Réglages"|
+PASS  B6. vue d'ensemble : dépenses du mois 770,00 DH (Courses), entrées séparées
+═══ W. Recommander vers une liste choisie (plusieurs listes actives) — contrôle ciblé ═══
+PASS  W1. destination demandée : listes en cours et nouvelle liste
+PASS  W2. liste choisie non vide : Ajouter / Remplacer proposé
+PASS  W3. articles ajoutés à « Souk » seulement (Carottes:1.000,Oignons:1.000,Tomates:3.000)
+PASS  W4. commande d'origine intacte
+ECHECS=2
+CRASH_APPLICATION=0
+═══ Q. Rappel d'achat : programmé puis reçu à l'horaire (horloge de l'émulateur avancée) — contrôle court ═══
+PASS  Q1. rappel activé (18:00, tous les jours), limite affichée : peut être différé par Android
+PASS  Q2. réveil programmé auprès d'Android (sans alarme exacte)
+      reçu après environ 30 s (horloge réglée à 17:59:50 ; Android peut différer)
+PASS  Q3. notification reçue : « Il reste 1 article à acheter », sans montant
 ECHECS=0
 CRASH_APPLICATION=0
-TOTAL_ECHECS=0
+TOTAL_ECHECS=2
