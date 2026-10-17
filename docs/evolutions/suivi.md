@@ -98,6 +98,8 @@ Proposées et appliquées sauf avis contraire :
 
 - 17/10/2026 : **livraison de recette** — pré-version GitHub `courses-natif-play-1.0.2-61` (commit `600e41a`, versionCode 1161, versionName 1.0.2, identifiant `app.smartcourse.courses.natif`, clé durable SHA-256 `c2cbce5e…669c88e`) : AAB `6427176c…cdaea5e0`, APK généré depuis le bundle `169eb581…77549b49`. Contrôles B et W rejoués avant construction, APK ouvert sur Android 16. Non publié sur Google Play.
 
+- 17/10/2026 : recette 1161 sur téléphone — deux blocages expliqués. L'APK utilise la production, encore en migration 022 (`/health`, commit `f460829`) : les routes des nouvelles fonctions y répondent 404, affiché à tort « Élément introuvable » ; et la liste des devises venait uniquement du serveur (vide sur 022). Corrigé : niveau du serveur lu sur `/health`, options inactives avec « nécessite la mise à jour du serveur », devises fournies par l'application.
+
 ## 6. Points bloquants / à valider
 1. **Sauvegarde vérifiée avant toute migration de production** : une sauvegarde récente doit être restaurée sur une base isolée et comparée (la seule présence de variables S3 ne suffit pas). Commande prévue côté serveur : `npm run backup -- verify` : elle restaure la dernière sauvegarde dans une base de contrôle **isolée** (variable `VERIFY_DATABASE_URL`, base vide distincte de la production) et compare les comptages au manifeste. À exécuter dans l'environnement Railway (secrets non partagés). Aucune migration de production avant ce résultat.
 2. **Validation visuelle des maquettes** (21 écrans, Google retiré) : https://claude.ai/artifact/B1cei82u74Zfo3upEbrs7h. Le module Budget n'est pas développé avant cette validation.
