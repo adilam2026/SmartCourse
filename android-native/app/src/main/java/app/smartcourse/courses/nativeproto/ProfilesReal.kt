@@ -150,7 +150,7 @@ fun ProfilesScreenReal(session: Session, onBack: () -> Unit) {
         codeFor = null
         act("Code d'accès modifié : ${p.displayName} est déconnecté de ses téléphones.") { repo.resetSecret(p.id, a, b) }
     } }
-    if (create) CreateProfileSheet(defaultCity = me?.city, onDismiss = { create = false }) { name, login, role, a, b, city ->
+    if (create) CreateProfileSheet(defaultCity = me?.city, familyLocated = me?.location?.confirmed == true, onDismiss = { create = false }) { name, login, role, a, b, city ->
         create = false
         scope.launch {
             busy = true
@@ -239,7 +239,7 @@ private fun ResetCodeSheet(p: ProfileDto, onDismiss: () -> Unit, onSave: (String
 }
 
 @Composable
-private fun CreateProfileSheet(defaultCity: String?, onDismiss: () -> Unit, onSave: (String, String, String, String, String, String?) -> Unit) {
+private fun CreateProfileSheet(defaultCity: String?, familyLocated: Boolean, onDismiss: () -> Unit, onSave: (String, String, String, String, String, String?) -> Unit) {
     var name by remember { mutableStateOf("") }
     var login by remember { mutableStateOf("") }
     var role by remember { mutableStateOf("staff") }
@@ -248,7 +248,8 @@ private fun CreateProfileSheet(defaultCity: String?, onDismiss: () -> Unit, onSa
     var b by remember { mutableStateOf("") }
     var pickCity by remember { mutableStateOf(false) }
     val loginOk = Regex("^[a-z0-9._-]{2,30}$").matches(login)
-    val ok = name.isNotBlank() && loginOk && isNewCode(a) && a == b && city != null
+    // Pays et ville confirmés pour la famille : le nouveau membre en hérite (aucune ville à choisir).
+    val ok = name.isNotBlank() && loginOk && isNewCode(a) && a == b && (familyLocated || city != null)
     AppSheet(onDismiss) {
         Column(Modifier.verticalScroll(rememberScrollState())) {
             Text("Nouveau profil", style = MaterialTheme.typography.titleLarge)
@@ -263,14 +264,16 @@ private fun CreateProfileSheet(defaultCity: String?, onDismiss: () -> Unit, onSa
             Spacer(Modifier.height(6.dp))
             SegTabs(ROLES.map { it.first }, ROLES.indexOfFirst { it.second == role }, { role = ROLES[it].second })
             Spacer(Modifier.height(12.dp))
-            SecondaryButton(city?.let { "Ville : $it" } ?: "Choisir la ville", { pickCity = true }, Modifier.fillMaxWidth(), height = 52.dp)
-            Spacer(Modifier.height(10.dp))
+            if (!familyLocated) {
+                SecondaryButton(city?.let { "Ville : $it" } ?: "Choisir la ville", { pickCity = true }, Modifier.fillMaxWidth(), height = 52.dp)
+                Spacer(Modifier.height(10.dp))
+            }
             CodeField(a, { a = it }, "Code d'accès", rule = true)
             Spacer(Modifier.height(10.dp))
             CodeField(b, { b = it }, "Confirmer le code")
             if (b.isNotEmpty() && a != b) Text("Les deux codes ne sont pas identiques.", color = C.Danger, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp))
             Spacer(Modifier.height(16.dp))
-            PrimaryButton("Créer le profil", { onSave(name.trim(), login, role, a, b, city) }, Modifier.fillMaxWidth(), enabled = ok)
+            PrimaryButton("Créer le profil", { onSave(name.trim(), login, role, a, b, if (familyLocated) null else city) }, Modifier.fillMaxWidth(), enabled = ok)
         }
     }
     if (pickCity) CityPickerSheet(city, { city = it; pickCity = false }, { pickCity = false })

@@ -73,6 +73,7 @@ fill "Votre prénom" "Karim" --scroll; hide_kb
 fill "Votre identifiant" "$NEWLOGIN" --scroll; hide_kb
 # Ville choisie sans ambiguïté (la liste contient « Casablanca » et « Casablanca Anfa ») : la valeur attendue en base est exactement celle-ci.
 NEWCITY="Casablanca Anfa"
+$UI tap "Pays : " --scroll >/dev/null; sleep 2; fill "Rechercher un pays" "maroc"; hide_kb; $UI tap "Maroc" --last >/dev/null; sleep 2
 $UI tap "Ville : " --scroll >/dev/null; sleep 2; fill "Rechercher une ville" "anfa"; hide_kb; $UI tap "$NEWCITY" --last >/dev/null; sleep 2
 expect "C1b. ville choisie affichée dans le formulaire" $UI has "Ville : $NEWCITY"
 fill "E-mail de récupération" "$NEWMAIL" --scroll; hide_kb
@@ -134,6 +135,7 @@ sql "INSERT INTO family_signups (request_id, email, email_hash, family_name, dis
 CAPMAIL="plafond.$(date +%s)@example.org"
 $UI tap "Première connexion" >/dev/null; sleep 1; $UI tap "Créer ma famille" >/dev/null; sleep 2
 fill "Nom de la famille" "Famille Plafond" --scroll; hide_kb; fill "Votre prénom" "Nadia" --scroll; hide_kb; fill "Votre identifiant" "nadia" --scroll; hide_kb
+$UI tap "Pays : " --scroll >/dev/null; sleep 2; fill "Rechercher un pays" "maroc"; hide_kb; $UI tap "Maroc" --last >/dev/null; sleep 2
 $UI tap "Ville : " --scroll >/dev/null; sleep 2; fill "Rechercher une ville" "rabat"; hide_kb; $UI tap "Rabat" --last >/dev/null; sleep 2
 fill "E-mail de récupération" "$CAPMAIL" --scroll; hide_kb; fill "Code d'accès (6" 583014 --scroll; hide_kb; fill "Confirmez le code" 583014 --scroll; hide_kb
 $UI tap "Recevoir le code par e-mail" --scroll >/dev/null; sleep 4
@@ -451,11 +453,14 @@ fill "Votre identifiant" "testv" --scroll; hide_kb
 fill "E-mail de récupération" "v.$(date +%s)@example.org" --scroll; hide_kb
 fill "Code d'accès (6" 274915 --scroll; hide_kb
 fill "Confirmez le code" 274915 --scroll; hide_kb
-expect "V1. ville non choisie : « Il manque : votre ville » affiché" $UI has "Il manque : votre ville"
+expect "V1. pays non choisi : « Il manque : le pays » affiché" $UI has "Il manque : le pays"
 expect "V2. bouton actif (jamais grisé sans explication)" $UI enabled "Recevoir le code par e-mail"
 $UI tap "Recevoir le code par e-mail" --scroll >/dev/null; sleep 2
-expect "V3. appui : choix de la ville ouvert, rien n'est envoyé" bash -c "$UI wait 'Rechercher une ville' 6 && test \"\$(docker exec sc-recette-pg psql -U smart -d smartcourse -tAc \"SELECT count(*) FROM family_signups WHERE login='testv'\")\" = 0"
-shot final-v1-ville-manquante
+expect "V3. appui : choix du pays ouvert, rien n'est envoyé" bash -c "$UI wait 'Rechercher un pays' 6 && test \"\$(docker exec sc-recette-pg psql -U smart -d smartcourse -tAc \"SELECT count(*) FROM family_signups WHERE login='testv'\")\" = 0"
+shot final-v1-pays-manquant
+fill "Rechercher un pays" "maroc"; hide_kb; $UI tap "Maroc" --last >/dev/null; sleep 2
+expect "V3b. Maroc : la ville est demandée" $UI has "Il manque : votre ville"
+$UI tap "Ville : " --scroll >/dev/null; sleep 2
 fill "Rechercher une ville" "rabat"; hide_kb; $UI tap "Rabat" --last >/dev/null; sleep 2
 expect "V4. ville choisie : plus rien ne manque" bash -c "$UI has 'Ville : Rabat' && ! $UI has 'Il manque'"
 shot final-v2-formulaire-complet

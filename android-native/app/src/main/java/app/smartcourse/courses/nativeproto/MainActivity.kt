@@ -194,7 +194,7 @@ fun App(session: Session, me: Me?) {
         data?.onForeground()
         onDispose { data?.onBackground(); if (LiveHolder.current === data) LiveHolder.current = null }
     }
-    LaunchedEffect(me?.prefs) { data?.applyPrefs(me?.prefs) }
+    LaunchedEffect(me?.prefs, me?.location) { data?.applyLocation(me?.location); data?.applyPrefs(me?.prefs) }
     val nav = rememberNavController()
     val entry by nav.currentBackStackEntryAsState()
     val route = entry?.destination?.route
@@ -254,6 +254,7 @@ fun App(session: Session, me: Me?) {
                         composable("v10") { PricesScreen(back) }
                         composable("v11") { DisplayScreen(back) }
                         composable("v12") { StatsScreen() }
+                        composable("v15") { LocationScreen(back) }
                         composable("stub/{name}") { StubScreen(it.arguments?.getString("name") ?: "", back) }
                     }
                     if (showBar) BottomNav(tabs, tabFor(route) ?: "", go)
@@ -333,7 +334,12 @@ private fun AccountSheet(me: Me, session: Session, onDismiss: () -> Unit, onLogo
         }
         Spacer(Modifier.height(14.dp))
         me.family?.let { Text("Famille : ${it.name} (${it.code})", style = MaterialTheme.typography.bodyMedium) }
-        Text(
+        // Pays et ville de la famille (confirmés par un administrateur) ; sinon, la ville personnelle reste modifiable comme avant.
+        val loc = me.location
+        if (loc?.confirmed == true) Text(
+            "Famille : ${countryName(loc.country) ?: loc.country}${loc.city?.let { " · $it" } ?: ""}", style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.heightIn(min = 48.dp).wrapContentHeight(Alignment.CenterVertically),
+        ) else Text(
             "Ville : ${me.city ?: "à choisir"} · Modifier", style = MaterialTheme.typography.bodyMedium, color = C.TealDark,
             modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onCity).heightIn(min = 48.dp).wrapContentHeight(Alignment.CenterVertically),
         )

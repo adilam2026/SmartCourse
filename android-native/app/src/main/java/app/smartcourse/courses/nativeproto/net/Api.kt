@@ -40,7 +40,18 @@ data class Me(
     val family: FamilyInfo? = null,
     val primary: Boolean? = null,
     val prefs: Prefs? = null,
+    val location: FamilyLocation? = null,
 )
+
+/** Pays et ville DE LA FAMILLE. [pricesAvailable] : prix indicatifs (Maroc, ou pays non encore confirmé). */
+@Serializable
+data class FamilyLocation(
+    val country: String? = null, val city: String? = null, val confirmed: Boolean = false,
+    val pricesAvailable: Boolean = true, val suggestion: LocationSuggestion? = null,
+)
+
+@Serializable
+data class LocationSuggestion(val country: String, val city: String)
 
 @Serializable
 data class Prefs(val showPrices: Boolean = false, val showTotals: Boolean = false, val rev: Long = 0)

@@ -33,14 +33,24 @@ fun AdminHubScreen(nav: (String) -> Unit) {
     val demo = LocalDemo.current
     var reset by remember { mutableStateOf(Launch.once("confirm")) }
     val groups = listOf(
-        "Produits et prix" to listOf(Entry("Catalogue", Icons.Rounded.Inventory2, "v09"), Entry("Gestion des prix", Icons.Rounded.LocalOffer, "v10")),
+        // Hors du Maroc : ni prix indicatifs ni gestion des prix.
+        "Produits et prix" to (listOf(Entry("Catalogue", Icons.Rounded.Inventory2, "v09")) + if (demo.pricesAvailable) listOf(Entry("Gestion des prix", Icons.Rounded.LocalOffer, "v10")) else emptyList()),
         "Famille et accès" to listOf(Entry("Profils", Icons.Rounded.Groups, "v08"), Entry("Récupération", Icons.Rounded.Key, "stub/Récupération")),
+        "Famille" to listOf(Entry("Pays et ville", Icons.Rounded.Public, "v15")),
         "Préférences" to listOf(Entry("Affichage", Icons.Rounded.Palette, "v11"), Entry("Notifications", Icons.Rounded.Notifications, "stub/Notifications")),
         "Application" to listOf(Entry("Sauvegarde", Icons.Rounded.Cloud, "stub/Sauvegarde"), Entry("À propos", Icons.Rounded.Info, "stub/À propos")),
     )
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         TopBar("Réglages")
         Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            // Localisation à confirmer (familles créées avant le choix du pays) : rien n'est appliqué sans un administrateur.
+            val loc = demo.data?.session?.signedMe?.location
+            if (loc != null && !loc.confirmed && demo.data?.me?.role == "admin") SCard(padding = PaddingValues(12.dp)) {
+                Text("Confirmez le pays de votre famille", style = MaterialTheme.typography.titleSmall)
+                Text("Il sert aux prix de votre ville. Rien n'a été modifié ni effacé.", style = MaterialTheme.typography.bodySmall)
+                Spacer(Modifier.height(8.dp))
+                PrimaryButton("Confirmer", { nav("v15") }, Modifier.fillMaxWidth())
+            }
             groups.forEach { (title, entries) ->
                 Text(title, style = MaterialTheme.typography.titleSmall, color = C.Muted, modifier = Modifier.padding(start = 4.dp, top = 8.dp))
                 SCard {

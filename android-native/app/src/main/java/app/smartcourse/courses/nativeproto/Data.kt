@@ -152,6 +152,8 @@ class Demo(initialRole: Role? = null, val live: Boolean = false) {
 
     var role by mutableStateOf(initialRole ?: if (Launch.str("role") == "staff") Role.STAFF else Role.ADMIN)
     var showPrices by mutableStateOf(Launch.flag("prices"))
+    /** Prix indicatifs disponibles pour la famille (Maroc, ou pays non confirmé). Hors du Maroc : prix et réglages de prix masqués. */
+    var pricesAvailable by mutableStateOf(true)
     var showTotals by mutableStateOf(false)
     var selMode by mutableStateOf(
         when (Launch.str("mode")) { "list" -> SelMode.LIST; else -> SelMode.GRID }

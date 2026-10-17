@@ -101,6 +101,7 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
         demo.selMode = SelMode.parse(kv.get(modeKey))
         demo.selOrg = SelOrg.parse(kv.get(orgKey))
         demo.listLoaded = engine.list != null
+        applyLocation(me.location)
         applyPrefs(me.prefs)
         render()
         syncDraft()
@@ -108,7 +109,12 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
 
     /* ───── Affichage ───── */
 
-    fun applyPrefs(p: Prefs?) { if (p != null) { demo.showPrices = p.showPrices; demo.showTotals = p.showTotals } }
+    fun applyPrefs(p: Prefs?) { if (p != null) { demo.showPrices = p.showPrices && demo.pricesAvailable; demo.showTotals = p.showTotals && demo.pricesAvailable } }
+    /** Localisation de la famille : hors du Maroc, aucun prix indicatif n'est affiché (les préférences enregistrées sont conservées). */
+    fun applyLocation(l: app.smartcourse.courses.nativeproto.net.FamilyLocation?) {
+        demo.pricesAvailable = l?.pricesAvailable ?: true
+        if (!demo.pricesAvailable) { demo.showPrices = false; demo.showTotals = false }
+    }
 
     private fun display(l: EffLine) = if (l.brand.isNullOrBlank()) l.name else "${l.name} ${l.brand}"
 

@@ -20,7 +20,7 @@ on:
   # Le fichier n'existe pas sur la branche par défaut (celle du serveur de production, qu'on ne touche pas) : lancement aussi par
   # un envoi sur claude/android-native dont le message contient [play] (tests et captures) ou [play-livrer] (plus le bundle).
   push:
-    branches: [claude/android-native]
+    branches: [claude/android-native, claude/evolutions-avancees]
 permissions:
   contents: read
 env:

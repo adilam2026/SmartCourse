@@ -107,6 +107,8 @@ fun CreateFamilyForm(session: Session) {
     var famName by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
     var login by remember { mutableStateOf("") }
+    var country by remember { mutableStateOf<String?>(null) }
+    var countrySheet by remember { mutableStateOf(false) }
     var city by remember { mutableStateOf<String?>(null) }
     var email by remember { mutableStateOf("") }
     var code by remember { mutableStateOf("") }
@@ -214,7 +216,15 @@ fun CreateFamilyForm(session: Session) {
     Spacer(Modifier.height(10.dp))
     FormField(login, { login = it.trim().lowercase().filter { ch -> ch.isLetterOrDigit() || ch in "._-" }.take(30) }, "Votre identifiant", leading = Icons.Rounded.Person)
     Spacer(Modifier.height(10.dp))
-    SecondaryButton(if (city == null) "Ville : à choisir (obligatoire)" else "Ville : $city", { citySheet = true }, Modifier.fillMaxWidth(), height = 54.dp)
+    // Pays d'abord ; la ville seulement pour le Maroc (jamais déduite du GPS ni de l'adresse IP).
+    SecondaryButton(if (country == null) "Pays : à choisir (obligatoire)" else "Pays : ${countryName(country)}", { countrySheet = true }, Modifier.fillMaxWidth(), height = 54.dp)
+    if (country == "MA") {
+        Spacer(Modifier.height(10.dp))
+        SecondaryButton(if (city == null) "Ville : à choisir (obligatoire)" else "Ville : $city", { citySheet = true }, Modifier.fillMaxWidth(), height = 54.dp)
+    } else if (country != null) {
+        Spacer(Modifier.height(6.dp))
+        Text("Hors du Maroc, l'application ne montre pas de prix indicatifs.", style = MaterialTheme.typography.bodySmall, color = C.Muted)
+    }
     Spacer(Modifier.height(10.dp))
     FormField(email, { email = it.trim() }, "E-mail de récupération", leading = Icons.Rounded.Email, keyboard = KeyboardOptions(keyboardType = KeyboardType.Email))
     Spacer(Modifier.height(10.dp))
@@ -228,20 +238,21 @@ fun CreateFamilyForm(session: Session) {
         if (famName.isBlank()) add("le nom de la famille")
         if (name.isBlank()) add("votre prénom")
         if (login.length < 2) add("votre identifiant (2 caractères au moins)")
-        if (city == null) add("votre ville")
+        if (country == null) add("le pays")
+        if (country == "MA" && city == null) add("votre ville")
         if (!email.contains("@") || !email.substringAfter("@").contains(".")) add("une adresse e-mail valide")
         if (!isNewCode(code)) add("un code d'accès de 6 à 8 chiffres")
         if (code2.isEmpty()) add("la confirmation du code d'accès")
     }
     if (missing.isNotEmpty()) Text("Il manque : ${missing.joinToString(", ")}.", style = MaterialTheme.typography.bodySmall, color = C.Muted, modifier = Modifier.padding(bottom = 8.dp))
     PrimaryButton(if (busy) "Envoi du code…" else "Recevoir le code par e-mail", {
-        if (missing.isNotEmpty()) { error = "Pour continuer, renseignez ${missing.joinToString(", ")}."; if (city == null) citySheet = true; return@PrimaryButton }
+        if (missing.isNotEmpty()) { error = "Pour continuer, renseignez ${missing.joinToString(", ")}."; if (country == null) countrySheet = true else if (country == "MA" && city == null) citySheet = true; return@PrimaryButton }
         if (code != code2) { error = "Les deux codes d'accès ne sont pas identiques."; return@PrimaryButton }
         busy = true; error = null
         scope.launch {
             val body = buildJsonObject {
                 put("requestId", requestId); put("familyName", famName.trim()); put("displayName", name.trim()); put("login", login)
-                put("city", city!!); put("email", email); put("secret", code); put("secretConfirm", code2)
+                put("country", country!!); if (country == "MA") put("city", city!!); put("email", email); put("secret", code); put("secretConfirm", code2)
             }
             when (val r = session.api.callPublic("POST", "/api/signup/start", body)) {
                 is Outcome.Ok -> {
@@ -256,4 +267,5 @@ fun CreateFamilyForm(session: Session) {
         }
     }, Modifier.fillMaxWidth(), enabled = !busy)
     if (citySheet) CityPickerSheet(city, { city = it; citySheet = false; error = null }, { citySheet = false })
+    if (countrySheet) CountryPickerSheet(country, { country = it.code; if (it.code != "MA") city = null; countrySheet = false; error = null }, { countrySheet = false })
 }
