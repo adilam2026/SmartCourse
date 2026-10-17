@@ -1,8 +1,10 @@
 ═══ V. Créer ma famille : le bouton dit ce qui manque (ville oubliée) — contrôle rapide ═══
-PASS  V1. ville non choisie : « Il manque : votre ville » affiché
+PASS  V1. pays non choisi : « Il manque : le pays » affiché
 PASS  V2. bouton actif (jamais grisé sans explication)
-PASS  V3. appui : choix de la ville ouvert, rien n'est envoyé
-PASS  V4. ville choisie : plus rien ne manque
-ECHECS=0
+PASS  V3. appui : choix du pays ouvert, rien n'est envoyé
+PASS  V3b. Maroc : la ville est demandée
+FAIL  V4. ville choisie : plus rien ne manque
+      écran : "Se connecter"|"Première connexion"|"Rejoindre une famille"|"Créer ma famille"|"Famille"|"Test"|"testv"|"Pays : Maroc"|"Ville : Rabat"|"v.1792235499@example.org"|"Code d'accès"|"Afficher le code"|"Entre 6 et 8 chiffres."|"••••••"|"Afficher le code"|"Il manque : un code d'accès de 6 à 8 chiffres."|"Recevoir le code par e-mail"|
+ECHECS=1
 CRASH_APPLICATION=0
-TOTAL_ECHECS=0
+TOTAL_ECHECS=1
