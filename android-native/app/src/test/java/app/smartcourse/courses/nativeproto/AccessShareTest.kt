@@ -22,7 +22,7 @@ class AccessShareTest {
 
     @Test fun codes_keepLeadingZeros_andAreSixDigits() {
         assertEquals("012345", codeDigits("012345"))
-        assertEquals("004719", codeDigits("0 04-719 9"))
+        assertEquals("0047199", codeDigits("0 04-719 9")) // jusqu'à 8 chiffres
         assertEquals("000123", codeDigits("000123abc"))
     }
 

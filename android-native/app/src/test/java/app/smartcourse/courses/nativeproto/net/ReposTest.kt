@@ -61,7 +61,7 @@ class ReposTest {
         val cases = mapOf(
             "last_admin" to "dernier administrateur", "primary_admin_protected" to "administrateur principal", "admin_cannot_deactivate" to "ne peut pas être désactivé",
             "admin_cannot_delete" to "Retirez d'abord", "primary_cannot_delete" to "ne peut pas être supprimé", "login_taken" to "existe déjà", "weak_secret" to "trop simple",
-            "invalid_secret" to "6 chiffres", "secret_mismatch" to "pas identiques",
+            "invalid_secret" to "entre 6 et 8 chiffres", "secret_mismatch" to "pas identiques",
         )
         for ((code, frag) in cases) {
             ok("""{"error":"$code","message":"x"}""", 409)
