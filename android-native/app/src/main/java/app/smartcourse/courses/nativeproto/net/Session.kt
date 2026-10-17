@@ -15,9 +15,9 @@ sealed interface AuthState {
 /** État de connexion de l'application : session conservée, vérifiée auprès du serveur, jamais devinée. */
 class Session(val storage: SessionStorage, val api: ApiClient, private val scope: CoroutineScope) {
     var state: AuthState by mutableStateOf(AuthState.Booting)
+        private set
     /** Profil connecté (dernières données de /api/me), ou null. */
     val signedMe: Me? get() = (state as? AuthState.SignedIn)?.me
-        private set
     /** Message à montrer sur l'écran de connexion (session expirée, déconnexion…). */
     var notice: Failure? by mutableStateOf(null)
         private set
