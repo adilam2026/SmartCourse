@@ -25,6 +25,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import kotlinx.coroutines.launch
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -67,9 +69,11 @@ fun FormField(
 /** Panneau inférieur Android natif (Material 3 ModalBottomSheet), aux couleurs de la charte. */
 @Composable
 fun AppSheet(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+    val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetState = state,
         containerColor = Color.White,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         // Poignée : même aspect que celle de Material (32 × 4 dp) dans une zone de 48 × 48 dp.
@@ -79,6 +83,11 @@ fun AppSheet(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit)
             }
         },
     ) {
-        Column(Modifier.fillMaxWidth().imePadding().navigationBarsPadding().padding(horizontal = 20.dp).padding(bottom = 16.dp), content = content)
+        // Contenu qui grandit après l'ouverture (données chargées, champ ajouté) : le panneau se redéploie au lieu de laisser le bas hors de l'écran.
+        Column(
+            Modifier.fillMaxWidth().onSizeChanged { if (state.isVisible) scope.launch { state.expand() } }
+                .imePadding().navigationBarsPadding().padding(horizontal = 20.dp).padding(bottom = 16.dp),
+            content = content,
+        )
     }
 }

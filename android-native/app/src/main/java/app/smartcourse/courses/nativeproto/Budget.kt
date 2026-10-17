@@ -352,6 +352,8 @@ fun CloseWithPaymentsSheet(listId: String, listLabel: String, remaining: Int, on
     var busy by remember { mutableStateOf(false) }
     suspend fun load() { when (val r = Fin.call(data, "GET", "/api/lists/$listId/payments", ListPayments.serializer())) { is FinR.Ok -> p = r.v; is FinR.Err -> error = r.message } }
     LaunchedEffect(listId) { load() }
+    // Ouvert seulement une fois les paiements lus : le récapitulatif s'affiche en entier d'emblée.
+    if (p == null && error == null) return
     AppSheet(onDismiss) {
         Text("Terminer les courses", style = MaterialTheme.typography.titleLarge)
         if (remaining > 0) Text("Il reste $remaining article${if (remaining > 1) "s" else ""} non acheté${if (remaining > 1) "s" else ""}. La liste sera archivée.", style = MaterialTheme.typography.bodySmall, color = C.Muted)
