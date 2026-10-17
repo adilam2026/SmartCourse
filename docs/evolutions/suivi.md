@@ -36,18 +36,18 @@ Le serveur fait une sauvegarde chiffrée quotidienne (pg_dump + manifeste + phot
 |---|---|---|
 | 1 | Sécuriser la version actuelle (référence, suivi, sauvegarde, retour arrière) | En cours : référence et suivi faits ; sauvegarde à confirmer |
 | 2 | Hors périmètre (paiement commercial, iPhone, chiffrement avancé, banque, OCR, devises) | Respecté |
-| 3 | Paramètres avancés : Plusieurs listes actives, Gestion du budget (désactivées par défaut, administrateurs, synchronisées) | Développé (branche `claude/evolutions-avancees`) pour « Plusieurs listes actives » ; « Gestion du budget » absente tant que le module n'est pas validé |
-| 4 | Pays / ville de la famille, prix indicatifs seulement au Maroc, devise du budget | Développé : migration 023, écran « Pays et ville », prix masqués hors Maroc (serveur et application). Devise : avec le budget |
+| 3 | Paramètres avancés : Plusieurs listes actives, Gestion du budget (désactivées par défaut, administrateurs, synchronisées) | Développé : les deux options (branche `claude/evolutions-avancees`) |
+| 4 | Pays / ville de la famille, prix indicatifs seulement au Maroc, devise du budget | Développé : migration 023, écran « Pays et ville », prix masqués hors Maroc ; devise proposée selon le pays, confirmée, figée dès la première opération |
 | 5 | Codes d'accès de 6 à 8 chiffres | Développé (serveur, web, Android), tests serveur et unitaires Android |
 | 6 | Connexion / inscription avec Google | **Retiré de cette livraison** (décision du 17/10/2026) : ni bouton, ni SDK, ni configuration OAuth. Authentification classique conservée. |
-| 7 | Notifications d'activité et rappels d'achat personnels | Développé (Android) : jours, horaires, rappel groupé, sans alarme exacte |
+| 7 | Notifications d'activité et rappels d'achat personnels | Développé (Android) : jours, horaires, rappel groupé, sans alarme exacte ; les rappels peuvent être différés par Android (aucun délai garanti) |
 | 8 | Plusieurs listes actives (option) | Développé : migration 024, sélecteur de liste, nouvelle liste nommée, Recommander vers une liste choisie |
 | 9 | Affichage : conserver les choix validés | Déjà livré, à conserver |
 | 10 | Création de produits après vérification du catalogue complet | Déjà livré (1143-1144), à conserver |
 | 11 | Cohérence liste ↔ sélection | Déjà livré (1143) ; la sélection suit la liste consultée |
-| 12-19 | Module Budget (paiements, clôture, opérations, budgets, Mon compte, écrans, exactitude) | Maquette — pas de développement avant validation |
-| 20 | Permissions financières distinctes, appliquées côté serveur | Maquette |
-| 21 | Exemples de référence | Serviront de tests de calcul |
+| 12-19 | Module Budget (paiements, clôture, opérations, budgets, Mon compte, écrans, exactitude) | Développé après validation des principes (17/10/2026) : migration 025, serveur et Android |
+| 20 | Permissions financières distinctes, appliquées côté serveur | Développé : gérer / consulter / saisir les paiements / modifier ; personnel limité à la saisie des paiements ; vérifié par le serveur |
+| 21 | Exemples de référence | Tests automatiques du serveur (900 DH ; 1 850 / 950 / 103 150 / 5 100 ; correction 450 → 400) : réussis |
 | 22 | Maquettes, étapes, contrôles ciblés | Étapes (a) à (d) développées ; contrôles ciblés en cours |
 | 23 | Livraison et retour arrière | À la fin |
 
@@ -91,6 +91,10 @@ Proposées et appliquées sauf avis contraire :
   - contrôle V (pays puis ville à la création de la famille) : réussi (run 50) ;
   - contrôle M (plusieurs listes actives : désactivée par défaut, activation par l'administrateur, nouvelle liste nommée, changement de liste, désactivation refusée avec message clair, aucune liste supprimée) : réussi (run 53). Le run 52 avait révélé un message générique au refus de désactivation, corrigé.
   - Non contrôlé sur émulateur : déclenchement réel d'un rappel à l'heure choisie (dépend d'Android ; à vérifier sur téléphone), Recommander vers une liste choisie, rappel groupé sur plusieurs listes.
+
+- 17/10/2026 : Budget, serveur : 8 tests (exemples de référence, idempotence, droits, devise figée, budgets reconduits, solde initial et corrections, suppression d'une famille) ; suite complète du serveur réussie. Ancien serveur 022 sur le schéma 025 : 54 tests réussis (retour arrière).
+- 17/10/2026 : émulateur Android 16, contrôles courts : B (budget : activation, deux paiements, clôture 770,00 DH sans débit supplémentaire, vue d'ensemble) réussi au run 60 après correction d'un panneau coupé (run 58) ; W (Recommander vers une liste choisie) réussi ; Q (rappel reçu environ 30 s après l'horaire, sans montant) réussi.
+- Sauvegarde : restauration de contrôle isolée prête (`verif-sauvegarde.yml`), testée localement ; **pas encore exécutée sur la sauvegarde de production** (secrets GitHub à ajouter par le propriétaire).
 
 ## 6. Points bloquants / à valider
 1. **Sauvegarde vérifiée avant toute migration de production** : une sauvegarde récente doit être restaurée sur une base isolée et comparée (la seule présence de variables S3 ne suffit pas). Commande prévue côté serveur : `npm run backup -- verify` : elle restaure la dernière sauvegarde dans une base de contrôle **isolée** (variable `VERIFY_DATABASE_URL`, base vide distincte de la production) et compare les comptages au manifeste. À exécuter dans l'environnement Railway (secrets non partagés). Aucune migration de production avant ce résultat.
