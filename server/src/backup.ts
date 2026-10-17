@@ -290,7 +290,7 @@ const INVARIANTS: { name: string; sql: string }[] = [
     name: "article acheté sans achat ouvert (ou l'inverse)",
     sql: `SELECT count(*)::int AS n FROM list_items i WHERE (i.status = 'purchased') <> EXISTS (SELECT 1 FROM purchases p WHERE p.list_item_id = i.id AND p.voided_at IS NULL)`,
   },
-  { name: "plusieurs listes actives dans une famille sans l'option", sql: `SELECT count(*)::int AS n FROM (SELECT l.family_id FROM lists l JOIN families f ON f.id = l.family_id WHERE l.status = 'active' AND NOT f.multi_lists_enabled GROUP BY 1 HAVING count(*) > 1) x` },
+  { name: "plusieurs listes actives dans une famille sans l'option", sql: `SELECT count(*)::int AS n FROM (SELECT l.family_id FROM lists l JOIN families f ON f.id = l.family_id WHERE l.status = 'active' AND NOT coalesce((to_jsonb(f) ->> 'multi_lists_enabled')::boolean, false) GROUP BY 1 HAVING count(*) > 1) x` },
   { name: "famille sans administrateur actif", sql: `SELECT count(*)::int AS n FROM families f WHERE NOT EXISTS (SELECT 1 FROM profiles p WHERE p.family_id = f.id AND p.role = 'admin' AND p.active)` },
 ];
 
