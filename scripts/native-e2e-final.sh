@@ -528,9 +528,9 @@ expect "M3. activée par l'administrateur (enregistrée côté serveur)" test "$
 adb shell input keyevent KEYCODE_BACK; sleep 2; tapt "Liste"; sleep 2
 expect "M4. sélecteur affiché : 1 liste en cours" $UI wait "1 liste en cours" 10
 $UI tap "1 liste en cours" >/dev/null; sleep 2; tapt "Nouvelle liste" --last
-fill "Ex. : Marché" "Marché"; hide_kb; $UI tap "Créer" --last >/dev/null; sleep 5
-expect "M5. nouvelle liste « Marché » créée et consultée ; l'autre reste ouverte" bash -c "test \"\$(docker exec sc-recette-pg psql -U smart -d smartcourse -tAc \"SELECT count(*) FROM lists l JOIN families f ON f.id=l.family_id WHERE f.code='$FAMILY' AND l.status='active'\")\" = 2 && $UI has 'Marché' && $UI has '2 listes en cours' && ! $UI has 'Tomates'"
-shot final-m2-liste-marche
+fill "Ex. : Marché" "Souk"; hide_kb  # adb input text ne sait pas taper les accents; $UI tap "Créer" --last >/dev/null; sleep 5
+expect "M5. nouvelle liste « Souk » créée et consultée ; l'autre reste ouverte" bash -c "test \"\$(docker exec sc-recette-pg psql -U smart -d smartcourse -tAc \"SELECT count(*) FROM lists l JOIN families f ON f.id=l.family_id WHERE f.code='$FAMILY' AND l.status='active'\")\" = 2 && $UI has 'Souk' && $UI has '2 listes en cours' && ! $UI has 'Tomates'"
+shot final-m2-liste-souk
 $UI tap "2 listes en cours" >/dev/null; sleep 3
 expect "M6. liste des listes en cours avec leurs articles restants" $UI has "1 à acheter"
 $UI tap "1 à acheter" >/dev/null; sleep 5
