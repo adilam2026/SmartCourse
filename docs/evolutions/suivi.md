@@ -104,8 +104,11 @@ Proposées et appliquées sauf avis contraire :
 
 - 17/10/2026 : **livraison de recette 1166** — pré-version `courses-natif-play-1.0.2-66` (commit `aa1eae4`, versionCode 1166), AAB `7db67134…58957bf7`, APK `82026f28…a6b59822`. Contrôle X rejoué avant construction (une relance : serveur de test jetable non démarré au premier essai, sans rapport avec l'application). Non publié sur Google Play.
 
+- 17/10/2026 : **restauration de contrôle de la sauvegarde de production réussie** dans un serveur PostgreSQL 18 isolé et jetable (workflow `verif-sauvegarde.yml`, run 15, sans adresse de la production) : 7 sauvegardes disponibles ; la plus récente du 17/10/2026 à 09:18 UTC (7,6 h avant le contrôle), schéma 022 ; fichier chiffré puis déchiffré avec la clé ; 32 tables restaurées, nombre de lignes de chacune identique au manifeste ; liste des migrations identique ; invariants respectés (articles achetés et achats, une liste active par famille, un administrateur actif par famille) ; 0 photo de famille référencée (aucune à vérifier).
+
 ## 6. Points bloquants / à valider
-1. **Sauvegarde vérifiée avant toute migration de production** : une sauvegarde récente doit être restaurée sur une base isolée et comparée (la seule présence de variables S3 ne suffit pas). Commande prévue côté serveur : `npm run backup -- verify` : elle restaure la dernière sauvegarde dans une base de contrôle **isolée** (variable `VERIFY_DATABASE_URL`, base vide distincte de la production) et compare les comptages au manifeste. À exécuter dans l'environnement Railway (secrets non partagés). Aucune migration de production avant ce résultat.
+1. ~~Sauvegarde vérifiée avant toute migration de production~~ : faite le 17/10/2026 (voir § 5) ; à refaire juste avant le déploiement si la sauvegarde la plus récente date de plus de 24 h.
+   Ancien texte : : une sauvegarde récente doit être restaurée sur une base isolée et comparée (la seule présence de variables S3 ne suffit pas). Commande prévue côté serveur : `npm run backup -- verify` : elle restaure la dernière sauvegarde dans une base de contrôle **isolée** (variable `VERIFY_DATABASE_URL`, base vide distincte de la production) et compare les comptages au manifeste. À exécuter dans l'environnement Railway (secrets non partagés). Aucune migration de production avant ce résultat.
 2. **Validation visuelle des maquettes** (21 écrans, Google retiré) : https://claude.ai/artifact/B1cei82u74Zfo3upEbrs7h. Le module Budget n'est pas développé avant cette validation.
 
 ## 7. Retour arrière
