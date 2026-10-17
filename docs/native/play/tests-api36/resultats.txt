@@ -7,6 +7,11 @@ PASS  B3. dépense Courses enregistrée et rattachée à la liste en cours (Carr
 PASS  B4. clôture : paiements déjà saisis et total de la liste (770,00 DH), rien à ressaisir
 PASS  B5. liste clôturée, paiements confirmés complets, aucun débit supplémentaire (BIM:32000,Carrefour:45000)
 PASS  B6. vue d'ensemble : dépenses du mois 770,00 DH (Courses), entrées séparées
+═══ W. Recommander vers une liste choisie (plusieurs listes actives) — contrôle ciblé ═══
+PASS  W1. destination demandée : listes en cours et nouvelle liste
+PASS  W2. liste choisie non vide : Ajouter / Remplacer proposé
+PASS  W3. articles ajoutés à « Souk » seulement (Carottes:1.000,Oignons:1.000,Tomates:3.000)
+PASS  W4. commande d'origine intacte
 ECHECS=0
 CRASH_APPLICATION=0
 TOTAL_ECHECS=0
