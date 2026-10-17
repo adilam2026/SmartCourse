@@ -36,19 +36,19 @@ Le serveur fait une sauvegarde chiffrée quotidienne (pg_dump + manifeste + phot
 |---|---|---|
 | 1 | Sécuriser la version actuelle (référence, suivi, sauvegarde, retour arrière) | En cours : référence et suivi faits ; sauvegarde à confirmer |
 | 2 | Hors périmètre (paiement commercial, iPhone, chiffrement avancé, banque, OCR, devises) | Respecté |
-| 3 | Paramètres avancés : Plusieurs listes actives, Gestion du budget (désactivées par défaut, administrateurs, synchronisées) | Maquette |
-| 4 | Pays / ville de la famille, prix indicatifs seulement au Maroc, devise du budget | Maquette |
-| 5 | Codes d'accès de 6 à 8 chiffres | À développer (pas de maquette nécessaire) |
+| 3 | Paramètres avancés : Plusieurs listes actives, Gestion du budget (désactivées par défaut, administrateurs, synchronisées) | Développé (branche `claude/evolutions-avancees`) pour « Plusieurs listes actives » ; « Gestion du budget » absente tant que le module n'est pas validé |
+| 4 | Pays / ville de la famille, prix indicatifs seulement au Maroc, devise du budget | Développé : migration 023, écran « Pays et ville », prix masqués hors Maroc (serveur et application). Devise : avec le budget |
+| 5 | Codes d'accès de 6 à 8 chiffres | Développé (serveur, web, Android), tests serveur et unitaires Android |
 | 6 | Connexion / inscription avec Google | **Retiré de cette livraison** (décision du 17/10/2026) : ni bouton, ni SDK, ni configuration OAuth. Authentification classique conservée. |
-| 7 | Notifications d'activité et rappels d'achat personnels | Maquette |
-| 8 | Plusieurs listes actives (option) | Maquette |
+| 7 | Notifications d'activité et rappels d'achat personnels | Développé (Android) : jours, horaires, rappel groupé, sans alarme exacte |
+| 8 | Plusieurs listes actives (option) | Développé : migration 024, sélecteur de liste, nouvelle liste nommée, Recommander vers une liste choisie |
 | 9 | Affichage : conserver les choix validés | Déjà livré, à conserver |
 | 10 | Création de produits après vérification du catalogue complet | Déjà livré (1143-1144), à conserver |
-| 11 | Cohérence liste ↔ sélection | Déjà livré (1143), à étendre aux listes multiples |
+| 11 | Cohérence liste ↔ sélection | Déjà livré (1143) ; la sélection suit la liste consultée |
 | 12-19 | Module Budget (paiements, clôture, opérations, budgets, Mon compte, écrans, exactitude) | Maquette — pas de développement avant validation |
 | 20 | Permissions financières distinctes, appliquées côté serveur | Maquette |
 | 21 | Exemples de référence | Serviront de tests de calcul |
-| 22 | Maquettes, étapes, contrôles ciblés | En cours |
+| 22 | Maquettes, étapes, contrôles ciblés | Étapes (a) à (d) développées ; contrôles ciblés en cours |
 | 23 | Livraison et retour arrière | À la fin |
 
 ## 3. Écarts entre le code actuel et la spécification
@@ -85,6 +85,9 @@ Proposées et appliquées sauf avis contraire :
 - 17/10/2026 : maquettes des nouveaux parcours (22 écrans, puis 21 après retrait de Google) : https://claude.ai/artifact/B1cei82u74Zfo3upEbrs7h — en attente de validation.
 - 17/10/2026 : production `/health` = `f460829`, migration `022`. Référence Git créée (`reference/android-1.0.2-1144`, `reference/serveur-022`). Analyse du code (listes, notifications, localisation, codes, prix, sauvegardes, rôles, authentification).
 
+- 17/10/2026 : tests serveur ciblés sur base de test locale (données fictives) : codes / inscription / récupération 71, localisation 3, plusieurs listes 2, quantités et migrations 37, listes 93, catalogue 58 — tous réussis.
+- 17/10/2026 : Android compilé et tests unitaires par l'intégration continue (branche `claude/evolutions-avancees`, run 48 : voir ci-dessous).
+
 ## 6. Points bloquants / à valider
 1. **Sauvegarde vérifiée avant toute migration de production** : une sauvegarde récente doit être restaurée sur une base isolée et comparée (la seule présence de variables S3 ne suffit pas). Commande prévue côté serveur : `npm run backup -- verify` : elle restaure la dernière sauvegarde dans une base de contrôle **isolée** (variable `VERIFY_DATABASE_URL`, base vide distincte de la production) et compare les comptages au manifeste. À exécuter dans l'environnement Railway (secrets non partagés). Aucune migration de production avant ce résultat.
 2. **Validation visuelle des maquettes** (21 écrans, Google retiré) : https://claude.ai/artifact/B1cei82u74Zfo3upEbrs7h. Le module Budget n'est pas développé avant cette validation.
@@ -92,5 +95,6 @@ Proposées et appliquées sauf avis contraire :
 ## 7. Retour arrière
 - **Revenir à l'ancien code (application)** : réinstaller l'APK de référence n'est possible qu'en désinstallant (versionCode inférieur) ; préférer une nouvelle version construite depuis `reference/android-1.0.2-1144` avec un versionCode supérieur.
 - **Revenir à l'ancien code (serveur)** : redéployer `reference/serveur-022` sur Railway. Les migrations sont additives : l'ancien serveur ignore les nouvelles tables et colonnes. Exception à prévoir : si l'index « une liste active » est levé, l'ancien serveur suppose une seule liste ; il faut d'abord clôturer les listes en trop (procédure documentée à l'étape multi-listes).
-- **Désactiver une fonction** : décocher l'option dans Paramètres avancés (données conservées).
+- **Désactiver une fonction** : décocher l'option dans Paramètres avancés (données conservées). « Plusieurs listes actives » ne se désactive que s'il ne reste qu'une liste en cours (le serveur refuse sinon : rien n'est fusionné ni supprimé automatiquement).
+- **Migration 024 et ancien serveur** : l'index unique est remplacé par un déclencheur ; pour redéployer `reference/serveur-022`, désactiver d'abord l'option (une seule liste en cours), puis recréer l'index `lists_one_active_per_family` si l'on veut retrouver exactement l'ancien schéma.
 - **Restaurer la base** : uniquement sur décision explicite ; une restauration perd tout ce qui a été saisi depuis la sauvegarde. Jamais automatique.

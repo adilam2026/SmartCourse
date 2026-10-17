@@ -135,7 +135,7 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
         scope.launch {
             if (engine.pendingOps > 0) engine.flush()
             when (val r = engine.switchTo(listId)) {
-                is Outcome.Ok -> { render(); syncDraft(); loadOpenLists(); after() }
+                is Outcome.Ok -> { render(); followList(); loadOpenLists(); after() }
                 is Outcome.Fail -> demo.say(if (r.failure == Failure.NETWORK || r.failure == Failure.TIMEOUT) networkMessage() else explain(r))
             }
         }
@@ -144,8 +144,9 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
     /** Nouvelle liste nommée (option « plusieurs listes ») : elle devient la liste consultée ; les autres listes ne changent pas. */
     fun createNamedList(name: String, after: () -> Unit = {}) {
         scope.launch {
+            if (engine.pendingOps > 0) engine.flush()
             when (val r = engine.createList(name)) {
-                is Outcome.Ok -> { render(); syncDraft(); loadOpenLists(); after() }
+                is Outcome.Ok -> { render(); followList(); loadOpenLists(); after() }
                 is Outcome.Fail -> demo.say(if (r.code == "active_exists") "Une liste est déjà en cours." else if (r.failure == Failure.NETWORK || r.failure == Failure.TIMEOUT) networkMessage() else explain(r))
             }
         }
@@ -214,6 +215,8 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
         val id = engine.list?.id
         if (draftListId == "\u0000") { draftListId = id; loadSelection(id); return }
         if (id == draftListId) return
+        // Plusieurs listes : l'ancienne liste encore ouverte garde sa sélection (rien n'est mis « à reprendre »).
+        if (demo.multiLists && demo.openLists.any { it.id == draftListId }) { followList(); return }
         if (draftListId == null) {
             // Le brouillon écrit alors qu'aucune liste n'existait suit la nouvelle liste.
             draftListId = id; persistDraft(); return
@@ -221,6 +224,14 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
         engine.stashDraftIfListChanged(draftListId, id) { pid -> demo.byId[pid]?.let { it.name to it.serverUnit } ?: ("Article" to null) }
         demo.selection.clear(); draftListId = id; loadSelection(id)
         demo.orphanCount = engine.orphans.size
+    }
+
+    /** Changement VOLONTAIRE de liste (l'ancienne reste ouverte) : sa sélection reste attachée à elle, celle de la nouvelle est rechargée. */
+    private fun followList() {
+        val id = engine.list?.id
+        if (id == draftListId) return
+        if (draftListId != "\u0000") persistDraft()
+        demo.selection.clear(); draftListId = id; loadSelection(id)
     }
 
     private fun persistDraft() {
@@ -284,7 +295,7 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
     private suspend fun onEvent(name: String) {
         when (name) {
             "ready" -> { backoff = 1000; online = true; refreshAll() }
-            "list.updated", "list.closed", "list.created", "list.deleted" -> { flushAndRefresh(); if (demo.multiLists) loadOpenLists() }
+            "list.updated", "list.closed", "list.created", "list.deleted" -> { if (demo.multiLists) loadOpenLists(); flushAndRefresh() }
             "catalog.updated" -> refreshCatalog()
             "prefs.updated" -> session.verify()
         }
@@ -292,7 +303,7 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
 
     /* ───── Synchronisation ───── */
 
-    suspend fun refreshAll() { refreshCatalog(); flushAndRefresh(); if (demo.multiLists) loadOpenLists() }
+    suspend fun refreshAll() { refreshCatalog(); if (demo.multiLists) loadOpenLists(); flushAndRefresh() }
 
     suspend fun refreshCatalog() {
         when (val r = session.api.call("GET", "/api/catalog")) {
