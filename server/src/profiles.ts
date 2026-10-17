@@ -88,7 +88,8 @@ export async function createProfile(db: Db, actor: AuthContext, input: CreatePro
     try {
       const r = await c.query(
         `INSERT INTO profiles (family_id, display_name, login, role, secret_hash, city) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-        [actor.familyId, input.displayName, input.login, input.role, hash, input.city ?? null],
+        // Sans ville choisie, le nouveau membre hérite de celle de la famille.
+        [actor.familyId, input.displayName, input.login, input.role, hash, input.city ?? (await c.query("SELECT city FROM families WHERE id = $1", [actor.familyId])).rows[0]?.city ?? null],
       );
       await audit(c, actor.familyId, actor.profileId, "profile.created", r.rows[0].id, { role: input.role });
       return { profile: toView(r.rows[0]) };

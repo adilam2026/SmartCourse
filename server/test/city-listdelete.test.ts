@@ -73,7 +73,7 @@ describe("ville du profil", () => {
 });
 
 describe("prix de la communauté par ville", () => {
-  it("la synchronisation n'utilise que la ville du profil ; sans ville elle la demande ; un autre profil d'une autre ville voit les siennes", async () => {
+  it("la synchronisation n'utilise que la ville de la famille (ou du profil) ; sans ville elle la demande ; un autre profil d'une autre ville voit les siennes", async () => {
     const share = async (city: string, amount: string) => {
       const g = await family(city);
       await app.inject({ method: "PUT", url: `/api/products/${g.products["Pommes"].id}/price`, cookies: g.admin, payload: { amount, refQty: 1, refUnit: "kg" } });
@@ -91,6 +91,8 @@ describe("prix de la communauté par ville", () => {
     expect((await props(marrakech.admin)).proposals.filter((p: any) => p.productId === marrakech.products["Pommes"].id)).toHaveLength(0); // aucune contribution dans sa ville
     // sans ville : demandée
     await db.query("UPDATE profiles SET city = NULL WHERE family_id = (SELECT family_id FROM profiles WHERE login = 'adil' ORDER BY created_at DESC LIMIT 1)");
+    // (depuis 023, la ville de la famille passe avant celle du profil : famille sans localisation confirmée ici)
+    await db.query("UPDATE families SET country = NULL, city = NULL, location_confirmed_at = NULL WHERE id = (SELECT family_id FROM profiles WHERE login = 'adil' ORDER BY created_at DESC LIMIT 1)");
     expect((await app.inject({ method: "GET", url: "/api/prices/community", cookies: marrakech.admin })).json().error).toBe("city_required");
     expect((await app.inject({ method: "POST", url: "/api/prices/share", cookies: marrakech.admin, payload: { productId: marrakech.products["Pommes"].id } })).json().error).toBe("city_required");
     // appliquer : seulement ce qui est sélectionné

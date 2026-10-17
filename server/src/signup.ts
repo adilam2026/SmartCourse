@@ -45,7 +45,9 @@ export interface SignupInput {
   familyName: string;
   displayName: string;
   login: string;
-  city: string;
+  /** Ville marocaine normalisée (null hors du Maroc). */
+  city: string | null;
+  country: string;
   email: string;
   secret: string;
 }
@@ -147,9 +149,9 @@ export async function startSignup(db: Db, recovery: RecoveryService, input: Sign
     // Une seule demande ouverte par adresse : la précédente est remplacée (son code ne fonctionne plus).
     await c.query("UPDATE family_signups SET superseded_at = now() WHERE email_hash = $1 AND completed_at IS NULL AND superseded_at IS NULL", [eh]);
     const r = await c.query(
-      `INSERT INTO family_signups (request_id, email, email_hash, ip_hash, family_name, display_name, login, city, secret_hash, code_hash, expires_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'', now() + make_interval(mins => $10)) RETURNING id, email, expires_at, last_sent_at`,
-      [input.requestId, email, eh, ipHash, input.familyName, input.displayName, input.login, input.city, secretHash, limits.codeMinutes],
+      `INSERT INTO family_signups (request_id, email, email_hash, ip_hash, family_name, display_name, login, city, country, secret_hash, code_hash, expires_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'', now() + make_interval(mins => $11)) RETURNING id, email, expires_at, last_sent_at`,
+      [input.requestId, email, eh, ipHash, input.familyName, input.displayName, input.login, input.city, input.country, secretHash, limits.codeMinutes],
     );
     await c.query("UPDATE family_signups SET code_hash = $2 WHERE id = $1", [r.rows[0].id, codeHash(r.rows[0].id, code)]);
     return r.rows[0];
@@ -240,6 +242,7 @@ export async function verifySignup(db: Db, signupId: string, code: string, limit
       familyName: r.family_name,
       admin: { displayName: r.display_name, login: r.login, secretHash: r.secret_hash, city: r.city, recoveryEmail: r.email, emailVerified: true },
       completed: true,
+      country: r.country ?? (r.city ? "MA" : null),
     });
     await c.query("UPDATE family_signups SET completed_at = now(), family_id = $2, profile_id = $3 WHERE id = $1", [r.id, created.familyId, created.profileId]);
     const s = await createSession(c, created.profileId);

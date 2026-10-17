@@ -7,6 +7,7 @@ import { can } from "./permissions.js";
 import type { SseHub } from "./hub.js";
 import { UNITS, type Unit } from "./lists.js";
 import { loadPrices, type PriceView } from "./prices.js";
+import { pricesAvailable } from "./countries.js";
 import { insertPhotoAsset, MAX_INPUT_BYTES, preparePhoto, type PhotoStore, type PreparedPhoto } from "./photos.js";
 
 interface Deps {
@@ -68,7 +69,9 @@ export function catalogRoutes(app: FastifyInstance, { db, store, guard, hub }: D
     // Revision read FIRST: if the catalogue changes while it is being read, the client holds a revision older than its data
     // and simply downloads once more; it can never keep stale data under a fresh revision.
     const rev = Number((await db.query("SELECT catalog_rev FROM families WHERE id = $1", [a.familyId])).rows[0]?.catalog_rev ?? 0);
-    const prices = await loadPrices(db, a.familyId);
+    // Hors du Maroc : aucun prix indicatif dans le catalogue (les prix familiaux restent enregistrés, simplement non affichés).
+    const country = (await db.query("SELECT country FROM families WHERE id = $1", [a.familyId])).rows[0]?.country as string | null;
+    const prices = pricesAvailable(country) ? await loadPrices(db, a.familyId) : new Map();
     const [cats, prods] = await Promise.all([
       db.query("SELECT key, label FROM categories ORDER BY position"),
       db.query(
