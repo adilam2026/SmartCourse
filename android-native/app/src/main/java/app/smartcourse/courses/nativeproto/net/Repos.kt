@@ -145,6 +145,11 @@ fun serverMessage(f: Outcome.Fail, general: (Failure) -> String): String = when 
     "weak_secret" -> "Code d'accès trop simple (évitez 123456, 111111…)."
     "product_exists" -> "Cet article existe déjà dans le catalogue."
     "forbidden" -> "Action réservée aux administrateurs."
+    "multiple_active_lists" -> "Plusieurs listes sont en cours : terminez les autres avant de désactiver l'option. Rien n'est fusionné ni supprimé automatiquement."
+    "active_exists" -> "Une liste est déjà en cours."
+    "country_required" -> "Choisissez le pays de la famille."
+    "invalid_country" -> "Choisissez un pays dans la liste."
+    "prices_unavailable" -> "Les prix indicatifs ne sont proposés qu'au Maroc."
     else -> when (f.failure) {
         Failure.FORBIDDEN -> "Action réservée aux administrateurs."
         Failure.NOT_FOUND -> "Élément introuvable : il a peut-être été supprimé. Actualisez l'écran."
