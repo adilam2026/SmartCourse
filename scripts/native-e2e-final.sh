@@ -744,6 +744,33 @@ expect "D6b. reconnexion refusée ; Driss et Lamiaa se connectent" bash -c "
 
 fi
 fi
+if want_s X; then
+echo "═══ X. Options avancées : activation des listes, choix et sélection de la devise, activation du budget, réglages gardés après réouverture — contrôle ciblé ═══" | tee -a "$OUT/resultats.txt"
+login_api adil 482913
+closeall_api; api PUT /api/family/features -d '{"multiLists":false,"budget":false}' >/dev/null
+FEAT() { sql "SELECT f.multi_lists_enabled||':'||f.budget_enabled||':'||coalesce(s.currency,'-') FROM families f LEFT JOIN finance_settings s ON s.family_id=f.id WHERE f.code='$FAMILY'"; }
+launch; $UI wait "Bienvenue" 25 >/dev/null
+signin "$FAMILY" adil 482913; $UI wait "Ma liste" 25 >/dev/null
+tapt "Réglages"; $UI tap "Paramètres avancés" --scroll >/dev/null; sleep 3
+expect "X0. serveur à jour : aucune option bloquée" bash -c "! $UI has 'mise à jour du serveur'"
+$UI tap "Plusieurs listes actives" >/dev/null; sleep 4
+expect "X1. « Plusieurs listes actives » activée sans message d'erreur ($(FEAT))" bash -c "test \"\$(docker exec sc-recette-pg psql -U smart -d smartcourse -tAc \"SELECT multi_lists_enabled FROM families WHERE code='$FAMILY'\")\" = t && ! $UI has 'introuvable'"
+$UI tap "Gestion du budget" >/dev/null; sleep 3
+$UI tap "Changer de devise" >/dev/null; sleep 3
+expect "X2. choix de devise ouvert : liste des devises avec leurs pays" bash -c "$UI has 'Devise de la famille' && $UI has 'EUR' && $UI has 'France'"
+shot final-x1-devises
+$UI tap "EUR" --scroll >/dev/null; sleep 2
+expect "X3. devise sélectionnée affichée, confirmation possible" bash -c "$UI has 'EUR' && $UI enabled 'Confirmer la devise et activer'"
+$UI tap "Confirmer la devise et activer" >/dev/null; sleep 5
+expect "X4. budget activé avec la devise choisie ($(FEAT))" test "$(FEAT)" = "true:true:EUR"
+launch; $UI wait "Ma liste" 25 >/dev/null; sleep 2
+tapt "Réglages"; $UI tap "Paramètres avancés" --scroll >/dev/null; sleep 3
+expect "X5. après fermeture et réouverture : options toujours activées, onglet Budget présent" bash -c "$UI has 'Activée' && $UI has 'Réglages du budget' && $UI has 'Budget'"
+shot final-x2-apres-reouverture
+api PUT /api/family/features -d '{"multiLists":false,"budget":false}' >/dev/null
+logout
+fi
+
 if want_s B; then
 echo "═══ B. Budget : activation, paiements pendant les courses, clôture sans double débit, vue d'ensemble — contrôle court ═══" | tee -a "$OUT/resultats.txt"
 login_api adil 482913

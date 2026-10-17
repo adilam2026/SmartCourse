@@ -165,23 +165,27 @@ fun AdvancedSettingsScreen(onBack: () -> Unit, nav: (String) -> Unit = {}) {
                 else "Seul un administrateur peut modifier ces options.",
                 style = MaterialTheme.typography.bodyMedium, color = C.Muted,
             )
+            // Serveur trop ancien pour ces options : elles restent visibles mais inactives, avec la raison (jamais « Élément introuvable »).
+            val listsOk = serverSupports(demo.serverSchema, 24)
+            val budgetOk = serverSupports(demo.serverSchema, 25)
+            if (!listsOk || !budgetOk) Text(SERVER_UPDATE_MSG, style = MaterialTheme.typography.bodyMedium, color = C.Amber)
             SCard(padding = PaddingValues(16.dp)) {
-                Row(Modifier.clickable(enabled = admin && !busy) { if (!demo.multiLists) apply(true) else confirmOff = true }, verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.clickable(enabled = admin && !busy && listsOk) { if (!demo.multiLists) apply(true) else confirmOff = true }, verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f).padding(end = 12.dp)) {
                         Text("Plusieurs listes actives", style = MaterialTheme.typography.titleSmall)
                         Text("Préparer plusieurs listes en même temps (marché, supermarché…). Chacun choisit la liste qu'il consulte.", style = MaterialTheme.typography.bodySmall)
                     }
-                    TealSwitch(demo.multiLists, { on -> if (on) apply(true) else confirmOff = true }, enabled = admin && !busy)
+                    TealSwitch(demo.multiLists, { on -> if (on) apply(true) else confirmOff = true }, enabled = admin && !busy && listsOk)
                 }
             }
             val budgetOn = me?.features?.budget == true
             SCard(padding = PaddingValues(16.dp)) {
-                Row(Modifier.clickable(enabled = admin && !busy) { if (budgetOn) confirmBudgetOff = true else activate = true }, verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.clickable(enabled = admin && !busy && budgetOk) { if (budgetOn) confirmBudgetOff = true else activate = true }, verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f).padding(end = 12.dp)) {
                         Text("Gestion du budget", style = MaterialTheme.typography.titleSmall)
                         Text(if (budgetOn) "Activée · onglet Budget et saisie des paiements pour les profils autorisés" else "Suivre les dépenses réelles de la famille, saisies à la main. Désactivée : aucun onglet Budget ni saisie de paiement.", style = MaterialTheme.typography.bodySmall)
                     }
-                    TealSwitch(budgetOn, { on -> if (on) activate = true else confirmBudgetOff = true }, enabled = admin && !busy)
+                    TealSwitch(budgetOn, { on -> if (on) activate = true else confirmBudgetOff = true }, enabled = admin && !busy && budgetOk)
                 }
                 if (budgetOn && demo.budget?.rights?.manage == true) {
                     Spacer(Modifier.height(8.dp))
@@ -197,7 +201,7 @@ fun AdvancedSettingsScreen(onBack: () -> Unit, nav: (String) -> Unit = {}) {
         scope.launch {
             when (val r = d.session.api.call("PUT", "/api/family/features", kotlinx.serialization.json.buildJsonObject { put("budget", kotlinx.serialization.json.JsonPrimitive(true)); put("currency", kotlinx.serialization.json.JsonPrimitive(cur)) })) {
                 is app.smartcourse.courses.nativeproto.net.Outcome.Ok -> { activate = false; d.session.verify(); d.loadBudget(); demo.say("Gestion du budget activée.") }
-                is app.smartcourse.courses.nativeproto.net.Outcome.Fail -> error = explain(r)
+                is app.smartcourse.courses.nativeproto.net.Outcome.Fail -> { activate = false; error = settingFailure(r, ::explain) }
             }
             busy = false
         }
@@ -211,7 +215,7 @@ fun AdvancedSettingsScreen(onBack: () -> Unit, nav: (String) -> Unit = {}) {
             scope.launch {
                 when (val r = d.session.api.call("PUT", "/api/family/features", kotlinx.serialization.json.buildJsonObject { put("budget", kotlinx.serialization.json.JsonPrimitive(false)) })) {
                     is app.smartcourse.courses.nativeproto.net.Outcome.Ok -> { d.session.verify(); demo.budget = null }
-                    is app.smartcourse.courses.nativeproto.net.Outcome.Fail -> error = explain(r)
+                    is app.smartcourse.courses.nativeproto.net.Outcome.Fail -> error = settingFailure(r, ::explain)
                 }
             }
         }, { confirmBudgetOff = false },
@@ -232,7 +236,9 @@ fun BudgetActivationSheet(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
     var cur by remember { mutableStateOf<String?>(null) }
     var pick by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        (Fin.call(data, "GET", "/api/budget", BudgetInfo.serializer()) as? FinR.Ok)?.let { info = it.v; cur = it.v.currency ?: it.v.proposedCurrency }
+        // Devise proposée selon le pays de la famille, même sans réponse du serveur ; le serveur la confirme à l'activation.
+        cur = COUNTRIES.firstOrNull { it.code == data.session.signedMe?.location?.country }?.currency
+        (Fin.call(data, "GET", "/api/budget", BudgetInfo.serializer()) as? FinR.Ok)?.let { info = it.v; cur = it.v.currency ?: it.v.proposedCurrency ?: cur }
     }
     AppSheet(onDismiss) {
         Text("Activer la gestion du budget", style = MaterialTheme.typography.titleLarge)
@@ -242,7 +248,8 @@ fun BudgetActivationSheet(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(C.TealSoft).clickable { pick = true }.heightIn(min = 56.dp).padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Devise de la famille", style = MaterialTheme.typography.labelMedium, color = C.Muted)
-                Text(cur?.let { it + if (it == info?.proposedCurrency) " — proposée pour votre pays" else "" } ?: "Choisir la devise", style = MaterialTheme.typography.bodyLarge)
+                val proposed = info?.proposedCurrency ?: COUNTRIES.firstOrNull { it.code == data.session.signedMe?.location?.country }?.currency
+                Text(cur?.let { it + if (it == proposed) " — proposée pour votre pays" else "" } ?: "Choisir la devise", style = MaterialTheme.typography.bodyLarge)
             }
             Icon(Icons.Rounded.ExpandMore, "Changer de devise", tint = C.TealDark)
         }
@@ -254,5 +261,5 @@ fun BudgetActivationSheet(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
         Spacer(Modifier.height(8.dp))
         SecondaryButton("Annuler", onDismiss, Modifier.fillMaxWidth())
     }
-    if (pick) CurrencySheet(cur, info?.currencies ?: emptyMap(), { cur = it; pick = false }, { pick = false })
+    if (pick) CurrencySheet(cur, info?.currencies?.takeIf { it.isNotEmpty() } ?: LOCAL_CURRENCIES, { cur = it; pick = false }, { pick = false })
 }

@@ -45,7 +45,7 @@ fun AdminHubScreen(nav: (String) -> Unit) {
         Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             // Localisation à confirmer (familles créées avant le choix du pays) : rien n'est appliqué sans un administrateur.
             val loc = demo.data?.session?.signedMe?.location
-            if (loc != null && !loc.confirmed && demo.data?.me?.role == "admin") SCard(padding = PaddingValues(12.dp)) {
+            if (loc != null && !loc.confirmed && demo.data?.me?.role == "admin" && serverSupports(demo.serverSchema, 23)) SCard(padding = PaddingValues(12.dp)) {
                 Text("Confirmez le pays de votre famille", style = MaterialTheme.typography.titleSmall)
                 Text("Il sert aux prix de votre ville. Rien n'a été modifié ni effacé.", style = MaterialTheme.typography.bodySmall)
                 Spacer(Modifier.height(8.dp))

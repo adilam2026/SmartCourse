@@ -162,6 +162,8 @@ class Demo(initialRole: Role? = null, val live: Boolean = false) {
     var reorderDestination by mutableStateOf<Map<String, Int>?>(null)
     /** Module Budget pour CE profil (null : option désactivée ou état pas encore lu) ; budgetRev change à chaque mise à jour du serveur. */
     var budget by mutableStateOf<BudgetInfo?>(null)
+    /** Dernière migration du serveur utilisé (lue sur /health) ; null tant qu'elle n'est pas connue. */
+    var serverSchema by mutableStateOf<String?>(null)
     var budgetRev by mutableStateOf(0)
     /** Identifiant de la liste consultée (paiements de courses rattachés automatiquement). */
     var currentListId by mutableStateOf<String?>(null)

@@ -583,7 +583,7 @@ fun BudgetSettingsScreen(nav: (String) -> Unit, onBack: () -> Unit) {
             Spacer(Modifier.height(16.dp))
         }
     }
-    if (currencySheet) CurrencySheet(b.currency, b.currencies, { c -> currencySheet = false; set(buildJsonObject { put("currency", c) }) }, { currencySheet = false })
+    if (currencySheet) CurrencySheet(b.currency, b.currencies.takeIf { it.isNotEmpty() } ?: LOCAL_CURRENCIES, { c -> currencySheet = false; set(buildJsonObject { put("currency", c) }) }, { currencySheet = false })
     if (newCat) NewCategoryDialog({ newCat = false }) { }
 }
 
@@ -596,7 +596,10 @@ fun CurrencySheet(current: String?, currencies: Map<String, Int>, onPick: (Strin
         LazyColumn(Modifier.heightIn(max = 380.dp)) {
             items(currencies.keys.sorted()) { c ->
                 Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { onPick(c) }.heightIn(min = 48.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(c, modifier = Modifier.weight(1f), color = if (c == current) C.TealDark else C.Ink)
+                    Column(Modifier.weight(1f)) {
+                        Text(c, style = MaterialTheme.typography.titleSmall, color = if (c == current) C.TealDark else C.Ink)
+                        currencyCountries(c).takeIf { it.isNotEmpty() }?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = C.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                    }
                     if (c == current) Icon(Icons.Rounded.Check, null, tint = C.TealDark)
                 }
             }

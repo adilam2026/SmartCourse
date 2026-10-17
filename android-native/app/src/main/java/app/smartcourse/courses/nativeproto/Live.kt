@@ -103,6 +103,7 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
         demo.listLoaded = engine.list != null
         applyLocation(me.location)
         applyFeatures(me.features)
+        scope.launch { loadServerLevel() }
         applyPrefs(me.prefs)
         render()
         syncDraft()
@@ -116,6 +117,11 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
         demo.multiLists = f?.multiLists == true
         if (demo.multiLists) scope.launch { loadOpenLists() } else demo.openLists = emptyList()
         if (f?.budget == true) scope.launch { loadBudget() } else demo.budget = null
+    }
+
+    suspend fun loadServerLevel() {
+        val r = session.api.call("GET", "/health")
+        if (r is Outcome.Ok) (r.value["schema"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.let { demo.serverSchema = it }
     }
 
     /** État du module Budget pour ce profil (droits compris, décidés par le serveur). */
@@ -164,7 +170,7 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
     /** Paramètres avancés (administrateurs) : renvoie un message d'erreur, ou null si c'est enregistré. */
     suspend fun setMultiLists(on: Boolean): String? = when (val r = session.api.call("PUT", "/api/family/features", buildJsonObject { put("multiLists", on) })) {
         is Outcome.Ok -> { session.verify(); demo.multiLists = on; if (on) loadOpenLists(); null }
-        is Outcome.Fail -> if (r.failure == Failure.NETWORK || r.failure == Failure.TIMEOUT) networkMessage() else explain(r)
+        is Outcome.Fail -> if (r.failure == Failure.NETWORK || r.failure == Failure.TIMEOUT) networkMessage() else settingFailure(r, ::explain)
     }
 
     /** Localisation de la famille : hors du Maroc, aucun prix indicatif n'est affiché (les préférences enregistrées sont conservées). */

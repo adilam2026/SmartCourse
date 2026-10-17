@@ -68,6 +68,7 @@ fun LocationScreen(onBack: () -> Unit) {
     Column(Modifier.fillMaxSize()) {
         TopBar("Pays et ville", onBack = onBack)
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (!serverSupports(demo.serverSchema, 23)) NoteCard(SERVER_UPDATE_MSG)
             if (loc != null && !loc.confirmed) NoteCard(
                 if (loc.suggestion != null) "Prérempli depuis la ville déjà connue (${loc.suggestion.city}). Vérifiez puis confirmez : rien n'est appliqué avant."
                 else "Le pays de votre famille n'est pas encore renseigné. Choisissez-le : rien n'a été modifié ni effacé."
@@ -91,7 +92,7 @@ fun LocationScreen(onBack: () -> Unit) {
                     scope.launch {
                         when (val r = session.api.call("PUT", "/api/family/location", buildJsonObject { put("country", c); if (c == "MA") put("city", city!!) })) {
                             is Outcome.Ok -> { session.verify(); demo.say("Pays et ville enregistrés."); onBack() }
-                            is Outcome.Fail -> error = explain(r)
+                            is Outcome.Fail -> error = settingFailure(r, ::explain)
                         }
                         busy = false
                     }
