@@ -1,0 +1,8 @@
+COURSES V3 - REFERENCE VISUELLE VALIDEE
+
+La planche PNG est une reference de direction graphique, pas une specification pixel-perfect. Les textes/chiffres illustratifs ne constituent pas des donnees de production.
+
+Personnel : grandes photos ; 3 vues liste visuelle / carres 2 colonnes / grandes cartes ; choix d'article ouvrant un panneau inferieur ; quantite +/- et saisie directe ; unite selon article ; prix indicatif unitaire sans calcul de total par article dans la selection ; liste d'achat lisible et validation.
+Administrateur : vue compacte ; catalogue avec visibilite reversible ; edition des prix ; reglages separes de visibilite des prix et du total estime ; gestion des profils.
+
+Ne pas inventer de fonctionnalites a partir des details approximatifs de l'image. Le code existant et les regles fonctionnelles explicites font foi.

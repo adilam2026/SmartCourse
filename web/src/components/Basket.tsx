@@ -80,7 +80,7 @@ export function FavoritesSheet({ engine, s, onClose, onPrepared }: { engine: Eng
             <li key={t.id} className="row row--stack row--compact" data-testid={`favorite-${t.name}`}>
               <span className="row__name">
                 <span className="row__title">{t.name}</span>
-                <small>{t.items.length} produit{t.items.length > 1 ? "s" : ""}{t.items.some((i) => !i.productActive) ? " · certains désactivés" : ""}</small>
+                <small>{t.items.length} produit{t.items.length > 1 ? "s" : ""}{t.items.some((i) => !i.productActive) ? " · certains masqués" : ""}</small>
               </span>
               <span className="row__actions">
                 <button className="btn btn--small btn--primary" data-testid={`use-${t.name}`} onClick={() => setUsing(t)}>Utiliser cette liste</button>

@@ -1,8 +1,9 @@
+import { isV3On } from "../v3";
 import type { Engine, State } from "../sync/engine";
 
 /** How many banner rows are showing — used by the screen to free space on short phones. */
 export const bannerCount = (s: State): number =>
-  (s.conn === "offline" || s.batches.length > 0 ? 1 : 0) + (s.orphan && s.list?.status === "active" ? 1 : 0) + (s.notices.length > 0 ? 1 : 0);
+  (s.conn === "offline" || s.batches.length > 0 ? 1 : 0) + (s.orphan && ((s.list === null && isV3On()) || s.list?.status === "active") ? 1 : 0) + (s.notices.length > 0 ? 1 : 0);
 
 /*
  * At most three compact rows, whatever the situation:
@@ -31,10 +32,10 @@ export function Banners({ engine, s }: { engine: Engine; s: State }) {
           )}
         </div>
       )}
-      {s.orphan && s.list && s.list.status === "active" && (
+      {s.orphan && ((s.list === null && isV3On()) || s.list?.status === "active") && (
         <div className="banner banner--info" data-testid="banner-orphan">
           <span>
-            Liste précédente clôturée. Reprendre vos <strong>{s.orphan.productIds.length}</strong> produit{s.orphan.productIds.length > 1 ? "s" : ""} ?
+            Liste précédente clôturée ou supprimée. Reprendre vos <strong>{s.orphan.productIds.length}</strong> produit{s.orphan.productIds.length > 1 ? "s" : ""} ?
           </span>
           <span className="banner__actions">
             <button className="btn btn--small" onClick={() => void engine.resumeOrphan()} data-testid="orphan-resume">Reprendre</button>

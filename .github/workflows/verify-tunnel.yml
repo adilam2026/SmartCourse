@@ -1,14 +1,28 @@
 name: Vérification du tunnel HTTPS de recette (manuelle, sans déploiement)
 # Lance scripts/recette-locale.sh AVEC son tunnel Cloudflare gratuit sur un serveur GitHub (base jetable, quelques minutes),
 # puis contrôle l'adresse publique comme le ferait Chrome sur Android. Aucun secret, aucun accès à Railway.
+#
+# RECETTE SUR TÉLÉPHONE : lancer avec « minutes » > 0 (10 à 120). L'application DE LA BRANCHE choisie reste ouverte pendant ce temps dans
+# un environnement jetable (AUCUNE donnée réelle ; la production n'est ni touchée ni visible) avec :
+#   - une adresse HTTPS temporaire ;
+#   - une APK de RECETTE « Courses V3 essai » (identifiant app.smartcourse.courses.recette : s'installe À CÔTÉ de l'application actuelle),
+#     reliée EXCLUSIVEMENT à cette adresse et téléchargeable à <adresse>/courses-v3-recette.apk.
+# L'adresse, le code famille, les identifiants d'essai et l'heure d'expiration sont publiés en ANNONCES de l'exécution (et dans son résumé).
+# Quand l'environnement s'arrête, l'adresse disparaît : l'APK de recette n'ouvre alors plus rien (ce n'est PAS une application autonome).
+# Attention : le dépôt est public, donc le journal aussi : il ne contient que l'adresse temporaire et des identifiants d'essai sans valeur.
 on:
   workflow_dispatch:
+    inputs:
+      minutes:
+        description: "Garder l'environnement d'essai ouvert N minutes pour un test sur téléphone (0 = vérification seule ; 10 à 120)"
+        default: "0"
 permissions:
   contents: read
+  statuses: write   # publie l'adresse de recette comme statut du commit (lisible pendant la session)
 jobs:
   tunnel:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 170
     steps:
       - uses: actions/checkout@v4
       - name: Démarrage de l'application et du tunnel
@@ -21,5 +35,67 @@ jobs:
           mkdir -p /tmp/pw && cd /tmp/pw && npm init -y >/dev/null && npm i playwright-core@1.64.0 >/dev/null
           cp "$GITHUB_WORKSPACE/scripts/check-tunnel.mjs" /tmp/pw/check.mjs
           BASE="$URL" FAMILY="$CODE" node /tmp/pw/check.mjs
+      # ---- APK de recette (seulement pour une session de test sur téléphone) ----
+      - uses: actions/setup-java@v4
+        if: inputs.minutes != '0'
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: APK de recette (identifiant distinct, reliée à cette adresse seulement)
+        if: inputs.minutes != '0'
+        run: |
+          set -euo pipefail
+          URL=$(grep -oE 'Application prête : https://[a-z0-9-]+\.trycloudflare\.com' /tmp/recette.out | awk '{print $4}')
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" | tail -1
+          # Clé jetable : n'a aucun lien avec la clé de l'application actuelle
+          F="$RUNNER_TEMP/recette.jks"; P=$(openssl rand -hex 16); echo "::add-mask::$P"
+          keytool -genkeypair -noprompt -keystore "$F" -storetype PKCS12 -alias recette -keyalg RSA -keysize 2048 -validity 3 -storepass "$P" -keypass "$P" -dname "CN=Courses V3 recette jetable" >/dev/null 2>&1
+          export ANDROID_KEYSTORE_PATH="$F" ANDROID_KEYSTORE_PASSWORD="$P" ANDROID_KEY_ALIAS=recette ANDROID_KEY_PASSWORD="$P"
+          (cd android && ./gradlew --no-daemon assembleRelease -PappUrl="$URL" -PappId=app.smartcourse.courses.recette -PappLabel="Courses V3 essai" -PversionCode="${{ github.run_number }}" -PversionName="3.0.0-recette.${{ github.run_number }}")
+          APK=$(ls android/app/build/outputs/apk/release/*.apk)
+          BT="$ANDROID_HOME/build-tools/36.0.0"
+          "$BT/aapt2" dump badging "$APK" > /tmp/badging.txt
+          grep -q "name='app.smartcourse.courses.recette'" /tmp/badging.txt
+          grep -q "application-label:'Courses V3 essai'" /tmp/badging.txt
+          ! grep -q "name='app.smartcourse.courses'" /tmp/badging.txt
+          "$BT/apksigner" verify --print-certs "$APK" | tee /tmp/apksigner.txt | grep -E "Verifies|SHA-256"
+          FP=$(grep -m1 "certificate SHA-256 digest" /tmp/apksigner.txt | sed 's/.*: //' | tr 'a-f' 'A-F' | sed 's/../&:/g; s/:$//')
+          # Le serveur d'essai déclare cette APK (plein écran sans barre d'adresse) ; la production n'est pas concernée
+          printf '[{"relation":["delegate_permission/common.handle_all_urls"],"target":{"namespace":"android_app","package_name":"app.smartcourse.courses.recette","sha256_cert_fingerprints":["%s"]}}]\n' "$FP" > /tmp/assetlinks-recette.json
+          docker cp /tmp/assetlinks-recette.json sc-recette-app:/app/server/assetlinks.json
+          docker cp "$APK" sc-recette-app:/app/web/dist/courses-v3-recette.apk
+          docker restart sc-recette-app >/dev/null
+          for _ in $(seq 1 60); do curl -fsS --max-time 5 "$URL/health" >/dev/null 2>&1 && break; sleep 2; done
+          curl -fsS "$URL/.well-known/assetlinks.json" | grep -q "app.smartcourse.courses.recette"
+          curl -fsSI "$URL/courses-v3-recette.apk" | head -1 | grep -q " 200"
+          echo "APK de recette prête : $(stat -c %s "$APK") octets, signature $FP"
+      - name: Annonce de la session de recette
+        if: inputs.minutes != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          M="${{ inputs.minutes }}"; case "$M" in ''|*[!0-9]*) M=60;; esac
+          [ "$M" -lt 10 ] && M=10; [ "$M" -gt 120 ] && M=120
+          echo "MINUTES=$M" >> "$GITHUB_ENV"
+          URL=$(grep -oE 'Application prête : https://[a-z0-9-]+\.trycloudflare\.com' /tmp/recette.out | awk '{print $4}')
+          CODE=$(grep -oE 'Code famille : [A-Z0-9]+' /tmp/recette.out | awk '{print $4}')
+          UTC=$(date -u -d "+$M minutes" +%H:%M); MA=$(date -u -d "+$((M + 60)) minutes" +%H:%M) # heure du Maroc = UTC+1 (les fuseaux ne sont pas installés sur le serveur)
+          echo "::notice title=RECETTE_ADRESSE::$URL"
+          echo "::notice title=RECETTE_CODE_FAMILLE::$CODE"
+          echo "::notice title=RECETTE_COMPTES::administrateur adil / 482913 | personnel marie / 573918 | parent lamiaa / 573918"
+          echo "::notice title=RECETTE_APK::$URL/courses-v3-recette.apk"
+          echo "::notice title=RECETTE_EXPIRATION::$MA (heure du Maroc) / $UTC UTC"
+          { echo "## Recette sur téléphone (environnement jetable, $M minutes)"; echo; echo "- Adresse : $URL"; echo "- Code famille : $CODE"; echo "- Administrateur : adil / 482913 · Personnel : marie / 573918 · Parent : lamiaa / 573918"; echo "- APK de recette : $URL/courses-v3-recette.apk"; echo "- Expire à $MA (heure du Maroc), $UTC UTC"; echo "- Activer la V3 : connexion en adil → Réglages → Aperçu V3."; } >> "$GITHUB_STEP_SUMMARY"
+          echo "Adresse $URL · code famille $CODE · expire à $MA (Maroc) / $UTC UTC"
+          # Statuts du commit : les journaux d'une exécution en cours ne sont pas lisibles, les statuts le sont tout de suite
+          gh api "repos/${{ github.repository }}/statuses/${{ github.sha }}" -f state=success -f context="recette/acces" -f target_url="$URL" -f description="$URL | code $CODE | expire $MA Maroc / $UTC UTC" >/dev/null
+          gh api "repos/${{ github.repository }}/statuses/${{ github.sha }}" -f state=success -f context="recette/apk" -f target_url="$URL/courses-v3-recette.apk" -f description="APK de recette : $URL/courses-v3-recette.apk" >/dev/null
+          gh api "repos/${{ github.repository }}/statuses/${{ github.sha }}" -f state=success -f context="recette/comptes" -f description="adil 482913 (admin) | marie 573918 (personnel) | lamiaa 573918 (parent)" >/dev/null
+      - name: Environnement ouvert (attente)
+        if: inputs.minutes != '0'
+        run: |
+          echo "Ouvert $MINUTES minutes. Annuler l'exécution pour l'arrêter plus tôt."
+          sleep $((MINUTES * 60))
       - run: scripts/recette-locale.sh --stop
         if: always()

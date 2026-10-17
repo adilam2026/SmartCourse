@@ -103,7 +103,7 @@ function Setup({ engine, s, onBack }: { engine: Engine; s: State; onBack(): void
         <label>Nom de la famille<input value={f.familyName} onChange={set("familyName")} required maxLength={60} data-testid="setup-family" /></label>
         <label>Votre nom affiché<input value={f.displayName} onChange={set("displayName")} required maxLength={40} data-testid="setup-name" /></label>
         <label>Votre identifiant<input value={f.login} onChange={set("login")} required autoCapitalize="none" pattern="[a-zA-Z0-9._-]{2,30}" data-testid="setup-login" /></label>
-        <label>Code secret — 6 chiffres<SecretInput kind="new" value={f.secret} onChange={(v) => setF({ ...f, secret: v })} testid="setup-secret" /></label>
+        <label>Code secret — entre 6 et 8 chiffres<SecretInput kind="new" value={f.secret} onChange={(v) => setF({ ...f, secret: v })} testid="setup-secret" /></label>
         <label>Confirmer le code secret<SecretInput kind="new" value={f.again} onChange={(v) => setF({ ...f, again: v })} testid="setup-again" /></label>
         {mismatch && <p className="error">Les deux codes secrets ne sont pas identiques.</p>}
         <CityPicker value={f.city} onChange={(city) => setF((x) => ({ ...x, city }))} testid="setup-city" />
@@ -243,7 +243,7 @@ export function LinkScreen({ kind, token, onDone }: { kind: "verify" | "reset"; 
       await api.resetPassword(token, secret, again);
       setState("saved");
     } catch (err) {
-      setError(err instanceof NetworkError ? "Pas de connexion." : err instanceof ApiError && err.code === "weak_secret" ? "Code secret trop simple (évitez 123456, 111111…)." : err instanceof ApiError && err.code === "invalid_link" ? "Ce lien n'est plus valable : demandez-en un nouveau." : "Code secret refusé (6 chiffres, identiques).");
+      setError(err instanceof NetworkError ? "Pas de connexion." : err instanceof ApiError && err.code === "weak_secret" ? "Code secret trop simple (évitez 123456, 111111…)." : err instanceof ApiError && err.code === "invalid_link" ? "Ce lien n'est plus valable : demandez-en un nouveau." : "Code secret refusé (entre 6 et 8 chiffres, identiques).");
     }
   };
   return (
@@ -255,7 +255,7 @@ export function LinkScreen({ kind, token, onDone }: { kind: "verify" | "reset"; 
       {state === "ok" && <section className="panel" data-testid="link-ok"><p><b>Adresse confirmée.</b></p><p className="muted">Elle peut désormais servir à retrouver le code famille ou à changer un mot de passe oublié.</p></section>}
       {state === "form" && (
         <form onSubmit={save}>
-          <label>Code secret — 6 chiffres<SecretInput kind="new" value={secret} onChange={setSecret} testid="reset-new" /></label>
+          <label>Code secret — entre 6 et 8 chiffres<SecretInput kind="new" value={secret} onChange={setSecret} testid="reset-new" /></label>
           <label>Confirmer le code secret<SecretInput kind="new" value={again} onChange={setAgain} testid="reset-confirm" /></label>
           {mismatch && <p className="error">Les deux codes secrets ne sont pas identiques.</p>}
           {error && <p className="error" role="alert" data-testid="reset-error">{error}</p>}

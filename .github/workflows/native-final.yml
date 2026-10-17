@@ -1,0 +1,206 @@
+name: Android natif — version finale (tests, APK release signé)
+# Version FINALE : identifiant app.smartcourse.courses.natif, nom « Courses », serveur permanent fixé à la compilation.
+# 1. test-final : APK final branché sur un serveur LOCAL jetable (même code serveur que la production), parcours complet sur émulateur.
+# 2. release   : uniquement si les tests sont verts ET la clé durable présente dans les secrets ; APK signé pour le serveur permanent.
+# 3. smoke-prod: l'APK livré, sur émulateur, s'ouvre sur l'écran de connexion (aucune connexion, aucune donnée réelle lue ni écrite).
+# Aucun déploiement, aucune publication Google Play.
+on:
+  workflow_dispatch:
+    inputs:
+      livrer:
+        description: "Construire et publier l'APK final signé (sinon : tests seulement)"
+        type: boolean
+        default: false
+      sections:
+        description: "Sections du parcours final à jouer (ex. C ou C,G) ; vide = toutes"
+        required: false
+        default: ""
+  push:
+    branches: [claude/android-native]
+    paths: ['android-native/**', 'scripts/native-*', '.github/workflows/native-final.yml']
+permissions:
+  contents: read
+env:
+  PROD_URL: https://smartcourse-production-c7ce.up.railway.app
+  VERSION_NAME: "1.0.0"
+jobs:
+  test-final:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[final]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      # Réutilisation : même code Android et mêmes paramètres du binaire (variante finale, serveur de test, version, code de
+      # version fixe, signature de test jetable) → l'APK de test déjà compilé est repris ; seuls les scripts de test ont changé.
+      - name: APK de test déjà compilé pour ce code et ces paramètres ?
+        id: apk
+        uses: actions/cache@v4
+        with:
+          path: dist/
+          key: apk-final-test-${{ hashFiles('android-native/**') }}-final1-srv-10.0.2.2-3000-v${{ env.VERSION_NAME }}-test-vc1-sig-essai-jetable
+      - uses: actions/setup-java@v4
+        if: steps.apk.outputs.cache-hit != 'true'
+        with: { distribution: temurin, java-version: 17, cache: gradle }
+      - name: Composants Android (SDK 36)
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" "build-tools;35.0.0" | tail -2
+      - name: APK final de TEST (serveur local de l'émulateur, clé jetable — jamais distribué)
+        if: steps.apk.outputs.cache-hit != 'true'
+        working-directory: android-native
+        run: |
+          export NATIF_KEYSTORE_FILE=/tmp/test-final.p12 NATIF_KEYSTORE_PASSWORD=essai-final NATIF_KEY_ALIAS=essai NATIF_KEY_PASSWORD=essai-final
+          keytool -genkeypair -noprompt -keystore $NATIF_KEYSTORE_FILE -storetype PKCS12 -alias essai -keyalg RSA -keysize 2048 -validity 2 -storepass essai-final -keypass essai-final -dname "CN=Essai version finale non distribuable"
+          ./gradlew --no-daemon assembleRelease -Pfinal=1 -PserverUrl=http://10.0.2.2:3000 -PversionCode=1 -PversionName="$VERSION_NAME-test"
+          mkdir -p ../dist && cp app/build/outputs/apk/release/*.apk ../dist/Courses-final-test.apk
+          "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump badging ../dist/Courses-final-test.apk | grep -E "^package:|application-label:"
+      - name: Serveur local jetable (code identique au serveur permanent)
+        run: |
+          NO_TUNNEL=1 scripts/recette-locale.sh | tee /tmp/recette.out
+          echo "FAMILY_CODE=$(grep -oE 'Code famille : [A-Z0-9]+' /tmp/recette.out | awk '{print $4}')" >> "$GITHUB_ENV"
+      - name: KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - name: Parcours de la version finale sur émulateur
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
+          script: bash scripts/native-e2e-final.sh dist/Courses-final-test.apk ${{ env.FAMILY_CODE }} native-final
+        env:
+          SECTIONS: ${{ inputs.sections }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: final-tests, path: native-final/ }
+      - run: scripts/recette-locale.sh --stop
+        if: always()
+
+  publier-tests:
+    needs: test-final
+    if: always() && needs.test-final.result != 'skipped'
+    runs-on: ubuntu-latest
+    permissions: { contents: write }
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: "${{ github.ref_name }}" }
+      - uses: actions/download-artifact@v4
+        with: { name: final-tests, path: native-final }
+      - run: |
+          rm -rf docs/native/final && mkdir -p docs/native/final && cp native-final/* docs/native/final/
+          git config user.name "github-actions"; git config user.email "github-actions@users.noreply.github.com"
+          git add docs/native/final && git commit -m "Version finale : résultats et captures de l'émulateur (run ${{ github.run_number }}) [skip ci]" || echo "rien à commiter"
+          git pull --rebase origin ${{ github.ref_name }} && git push origin HEAD:${{ github.ref_name }}
+
+  release:
+    needs: test-final
+    # APK livré : uniquement sur lancement manuel (jamais automatiquement à l'envoi d'un commit).
+    if: github.event_name == 'workflow_dispatch' && inputs.livrer
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions: { contents: write }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Clé durable présente ?
+        env:
+          KS_B64: ${{ secrets.NATIF_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.NATIF_KEYSTORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.NATIF_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.NATIF_KEY_PASSWORD }}
+          CERT: ${{ secrets.NATIF_CERT_SHA256 }}
+        run: |
+          miss=""; for v in KS_B64 KS_PASS KS_ALIAS KEY_PASS CERT; do [ -n "${!v}" ] || miss="$miss $v"; done
+          [ -z "$miss" ] || { echo "::error::Secrets manquants (NATIF_KEYSTORE_B64, NATIF_KEYSTORE_PASSWORD, NATIF_KEY_ALIAS, NATIF_KEY_PASSWORD, NATIF_CERT_SHA256) :$miss — aucun APK final n'est produit sans la clé durable."; exit 1; }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17, cache: gradle }
+      - name: Composants Android (SDK 36)
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" "build-tools;35.0.0" | tail -2
+      - name: Serveur permanent joignable et à jour
+        run: |
+          H=$(curl -fsS -m 20 "$PROD_URL/health"); echo "$H"
+          echo "$H" | grep -q '"status":"ok"'
+          # Compatibilité : la création de famille autonome doit exister (requête invalide → 400 ; route absente → 404). Aucune donnée créée.
+          C=$(curl -s -o /dev/null -w '%{http_code}' -m 20 -X POST "$PROD_URL/api/signup/verify" -H 'content-type: application/json' -d '{}')
+          echo "POST /api/signup/verify (corps vide) : $C"
+          [ "$C" = 400 ] || { echo "::error::le serveur permanent n'a pas encore la création de famille autonome (déployer d'abord)"; exit 1; }
+      - name: APK FINAL (release, R8, clé durable)
+        working-directory: android-native
+        env:
+          KS_B64: ${{ secrets.NATIF_KEYSTORE_B64 }}
+          NATIF_KEYSTORE_PASSWORD: ${{ secrets.NATIF_KEYSTORE_PASSWORD }}
+          NATIF_KEY_ALIAS: ${{ secrets.NATIF_KEY_ALIAS }}
+          NATIF_KEY_PASSWORD: ${{ secrets.NATIF_KEY_PASSWORD }}
+        run: |
+          umask 077; echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/natif.keystore"
+          export NATIF_KEYSTORE_FILE="$RUNNER_TEMP/natif.keystore"
+          ./gradlew --no-daemon assembleRelease -Pfinal=1 -PserverUrl="$PROD_URL" -PversionCode=$((1000 + ${{ github.run_number }})) -PversionName="$VERSION_NAME"
+          rm -f "$RUNNER_TEMP/natif.keystore"
+      - name: Contrôles (identifiant, nom, signature durable, serveur, aucune WebView)
+        env:
+          CERT: ${{ secrets.NATIF_CERT_SHA256 }}
+        run: |
+          set -e
+          APK=$(ls android-native/app/build/outputs/apk/release/*.apk | head -1); BT="$ANDROID_HOME/build-tools/35.0.0"
+          "$BT/aapt2" dump badging "$APK" > /tmp/badging.txt
+          grep -E "^package:|application-label:" /tmp/badging.txt
+          grep -q "name='app.smartcourse.courses.natif'" /tmp/badging.txt
+          grep -q "application-label:'Mes Courses'" /tmp/badging.txt
+          FP=$("$BT/apksigner" verify --print-certs "$APK" | grep -m1 "certificate SHA-256 digest" | sed 's/.*: //')
+          echo "Empreinte de signature : $FP"
+          # Jamais de changement silencieux de clé : l'empreinte doit être celle déclarée dans le secret NATIF_CERT_SHA256.
+          [ "$FP" = "$(echo "$CERT" | tr -d ': ' | tr 'A-F' 'a-f')" ] || { echo "::error::empreinte différente de NATIF_CERT_SHA256"; exit 1; }
+          [ "$FP" != "49802f27bda9539d96401dc6fc7e82cf8788be0eb82da5ada41578e3239940d0" ] || { echo "::error::clé de recette publique interdite pour la version finale"; exit 1; }
+          mkdir -p /tmp/dex && (cd /tmp/dex && unzip -qo "$GITHUB_WORKSPACE/$APK" 'classes*.dex')
+          strings -a /tmp/dex/classes*.dex | grep -q "$PROD_URL" || { echo "::error::adresse du serveur permanent absente"; exit 1; }
+          ! strings -a /tmp/dex/classes*.dex | grep -q "trycloudflare" || { echo "::error::tunnel trouvé dans l'APK"; exit 1; }
+          for pat in androidbrowserhelper customtabs capacitor cordova; do ! strings -a /tmp/dex/classes*.dex | grep -qi "$pat" || { echo "::error::$pat"; exit 1; }; done
+          mkdir -p dist && cp "$APK" "dist/MesCourses-$VERSION_NAME.apk"; sha256sum "dist/MesCourses-$VERSION_NAME.apk" | tee dist/sha256.txt
+          echo "$FP" > dist/empreinte.txt
+      - uses: actions/upload-artifact@v4
+        with: { name: apk-final, path: dist/ }
+      - name: Publication de l'APK (release GitHub, pas Google Play)
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          TAG="courses-natif-$VERSION_NAME-${{ github.run_number }}"
+          printf '%s\n' "Mes Courses $VERSION_NAME (application Android native) — version finale, hors Google Play." "" \
+            "- Identifiant : app.smartcourse.courses.natif (s'installe à côté de l'application actuelle et de la recette)" \
+            "- Serveur : $PROD_URL" "- Code de version : $((1000 + ${{ github.run_number }}))" \
+            "- Empreinte SHA-256 du certificat : $(cat dist/empreinte.txt)" "- SHA-256 du fichier : $(cut -d' ' -f1 dist/sha256.txt)" > /tmp/notes.md
+          gh release create "$TAG" "dist/MesCourses-$VERSION_NAME.apk" --repo "${{ github.repository }}" --target "${{ github.sha }}" --title "Mes Courses $VERSION_NAME" --notes-file /tmp/notes.md
+
+  smoke-prod:
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: apk-final, path: dist }
+      - name: KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - name: APK livré sur émulateur (écran de connexion uniquement, aucune connexion)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
+          script: |
+            mkdir -p native-final-prod; adb install -r dist/MesCourses-$VERSION_NAME.apk
+            adb shell am start -W -n app.smartcourse.courses.natif/app.smartcourse.courses.nativeproto.MainActivity; sleep 8
+            python3 scripts/native-ui.py wait "Bienvenue" 25 && echo "PASS écran de connexion" | tee native-final-prod/resultats.txt
+            ! python3 scripts/native-ui.py has "RECETTE" && ! python3 scripts/native-ui.py has "Serveur :" && echo "PASS aucun bandeau ni serveur à saisir" | tee -a native-final-prod/resultats.txt
+            adb exec-out screencap -p > native-final-prod/final-livre-connexion.png
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: final-prod-smoke, path: native-final-prod/ }

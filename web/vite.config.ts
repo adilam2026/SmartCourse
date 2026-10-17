@@ -46,7 +46,7 @@ export default defineConfig({
         globIgnores: ["**/confidentialite.html", "**/suppression-compte.html"],
         importScripts: ["push-sw.js"], // notifications téléphone (push, toucher)
         navigateFallback: "/index.html",
-        navigateFallbackDenylist: [/^\/api\//, /^\/push-sw\.js$/, /^\/\.well-known\//, /^\/version\.json$/, /^\/confidentialite(\.html)?$/, /^\/suppression-compte(\.html)?$/],
+        navigateFallbackDenylist: [/^\/api\//, /^\/push-sw\.js$/, /^\/\.well-known\//, /^\/version\.json$/, /\.apk$/, /^\/confidentialite(\.html)?$/, /^\/suppression-compte(\.html)?$/],
         // Photos are immutable (content-addressed): cache-first, kept for offline use.
         runtimeCaching: [
           {

@@ -1,11 +1,11 @@
 import { useRef, useState } from "react";
 
-/** Digits only, at most 6 (leading zeros are kept: the value is always a string). */
-export const digits6 = (v: string): string => v.replace(/\D/g, "").slice(0, 6);
-/** A NEW code: exactly 6 digits. */
-export const isNewSecret = (v: string): boolean => /^\d{6}$/.test(v);
-/** An EXISTING password may hold letters or symbols: 6 visible characters. */
-export const isAnySecret = (v: string): boolean => [...v].length === 6 && !/\s/.test(v);
+/** Digits only, at most 8 (leading zeros are kept: the value is always a string). */
+export const digits6 = (v: string): string => v.replace(/\D/g, "").slice(0, 8);
+/** A NEW code: 6 to 8 digits (same rule as the server). */
+export const isNewSecret = (v: string): boolean => /^\d{6,8}$/.test(v);
+/** An EXISTING password: legacy 6 visible characters (letters or symbols allowed), or 6 to 8 digits. */
+export const isAnySecret = (v: string): boolean => (/^\d{6,8}$/.test(v) || [...v].length === 6) && !/\s/.test(v);
 
 interface Props {
   value: string;
@@ -37,9 +37,9 @@ export function SecretInput({ value, onChange, testid, kind, required = true }: 
         type="password"
         inputMode={isNew || !full ? "numeric" : "text"}
         pattern={isNew || !full ? "[0-9]*" : undefined}
-        maxLength={6}
+        maxLength={8}
         value={value}
-        onChange={(e) => onChange(isNew ? digits6(e.target.value) : e.target.value.replace(/\s/g, "").slice(0, 6))}
+        onChange={(e) => onChange(isNew ? digits6(e.target.value) : e.target.value.replace(/\s/g, "").slice(0, 8))}
         autoComplete={isNew ? "off" : "current-password"}
         autoCapitalize="none"
         autoCorrect="off"

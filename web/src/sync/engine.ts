@@ -1,7 +1,7 @@
 import { api as realApi, ApiError, NetworkError } from "../api";
 import { AppDbClass, type AppDb, type OrphanRow } from "../db";
 import type { Batch, Catalog, ListView, Me, Op, OpResult, Toggles } from "../types";
-import { clampQty, fmtQty } from "../units";
+import { clampQty, clampQtyFine, fmtQty } from "../units";
 import { buildOps, cancelQueuedAdd, editQueuedAdd, interpretResults, isPurchased, normalizeToggles, openItem, planBasket, projectedPresence, requestAgainToggle, setQuantityToggle, toggleProduct } from "./logic";
 import type { BasketItem, BasketMode, BasketReport } from "./logic";
 
@@ -44,9 +44,14 @@ export interface State {
   installRefused: boolean;
   /** How this person likes the catalogue shown (kept per profile on this phone). */
   catalogView: CatalogView;
+  v3Mode: V3Mode;
 }
 
 export type CatalogView = "all" | "categories";
+/** V3 : trois présentations des articles à choisir (mémorisée par utilisateur sur cet appareil). */
+/** Brouillon et lots d'envoi faits alors qu'aucune liste n'existe : la liste en cours est créée par le serveur à l'enregistrement. */
+export const NO_LIST = "none";
+export type V3Mode = "list" | "squares" | "cards";
 
 /** The subset of EventSource the engine uses (so tests can fake it). */
 export interface EventSourceLike {
@@ -75,9 +80,13 @@ const RETRY_MS = [3_000, 8_000, 20_000, 45_000];
 export class Engine {
   private s: State = {
     phase: "boot", me: null, conn: "online", catalog: null, list: undefined, toggles: {}, draftListId: null, batches: [],
-    sending: false, justSynced: false, notices: [], orphan: null, deleted: null, loginError: null, loggingIn: false, lastLogin: null, live: false, welcomeCode: null, prefillInstallToken: null, installFrom: null, installRefused: false, catalogView: "all",
+    sending: false, justSynced: false, notices: [], orphan: null, deleted: null, loginError: null, loggingIn: false, lastLogin: null, live: false, welcomeCode: null, prefillInstallToken: null, installFrom: null, installRefused: false, catalogView: "all", v3Mode: "squares",
   };
   private listeners = new Set<() => void>();
+  /** Lots refusés par le serveur (jamais enregistrés) : lus par validate() pour ne pas annoncer un succès. */
+  private dropped = new Set<string>();
+  /** Demandes non envoyées d'une AUTRE famille, effacées de ce téléphone à la connexion (annoncées une fois). */
+  private lostOnSwitch = 0;
   private api: typeof realApi;
   private db: AppDb;
   private newId: () => string;
@@ -229,6 +238,10 @@ export class Engine {
     const other = (known && known.familyId !== mine) || (await stale(this.db.cache as never)) || (await stale(this.db.outbox as never)) || (await stale(this.db.drafts as never)) || (await stale(this.db.orphans as never));
     if (!other) return;
     const login = (await this.db.meta.get("lastLogin"))?.value;
+    // Jamais de perte silencieuse : ce qui n'avait pas encore été envoyé (lots en attente, brouillons) est compté puis annoncé.
+    const lost = (await this.db.outbox.filter((r) => r.familyId !== mine).toArray()).reduce((n, b) => n + (b as unknown as { ops: unknown[] }).ops.length, 0)
+      + (await this.db.drafts.filter((r) => r.familyId !== mine).toArray()).reduce((n, d) => n + Object.keys(d.toggles).length, 0);
+    this.lostOnSwitch = lost;
     await this.wipeLocal();
     if (login && this.s.lastLogin) await this.db.meta.put({ key: "lastLogin", value: this.s.lastLogin });
   }
@@ -300,6 +313,10 @@ export class Engine {
     }
     this.set({ me, phase: "ready" });
     await this.loadLocal(me);
+    if (this.lostOnSwitch > 0) {
+      this.notice(`${this.lostOnSwitch} demande${this.lostOnSwitch > 1 ? "s" : ""} non envoyée${this.lostOnSwitch > 1 ? "s" : ""} d'une autre famille ${this.lostOnSwitch > 1 ? "ont" : "a"} été effacée${this.lostOnSwitch > 1 ? "s" : ""} de ce téléphone : rien n'est mélangé avec cette famille.`);
+      this.lostOnSwitch = 0;
+    }
     this.openEvents();
     if (online) await this.refresh();
     await this.flush(); // the screen is already up (phase "ready"); this only drains the outbox
@@ -393,8 +410,10 @@ export class Engine {
       }
     }
     const pref = (await this.db.meta.get(`catalogView:${me.familyId}:${me.id}`))?.value;
+    const v3 = (await this.db.meta.get(`v3Mode:${me.familyId}:${me.id}`))?.value;
     this.set({
       catalogView: pref === "categories" ? "categories" : "all",
+      v3Mode: v3 === "list" || v3 === "cards" ? v3 : "squares",
       catalog: cache?.catalog ?? null,
       list: cache ? cache.list : undefined,
       batches: batches.map(({ familyId: _f, profileId: _p, ...b }) => b),
@@ -535,7 +554,8 @@ export class Engine {
 
   private async applyServerState(catalog: Catalog, list: ListView | null): Promise<void> {
     let { toggles, draftListId } = this.s;
-    if (list && draftListId && draftListId !== list.id) {
+    const hadNoList = draftListId === NO_LIST;
+    if (list && draftListId && draftListId !== NO_LIST && draftListId !== list.id) {
       // A new list replaced the one these choices were made for: never apply them silently.
       const adds = Object.entries(toggles).filter(([, t]) => t.want).map(([p]) => p);
       await this.stashOrphan(draftListId, adds);
@@ -543,6 +563,8 @@ export class Engine {
     }
     if (list) draftListId = list.id;
     this.set({ catalog, list, toggles: normalizeToggles(list, this.s.batches, toggles), draftListId });
+    // Le brouillon fait sans liste suit la liste qui vient d'apparaître (créée par quelqu'un d'autre ou par notre propre lot).
+    if (hadNoList && list && this.s.me) await this.db.drafts.delete([this.s.me.familyId, this.s.me.id, NO_LIST]);
     await Promise.all([this.persistCache(), this.persistDraft()]);
     this.preloadFn(catalog.categories.flatMap((c) => c.products.map((p) => p.photoUrl).filter((u): u is string => !!u && !this.preloaded.has(u))));
     for (const c of catalog.categories) for (const p of c.products) if (p.photoUrl) this.preloaded.add(p.photoUrl);
@@ -561,7 +583,7 @@ export class Engine {
   /** Explicit, one-tap resume of the choices made for a closed list, into the current list. */
   async resumeOrphan(): Promise<void> {
     const { orphan, list, catalog } = this.s;
-    if (!orphan || !list || list.status !== "active") return;
+    if (!orphan || !this.selectable()) return;
     const active = new Set(catalog?.categories.flatMap((c) => c.products.map((p) => p.id)));
     let toggles = this.s.toggles;
     for (const productId of orphan.productIds) {
@@ -570,7 +592,7 @@ export class Engine {
       if (toggles[productId]?.want === false) toggles = toggleProduct(list, this.s.batches, toggles, productId); // never un-select by accident
     }
     await this.db.orphans.delete(orphan.id);
-    this.set({ toggles, orphan: null });
+    this.set({ toggles, orphan: null, draftListId: this.s.draftListId ?? list?.id ?? NO_LIST });
     await this.persistDraft();
   }
 
@@ -582,9 +604,15 @@ export class Engine {
   }
 
   // ---- draft actions -------------------------------------------------------------------------
+  /** Peut-on choisir des articles ? Une liste en cours, ou aucune liste (le brouillon attend : la validation crée la liste). */
+  private selectable(): boolean {
+    const l = this.s.list;
+    return l === null || (l !== undefined && l.status === "active");
+  }
+
   async toggle(productId: string): Promise<void> {
     const { list, batches, toggles } = this.s;
-    if (!list || list.status !== "active") return;
+    if (!this.selectable()) return;
     if (isPurchased(list, productId, batches) && !toggles[productId]?.again) return this.notice("Déjà acheté : utilisez « Nouvelle demande » pour en demander encore.");
     const wasPresent = projectedPresence(list, batches, productId);
     const hasServerRow = !!openItem(list, productId);
@@ -597,7 +625,7 @@ export class Engine {
       await this.persistOutbox();
       return;
     }
-    this.set({ toggles: toggleProduct(list, batches, toggles, productId), draftListId: this.s.draftListId ?? list.id });
+    this.set({ toggles: toggleProduct(list, batches, toggles, productId), draftListId: this.s.draftListId ?? list?.id ?? NO_LIST });
     await this.persistDraft();
   }
 
@@ -610,10 +638,10 @@ export class Engine {
   }
 
   /** Sets the wanted quantity of a selected product. Never adds a second line; never touches other articles. */
-  async setQuantity(productId: string, wanted: number): Promise<void> {
+  async setQuantity(productId: string, wanted: number, exact = false): Promise<void> {
     const { list, batches, toggles } = this.s;
-    if (!list || list.status !== "active") return;
-    const qty = clampQty(wanted, this.unitFor(productId));
+    if (!this.selectable()) return;
+    const qty = exact ? clampQtyFine(wanted, this.unitFor(productId)) : clampQty(wanted, this.unitFor(productId));
     const present = projectedPresence(list, batches, productId);
     if (!(toggles[productId]?.want ?? present)) return; // the counter only exists on a selected card
     if (present && !openItem(list, productId) && !toggles[productId]) {
@@ -624,14 +652,14 @@ export class Engine {
       await this.persistOutbox();
       return;
     }
-    this.set({ toggles: setQuantityToggle(list, batches, toggles, productId, qty), draftListId: this.s.draftListId ?? list.id });
+    this.set({ toggles: setQuantityToggle(list, batches, toggles, productId, qty), draftListId: this.s.draftListId ?? list?.id ?? NO_LIST });
     await this.persistDraft();
   }
 
   /** Explicit "new request" for a product that was already bought in this list. */
   async requestAgain(productId: string): Promise<void> {
     const { list, batches, toggles } = this.s;
-    if (!list || list.status !== "active") return;
+    if (!list || list.status !== "active") return; // « nouvelle demande » suppose un article déjà acheté dans une liste
     if (!isPurchased(list, productId, batches)) return;
     this.set({ toggles: requestAgainToggle(list, batches, toggles, productId), draftListId: this.s.draftListId ?? list.id });
     await this.persistDraft();
@@ -643,22 +671,36 @@ export class Engine {
     if (me) await this.db.meta.put({ key: `catalogView:${me.familyId}:${me.id}`, value: view });
   }
 
+  /** V3 : change d'affichage tout de suite ; le choix est gardé pour ce profil sur cet appareil (aucune donnée de la famille n'est touchée). */
+  async setV3Mode(mode: V3Mode): Promise<void> {
+    const me = this.s.me;
+    this.set({ v3Mode: mode });
+    if (me) await this.db.meta.put({ key: `v3Mode:${me.familyId}:${me.id}`, value: mode });
+  }
+
   /** "Valider": move the pending choices into the outbox (persisted first), then try to send. */
-  async validate(): Promise<void> {
+  /**
+   * Résultat réel de la validation : « sent » (le serveur a enregistré), « queued » (gardée sur ce téléphone, envoyée au retour du réseau),
+   * « failed » (refusée par le serveur : rien n'est enregistré), « nothing » (aucun changement à envoyer).
+   */
+  async validate(): Promise<"sent" | "queued" | "failed" | "nothing"> {
     const { list, toggles } = this.s;
     // Not refused while a sync is in flight: the new batch is queued and the running loop sends it right after
     // (a second tap is harmless: the first one already emptied the pending choices).
-    if (!list || list.status !== "active") return;
+    if (!this.selectable()) return "nothing";
     const ops = buildOps(list, this.s.batches, toggles, this.newId);
     if (ops.length === 0) {
       this.set({ toggles: {} });
-      return this.persistDraft();
+      await this.persistDraft();
+      return "nothing";
     }
     // The validation keeps the moment the person pressed the button, even if the phone is offline and it is sent hours later.
-    const batch: Batch = { id: this.newId(), listId: list.id, ops, createdAt: Date.now(), validatedAt: new Date().toISOString() };
+    const batch: Batch = { id: this.newId(), listId: list?.id ?? NO_LIST, ops, createdAt: Date.now(), validatedAt: new Date().toISOString() };
     this.set({ batches: [...this.s.batches, batch], toggles: {} });
     await Promise.all([this.persistOutbox(), this.persistDraft()]); // on disk before any network call
     await this.flush();
+    if (this.dropped.delete(batch.id)) return "failed";
+    return this.s.batches.some((b) => b.id === batch.id) ? "queued" : "sent";
   }
 
   // ---- sending -------------------------------------------------------------------------------
@@ -671,7 +713,7 @@ export class Engine {
       this.set({ sending: true });
       let res: Awaited<ReturnType<typeof this.api.postOps>>;
       try {
-        res = await this.api.postOps(batch.listId, batch.ops, { id: batch.id, at: batch.validatedAt });
+        res = await this.api.postOps(batch.listId === NO_LIST ? "active" : batch.listId, batch.ops, { id: batch.id, at: batch.validatedAt }); // « active » : le serveur crée la liste du jour si besoin
       } catch (e) {
         this.inFlightBatchId = undefined;
         this.set({ sending: false });
@@ -682,7 +724,20 @@ export class Engine {
         }
         if (e instanceof ApiError && e.status === 401) return void this.set({ phase: "loggedOut" });
         if (e instanceof ApiError && e.status >= 500) return this.scheduleRetry();
+        // La liste visée n'existe plus (clôturée puis supprimée) : rien n'est ajouté à une archive ni recréé ; les articles redeviennent une
+        // proposition « Reprendre » (jamais perdus en silence).
+        if (e instanceof ApiError && e.status === 404 && batch.listId !== NO_LIST) {
+          const adds = [...new Set(batch.ops.filter((o) => o.type === "add" || o.type === "request_again").map((o) => (o as { productId: string }).productId))];
+          const rest = this.s.batches.filter((b) => b.id !== batch.id);
+          this.dropped.add(batch.id);
+          this.set({ batches: rest, toggles: normalizeToggles(this.s.list, rest, this.s.toggles), sending: false });
+          await this.stashOrphan(batch.listId, adds);
+          this.notice("Cette liste n'existe plus : vos articles vous sont proposés à nouveau, rien n'a été ajouté à une liste archivée.");
+          await this.persistOutbox();
+          continue;
+        }
         // 400/403/404: the server will never accept this batch — drop it rather than retry forever.
+        this.dropped.add(batch.id);
         this.set({ batches: this.s.batches.filter((b) => b.id !== batch.id), toggles: normalizeToggles(this.s.list, this.s.batches.filter((b) => b.id !== batch.id), this.s.toggles) });
         this.notice("Un envoi n'a pas pu être enregistré. Vérifiez la liste.");
         await this.persistOutbox();
@@ -696,10 +751,12 @@ export class Engine {
       for (const i of this.s.list?.items ?? []) names.set(i.productId, i.name);
       const { notices, orphanAdds } = interpretResults(batch, res.results, (id) => names.get(id) ?? "Produit");
       const currentListId = this.s.list?.id;
-      const stillCurrent = res.list.status === "active" && res.list.id === currentListId;
+      const stillCurrent = res.list.status === "active" && (res.list.id === currentListId || (currentListId === undefined && this.s.list === null));
       const list = stillCurrent ? res.list : this.s.list;
       if (!stillCurrent) refreshNeeded = true;
-      this.set({ batches: remaining, list, sending: false, conn: "online", justSynced: true, toggles: normalizeToggles(list, remaining, this.s.toggles) });
+      const wasNoList = this.s.draftListId === NO_LIST;
+      this.set({ batches: remaining, list, sending: false, conn: "online", justSynced: true, toggles: normalizeToggles(list, remaining, this.s.toggles), draftListId: wasNoList && list ? list.id : this.s.draftListId });
+      if (wasNoList && list && this.s.me) await this.db.drafts.delete([this.s.me.familyId, this.s.me.id, NO_LIST]); // le brouillon suit la liste créée
       for (const t of notices) this.notice(t);
       if (orphanAdds.length) await this.stashOrphan(batch.listId, orphanAdds);
       await Promise.all([this.persistOutbox(), this.persistCache(), this.persistDraft()]);
@@ -796,7 +853,7 @@ export class Engine {
     ].filter(Boolean);
     this.notice(`« ${title} » préparé : ${parts.length ? parts.join(", ") : "rien à changer"}. Modifiez si besoin puis validez.`);
     const skipped: string[] = [];
-    if (report.inactive.length) skipped.push(`produits désactivés (non réactivés) : ${report.inactive.join(", ")}`);
+    if (report.inactive.length) skipped.push(`produits masqués (non réaffichés) : ${report.inactive.join(", ")}`);
     if (report.unitMismatch.length) skipped.push(`unité différente (non modifiés) : ${report.unitMismatch.join(", ")}`);
     if (report.purchased.length) skipped.push(`déjà achetés dans cette liste : ${report.purchased.join(", ")}`);
     if (skipped.length) this.notice(`Non repris — ${skipped.join(" ; ")}.`);

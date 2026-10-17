@@ -25,6 +25,16 @@ export function clampQty(q: number, unit: Unit): number {
   return Math.min(MAX_QTY, Math.max(minOf(unit), v));
 }
 
+/**
+ * V3, saisie en grammes ou en millilitres : conversion EXACTE vers le kilo ou le litre (le serveur garde 3 décimales : 125 g = 0,125 kg).
+ * Mêmes limites que clampQty pour les unités comptées ; pour le poids et le volume, au plus 3 décimales et au moins 10 g (10 ml).
+ */
+export function clampQtyFine(q: number, unit: Unit): number {
+  if (!isFractional(unit)) return clampQty(q, unit);
+  if (!Number.isFinite(q)) return 0.01;
+  return Math.min(MAX_QTY, Math.max(0.01, Math.round(q * 1000) / 1000));
+}
+
 /** The quantity after one tap on [+] (dir 1) or [−] (dir -1); null when that tap is not allowed (the button is disabled). */
 export function stepQty(q: number, unit: Unit, dir: 1 | -1, fine = false): number | null {
   const next = round(q + dir * stepOf(unit, fine));

@@ -170,7 +170,7 @@ test.describe("2 · haut du catalogue simplifié", () => {
     await ctx.setOffline(true);
     await card(page, f, "Beurre").click();
     await page.getByTestId("validate").click();
-    await expect(state).toHaveText("En attente de connexion");
+    await expect(state).toHaveText("Envoi en attente");
     await page.waitForTimeout(300);
     await page.screenshot({ path: `${CAP}/amelioration-catalogue-haut.png`, clip: { x: 0, y: 0, width: 390, height: 330 } });
     await ctx.setOffline(false);

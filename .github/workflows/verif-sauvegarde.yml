@@ -1,0 +1,71 @@
+name: Sauvegarde de production — restauration de contrôle dans une base isolée
+# Lit la plus récente sauvegarde CHIFFRÉE de production dans son stockage, la restaure dans un serveur PostgreSQL JETABLE créé
+# pour ce contrôle (conteneur local de cette exécution, détruit à la fin), puis compare au manifeste : lignes de chaque table,
+# migrations, invariants métier, photos de la famille. La base de production n'est JAMAIS une destination : son adresse n'est pas
+# fournie et le programme refuse toute cible autre que le serveur jetable local. Seule écriture, sur demande : une copie protégée
+# (backups-conservees/) de sauvegardes désignées ; rien n'est jamais supprimé ni modifié.
+# Journal public : dates, nombres et résultats seulement (aucun hôte, nom de stockage ni secret).
+# Secrets GitHub nécessaires (Settings → Secrets and variables → Actions), copiés depuis les variables Railway du service :
+#   BACKUP_KEY, S3_BUCKET, S3_ENDPOINT, S3_REGION,
+#   S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY
+#   et, SEULEMENT si la variable S3_FORCE_PATH_STYLE existe dans Railway : S3_FORCE_PATH_STYLE
+# Lancement : un envoi sur claude/evolutions-avancees dont le message contient [verif-sauvegarde] (ou lancement manuel).
+on:
+  workflow_dispatch:
+    inputs:
+      conserver:
+        description: "Sauvegardes à copier hors élagage (fragments d'horodatage séparés par des virgules, ex. 2026-10-17T09-18)"
+        required: false
+        default: ""
+      conserver_verifiee:
+        description: "Copier aussi la plus récente, si sa restauration réussit"
+        type: boolean
+        default: false
+  push:
+    branches: [claude/evolutions-avancees]
+permissions:
+  contents: read
+jobs:
+  restauration:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[verif-sauvegarde]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Secrets présents (sans les afficher)
+        env:
+          K: ${{ secrets.BACKUP_KEY }}
+          B: ${{ secrets.S3_BUCKET }}
+          A: ${{ secrets.S3_ACCESS_KEY_ID }}
+          S: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+        run: |
+          miss=""; [ -n "$K" ] || miss="$miss BACKUP_KEY"; [ -n "$B" ] || miss="$miss S3_BUCKET"
+          [ -n "$A" ] || miss="$miss S3_ACCESS_KEY_ID"; [ -n "$S" ] || miss="$miss S3_SECRET_ACCESS_KEY"
+          [ -z "$miss" ] || { echo "::error::secrets GitHub manquants :$miss"; exit 1; }
+          echo "Secrets présents."
+      - name: Image du serveur (outils pg_restore 16, 17, 18) et serveur PostgreSQL jetable
+        run: |
+          . scripts/lib-docker.sh
+          docker_build smartcourse:verif
+          docker network create verif-net
+          PG=$(docker_image postgres:18)
+          docker run -d --name restore-pg --network verif-net -e POSTGRES_USER=verif -e POSTGRES_PASSWORD=verif -e POSTGRES_DB=verif "$PG" >/dev/null
+          for _ in $(seq 1 60); do docker exec restore-pg pg_isready -U verif -d verif >/dev/null 2>&1 && break; sleep 1; done
+      - name: Restauration de contrôle de la sauvegarde la plus récente
+        env:
+          BACKUP_KEY: ${{ secrets.BACKUP_KEY }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
+          S3_REGION: ${{ secrets.S3_REGION }}
+          S3_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
+          S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+          S3_FORCE_PATH_STYLE: ${{ secrets.S3_FORCE_PATH_STYLE }}
+          KEEP: ${{ inputs.conserver }}
+          KEEP_LATEST: ${{ inputs.conserver_verifiee && '1' || '' }}
+        run: |
+          set -o pipefail # un échec de la restauration ne doit jamais être masqué par « tee »
+          docker run --rm --network verif-net -e BACKUP_KEY -e S3_BUCKET -e S3_ENDPOINT -e S3_REGION -e S3_ACCESS_KEY_ID -e S3_SECRET_ACCESS_KEY -e S3_FORCE_PATH_STYLE -e KEEP -e KEEP_LATEST \
+            -e RESTORE_TARGET_URL=postgres://verif:verif@restore-pg:5432/verif smartcourse:verif node dist/backup-isolated.js | tee bilan.txt
+      - name: Nettoyage (serveur jetable détruit)
+        if: always()
+        run: docker rm -f restore-pg >/dev/null 2>&1; docker network rm verif-net >/dev/null 2>&1; true

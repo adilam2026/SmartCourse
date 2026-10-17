@@ -1,0 +1,10 @@
+═══ X. Options avancées : activation des listes, choix et sélection de la devise, activation du budget, réglages gardés après réouverture — contrôle ciblé ═══
+PASS  X0. serveur à jour : aucune option bloquée
+PASS  X1. « Plusieurs listes actives » activée sans message d'erreur (true:false:-)
+PASS  X2. choix de devise ouvert : liste des devises avec leurs pays
+PASS  X3. devise sélectionnée affichée, confirmation possible
+PASS  X4. budget activé avec la devise choisie (true:true:EUR)
+PASS  X5. après fermeture et réouverture : options toujours activées, onglet Budget présent
+ECHECS=0
+CRASH_APPLICATION=0
+TOTAL_ECHECS=0

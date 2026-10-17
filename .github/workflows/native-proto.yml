@@ -1,0 +1,256 @@
+name: Android natif (compilation, tests, recette — sans déploiement)
+# Ne se lance que sur demande. Compile le module android-native (Kotlin + Jetpack Compose),
+# l'exécute sur un émulateur Android, capture les écrans réels et publie l'APK d'essai.
+# Aucun secret, aucun accès à Railway, aucune donnée réelle : l'application ne parle qu'au serveur de recette que l'utilisateur saisit.
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/android-native]   # la compilation se lance à chaque envoi ; les captures seulement avec « [captures] » dans le message
+    paths: ['android-native/**', 'scripts/native-*', 'scripts/touch-audit.py', 'scripts/gen-pricing-vectors.mjs', 'docs/native/livraison-notes.md', '.github/workflows/native-proto.yml']
+permissions:
+  contents: read
+jobs:
+  build:
+    # Diagnostic ciblé du parcours final ([sections:…]) : déjà compilé et testé par le workflow Google Play, pas de doublon.
+    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[sections:')
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      # Réutilisation : si le code Android (android-native/**) est identique à un build déjà réussi, son APK (même commit de code,
+      # même signature) est repris tel quel ; seuls les scripts de test changent. Sinon : compilation complète, avec cache Gradle.
+      - name: APK déjà compilé pour ce code Android ?
+        id: apk
+        uses: actions/cache@v4
+        with:
+          path: dist/
+          key: apk-natif-${{ hashFiles('android-native/**') }}
+      - uses: actions/setup-java@v4
+        if: steps.apk.outputs.cache-hit != 'true'
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+      - name: Composants Android (SDK 36)
+        if: steps.apk.outputs.cache-hit != 'true'
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" "build-tools;35.0.0" | tail -2
+      - name: Tests unitaires (client HTTP, session, erreurs)
+        if: steps.apk.outputs.cache-hit != 'true'
+        working-directory: android-native
+        run: ./gradlew --no-daemon testDebugUnitTest
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.apk.outputs.cache-hit != 'true'
+        with:
+          name: tests-unitaires
+          path: android-native/app/build/reports/tests/testDebugUnitTest/
+      - name: Compilation de l'APK (release, R8)
+        if: steps.apk.outputs.cache-hit != 'true'
+        working-directory: android-native
+        run: ./gradlew --no-daemon assembleRelease -PversionCode=${{ github.run_number }} -PversionName="0.1-proto.${{ github.run_number }}"
+      - name: Contrôles de l'APK
+        if: steps.apk.outputs.cache-hit != 'true'
+        run: |
+          set -e
+          APK=$(ls android-native/app/build/outputs/apk/release/*.apk | head -1)
+          BT="$ANDROID_HOME/build-tools/35.0.0"
+          "$BT/aapt2" dump badging "$APK" > /tmp/badging.txt
+          "$BT/apksigner" verify --print-certs "$APK" | grep -E "Verifies|SHA-256" | head -3
+          grep -E "^package:" /tmp/badging.txt
+          echo "--- permissions déclarées :"; grep -c "uses-permission" /tmp/badging.txt || true
+          # Permissions autorisées : INTERNET (joindre le serveur choisi), ACCESS_NETWORK_STATE (savoir quand le réseau revient),
+          # POST_NOTIFICATIONS (notifications, demandées à l'utilisateur), et celles de WorkManager (relance au démarrage, jamais de position ni de contacts)
+          grep "uses-permission" /tmp/badging.txt | grep -v "android.permission.INTERNET" | grep -v "DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" | grep -v "android.permission.ACCESS_NETWORK_STATE" | grep -v "android.permission.POST_NOTIFICATIONS" | grep -v "android.permission.RECEIVE_BOOT_COMPLETED" | grep -v "android.permission.WAKE_LOCK" | grep -v "android.permission.FOREGROUND_SERVICE" && { echo "::error::permission inattendue"; exit 1; } || true
+          grep -q "android.permission.INTERNET" /tmp/badging.txt
+          # Signature de recette STABLE : toujours la même empreinte, pour mettre à jour sans désinstaller
+          FP=$("$BT/apksigner" verify --print-certs "$APK" | grep -m1 "certificate SHA-256 digest" | sed 's/.*: //')
+          echo "Empreinte de signature : $FP"
+          [ "$FP" = "49802f27bda9539d96401dc6fc7e82cf8788be0eb82da5ada41578e3239940d0" ] || { echo "::error::signature différente de la clé de recette stable"; exit 1; }
+          grep -q "name='app.smartcourse.courses.nativeproto'" /tmp/badging.txt
+          # Architecture : pas de WebView / TWA / Capacitor dans l'APK
+          mkdir -p /tmp/dex && cd /tmp/dex && unzip -qo "$GITHUB_WORKSPACE/$APK" 'classes*.dex'
+          for pat in androidbrowserhelper customtabs capacitor cordova; do
+            if strings -a /tmp/dex/classes*.dex | grep -qi "$pat"; then echo "::error::trace de $pat dans l'APK"; exit 1; fi
+          done
+          echo "WebView (références dans le dex) : $(strings -a /tmp/dex/classes*.dex | grep -c 'android/webkit/WebView' || true)" | tee /tmp/webview.txt
+          ls -l "$GITHUB_WORKSPACE/$APK"
+          mkdir -p "$GITHUB_WORKSPACE/dist" && cp "$GITHUB_WORKSPACE/$APK" "$GITHUB_WORKSPACE/dist/CoursesNatif-proto.apk"
+          cp /tmp/badging.txt "$GITHUB_WORKSPACE/dist/badging.txt"; cp /tmp/webview.txt "$GITHUB_WORKSPACE/dist/webview.txt"
+      - name: Bibliothèques embarquées (preuve d'architecture)
+        if: steps.apk.outputs.cache-hit != 'true'
+        working-directory: android-native
+        run: ./gradlew --no-daemon :app:dependencies --configuration releaseRuntimeClasspath | grep -E "^\+---|^\\\\---" | sed 's/ (\*)//' | sort -u > ../dist/dependances.txt; ! grep -iE "webkit|browser|capacitor|cordova" ../dist/dependances.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: dist/
+
+  e2e:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk
+          path: dist
+      - name: Serveur de recette isolé (Docker, base jetable, comptes d'essai)
+        run: |
+          NO_TUNNEL=1 scripts/recette-locale.sh | tee /tmp/recette.out
+          CODE=$(grep -oE 'Code famille : [A-Z0-9]+' /tmp/recette.out | awk '{print $4}')
+          echo "FAMILY_CODE=$CODE" >> "$GITHUB_ENV"
+      - name: KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - name: Parcours de connexion sur émulateur Android
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
+          script: bash scripts/native-e2e-all.sh dist/CoursesNatif-proto.apk ${{ env.FAMILY_CODE }}
+        env:
+          SKIP_LOT1: ${{ (contains(github.event.head_commit.message, '[lot2]') || contains(github.event.head_commit.message, '[lot3]')) && '1' || '' }}
+          SKIP_LOT2: ${{ contains(github.event.head_commit.message, '[lot3]') && '1' || '' }}
+          CIBLE: ${{ contains(github.event.head_commit.message, '[cible') && '1' || '' }}
+          MSG: ${{ github.event.head_commit.message }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e
+          path: |
+            native-e2e/
+            native-e2e-lot2/
+            native-e2e-lot3/
+            native-e2e-cible/
+      - run: scripts/recette-locale.sh --stop
+        if: always()
+
+  captures:
+    needs: build
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[captures]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk
+          path: dist
+      - name: KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - name: Émulateur Android et captures réelles
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
+          script: bash scripts/native-captures.sh dist/CoursesNatif-proto.apk native-captures
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: captures
+          path: native-captures/
+
+  publier:
+    needs: [build, e2e, captures]
+    # Publie toujours les résultats du parcours de bout en bout dans le dépôt (même en cas d'échec, pour les lire) ; l'APK seulement si tout est vert.
+    if: ${{ always() && needs.build.result == 'success' && (github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[captures]') || contains(github.event.head_commit.message, '[lot2]')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk
+          path: dist
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: captures
+          path: native-captures
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: e2e
+          path: native-e2e
+      - name: Captures dans le dépôt (branche android-native uniquement)
+        run: |
+          if [ -d native-captures ]; then rm -rf docs/native/captures && mkdir -p docs/native/captures && cp native-captures/* docs/native/captures/; fi
+          if [ -d native-e2e/native-e2e ]; then rm -rf docs/native/e2e && mkdir -p docs/native/e2e && cp native-e2e/native-e2e/* docs/native/e2e/; fi
+          if [ -d native-e2e/native-e2e-lot3 ]; then rm -rf docs/native/e2e-lot3 && mkdir -p docs/native/e2e-lot3 && cp native-e2e/native-e2e-lot3/* docs/native/e2e-lot3/; fi
+          if [ -d native-e2e/native-e2e-lot2 ]; then rm -rf docs/native/e2e-lot2 && mkdir -p docs/native/e2e-lot2 && cp native-e2e/native-e2e-lot2/* docs/native/e2e-lot2/; fi
+          if [ -d native-e2e/native-e2e-cible ]; then rm -rf docs/native/e2e-cible && mkdir -p docs/native/e2e-cible && cp native-e2e/native-e2e-cible/* docs/native/e2e-cible/; fi
+          mkdir -p docs/native/preuves && cp dist/badging.txt dist/webview.txt dist/dependances.txt docs/native/preuves/
+          git config user.name "github-actions"; git config user.email "actions@users.noreply.github.com"
+          git add docs/native
+          git commit -m "Prototype natif : captures réelles de l'émulateur (run ${{ github.run_number }}) [skip ci]" || echo "rien à commiter"
+          git pull --rebase origin ${{ github.ref_name }} && git push origin HEAD:${{ github.ref_name }}
+      - name: Publication de l'APK d'essai (préversion, hors production)
+        if: ${{ needs.e2e.result == 'success' && needs.captures.result == 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "native-proto-${{ github.run_number }}" dist/CoursesNatif-proto.apk \
+            --prerelease --target "${{ github.sha }}" \
+            --title "Courses natif — recette ${{ github.run_number }}" \
+            --notes "APK de recette de l'application Android native (Kotlin + Jetpack Compose). Identifiant distinct app.smartcourse.courses.nativeproto : s'installe à côté de l'application actuelle. Signature de recette STABLE : s'installe par-dessus la version précédente, sans désinstaller. Connexion réelle au serveur de recette saisi dans l'application ; les listes restent simulées tant que le lot correspondant n'est pas livré. Ne pas distribuer."
+
+  livraison:
+    # APK de recette livré à l'utilisateur : compilé et testé en unitaire ; publié en préversion avec les résultats RÉELS du parcours de bout en bout
+    # (docs/native/livraison-notes.md). Même signature de recette (mise à jour sans désinstaller). Hors production.
+    needs: [build]
+    if: ${{ contains(github.event.head_commit.message, '[livraison]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk
+          path: dist
+      - name: Publication de l'APK de recette (préversion, hors production)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="native-proto-recette-${{ github.run_number }}"
+          gh release create "$TAG" dist/CoursesNatif-proto.apk --prerelease --target "${{ github.sha }}" \
+            --title "Courses natif — recette lots 3 à 6 (${{ github.run_number }})" --notes-file docs/native/livraison-notes.md
+          echo "$TAG" > /tmp/tag.txt
+          # L'ancienne préversion « brouillon » renvoyait à un document absent : sa description est remplacée.
+          gh release edit native-proto-brouillon-31 --title "Courses natif — ancien brouillon 31 (remplacé)" \
+            --notes "Remplacé par $TAG. Cette préversion est conservée pour mémoire ; ne pas l'utiliser." || true
+
+  notes:
+    # Met à jour la description d'une préversion avec le texte du dépôt (docs/native/livraison-notes.md), sans recompiler.
+    if: ${{ contains(github.event.head_commit.message, '[notes ') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Description de la préversion
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MSG: ${{ github.event.head_commit.message }}
+        run: |
+          TAG=$(echo "$MSG" | grep -oE '\[notes [a-zA-Z0-9._-]+\]' | head -1 | sed -E 's/\[notes (.*)\]/\1/')
+          [ -n "$TAG" ] && gh release edit "$TAG" --notes-file docs/native/livraison-notes.md

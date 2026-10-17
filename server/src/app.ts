@@ -21,6 +21,10 @@ import { HttpError } from "./errors.js";
 import { SseHub } from "./hub.js";
 import { can, type Action } from "./permissions.js";
 import { canonicalCity } from "./cities.js";
+import { COUNTRIES, isCountry } from "./countries.js";
+import { familyLocation, locationRoutes } from "./location.js";
+import { familyFeatures, featureRoutes } from "./features.js";
+import { budgetRoutes } from "./budget.js";
 import { priceRoutes } from "./prices.js";
 import { templateRoutes } from "./templates.js";
 import { priceCommunityRoutes } from "./price-community.js";
@@ -28,7 +32,7 @@ import { createProfile, deleteOwnAccount, deleteProfile, listProfiles, resetSecr
 import { mailerFromEnv } from "./mail.js";
 import { countFamilyData, identifyFamily, purgeFamily } from "./family-purge.js";
 import { RecoveryService, secretMatches } from "./recovery.js";
-import { NEW_SECRET_PATTERN, SECRET_PATTERN } from "./security.js";
+import { NEW_SECRET_PATTERN, NEW_SECRET_RULE, SECRET_PATTERN } from "./security.js";
 
 export interface AppDeps {
   db: Db;
@@ -75,8 +79,8 @@ const loginSchema = z.object({
   secret: z.string().regex(SECRET_PATTERN),
 });
 const loginField = z.string().trim().toLowerCase().regex(/^[a-z0-9._-]{2,30}$/);
-/** Un NOUVEAU code : exactement 6 chiffres (les anciens mots de passe à lettres restent acceptés à la connexion seulement). */
-const secretField = z.string().regex(NEW_SECRET_PATTERN, "6 chiffres");
+/** Un NOUVEAU code : 6 à 8 chiffres (les anciens mots de passe à lettres restent acceptés à la connexion seulement). */
+const secretField = z.string().regex(NEW_SECRET_PATTERN, "entre 6 et 8 chiffres");
 const emailField = z.string().trim().toLowerCase().email().max(254);
 const roleField = z.enum(["admin", "parent", "staff"]);
 const nameField = z.string().trim().min(1).max(40);
@@ -114,7 +118,11 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
   app.setErrorHandler((err, _req, reply) => {
     if (err instanceof HttpError) return reply.code(err.status).send({ error: err.code, message: err.message });
-    if (err instanceof ZodError) return reply.code(400).send({ error: "invalid_request", issues: err.issues });
+    if (err instanceof ZodError) {
+      // Nouveau code d'accès mal formé : message précis et identique partout (application, site, serveur).
+      if (err.issues.some((i) => i.message === "entre 6 et 8 chiffres")) return reply.code(400).send({ error: "invalid_secret", message: NEW_SECRET_RULE });
+      return reply.code(400).send({ error: "invalid_request", issues: err.issues });
+    }
     const status = (err as { statusCode?: number }).statusCode;
     if (status && status < 500) return reply.code(status).send({ error: "bad_request", message: (err as Error).message });
     app.log.error(err);
@@ -183,7 +191,9 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     familyName: z.string().trim().min(1).max(60),
     displayName: nameField,
     login: loginField,
-    city: z.string().trim().min(1).max(60),
+    // Pays (code ISO) ; ville seulement pour le Maroc. Sans pays (ancienne application) : une ville marocaine vaut « Maroc ».
+    country: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/).optional(),
+    city: z.string().trim().max(60).optional(),
     email: emailField,
     secret: secretField,
     secretConfirm: z.string(),
@@ -192,8 +202,11 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     signupOpen();
     const b = signupStartSchema.parse(req.body);
     if (b.secretConfirm !== b.secret) throw new HttpError(400, "secret_mismatch", "Les deux codes d'accès ne sont pas identiques");
-    const city = resolveCity(b.city, true)!;
-    const v = await startSignup(db, recovery, { requestId: b.requestId, familyName: b.familyName, displayName: b.displayName, login: b.login, city, email: b.email, secret: b.secret }, ipKey(req.ip), signupLimits);
+    const country = b.country ?? (b.city ? "MA" : undefined);
+    if (!country) throw new HttpError(400, "country_required", "Choisissez le pays de la famille");
+    if (!isCountry(country)) throw new HttpError(400, "invalid_country", "Choisissez un pays dans la liste");
+    const city = country === "MA" ? resolveCity(b.city, true)! : null;
+    const v = await startSignup(db, recovery, { requestId: b.requestId, familyName: b.familyName, displayName: b.displayName, login: b.login, city, country, email: b.email, secret: b.secret }, ipKey(req.ip), signupLimits);
     return reply.code(201).send(v);
   });
   app.post("/api/signup/resend", { config: { rateLimit: deps.signupRateLimit ?? { max: 10, timeWindow: "1 hour" } } }, async (req) => {
@@ -228,6 +241,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     const pr = (await db.query("SELECT show_prices, show_totals, prefs_rev, city FROM profiles WHERE id = $1", [a.profileId])).rows[0];
     me.city = pr?.city ?? null;
     me.prefs = { showPrices: !!pr?.show_prices, showTotals: !!pr?.show_totals, rev: Number(pr?.prefs_rev ?? 0) };
+    me.location = await familyLocation(db, a.familyId, can(a.role, "family.manage"));
+    me.features = await familyFeatures(db, a.familyId);
     if (can(a.role, "family.manage")) {
       const f = await db.query("SELECT code, name FROM families WHERE id = $1", [a.familyId]);
       me.family = { code: f.rows[0].code, name: f.rows[0].name };
@@ -389,6 +404,10 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
   catalogRoutes(app, { db, store: deps.store, guard, hub });
   familyProductRoutes(app, { db, store: deps.store, guard, hub, managers: deps.catalogManagers });
+  locationRoutes(app, { db, guard, hub, resolveCity: (c) => resolveCity(c, true)! });
+  featureRoutes(app, { db, guard, hub });
+  budgetRoutes(app, { db, guard, hub });
+  app.get("/api/countries", async () => ({ countries: COUNTRIES }));
   listRoutes(app, { db, hub, guard, push });
   priceRoutes(app, { db, guard, hub });
   templateRoutes(app, { db, guard });

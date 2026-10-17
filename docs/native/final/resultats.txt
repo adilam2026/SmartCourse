@@ -1,0 +1,10 @@
+═══ F. Version finale : identifiant, nom, serveur fixe ═══
+PASS  F0. identifiant app.smartcourse.courses.natif installé
+PASS  F0b. nom affiché « Mes Courses »
+PASS  F1. écran de connexion direct (aucune saisie de serveur)
+PASS  F1b. aucun bandeau ni fonction de démonstration
+PASS  F1c. aucun lien « Serveur … Modifier »
+PASS  F1d. accès de recette désactivés (écran simulé refusé)
+PASS  F1e. pas d'écrans de démonstration
+ECHECS=0
+CRASH_APPLICATION=0

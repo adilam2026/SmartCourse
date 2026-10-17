@@ -120,7 +120,9 @@ describe("propositions et espace /gestion", () => {
     const list = (await app.inject({ method: "GET", url: "/api/gestion/proposals", cookies: m.admin })).json();
     const got = list.proposals.find((x: any) => x.name === "Lait d'avoine");
     expect(got).toMatchObject({ description: "Brique de 1 L", unit: "brique", families: 1 });
-    expect(JSON.stringify(got)).not.toMatch(/F\d|family/i); // jamais la famille
+    // jamais la famille (l'identifiant aléatoire de la proposition est exclu : ses chiffres hexadécimaux peuvent contenir « f5 »)
+    const { id: _proposalId, ...shown } = got;
+    expect(JSON.stringify(shown)).not.toMatch(/F\d|family/i);
 
     // Rien n'est public avant acceptation
     expect((await db.query("SELECT 1 FROM extended_catalog WHERE name = 'Boisson d''avoine'")).rows).toHaveLength(0);

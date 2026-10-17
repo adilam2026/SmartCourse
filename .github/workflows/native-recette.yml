@@ -1,0 +1,55 @@
+name: Android natif — session de recette (serveur isolé, sans déploiement)
+# Ouvre un serveur de recette JETABLE (base de données vide + comptes d'essai) derrière une adresse HTTPS temporaire,
+# pour tester sur téléphone l'APK natif publié par le workflow « Android natif ». Aucune donnée réelle, aucun accès à Railway.
+# Lancement : message de commit contenant « [recette 60] » (durée en minutes, 10 à 120) sur la branche claude/android-native,
+# ou manuellement (workflow_dispatch). L'adresse, le code famille et les comptes sont publiés comme statuts du commit.
+on:
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: "Durée d'ouverture en minutes (10 à 120)"
+        default: "60"
+  push:
+    branches: [claude/android-native]
+permissions:
+  contents: read
+  statuses: write
+jobs:
+  recette:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[recette')
+    runs-on: ubuntu-latest
+    timeout-minutes: 170
+    steps:
+      - uses: actions/checkout@v4
+      - name: Serveur de recette et tunnel HTTPS
+        run: scripts/recette-locale.sh | tee /tmp/recette.out
+      - name: Contrôle de la connexion via l'adresse publique
+        run: |
+          URL=$(grep -oE 'Application prête : https://[a-z0-9-]+\.trycloudflare\.com' /tmp/recette.out | awk '{print $4}')
+          CODE=$(grep -oE 'Code famille : [A-Z0-9]+' /tmp/recette.out | awk '{print $4}')
+          curl -fsS "$URL/health" | grep -q '"status":"ok"'
+          # Même requête que celle de l'application native
+          curl -fsS -X POST "$URL/api/auth/login" -H 'content-type: application/json' -d "{\"familyCode\":\"$CODE\",\"login\":\"adil\",\"secret\":\"482913\"}" | grep -q '"role":"admin"'
+          echo "URL=$URL" >> "$GITHUB_ENV"; echo "CODE=$CODE" >> "$GITHUB_ENV"
+      - name: Annonce (statuts du commit)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_MINUTES: ${{ inputs.minutes }}
+          MSG: ${{ github.event.head_commit.message }}
+        run: |
+          M="${INPUT_MINUTES:-}"
+          if [ -z "$M" ]; then M=$(echo "$MSG" | grep -oE '\[recette [0-9]+\]' | grep -oE '[0-9]+' | head -1); fi
+          case "$M" in ''|*[!0-9]*) M=60;; esac
+          [ "$M" -lt 10 ] && M=10; [ "$M" -gt 120 ] && M=120
+          echo "MINUTES=$M" >> "$GITHUB_ENV"
+          UTC=$(date -u -d "+$M minutes" +%H:%M); MA=$(date -u -d "+$((M + 60)) minutes" +%H:%M)
+          TAG=$(gh release list --repo "${{ github.repository }}" --limit 30 --json tagName --jq '[.[] | select(.tagName | startswith("native-proto-"))][0].tagName')
+          APK="https://github.com/${{ github.repository }}/releases/download/$TAG/CoursesNatif-proto.apk"
+          gh api "repos/${{ github.repository }}/statuses/${{ github.sha }}" -f state=success -f context="natif/serveur" -f target_url="$URL" -f description="$URL | code famille $CODE | expire $MA Maroc / $UTC UTC" >/dev/null
+          gh api "repos/${{ github.repository }}/statuses/${{ github.sha }}" -f state=success -f context="natif/apk" -f target_url="$APK" -f description="APK natif ($TAG) : $APK" >/dev/null
+          gh api "repos/${{ github.repository }}/statuses/${{ github.sha }}" -f state=success -f context="natif/comptes" -f description="adil 482913 (admin) | lamiaa 573918 (parent) | marie 573918 (personnel)" >/dev/null
+          { echo "## Recette native ($M min)"; echo "- Serveur : $URL"; echo "- Code famille : $CODE"; echo "- APK : $APK"; echo "- Expire à $MA (Maroc) / $UTC UTC"; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Environnement ouvert
+        run: sleep $((MINUTES * 60))
+      - run: scripts/recette-locale.sh --stop
+        if: always()

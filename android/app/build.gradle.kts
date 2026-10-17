@@ -13,7 +13,8 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "app.smartcourse.courses"
+        // Identifiant distinct possible pour une APK de RECETTE (-PappId=…) : elle s'installe à côté de l'application actuelle, sans la remplacer.
+        applicationId = (project.findProperty("appId") as String?) ?: "app.smartcourse.courses"
         minSdk = 24
         targetSdk = 36
         // Google Play exige un versionCode strictement croissant : le workflow passe le numéro d'exécution.
@@ -21,6 +22,7 @@ android {
         versionCode = maxOf((project.findProperty("versionCode") as String?)?.toInt() ?: 1, 7)
         versionName = (project.findProperty("versionName") as String?) ?: "1.0.0"
         manifestPlaceholders["appUrl"] = "$appUrl/"
+        manifestPlaceholders["appLabel"] = (project.findProperty("appLabel") as String?) ?: "Courses"
         manifestPlaceholders["appHost"] = appHost
         resValue("string", "asset_statements", """[{"relation":["delegate_permission/common.handle_all_urls"],"target":{"namespace":"web","site":"$appUrl"}}]""")
     }

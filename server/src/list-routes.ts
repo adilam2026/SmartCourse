@@ -5,7 +5,7 @@ import { HttpError } from "./errors.js";
 import type { Guard } from "./guard.js";
 import type { SseHub } from "./hub.js";
 import type { PushService } from "./push.js";
-import { applyOps, closeList, createList, deleteArchivedList, ensureActiveList, getActiveListView, getListView, listHistory, repriceList, type OpIn } from "./lists.js";
+import { applyOps, closeList, createList, deleteArchivedList, ensureActiveList, getActiveListView, getListView, listHistory, openLists, repriceList, type OpIn } from "./lists.js";
 import { can, type Action } from "./permissions.js";
 
 const uuid = z.string().uuid();
@@ -51,8 +51,27 @@ export function listRoutes(app: FastifyInstance, { db, hub, guard, push }: { db:
     return { updated, list: await getListView(db, req.auth!, id) };
   });
 
+  // Listes en cours (plusieurs seulement si la famille a activé l'option) et choix de la liste consultée par ce profil.
+  app.get("/api/lists/open", { preHandler: guard() }, async (req) => ({ lists: await openLists(db, req.auth!) }));
+  app.put("/api/me/current-list", { preHandler: guard() }, async (req) => {
+    const { listId } = z.object({ listId: uuid }).parse(req.body ?? {});
+    const ok = (await db.query("SELECT 1 FROM lists WHERE id = $1 AND family_id = $2 AND status = 'active'", [listId, req.auth!.familyId])).rows[0];
+    if (!ok) throw new HttpError(404, "not_found", "Liste introuvable ou terminée");
+    await db.query("UPDATE profiles SET current_list_id = $2 WHERE id = $1", [req.auth!.profileId, listId]);
+    return { list: await getListView(db, req.auth!, listId) };
+  });
+  app.patch("/api/lists/:id", { preHandler: guard("list.create") }, async (req) => {
+    const { id } = z.object({ id: uuid }).parse(req.params);
+    const { name } = z.object({ name: z.string().trim().min(1).max(40).nullable() }).parse(req.body ?? {});
+    const r = await db.query("UPDATE lists SET name = $3 WHERE id = $1 AND family_id = $2 AND status = 'active' RETURNING id", [id, req.auth!.familyId, name]);
+    if (!r.rows[0]) throw new HttpError(404, "not_found", "Liste introuvable ou terminée");
+    hub.broadcast(req.auth!.familyId, "list.updated", { listId: id });
+    return { list: await getListView(db, req.auth!, id) };
+  });
+
   app.post("/api/lists", { preHandler: guard("list.create") }, async (req, reply) => {
-    const { id } = await createList(db, hub, req.auth!);
+    const { name } = z.object({ name: z.string().trim().min(1).max(40).optional() }).parse(req.body ?? {});
+    const { id } = await createList(db, hub, req.auth!, name);
     return reply.code(201).send({ list: await getListView(db, req.auth!, id) });
   });
 

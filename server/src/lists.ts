@@ -359,8 +359,21 @@ const stripDetail = (r: OpResult): OpResult => {
  * qui n'a ni le droit de créer ni celui de clôturer une liste) obtient la liste du jour. Deux appareils qui valident en même temps ne créent
  * jamais deux listes en cours (l'index unique de la base les départage) et aucune demande n'est perdue : les deux lots s'appliquent à la même liste.
  */
+/**
+ * Liste en cours CONSULTÉE par ce profil : celle qu'il a choisie si elle est toujours en cours, sinon la plus récente de la famille.
+ * Avec une seule liste en cours (cas par défaut), c'est simplement « la liste en cours », comme avant.
+ */
+export async function currentActiveListId(db: Pick<Db, "query">, a: AuthContext): Promise<string | undefined> {
+  const r = await db.query<{ id: string }>(
+    `SELECT l.id FROM lists l WHERE l.family_id = $1 AND l.status = 'active'
+      ORDER BY (l.id = (SELECT current_list_id FROM profiles WHERE id = $2)) DESC NULLS LAST, l.created_at DESC LIMIT 1`,
+    [a.familyId, a.profileId],
+  );
+  return r.rows[0]?.id;
+}
+
 export async function ensureActiveList(db: Db, hub: SseHub, a: AuthContext): Promise<string> {
-  const find = async () => (await db.query<{ id: string }>("SELECT id FROM lists WHERE family_id = $1 AND status = 'active'", [a.familyId])).rows[0]?.id;
+  const find = async () => currentActiveListId(db, a);
   const cur = await find();
   if (cur) return cur;
   try {
@@ -376,9 +389,11 @@ export async function ensureActiveList(db: Db, hub: SseHub, a: AuthContext): Pro
   }
 }
 
-export async function createList(db: Db, hub: SseHub, a: AuthContext): Promise<{ id: string }> {
+export async function createList(db: Db, hub: SseHub, a: AuthContext, name?: string): Promise<{ id: string }> {
   try {
-    const r = await db.query<{ id: string }>("INSERT INTO lists (family_id, created_by) VALUES ($1,$2) RETURNING id", [a.familyId, a.profileId]);
+    const r = await db.query<{ id: string }>("INSERT INTO lists (family_id, created_by, name) VALUES ($1,$2,$3) RETURNING id", [a.familyId, a.profileId, name ?? null]);
+    // La nouvelle liste devient celle que son auteur consulte (les autres membres restent sur la leur).
+    await db.query("UPDATE profiles SET current_list_id = $2 WHERE id = $1", [a.profileId, r.rows[0]!.id]);
     hub.broadcast(a.familyId, "list.created", { listId: r.rows[0]!.id });
     return r.rows[0]!;
   } catch (e: any) {
@@ -532,6 +547,7 @@ export async function getListView(db: Db, a: AuthContext, listId: string) {
   }
   const view: Record<string, unknown> = {
     id: l.id,
+    name: l.name ?? null,
     status: l.status,
     createdAt: l.created_at.toISOString(),
     closedAt: l.closed_at?.toISOString() ?? null,
@@ -585,8 +601,23 @@ export async function getListView(db: Db, a: AuthContext, listId: string) {
 }
 
 export async function getActiveListView(db: Db, a: AuthContext) {
-  const r = await db.query("SELECT id FROM lists WHERE family_id = $1 AND status = 'active'", [a.familyId]);
-  return r.rows[0] ? getListView(db, a, r.rows[0].id) : null;
+  const id = await currentActiveListId(db, a);
+  return id ? getListView(db, a, id) : null;
+}
+
+/** Listes en cours de la famille, avec leurs compteurs (sélecteur de liste, rappels regroupés). */
+export async function openLists(db: Pick<Db, "query">, a: AuthContext) {
+  const r = await db.query(
+    `SELECT l.id, l.name, l.created_at,
+            count(i.*) FILTER (WHERE i.status = 'to_buy')::int AS remaining,
+            count(i.*) FILTER (WHERE i.status = 'purchased')::int AS purchased
+       FROM lists l LEFT JOIN list_items i ON i.list_id = l.id
+      WHERE l.family_id = $1 AND l.status = 'active'
+      GROUP BY l.id ORDER BY l.created_at DESC`,
+    [a.familyId],
+  );
+  const current = await currentActiveListId(db, a);
+  return r.rows.map((x) => ({ id: x.id as string, name: (x.name as string | null) ?? null, createdAt: (x.created_at as Date).toISOString(), remaining: x.remaining as number, purchased: x.purchased as number, current: x.id === current }));
 }
 
 export async function listHistory(db: Db, a: AuthContext, limit: number, before?: string) {

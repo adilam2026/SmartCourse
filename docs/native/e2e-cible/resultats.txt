@@ -1,0 +1,36 @@
+═══ Cas M : liste terminée pendant l'attente → articles ET quantités conservés, « Reprendre » ═══
+PASS  M0. personnel connecté
+PASS  M0a. quantité choisie : Carottes 1,5 kg
+PASS  M0b. quantité choisie : Tomates 2 kg
+PASS  M0c. deux articles dans la sélection
+PASS  M0d. hors connexion : « Envoi en attente » affiché
+PASS  M1. la demande part au retour du réseau puis est refusée proprement
+PASS  M2. serveur : rien n'a été ajouté à la liste archivée
+PASS  M3. « Reprendre » proposé pour les articles gardés
+PASS  M3b. le nombre d'articles gardés est annoncé (2)
+PASS  M4. les deux articles sont repris dans la sélection
+PASS  M4a. quantité conservée : Carottes 1,5 kg
+PASS  M4b. quantité conservée : Tomates 2 kg
+PASS  M5. serveur : nouvelle liste, Carottes 1.500 kg (1.500 kg)
+PASS  M5b. serveur : Tomates 2.000 kg (2.000 kg)
+═══ Cas M2 : brouillon NON validé quand la liste est terminée par quelqu'un d'autre ═══
+PASS  M2a. brouillon : Oignons 1,5 kg, sans validation
+PASS  M2b. la clôture par un parent est apprise en direct : brouillon gardé, « Reprendre » proposé
+PASS  M2c. serveur : rien n'a été écrit pour le brouillon
+PASS  M2d. brouillon repris
+PASS  M2e. quantité conservée : 1,5 kg
+═══ Cas D : « Se déconnecter » visible dans Réglages et dans Compte, avertissement si envoi en attente ═══
+PASS  D1. « Se déconnecter » visible en bas des Réglages
+PASS  D1b. distinct de « Réinitialiser la famille » (deux actions séparées, Se déconnecter au-dessus)
+PASS  D1c. confirmation demandée
+PASS  D2. retour à l'écran de connexion
+PASS  D2b. aucune donnée du profil précédent affichée
+PASS  D3. personnel connecté
+PASS  D3b. hors connexion : envoi en attente
+PASS  D4. personnel : « Se déconnecter » dans Compte
+PASS  D4b. avertissement : modification non envoyée
+PASS  D4c. annulation : toujours connecté, rien supprimé
+PASS  D5. la modification part au retour du réseau
+PASS  D6. personnel déconnecté depuis Compte
+PASS  D6b. aucune donnée du personnel affichée
+═══ Cas P : personnel — accueil sur Choisir, enregistrement sans quitter l'écran, modification sans doublon ═══

@@ -176,7 +176,7 @@ export function Stats({ engine, s, onOpenList }: { engine: Engine; s: State; onO
               <p><strong>Un achat</strong> = une ligne de la liste marquée « Acheté » (un produit acheté une fois). Ce n'est pas un nombre de passages en magasin : trois produits achetés au même passage font trois achats.</p>
               <p>La <strong>quantité</strong> additionne ce qui a été acheté, séparément pour chaque unité : les kilos ne sont jamais ajoutés aux briques ni aux pièces. Les achats corrigés ne comptent pas.</p>
               <p>Les achats anciens, faits avant que les quantités existent, sont comptés mais leur quantité reste « non enregistrée ».</p>
-              <p data-testid="stats-no-spending">Aucun prix n'est saisi dans SmartCourse : il n'y a donc pas de statistiques de dépenses.</p>
+              <p data-testid="stats-no-spending">Ces statistiques comptent des achats, pas des montants. Les prix de l'application sont indicatifs : ils ne sont jamais une dépense réellement payée.</p>
               {data.comparison.available === false && <p data-testid="stats-no-compare">Pas de comparaison : l'historique ne couvre pas encore la période équivalente précédente.</p>}
               <p>L'absence d'achat enregistré ne prouve pas qu'un produit est nouveau, et un achat n'est pas une consommation réelle.</p>
               <button className="btn btn--ghost" onClick={() => setHelp(false)}>Fermer</button>

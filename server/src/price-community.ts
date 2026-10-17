@@ -3,6 +3,8 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { withTx, type Db } from "./db.js";
 import { HttpError } from "./errors.js";
+import { pricesAvailable } from "./countries.js";
+import { priceCity } from "./location.js";
 import type { Guard } from "./guard.js";
 import type { SseHub } from "./hub.js";
 import type { Unit } from "./lists.js";
@@ -123,9 +125,11 @@ async function proposalsFor(db: Db, familyId: string, productId: string, city: s
   return out;
 }
 
-/** Ville du profil qui agit : tout se fait dans SA ville. Sans ville, l'application la lui demande (sans bloquer le reste). */
-async function cityOf(db: Pick<Db, "query">, profileId: string): Promise<string> {
-  const c = (await db.query("SELECT city FROM profiles WHERE id = $1", [profileId])).rows[0]?.city as string | null | undefined;
+/** Ville des prix communautaires : celle de la famille (Maroc confirmé), sinon celle du profil. Hors du Maroc : aucun prix local. */
+async function cityOf(db: Pick<Db, "query">, familyId: string, profileId: string): Promise<string> {
+  const f = (await db.query("SELECT country FROM families WHERE id = $1", [familyId])).rows[0];
+  if (!pricesAvailable(f?.country)) throw new HttpError(409, "prices_unavailable", "Les prix indicatifs ne sont disponibles qu'au Maroc");
+  const c = await priceCity(db, familyId, profileId);
   if (!c) throw new HttpError(409, "city_required", "Indiquez votre ville pour partager ou synchroniser les prix");
   return c;
 }
@@ -139,7 +143,7 @@ export function priceCommunityRoutes(app: FastifyInstance, { db, guard, hub }: D
     const b = z
       .object({ productId: z.string().uuid(), observedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), store: z.string().trim().max(60).optional() })
       .parse(req.body);
-    const city = await cityOf(db, a.profileId);
+    const city = await cityOf(db, a.familyId, a.profileId);
     const k = await stableKey(db, a.familyId, b.productId);
     if (!k) throw new HttpError(409, "not_shareable", "Ce produit n'existe que dans votre famille : il ne peut pas être partagé");
     const fp = (await db.query("SELECT * FROM family_prices WHERE family_id = $1 AND product_id = $2 AND source = 'family'", [a.familyId, b.productId])).rows[0];
@@ -178,7 +182,7 @@ export function priceCommunityRoutes(app: FastifyInstance, { db, guard, hub }: D
   // « Synchroniser les prix » : propositions compatibles, avec le prix actuel de la famille.
   app.get("/api/prices/community", { preHandler: guard("family.manage") }, async (req) => {
     const a = req.auth!;
-    const city = await cityOf(db, a.profileId);
+    const city = await cityOf(db, a.familyId, a.profileId);
     const products = (await db.query("SELECT id FROM products WHERE family_id = $1 AND (catalog_key IS NOT NULL OR extended_id IS NOT NULL)", [a.familyId])).rows;
     const proposals: Proposal[] = [];
     for (const p of products) proposals.push(...(await proposalsFor(db, a.familyId, p.id, city)));
@@ -192,7 +196,7 @@ export function priceCommunityRoutes(app: FastifyInstance, { db, guard, hub }: D
   app.post("/api/prices/community/apply", { preHandler: guard("family.manage") }, async (req) => {
     const a = req.auth!;
     const b = z.object({ items: z.array(choose).min(1).max(100) }).parse(req.body);
-    const city = await cityOf(db, a.profileId);
+    const city = await cityOf(db, a.familyId, a.profileId);
     let applied = 0;
     const gone: string[] = [];
     for (const it of b.items) {
@@ -222,7 +226,7 @@ export function priceCommunityRoutes(app: FastifyInstance, { db, guard, hub }: D
     const b = choose.extend({ reason: z.string().trim().max(200).optional() }).parse(req.body);
     const k = await stableKey(db, a.familyId, b.productId);
     if (!k) throw new HttpError(404, "not_found", "Produit introuvable");
-    const g = (await groups(db, a.familyId, k.origin, k.key, await cityOf(db, a.profileId))).find((x) => x.format === b.format);
+    const g = (await groups(db, a.familyId, k.origin, k.key, await cityOf(db, a.familyId, a.profileId))).find((x) => x.format === b.format);
     if (!g) throw new HttpError(409, "proposal_gone", "Cette proposition n'est plus disponible");
     const me = opaque(a.familyId);
     await withTx(db, async (c) => {

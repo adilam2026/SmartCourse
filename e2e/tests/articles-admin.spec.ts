@@ -123,7 +123,7 @@ test.describe("administration du catalogue : ajouter et modifier un article", ()
     await page.getByTestId("edit-Tomates cerises").click();
     await page.getByTestId("pf-active").uncheck();
     await page.getByTestId("pf-save").click();
-    await expect(page.getByTestId("prod-Tomates cerises")).toContainText("désactivé");
+    await expect(page.getByTestId("prod-Tomates cerises")).toContainText(/masqué/i);
     const staffView = (await (await f.staff.get("/api/catalog")).json()).categories.flatMap((c: any) => c.products);
     expect(staffView.find((p: any) => p.id === before.id)).toBeUndefined();
     await ctx.close();
@@ -163,7 +163,7 @@ test.describe("administration du catalogue : ajouter et modifier un article", ()
       await page.getByTestId("pf-active").uncheck();
       await page.getByTestId("pf-save").click();
       await expect(page.getByRole("dialog")).toHaveCount(0);
-      await expect(page.getByTestId(`prod-${n}`)).toContainText("désactivé");
+      await expect(page.getByTestId(`prod-${n}`)).toContainText(/masqué/i);
     }
     // 1. plus ajoutable (Carottes n'était pas dans la liste)
     expect((await add2(f.products["Carottes"]!)).reason).toBe("product_inactive");
@@ -172,12 +172,12 @@ test.describe("administration du catalogue : ajouter et modifier un article", ()
     const staff = await staffCtx.newPage();
     await uiLogin(staff, f);
     const tom = staff.getByTestId(`wrap-${f.products["Tomates"]}`);
-    await expect(tom).toContainText("désactivé");
+    await expect(tom).toContainText(/masqué/i);
     await expect(staff.getByTestId(`card-${f.products["Carottes"]}`)).toHaveCount(0);
     const parentCtx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
     const parent = await parentCtx.newPage();
     await uiLogin(parent, f, "lamiaa", "573918");
-    await expect(parent.getByTestId(`row-${f.products["Tomates"]}`)).toContainText("désactivé");
+    await expect(parent.getByTestId(`row-${f.products["Tomates"]}`)).toContainText(/masqué/i);
     // achetable (parent)
     await parent.getByTestId(`buy-${f.products["Tomates"]}`).click();
     await expect(parent.getByTestId(`by-${f.products["Tomates"]}`)).toContainText("Acheté par");

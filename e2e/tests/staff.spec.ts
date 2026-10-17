@@ -95,7 +95,7 @@ test.describe("parcours du personnel", () => {
     await page.getByTestId("validate").click();
     await expect(page.getByTestId("banner-offline")).toBeVisible();
     await expect(page.getByTestId("banner-pending")).toBeVisible();
-    await expect(page.getByTestId("sync-state")).toContainText("En attente de connexion");
+    await expect(page.getByTestId("sync-state")).toContainText("Envoi en attente");
     await expect(page.getByTestId("sync-state")).not.toContainText("Liste à jour");
     await expect(card(page, f, "Lait")).toHaveAttribute("data-state", "unsaved"); // pas « saved »
     await page.screenshot({ path: "shots/staff-offline-pending.png" });

@@ -18,6 +18,8 @@ import { NotificationSettings, usePushControl } from "../components/Notification
 import { PageHead } from "../components/PageHead";
 import { useBackLayer } from "../useBackLayer";
 import { PriceDialog } from "../components/PriceDialog";
+import { PricesAdmin } from "./PricesAdmin";
+import { setV3On, useV3 } from "../v3";
 import { ProductForm } from "../components/ProductForm";
 import { Thumb } from "../components/Thumb";
 import { CatalogBrowser, CatPhoto } from "./CatalogBrowser";
@@ -31,7 +33,7 @@ const ROLE_LABEL: Record<Role, string> = { admin: "Administrateur", parent: "Par
 
 const errText = userMessage;
 
-type Section = "profiles" | "recovery" | "reset" | "catalog" | "prices" | "notifications" | "backups" | "about";
+type Section = "pricing" | "v3" | "profiles" | "recovery" | "reset" | "catalog" | "prices" | "notifications" | "backups" | "about";
 
 /** Backup state in one sentence: what matters to the family. How it works stays on the operator side (server logs). */
 function backupSummary(st: BackupStatus | null): { ok: boolean; text: string } {
@@ -46,6 +48,7 @@ export function Settings({ engine, s }: { engine: Engine; s: State }) {
   const [section, setSection] = useState<Section | null>(null);
   const [backup, setBackup] = useState<BackupStatus | null>(null);
   const push = usePushControl();
+  const v3on = useV3();
   useEffect(() => void api.backupStatus().then(setBackup).catch(() => {}), []);
   useBackLayer(section !== null, () => setSection(null)); // Android Back: from a section to the list of settings
   const bs = backupSummary(backup);
@@ -56,9 +59,11 @@ export function Settings({ engine, s }: { engine: Engine; s: State }) {
       { key: "profiles", icon: "users", title: "Famille et profils", text: "Profils, rôles, codes d'accès", testid: "seg-profiles" },
       { key: "recovery", icon: "lock", title: "Adresse de récupération", text: "Code famille et mot de passe oubliés", testid: "seg-recovery" },
       { key: "catalog", icon: "grid", title: "Catalogue", text: "Produits, photos, unités et prix", testid: "seg-catalog" },
+      { key: "pricing", icon: "grid", title: "Gestion des prix", text: "Prix des articles, manquants, synchronisation", testid: "seg-pricing" },
       { key: "prices", icon: "info", title: "Prix", text: s.me?.prefs?.showTotals ? "Prix et total estimé" : s.me?.prefs?.showPrices ? "Prix indicatifs" : "Affichage simple, sans prix", testid: "seg-prices" },
       { key: "notifications", icon: "bell", title: "Notifications", text: pushText, testid: "seg-notifications" },
       { key: "backups", icon: "shield", title: "Sauvegarde", text: bs.text, testid: "seg-backups" },
+      ...(s.me?.primary ? [{ key: "v3" as Section, icon: "grid" as IconName, title: "Aperçu V3", text: v3on ? "Activé sur cet appareil" : "Essai de la nouvelle interface", testid: "seg-v3" }] : []),
       ...(s.me?.primary ? [{ key: "reset" as Section, icon: "shield" as IconName, title: "Réinitialiser la famille", text: "Suppression définitive, pour recommencer", testid: "seg-reset" }] : []),
       { key: "about", icon: "info", title: "À propos", text: "Mises à jour de l'application", testid: "seg-about" },
     ];
@@ -77,10 +82,12 @@ export function Settings({ engine, s }: { engine: Engine; s: State }) {
       </>
     );
   }
-  const titles: Record<Section, string> = { profiles: "Famille et profils", recovery: "Adresse de récupération", reset: "Réinitialiser la famille", catalog: "Catalogue", prices: "Prix", notifications: "Notifications", backups: "Sauvegarde", about: "À propos" };
+  const titles: Record<Section, string> = { pricing: "Gestion des prix", v3: "Aperçu V3", profiles: "Famille et profils", recovery: "Adresse de récupération", reset: "Réinitialiser la famille", catalog: "Catalogue", prices: "Prix", notifications: "Notifications", backups: "Sauvegarde", about: "À propos" };
   return (
     <>
       <PageHead engine={engine} s={s} title={titles[section]} onBack={() => setSection(null)} backLabel="Réglages" backTestId="settings-back" subtitle={section === "profiles" && s.me?.family ? <>Code de la famille : <b data-testid="family-code">{s.me.family.code}</b></> : undefined} />
+      {section === "pricing" && <PricesAdmin engine={engine} s={s} />}
+      {section === "v3" && s.me?.primary && <PreviewV3 />}
       {section === "profiles" && <Profiles me={s.me!.id} familyCode={s.me!.family?.code ?? ""} />}
       {section === "recovery" && <RecoveryPanel />}
       {section === "reset" && <ResetFamily engine={engine} />}
@@ -90,6 +97,19 @@ export function Settings({ engine, s }: { engine: Engine; s: State }) {
       {section === "backups" && <BackupCard st={backup} />}
       {section === "about" && <div className="versioninfo--page"><VersionInfo engine={engine} /></div>}
     </>
+  );
+}
+
+/** Aperçu V3 : active (ou coupe) la nouvelle interface de choix des articles sur CET appareil seulement. Réservé à l'administrateur principal. */
+function PreviewV3() {
+  const on = useV3();
+  return (
+    <div className="panel" data-testid="v3-panel">
+      <p>Nouvelle interface de choix des articles (trois affichages, panneau de quantité), en essai.</p>
+      <p className="muted" data-testid="v3-scope">Réservé à cet appareil : les autres téléphones et les autres profils ne la voient pas. Aucune donnée n'est modifiée.</p>
+      <label className="check"><input type="checkbox" checked={on} onChange={(e) => setV3On(e.target.checked)} data-testid="v3-toggle" /> Activer la V3 sur cet appareil</label>
+      {on && <button className="btn" data-testid="v3-off" onClick={() => setV3On(false)}>Revenir à la V2</button>}
+    </div>
   );
 }
 
@@ -207,12 +227,12 @@ function EditProfile({ profile, onClose, run }: { profile: Profile; onClose(): v
   );
 }
 
-/** Un NOUVEAU code secret : exactement 6 chiffres, choisi à la main, saisi deux fois, clavier numérique, saisie masquée. */
+/** Un NOUVEAU code secret : 6 à 8 chiffres, choisi à la main, saisi deux fois, clavier numérique, saisie masquée. */
 function PasswordFields({ secret, again, setSecret, setAgain, prefix }: { secret: string; again: string; setSecret(v: string): void; setAgain(v: string): void; prefix: string }) {
   const mismatch = again.length > 0 && secret !== again;
   return (
     <>
-      <label className="field">Code secret — 6 chiffres<SecretInput kind="new" value={secret} onChange={setSecret} testid={`${prefix}-secret`} /></label>
+      <label className="field">Code secret — entre 6 et 8 chiffres<SecretInput kind="new" value={secret} onChange={setSecret} testid={`${prefix}-secret`} /></label>
       <label className="field">Confirmer le code secret<SecretInput kind="new" value={again} onChange={setAgain} testid={`${prefix}-secret2`} /></label>
       {mismatch && <p className="error" data-testid={`${prefix}-mismatch`}>Les deux codes secrets ne sont pas identiques.</p>}
     </>
@@ -276,7 +296,7 @@ function AddProfile({ defaultCity, onClose, onCreated }: { defaultCity: string; 
         </label>
         <CityPicker key={defaultCity} value={city} onChange={setCity} testid="np-city" />
         <PasswordFields secret={secret} again={again} setSecret={setSecret} setAgain={setAgain} prefix="np" />
-        <p className="muted">Vous choisissez ce code : 6 chiffres. Rien n'est généré automatiquement.</p>
+        <p className="muted">Vous choisissez ce code : entre 6 et 8 chiffres. Rien n'est généré automatiquement.</p>
         {error && <p className="error" role="alert" data-testid="np-error">{error}</p>}
         <button className="btn btn--primary btn--big" disabled={!isNewSecret(secret) || secret !== again || !displayName.trim() || !login.trim() || !city} data-testid="np-submit">Créer</button>
         <button type="button" className="btn btn--ghost" onClick={onClose}>Annuler</button>
@@ -338,6 +358,8 @@ function CatalogAdmin({ engine, s }: { engine: Engine; s: State }) {
   const [form, setForm] = useState<{ product?: Product } | null>(null);
   const [audit, setAudit] = useState<Record<string, AuditProduct>>({});
   const [filter, setFilter] = useState<"all" | "check" | "own" | "none">("all");
+  const [tab, setTab] = useState<"all" | "shown" | "hidden">("all");
+  const [photosOpen, setPhotosOpen] = useState(false);
   const [priceFor, setPriceFor] = useState<string | null>(null); // id de l'article dont on met le prix à jour
   const [compare, setCompare] = useState<{ product: Product; catalogUrl: string } | null>(null);
   const load = () => Promise.all([
@@ -351,6 +373,9 @@ function CatalogAdmin({ engine, s }: { engine: Engine; s: State }) {
     if (filter === "all" || !a) return filter === "all";
     return filter === "check" ? a.sharedWithOtherNames || !!a.catalogPhotoUrl : filter === "own" ? a.photoSource === "famille" : a.photoSource === "none";
   };
+  const every = cat?.categories.flatMap((c) => c.products) ?? [];
+  const nShown = every.filter((p) => p.active).length;
+  const nHidden = every.length - nShown;
   const act = async (fn: () => Promise<unknown>) => {
     setError(null);
     try {
@@ -387,34 +412,52 @@ function CatalogAdmin({ engine, s }: { engine: Engine; s: State }) {
         <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Chercher un produit" aria-label="Chercher dans mes produits" data-testid="mine-search" />
         <button className="btn btn--primary btn--small" data-testid="add-article" onClick={() => setForm({})}>+ Article</button>
       </div>
-      <div className="catchips" role="tablist" aria-label="Contrôle des photos" data-testid="photo-filters">
-        {([["all", "Tous"], ["check", `À vérifier (${count((a) => a.sharedWithOtherNames || !!a.catalogPhotoUrl)})`], ["own", `Photos de la famille (${count((a) => a.photoSource === "famille")})`], ["none", `Sans photo (${count((a) => a.photoSource === "none")})`]] as const).map(([k, label]) => (
-          <button key={k} role="tab" aria-selected={filter === k} className={`catchip ${filter === k ? "on" : ""}`} data-testid={`pf-${k}`} onClick={() => setFilter(k)}>{label}</button>
+      <div className="seg seg--wrap cattabs" role="tablist" aria-label="Articles affichés ou masqués">
+        {([["all", `Tous (${every.length})`], ["shown", `Affichés (${nShown})`], ["hidden", `Masqués (${nHidden})`]] as const).map(([k, label]) => (
+          <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} data-testid={`cat-tab-${k}`} onClick={() => setTab(k)}>{label}</button>
         ))}
       </div>
+      <button className="linkbtn linkbtn--inline photoslink" aria-expanded={photosOpen} data-testid="pf-toggle" onClick={() => setPhotosOpen((v) => !v)}>
+        {photosOpen ? "Masquer le contrôle des photos" : `Contrôle des photos${count((a) => a.sharedWithOtherNames || !!a.catalogPhotoUrl) ? ` · ${count((a) => a.sharedWithOtherNames || !!a.catalogPhotoUrl)} à vérifier` : ""}`}
+      </button>
+      {photosOpen && (
+        <div className="catchips" role="tablist" aria-label="Contrôle des photos" data-testid="photo-filters">
+          {([["all", "Tous"], ["check", `À vérifier (${count((a) => a.sharedWithOtherNames || !!a.catalogPhotoUrl)})`], ["own", `Photos de la famille (${count((a) => a.photoSource === "famille")})`], ["none", `Sans photo (${count((a) => a.photoSource === "none")})`]] as const).map(([k, label]) => (
+            <button key={k} role="tab" aria-selected={filter === k} className={`catchip ${filter === k ? "on" : ""}`} data-testid={`pf-${k}`} onClick={() => setFilter(k)}>{label}</button>
+          ))}
+        </div>
+      )}
       {cat?.categories.map((c) => {
         const needle = flatten(q);
-        const prods = c.products.filter((p) => (!needle || flatten(p.name).includes(needle)) && matches(p));
+        const prods = c.products.filter((p) => (!needle || flatten(p.name).includes(needle)) && matches(p) && (tab === "all" || (tab === "shown") === p.active));
         if (!prods.length) return null;
         return (
         <section key={c.key}>
           <h2 className="sect">{CATEGORY_EMOJI[c.key]} {c.label}</h2>
           <ul className="rows">
             {prods.map((p) => (
-              <li key={p.id} className={`row row--cat row--line ${p.active ? "" : "row--off"}`} data-testid={`prod-${p.name}`}>
+              <li key={p.id} className={`row row--cat row--cat4 ${p.active ? "" : "row--off"}`} data-testid={`prod-${p.name}`} data-active={p.active ? "1" : "0"}>
                 <Thumb photoUrl={p.photoUrl} category={c.key} />
-                <span className="row__name">{p.name}<small>{[p.brand, unitLabel(p.unit), p.active ? null : "désactivé"].filter(Boolean).join(" · ")}</small></span>
+                <span className="row__name">{p.name}<small>{[p.brand, unitLabel(p.unit)].filter(Boolean).join(" · ")} · <b className={p.active ? "stateon" : "stateoff"} data-testid={`state-${p.name}`}>{p.active ? "Affiché" : "Masqué"}</b></small></span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={p.active}
+                  aria-label={`${p.name} : ${p.active ? "affiché" : "masqué"}. Changer`}
+                  className={`switch ${p.active ? "on" : ""}`}
+                  data-testid={`active-${p.name}`}
+                  onClick={() => void act(() => api.patchProduct(p.id, { active: !p.active }))}
+                >
+                  <span className="switch__track" aria-hidden="true"><i /></span>
+                </button>
                 <span className="rowbtns">
                   <button className="btn btn--small" data-testid={`edit-${p.name}`} aria-label={`Modifier ${p.name}`} onClick={() => setForm({ product: p })}>Modifier</button>
                   {s.me?.prefs?.showPrices && <button className="btn btn--small" data-testid={`price-${p.name}`} aria-label={`Mettre à jour le prix de ${p.name}`} onClick={() => setPriceFor(p.id)}>Prix</button>}
-                  <Menu label={`Autres actions pour ${p.name}`} testid={`more-${p.name}`}>
-                    {(close) => (
-                      <>
-                        {audit[p.id]?.catalogPhotoUrl && <MenuItem testid={`usecat-${p.name}`} onClick={() => { close(); setCompare({ product: p, catalogUrl: audit[p.id]!.catalogPhotoUrl! }); }}>Photo du catalogue</MenuItem>}
-                        <MenuItem testid={`active-${p.name}`} onClick={() => { close(); void act(() => api.patchProduct(p.id, { active: !p.active })); }}>{p.active ? "Désactiver" : "Réactiver"}</MenuItem>
-                      </>
-                    )}
-                  </Menu>
+                  {audit[p.id]?.catalogPhotoUrl && (
+                    <Menu label={`Autres actions pour ${p.name}`} testid={`more-${p.name}`}>
+                      {(close) => <MenuItem testid={`usecat-${p.name}`} onClick={() => { close(); setCompare({ product: p, catalogUrl: audit[p.id]!.catalogPhotoUrl! }); }}>Photo du catalogue</MenuItem>}
+                    </Menu>
+                  )}
                 </span>
               </li>
             ))}

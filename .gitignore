@@ -17,3 +17,6 @@ android/.gradle
 android/build
 android/app/build
 android/local.properties
+
+# Clé de RECETTE publique (sans valeur : sert seulement à mettre à jour l'APK de recette sans désinstaller)
+!android-native/recette.keystore

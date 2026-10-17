@@ -2,7 +2,7 @@ import type pg from "pg";
 import { withTx, type Db } from "./db.js";
 import { HttpError, invalidCredentials } from "./errors.js";
 import type { Role } from "./permissions.js";
-import { dummyHash, generateFamilyCode, hashSecret, hashToken, isValidNewSecret, isWeakSecret, newToken, verifySecret } from "./security.js";
+import { dummyHash, generateFamilyCode, hashSecret, hashToken, isValidNewSecret, isWeakSecret, NEW_SECRET_RULE, newToken, verifySecret } from "./security.js";
 
 export interface AuthContext {
   sessionId: string;
@@ -149,7 +149,7 @@ export interface SetupInput {
  * Everything happens in one transaction, so a failure after consumption gives the token back.
  */
 export async function setupFamily(db: Db, input: SetupInput): Promise<{ token: string; familyCode: string; auth: AuthContext }> {
-  if (!isValidNewSecret(input.admin.secret)) throw new HttpError(400, "invalid_secret", "Le code secret doit comporter exactement 6 chiffres");
+  if (!isValidNewSecret(input.admin.secret)) throw new HttpError(400, "invalid_secret", NEW_SECRET_RULE);
   if (isWeakSecret(input.admin.secret)) throw new HttpError(400, "weak_secret", "Code secret trop simple (évitez 123456, 111111…)");
   const secretHash = await hashSecret(input.admin.secret);
   return withTx(db, async (c) => {
@@ -188,7 +188,7 @@ export async function setupFamily(db: Db, input: SetupInput): Promise<{ token: s
  */
 export async function createFamilyRecords(
   c: pg.PoolClient,
-  input: { familyName: string; admin: { displayName: string; login: string; secretHash: string; city: string | null; recoveryEmail: string | null; emailVerified: boolean }; completed: boolean },
+  input: { familyName: string; admin: { displayName: string; login: string; secretHash: string; city: string | null; recoveryEmail: string | null; emailVerified: boolean }; completed: boolean; country?: string | null },
 ): Promise<{ familyId: string; profileId: string; code: string }> {
   let code = "";
   let familyId = "";
@@ -199,6 +199,9 @@ export async function createFamilyRecords(
   }
   if (!familyId) throw new HttpError(503, "family_code_unavailable", "Création impossible pour le moment : réessayez");
   if (input.completed) await c.query("UPDATE families SET setup_completed_at = now() WHERE id = $1", [familyId]);
+  // Pays choisi à la création (ou Maroc quand une ville marocaine a été choisie) : localisation confirmée de la famille.
+  const country = input.country ?? (input.admin.city ? "MA" : null);
+  if (country) await c.query("UPDATE families SET country = $2, city = $3, location_confirmed_at = now() WHERE id = $1", [familyId, country, country === "MA" ? input.admin.city : null]);
   const prof = await c.query<{ id: string }>(
     `INSERT INTO profiles (family_id, display_name, login, role, secret_hash, is_primary, recovery_email, recovery_email_verified_at, city)
      VALUES ($1, $2, $3, 'admin', $4, true, $5, CASE WHEN $6 THEN now() END, $7) RETURNING id`,
