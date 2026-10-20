@@ -1,10 +1,142 @@
-═══ X. Options avancées : activation des listes, choix et sélection de la devise, activation du budget, réglages gardés après réouverture — contrôle ciblé ═══
-PASS  X0. serveur à jour : aucune option bloquée
-PASS  X1. « Plusieurs listes actives » activée sans message d'erreur (true:false:-)
-PASS  X2. choix de devise ouvert : liste des devises avec leurs pays
-PASS  X3. devise sélectionnée affichée, confirmation possible
-PASS  X4. budget activé avec la devise choisie (true:true:EUR)
-PASS  X5. après fermeture et réouverture : options toujours activées, onglet Budget présent
+═══ F. Version finale : identifiant, nom, serveur fixe ═══
+PASS  F0. identifiant app.smartcourse.courses.natif installé
+PASS  F0b. nom affiché « Mes Courses »
+PASS  F1. écran de connexion direct (aucune saisie de serveur)
+PASS  F1b. aucun bandeau ni fonction de démonstration
+PASS  F1c. aucun lien « Serveur … Modifier »
+PASS  F1d. accès de recette désactivés (écran simulé refusé)
+PASS  F1e. pas d'écrans de démonstration
+═══ G. Administrateur : connexion, sélection, achat, historique ═══
+PASS  G1. administrateur connecté
+PASS  G1b. aucun bandeau
+PASS  G1c. Compte dans l'en-tête
+PASS  G1d. aucune liste : « Créer une liste »
+PASS  G2. sélection (recherche pour l'administrateur)
+PASS  G3. liste créée avec Tomates
+PASS  G3b. serveur : Tomates à acheter (1.000 kg to_buy)
+PASS  G4. achat enregistré par le serveur (1.000 kg purchased)
+PASS  G4b. article dans « Déjà achetés »
+PASS  G5. liste archivée par le serveur
+PASS  G5b. historique affiché
+PASS  G6. Réglages : « Se déconnecter » visible
+PASS  G6b. aucune fonction technique dans Réglages
+PASS  G7. Compte : profil réel, sans serveur ni démonstration
+PASS  G8. déconnecté : retour à la connexion
+═══ H. Parent : rôle ═══
+PASS  H1. parent connecté
+PASS  H2. parent : pas d'onglet Réglages
+PASS  H3. parent : Historique accessible
 ECHECS=0
 CRASH_APPLICATION=0
-TOTAL_ECHECS=0
+═══ F. Version finale : identifiant, nom, serveur fixe ═══
+PASS  F0. identifiant app.smartcourse.courses.natif installé
+PASS  F0b. nom affiché « Mes Courses »
+PASS  F1. écran de connexion direct (aucune saisie de serveur)
+PASS  F1b. aucun bandeau ni fonction de démonstration
+PASS  F1c. aucun lien « Serveur … Modifier »
+PASS  F1d. accès de recette désactivés (écran simulé refusé)
+PASS  F1e. pas d'écrans de démonstration
+═══ P. Personnel : Choisir mes articles, enregistrement, hors connexion ═══
+PASS  P1. personnel : « Choisir mes articles » directement
+PASS  P1b. aucun onglet en bas
+FAIL  P1c. aucune recherche
+      écran : "Choisir mes articles"|"Affichage : Cartes, par catégories"|"Compte"|"Rechercher un produit…"|"Légumes et herbes, 15 articles"|"Légumes et herbes"|"15 articles"|"Fruits, 10 articles"|"Fruits"|"10 articles"|"Laitages et œufs, 10 articles"|"Laitages et œufs"|"10 articles"|"Épicerie, 15 articles"|"Épicerie"|"15 articles"|"Viandes et poisson, 5 articles"|"Viandes et poisson"|"5 articles"|"Surgelés, 2 articles"|"Surgelés"|"2 articles"|"Terminer ma sélection"|
+PASS  P1d. aucun bandeau
+PASS  P1e. Compte dans l'en-tête
+FAIL  P2. « Sélection enregistrée »
+      écran : "Choisir mes articles"|"Affichage : Cartes, par catégories"|"Compte"|"Rechercher un produit…"|"Viandes et poisson, 5 articles"|"Viandes et poisson"|"5 articles"|"Surgelés, 2 articles"|"Surgelés"|"2 articles"|"Pain et petit-déjeuner, 6 articles"|"Pain et petit-déjeuner"|"6 articles"|"Boissons, 2 articles"|"Boissons"|"2 articles"|"Maison, 9 articles"|"Maison"|"9 articles"|"Hygiène, 6 articles"|"Hygiène"|"6 articles"|"Terminer ma sélection"|
+PASS  P2b. reste sur Choisir
+FAIL  P2c. serveur : liste du jour créée par la demande ()
+      écran : "Choisir mes articles"|"Affichage : Cartes, par catégories"|"Compte"|"Rechercher un produit…"|"Viandes et poisson, 5 articles"|"Viandes et poisson"|"5 articles"|"Surgelés, 2 articles"|"Surgelés"|"2 articles"|"Pain et petit-déjeuner, 6 articles"|"Pain et petit-déjeuner"|"6 articles"|"Boissons, 2 articles"|"Boissons"|"2 articles"|"Maison, 9 articles"|"Maison"|"9 articles"|"Hygiène, 6 articles"|"Hygiène"|"6 articles"|"Terminer ma sélection"|
+FAIL  P2d. quantité enregistrée affichée
+      écran : "Choisir mes articles"|"Affichage : Cartes, par catégories"|"Compte"|"Rechercher un produit…"|"Viandes et poisson, 5 articles"|"Viandes et poisson"|"5 articles"|"Surgelés, 2 articles"|"Surgelés"|"2 articles"|"Pain et petit-déjeuner, 6 articles"|"Pain et petit-déjeuner"|"6 articles"|"Boissons, 2 articles"|"Boissons"|"2 articles"|"Maison, 9 articles"|"Maison"|"9 articles"|"Hygiène, 6 articles"|"Hygiène"|"6 articles"|"Terminer ma sélection"|
+FAIL  P3. hors connexion : « Envoi en attente »
+      écran : "Hors connexion : session et dernières données conservées sur ce téléphone."|"Choisir mes articles"|"Affichage : Cartes, par catégories"|"Compte"|"Rechercher un produit…"|"Viandes et poisson, 5 articles"|"Viandes et poisson"|"5 articles"|"Surgelés, 2 articles"|"Surgelés"|"2 articles"|"Pain et petit-déjeuner, 6 articles"|"Pain et petit-déjeuner"|"6 articles"|"Boissons, 2 articles"|"Boissons"|"2 articles"|"Maison, 9 articles"|"Maison"|"Hygiène, 6 articles"|"Hygiène"|"Terminer ma sélection"|
+FAIL  P3b. la demande survit à la fermeture de l'application
+      écran : "Hors connexion : session et dernières données conservées sur ce téléphone."|"Choisir mes articles"|"Affichage : Cartes, par catégories"|"Compte"|"Rechercher un produit…"|"Légumes et herbes, 15 articles"|"Légumes et herbes"|"15 articles"|"Fruits, 10 articles"|"Fruits"|"10 articles"|"Laitages et œufs, 10 articles"|"Laitages et œufs"|"10 articles"|"Épicerie, 15 articles"|"Épicerie"|"15 articles"|"Viandes et poisson, 5 articles"|"Surgelés, 2 articles"|"Terminer ma sélection"|
+PASS  P4. reprise : envoi au retour du réseau
+FAIL  P4b. serveur : une seule ligne, quantité remplacée ()
+      écran : "Hors connexion : session et dernières données conservées sur ce téléphone."|"Choisir mes articles"|"Affichage : Cartes, par catégories"|"Compte"|"Rechercher un produit…"|"Légumes et herbes, 15 articles"|"Légumes et herbes"|"15 articles"|"Fruits, 10 articles"|"Fruits"|"10 articles"|"Laitages et œufs, 10 articles"|"Laitages et œufs"|"10 articles"|"Épicerie, 15 articles"|"Épicerie"|"15 articles"|"Viandes et poisson, 5 articles"|"Surgelés, 2 articles"|"Terminer ma sélection"|
+PASS  P5. personnel : « Se déconnecter » dans Compte
+PASS  P5b. déconnecté
+═══ J. Personnel : minuit, liste ouverte plusieurs jours, clôture par un parent (en ligne et hors connexion) ═══
+FAIL  J1. sélection enregistrée sur la liste ouverte ()
+      écran : "Choisir mes articles"|"Affichage : Cartes, par catégories"|"Compte"|"Rechercher un produit…"|"Viandes et poisson, 5 articles"|"Viandes et poisson"|"5 articles"|"Surgelés, 2 articles"|"Surgelés"|"2 articles"|"Pain et petit-déjeuner, 6 articles"|"Pain et petit-déjeuner"|"6 articles"|"Boissons, 2 articles"|"Boissons"|"2 articles"|"Maison, 9 articles"|"Maison"|"9 articles"|"Hygiène, 6 articles"|"Hygiène"|"6 articles"|"Terminer ma sélection"|
+PASS  J2. l'horloge du téléphone est passée minuit (2026-10-20 → 2026-10-21)
+FAIL  J2b. après minuit, application ouverte : sélection toujours affichée (Enregistré · 1 kg)
+      écran : "Choisir mes articles"|"Affichage : Cartes, par catégories"|"Compte"|"Rechercher un produit…"|"Viandes et poisson, 5 articles"|"Viandes et poisson"|"5 articles"|"Surgelés, 2 articles"|"Surgelés"|"2 articles"|"Pain et petit-déjeuner, 6 articles"|"Pain et petit-déjeuner"|"6 articles"|"Boissons, 2 articles"|"Boissons"|"2 articles"|"Maison, 9 articles"|"Maison"|"9 articles"|"Hygiène, 6 articles"|"Hygiène"|"6 articles"|"Terminer ma sélection"|
+FAIL  J2c. après minuit, application relancée : toujours sur Choisir, sélection conservée
+      écran : "Choisir mes articles"|"Affichage : Cartes, par catégories"|"Compte"|"Rechercher un produit…"|"Légumes et herbes, 15 articles"|"Légumes et herbes"|"15 articles"|"Fruits, 10 articles"|"Fruits"|"10 articles"|"Laitages et œufs, 10 articles"|"Laitages et œufs"|"10 articles"|"Épicerie, 15 articles"|"Épicerie"|"15 articles"|"Viandes et poisson, 5 articles"|"Viandes et poisson"|"5 articles"|"Surgelés, 2 articles"|"Surgelés"|"2 articles"|"Terminer ma sélection"|
+PASS  J2d. serveur : même liste, toujours ouverte
+FAIL  J3. trois jours plus tard : sélection et quantité conservées
+      écran : "Choisir mes articles"|"Affichage : Cartes, par catégories"|"Compte"|"Rechercher un produit…"|"Légumes et herbes, 15 articles"|"Légumes et herbes"|"15 articles"|"Fruits, 10 articles"|"Fruits"|"10 articles"|"Laitages et œufs, 10 articles"|"Laitages et œufs"|"10 articles"|"Épicerie, 15 articles"|"Épicerie"|"15 articles"|"Viandes et poisson, 5 articles"|"Viandes et poisson"|"5 articles"|"Surgelés, 2 articles"|"Surgelés"|"2 articles"|"Terminer ma sélection"|
+FAIL  J3b. modification enregistrée sur la MÊME liste ()
+      écran : "Choisir mes articles"|"Affichage : Cartes, par catégories"|"Compte"|"Rechercher un produit…"|"Légumes et herbes, 15 articles"|"Légumes et herbes"|"15 articles"|"Fruits, 10 articles"|"Fruits"|"10 articles"|"Laitages et œufs, 10 articles"|"Laitages et œufs"|"10 articles"|"Épicerie, 15 articles"|"Épicerie"|"15 articles"|"Viandes et poisson, 5 articles"|"Viandes et poisson"|"5 articles"|"Surgelés, 2 articles"|"Surgelés"|"2 articles"|"Terminer ma sélection"|
+PASS  J3c. serveur : toujours une seule liste ouverte
+PASS  J4. clôture par le parent apprise : sélections de cette liste réinitialisées
+FAIL  J4b. reste sur Choisir, articles et photos toujours affichés
+      écran : "Choisir mes articles"|"Affichage : Cartes, par catégories"|"Compte"|"Rechercher un produit…"|"Légumes et herbes, 15 articles"|"Légumes et herbes"|"15 articles"|"Fruits, 10 articles"|"Fruits"|"10 articles"|"Laitages et œufs, 10 articles"|"Laitages et œufs"|"10 articles"|"Épicerie, 15 articles"|"Épicerie"|"15 articles"|"Viandes et poisson, 5 articles"|"Viandes et poisson"|"5 articles"|"Surgelés, 2 articles"|"Surgelés"|"2 articles"|"Terminer ma sélection"|
+FAIL  J4c. historique : liste archivée avec son contenu ()
+      écran : "Choisir mes articles"|"Affichage : Cartes, par catégories"|"Compte"|"Rechercher un produit…"|"Légumes et herbes, 15 articles"|"Légumes et herbes"|"15 articles"|"Fruits, 10 articles"|"Fruits"|"10 articles"|"Laitages et œufs, 10 articles"|"Laitages et œufs"|"10 articles"|"Épicerie, 15 articles"|"Épicerie"|"15 articles"|"Viandes et poisson, 5 articles"|"Viandes et poisson"|"5 articles"|"Surgelés, 2 articles"|"Surgelés"|"2 articles"|"Terminer ma sélection"|
+FAIL  J5. nouvelle liste : sélection enregistrée ()
+      écran : "Choisir mes articles"|"Affichage : Cartes, par catégories"|"Compte"|"Rechercher un produit…"|"Viandes et poisson, 5 articles"|"Viandes et poisson"|"5 articles"|"Surgelés, 2 articles"|"Surgelés"|"2 articles"|"Pain et petit-déjeuner, 6 articles"|"Pain et petit-déjeuner"|"6 articles"|"Boissons, 2 articles"|"Boissons"|"2 articles"|"Maison, 9 articles"|"Maison"|"9 articles"|"Hygiène, 6 articles"|"Hygiène"|"6 articles"|"Terminer ma sélection"|
+FAIL  J5b. hors connexion : demande non envoyée (« Envoi en attente »)
+      écran : "Hors connexion : session et dernières données conservées sur ce téléphone."|"Choisir mes articles"|"Affichage : Cartes, par catégories"|"Compte"|"Rechercher un produit…"|"Viandes et poisson, 5 articles"|"Viandes et poisson"|"5 articles"|"Surgelés, 2 articles"|"Surgelés"|"2 articles"|"Pain et petit-déjeuner, 6 articles"|"Pain et petit-déjeuner"|"6 articles"|"Boissons, 2 articles"|"Boissons"|"2 articles"|"Maison, 9 articles"|"Maison"|"Hygiène, 6 articles"|"Hygiène"|"Terminer ma sélection"|
+FAIL  J5c. brouillon non validé (Carottes)
+      écran : "Hors connexion : session et dernières données conservées sur ce téléphone."|"Choisir mes articles"|"Affichage : Cartes, par catégories"|"Compte"|"Rechercher un produit…"|"Viandes et poisson, 5 articles"|"Viandes et poisson"|"5 articles"|"Surgelés, 2 articles"|"Surgelés"|"2 articles"|"Pain et petit-déjeuner, 6 articles"|"Pain et petit-déjeuner"|"6 articles"|"Boissons, 2 articles"|"Boissons"|"2 articles"|"Maison, 9 articles"|"Maison"|"9 articles"|"Hygiène, 6 articles"|"Hygiène"|"6 articles"|"Terminer ma sélection"|
+PASS  J6. retour du réseau : la clôture est appliquée (sélection enregistrée réinitialisée)
+FAIL  J6b. la demande non envoyée et le brouillon sont gardés : « Reprendre »
+      écran : "Choisir mes articles"|"Affichage : Cartes, par catégories"|"Compte"|"Rechercher un produit…"|"Viandes et poisson, 5 articles"|"Viandes et poisson"|"5 articles"|"Surgelés, 2 articles"|"Surgelés"|"2 articles"|"Pain et petit-déjeuner, 6 articles"|"Pain et petit-déjeuner"|"6 articles"|"Boissons, 2 articles"|"Boissons"|"2 articles"|"Maison, 9 articles"|"Maison"|"9 articles"|"Hygiène, 6 articles"|"Hygiène"|"6 articles"|"Terminer ma sélection"|
+FAIL  J6c. historique non modifié par les demandes tardives ()
+      écran : "Choisir mes articles"|"Affichage : Cartes, par catégories"|"Compte"|"Rechercher un produit…"|"Viandes et poisson, 5 articles"|"Viandes et poisson"|"5 articles"|"Surgelés, 2 articles"|"Surgelés"|"2 articles"|"Pain et petit-déjeuner, 6 articles"|"Pain et petit-déjeuner"|"6 articles"|"Boissons, 2 articles"|"Boissons"|"2 articles"|"Maison, 9 articles"|"Maison"|"9 articles"|"Hygiène, 6 articles"|"Hygiène"|"6 articles"|"Terminer ma sélection"|
+PASS  J6d. reste sur Choisir
+FAIL  J7. reprise : demande (Tomates 1,5 kg) et brouillon (Carottes) repris dans la sélection
+      écran : "Choisir mes articles"|"Affichage : Cartes, par catégories"|"Compte"|"Rechercher un produit…"|"Viandes et poisson, 5 articles"|"Viandes et poisson"|"5 articles"|"Surgelés, 2 articles"|"Surgelés"|"2 articles"|"Pain et petit-déjeuner, 6 articles"|"Pain et petit-déjeuner"|"6 articles"|"Boissons, 2 articles"|"Boissons"|"2 articles"|"Maison, 9 articles"|"Maison"|"9 articles"|"Hygiène, 6 articles"|"Hygiène"|"6 articles"|"Terminer ma sélection"|
+FAIL  J7b. serveur : nouvelle liste du jour avec les articles repris ()
+      écran : "Choisir mes articles"|"Affichage : Cartes, par catégories"|"Compte"|"Rechercher un produit…"|"Viandes et poisson, 5 articles"|"Viandes et poisson"|"5 articles"|"Surgelés, 2 articles"|"Surgelés"|"2 articles"|"Pain et petit-déjeuner, 6 articles"|"Pain et petit-déjeuner"|"6 articles"|"Boissons, 2 articles"|"Boissons"|"2 articles"|"Maison, 9 articles"|"Maison"|"9 articles"|"Hygiène, 6 articles"|"Hygiène"|"6 articles"|"Terminer ma sélection"|
+FAIL  J7c. les listes archivées restent intactes
+      écran : "Choisir mes articles"|"Affichage : Cartes, par catégories"|"Compte"|"Rechercher un produit…"|"Viandes et poisson, 5 articles"|"Viandes et poisson"|"5 articles"|"Surgelés, 2 articles"|"Surgelés"|"2 articles"|"Pain et petit-déjeuner, 6 articles"|"Pain et petit-déjeuner"|"6 articles"|"Boissons, 2 articles"|"Boissons"|"2 articles"|"Maison, 9 articles"|"Maison"|"9 articles"|"Hygiène, 6 articles"|"Hygiène"|"6 articles"|"Terminer ma sélection"|
+ECHECS=22
+CRASH_APPLICATION=0
+═══ K. Clavier numérique des codes d'accès ═══
+PASS  K1. connexion : clavier numérique pour le code (0x12)
+PASS  K2. code affiché : zéro initial conservé (047193)
+PASS  K2b. clavier toujours numérique quand le code est affiché (0x12)
+PASS  K2c. 8 chiffres au plus (le 9e est ignoré)
+PASS  K3. code remasqué
+═══ S. Partager l'accès d'un membre (famille JETABLE) ═══
+PASS  S0. administrateur connecté (saisies vérifiées)
+PASS  S1. code famille affiché avec « Partager le code famille » et « Copier »
+PASS  S1b. son propre profil : partage impossible
+FAIL  S1c. ville reprise de l'administrateur
+      écran : "Close sheet"|"Nouveau profil"|"Zoe"|"zoe"|"Rôle"|"Parent"|"Personnel"|"Administrateur"|"Code d'accès"|"Afficher le code"|"Entre 6 et 8 chiffres."|"Confirmer le code"|"Afficher le code"|"Créer le profil"|
+PASS  S2. création : clavier numérique (0x12)
+PASS  S2b. code saisi avec son zéro initial (047193)
+FAIL  S3. partage proposé dès la création
+      écran : "Retour"|"Profils"|"3 profils"|"Actualiser"|"Ajouter un profil"|"Code famille : GF72MQZT"|"À donner aux membres avec leur identifiant et leur code d'accès. Ce message ne contient aucun code d'accès."|"Partager le code famille"|"Copier"|"A"|"Adil"|"Administrateur principal"|"Vous"|"Actions pour Adil"|"L"|"Lamiaa"|"Parent"|"Actions pour Lamiaa"|"M"|"Marie"|"Personnel"|"Actions pour Marie"|"L'administrateur principal et le dernier administrateur actif sont protégés ; un administrateur ne se désactive ni ne se supprime sans perdre d'abord son rôle. Désactiver un profil n'est pas le supprimer."|"Liste"|"Liste"|"Historique"|"Historique"|"Statistiques"|"Statistiques"|"Réglages"|"Réglages"|
+FAIL  S3b. serveur : profil créé, code non stocké en clair
+      écran : "Retour"|"Profils"|"3 profils"|"Actualiser"|"Ajouter un profil"|"Code famille : GF72MQZT"|"À donner aux membres avec leur identifiant et leur code d'accès. Ce message ne contient aucun code d'accès."|"Partager le code famille"|"Copier"|"A"|"Adil"|"Administrateur principal"|"Vous"|"Actions pour Adil"|"L"|"Lamiaa"|"Parent"|"Actions pour Lamiaa"|"M"|"Marie"|"Personnel"|"Actions pour Marie"|"L'administrateur principal et le dernier administrateur actif sont protégés ; un administrateur ne se désactive ni ne se supprime sans perdre d'abord son rôle. Désactiver un profil n'est pas le supprimer."|"Liste"|"Liste"|"Historique"|"Historique"|"Statistiques"|"Statistiques"|"Réglages"|"Réglages"|
+FAIL  S4b. « Copier les informations »
+      écran : "Retour"|"Profils"|"3 profils"|"Actualiser"|"Ajouter un profil"|"Code famille : GF72MQZT"|"À donner aux membres avec leur identifiant et leur code d'accès. Ce message ne contient aucun code d'accès."|"Partager le code famille"|"Copier"|"A"|"Adil"|"Administrateur principal"|"Vous"|"Actions pour Adil"|"L"|"Lamiaa"|"Parent"|"Actions pour Lamiaa"|"M"|"Marie"|"Personnel"|"Actions pour Marie"|"L'administrateur principal et le dernier administrateur actif sont protégés ; un administrateur ne se désactive ni ne se supprime sans perdre d'abord son rôle. Désactiver un profil n'est pas le supprimer."|"Liste"|"Liste"|"Historique"|"Historique"|"Statistiques"|"Statistiques"|"Réglages"|"Réglages"|
+PASS  S4d. panneau de partage de l'application fermé
+FAIL  S5. le code partagé fonctionne (zéro initial) : connexion de Zoé
+      écran : "Retour"|"Profils"|"3 profils"|"Actualiser"|"Ajouter un profil"|"Code famille : GF72MQZT"|"À donner aux membres avec leur identifiant et leur code d'accès. Ce message ne contient aucun code d'accès."|"Partager le code famille"|"Copier"|"A"|"Adil"|"Administrateur principal"|"Vous"|"Actions pour Adil"|"L"|"Lamiaa"|"Parent"|"Actions pour Lamiaa"|"M"|"Marie"|"Personnel"|"Actions pour Marie"|"L'administrateur principal et le dernier administrateur actif sont protégés ; un administrateur ne se désactive ni ne se supprime sans perdre d'abord son rôle. Désactiver un profil n'est pas le supprimer."|"Liste"|"Liste"|"Historique"|"Historique"|"Statistiques"|"Statistiques"|"Réglages"|"Réglages"|
+FAIL  S6. menu : « Partager l'accès » (rien ne change à l'ouverture)
+      écran : "Retour"|"Profils"|"3 profils"|"Actualiser"|"Ajouter un profil"|"Code famille : GF72MQZT"|"À donner aux membres avec leur identifiant et leur code d'accès. Ce message ne contient aucun code d'accès."|"Partager le code famille"|"Copier"|"A"|"Adil"|"Administrateur principal"|"Vous"|"Actions pour Adil"|"L"|"Lamiaa"|"Parent"|"Actions pour Lamiaa"|"M"|"Marie"|"Personnel"|"Actions pour Marie"|"L'administrateur principal et le dernier administrateur actif sont protégés ; un administrateur ne se désactive ni ne se supprime sans perdre d'abord son rôle. Désactiver un profil n'est pas le supprimer."|"Liste"|"Liste"|"Historique"|"Historique"|"Statistiques"|"Statistiques"|"Réglages"|"Réglages"|
+FAIL  S6b. explication : code non conservé, l'ancien cessera de fonctionner
+      écran : "Retour"|"Profils"|"3 profils"|"Actualiser"|"Ajouter un profil"|"Code famille : GF72MQZT"|"À donner aux membres avec leur identifiant et leur code d'accès. Ce message ne contient aucun code d'accès."|"Partager le code famille"|"Copier"|"A"|"Adil"|"Administrateur principal"|"Vous"|"Actions pour Adil"|"L"|"Lamiaa"|"Parent"|"Actions pour Lamiaa"|"M"|"Marie"|"Personnel"|"Actions pour Marie"|"L'administrateur principal et le dernier administrateur actif sont protégés ; un administrateur ne se désactive ni ne se supprime sans perdre d'abord son rôle. Désactiver un profil n'est pas le supprimer."|"Liste"|"Liste"|"Historique"|"Historique"|"Statistiques"|"Statistiques"|"Réglages"|"Réglages"|
+FAIL  S6c. annulation : code inchangé (empreinte identique, connexion 047193 toujours valable)
+      écran : "Retour"|"Profils"|"3 profils"|"Actualiser"|"Ajouter un profil"|"Code famille : GF72MQZT"|"À donner aux membres avec leur identifiant et leur code d'accès. Ce message ne contient aucun code d'accès."|"Partager le code famille"|"Copier"|"A"|"Adil"|"Administrateur principal"|"Vous"|"Actions pour Adil"|"L"|"Lamiaa"|"Parent"|"Actions pour Lamiaa"|"M"|"Marie"|"Personnel"|"Actions pour Marie"|"L'administrateur principal et le dernier administrateur actif sont protégés ; un administrateur ne se désactive ni ne se supprime sans perdre d'abord son rôle. Désactiver un profil n'est pas le supprimer."|"Liste"|"Liste"|"Historique"|"Historique"|"Statistiques"|"Statistiques"|"Réglages"|"Réglages"|
+FAIL  S7. nouveau code généré et affiché ()
+      écran : "Retour"|"Profils"|"3 profils"|"Actualiser"|"Ajouter un profil"|"Code famille : GF72MQZT"|"À donner aux membres avec leur identifiant et leur code d'accès. Ce message ne contient aucun code d'accès."|"Partager le code famille"|"Copier"|"A"|"Adil"|"Administrateur principal"|"Vous"|"Actions pour Adil"|"L"|"Lamiaa"|"Parent"|"Actions pour Lamiaa"|"M"|"Marie"|"Personnel"|"Actions pour Marie"|"L'administrateur principal et le dernier administrateur actif sont protégés ; un administrateur ne se désactive ni ne se supprime sans perdre d'abord son rôle. Désactiver un profil n'est pas le supprimer."|"Liste"|"Liste"|"Historique"|"Historique"|"Statistiques"|"Statistiques"|"Réglages"|"Réglages"|
+FAIL  S7b. l'ancien code ne fonctionne plus ; le nouveau, si
+      écran : "Retour"|"Profils"|"3 profils"|"Actualiser"|"Ajouter un profil"|"Code famille : GF72MQZT"|"À donner aux membres avec leur identifiant et leur code d'accès. Ce message ne contient aucun code d'accès."|"Partager le code famille"|"Copier"|"A"|"Adil"|"Administrateur principal"|"Vous"|"Actions pour Adil"|"L"|"Lamiaa"|"Parent"|"Actions pour Lamiaa"|"M"|"Marie"|"Personnel"|"Actions pour Marie"|"L'administrateur principal et le dernier administrateur actif sont protégés ; un administrateur ne se désactive ni ne se supprime sans perdre d'abord son rôle. Désactiver un profil n'est pas le supprimer."|"Liste"|"Liste"|"Historique"|"Historique"|"Statistiques"|"Statistiques"|"Réglages"|"Réglages"|
+FAIL  S8. avec WhatsApp : WhatsApp s'ouvre avec le message (envoi par l'administrateur)
+      écran : "Retour"|"Profils"|"3 profils"|"Actualiser"|"Ajouter un profil"|"Code famille : GF72MQZT"|"À donner aux membres avec leur identifiant et leur code d'accès. Ce message ne contient aucun code d'accès."|"Partager le code famille"|"Copier"|"A"|"Adil"|"Administrateur principal"|"Vous"|"Actions pour Adil"|"L"|"Lamiaa"|"Parent"|"Actions pour Lamiaa"|"M"|"Marie"|"Personnel"|"Actions pour Marie"|"L'administrateur principal et le dernier administrateur actif sont protégés ; un administrateur ne se désactive ni ne se supprime sans perdre d'abord son rôle. Désactiver un profil n'est pas le supprimer."|"Liste"|"Liste"|"Historique"|"Historique"|"Statistiques"|"Statistiques"|"Réglages"|"Réglages"|
+PASS  S9. code famille : WhatsApp s'ouvre
+PASS  S9b. « Copier » le code famille
+PASS  S4. sans WhatsApp : partage Android ouvert (rien n'est envoyé)
+PASS  S4c. panneau de partage refermé sans rien envoyer, retour à l'application
+ECHECS=11
+CRASH_APPLICATION=0
+TOTAL_ECHECS=33
