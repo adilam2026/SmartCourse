@@ -34,21 +34,46 @@ sans l'accord explicite du propriétaire.
 
 - Toutes les familles, tous les membres, listes, budgets et historiques sont conservés tels quels : la migration ajoute une table
   et des colonnes, et enregistre chaque code famille existant comme alias (contrôlé par un test de migration sur une base remplie).
-- Application 1166 (ancienne) avec le nouveau serveur : connexion par code famille ou par identifiant ; un administrateur qui crée
-  un membre choisit encore un code permanent (comportement d'avant). Limite : un membre invité avec un code provisoire doit utiliser
-  la nouvelle application (l'ancienne ne propose pas l'écran de choix du code).
-- Nouvelle application avec l'ancien serveur (025) : connexion par code famille ; l'identifiant famille n'est pas proposé ; la
-  création d'un membre affiche « Cette fonction nécessite la mise à jour du serveur ».
-- Application web : connexion par identifiant ou code acceptée par le serveur ; ses écrans ne sont pas modifiés.
+- **APK 1166 et site web, comptes existants** : connexion inchangée, par code famille ou par identifiant famille.
+- **APK 1166 et site web, membre invité avec un code provisoire** : la connexion est refusée **sans ouvrir de session** et sans
+  consommer le code (réponse 426 `app_update_required`, donnée seulement si les identifiants sont exacts ; sinon message générique).
+  Rien ne permet donc de contourner le choix du code personnel.
+  - Site web : « Ce code d'accès est provisoire : choisissez d'abord votre code personnel dans l'application Mes Courses (dernière
+    version sur Google Play), puis connectez-vous ici avec ce code. »
+  - APK 1166 : il ne sait afficher que ses messages intégrés ; pour cette réponse, il affiche « Une erreur inattendue est survenue.
+    Réessayez. ». L'indication de mise à jour vient du message d'invitation reçu par WhatsApp : « Installez ou mettez à jour
+    Mes Courses depuis Google Play… ».
+  - Nouvelle application : elle déclare savoir faire choisir le code (`clientFeatures: ["provisional"]`) et affiche l'écran de choix.
+- Nouvelle application avec l'ancien serveur (025) : connexion par code famille ; l'identifiant famille n'est pas proposé ; l'ajout
+  d'un membre affiche « Cette fonction nécessite la mise à jour du serveur ».
 
 ## Retour arrière
 
+**Cible : `reference/serveur-025-compat-026`** (commit `aa64651`) = serveur de production 64af689 + correctif minimal :
+- connexion par identifiant famille (actuel ou ancien) ou par code famille ;
+- **un code provisoire n'ouvre jamais de session** (réponse identique à un code faux) : aucune dégradation de sécurité ;
+- l'administrateur peut débloquer un membre en lui choisissant un code (comme avant), ce qui lève le statut provisoire ;
+- suppression d'une famille : identifiants réduits à leur empreinte ;
+- migration 026 incluse ; suite de tests complète : 338 réussis, dont 3 propres au retour arrière.
+
 | Situation | Conduite | Données |
 |---|---|---|
-| Problème sur le nouveau serveur | Redéployer `reference/serveur-025` (64af689). La migration 026 reste en place : l'ancien serveur l'ignore (sa suite de tests passe sur un schéma 026, hors les deux contrôles de la liste des migrations) | Aucune donnée supprimée |
-| Pendant le retour arrière | Connexion par **code famille** seulement (les identifiants ne sont pas lus par l'ancien serveur). Limite : l'ancien serveur ignore l'expiration et l'usage unique, donc un code provisoire non remplacé fonctionne (même expiré ou déjà utilisé) jusqu'au retour du nouveau serveur, qui rétablit alors l'obligation de choisir son code | — |
-| Retour au nouveau serveur | Les familles créées entre-temps sont rattrapées au démarrage (code réservé comme alias) ; la connexion par code fonctionne même sans alias | Rien à faire |
+| Problème sur le nouveau serveur | Redéployer `reference/serveur-025-compat-026`. Le schéma 026 reste en place | Aucune donnée supprimée |
+| Membres avec un code provisoire non remplacé | Connexion refusée pendant le retour arrière ; l'administrateur peut leur choisir un code, ou attendre le retour du nouveau serveur (codes encore valables s'ils n'ont pas expiré) | Membres et données intacts |
+| Retour au nouveau serveur | Familles créées entre-temps rattrapées au démarrage (code réservé comme alias) | Rien à faire |
 | Application | Version construite depuis `reference/android-1.0.2-1166` avec un versionCode supérieur | — |
 | Base de données | Jamais de restauration en production sans l'accord explicite du propriétaire | Copies protégées sous `backups-conservees/` |
 
-Avant un déploiement : sauvegarde neuve vérifiée juste avant la migration (mécanisme déjà en place au démarrage du serveur).
+**À ne pas utiliser** après la migration 026 : `reference/serveur-025` (64af689) seul, qui laisserait un code provisoire valable sans
+limite. Si cela arrivait malgré tout, procédure ciblée (rien n'est supprimé ; à exécuter seulement avec l'accord du propriétaire) :
+`UPDATE profiles SET secret_hash = '!' WHERE secret_temporary;` puis fermeture de leurs sessions
+(`UPDATE sessions SET revoked_at = now() WHERE revoked_at IS NULL AND profile_id IN (SELECT id FROM profiles WHERE secret_temporary);`).
+Ces membres redemandent un code à leur administrateur.
+
+## Recette : parcours du personnel (P et J)
+
+Les 22 échecs P/J de la recette complète venaient des tests, pas de l'application : écrits le 14/10, ils supposaient l'ancien
+écran du personnel (liste d'articles nommés, sans recherche). Depuis les évolutions validées du 15/10 (affichage « Cartes, par
+catégories » par défaut, recherche pour le personnel), les articles ne sont nommés qu'en affichage Liste : le test ne trouvait pas
+« Tomates », rien n'était choisi, et toutes les étapes suivantes échouaient en cascade (mêmes 22 échecs sur la version 1166).
+Les tests ont été mis à jour (passage en « Liste, tous les articles », présence de la recherche) et rejoués : voir le compte rendu.
