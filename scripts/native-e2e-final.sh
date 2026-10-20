@@ -21,6 +21,8 @@ closeall_api() { api GET /api/lists/open >/dev/null; for l in $(jq -r '.lists[]?
 pid_of() { sql "SELECT p.id FROM products p JOIN families f ON f.id=p.family_id WHERE f.code='$FAMILY' AND p.name='$1'"; }
 add_api() { api POST "${3:-/api/lists/active/ops}" -d "{\"ops\":[{\"opId\":\"$(cat /proc/sys/kernel/random/uuid)\",\"type\":\"add\",\"productId\":\"$(pid_of "$1")\",\"quantity\":$2}]}" >/dev/null; }
 
+# Saisie : « adb shell input text » coupe au premier espace ; les espaces sont donc transmis en %s (« Famille Benali » entier).
+fill() { $UI tap "$1" ${3:-} >/dev/null || return 1; sleep 1; clear_field; adb shell input text "${2// /%s}"; sleep 1; }
 # Sections à jouer (variable SECTIONS, ex. « C » ou « C,G ») ; vide = toutes. Chaque section part de l'écran de connexion.
 want_s() { [ -z "${SECTIONS:-}" ] || [[ ",${SECTIONS// /}," == *",$1,"* ]]; }
 # Saisies VÉRIFIÉES : chaque fill() doit réussir et le champ doit afficher la valeur tapée. Le code d'accès est contrôlé en clair avec
@@ -38,7 +40,7 @@ tf_secret() {
 }
 # Champs de connexion retrouvés par leur position (identifiant famille, identifiant personnel, code), quel que soit leur contenu
 # (le téléphone retient la famille : son identifiant s'il est choisi, sinon le code famille).
-fill_field() { $UI field "$1" >/dev/null || return 1; sleep 1; clear_field; adb shell input text "$2"; sleep 1; }
+fill_field() { $UI field "$1" >/dev/null || return 1; sleep 1; clear_field; adb shell input text "${2// /%s}"; sleep 1; }
 tf_field() { fill_field "$1" "$2" || { T_ERR="champ n°$1 introuvable"; return 1; }; hide_kb; $UI has "$2" || { T_ERR="« $2 » absent après saisie"; return 1; }; }
 tf_login() { # $1 famille (identifiant ou code), $2 identifiant personnel, $3 code : formulaire rempli et vérifié, puis envoyé
   tf_field 0 "$1" || return 1; PREV_FAMILY="$1"
@@ -191,6 +193,7 @@ adb shell input swipe 540 1700 540 600 300; sleep 1
 expect "G6. Réglages : « Se déconnecter » visible" $UI wait "Se déconnecter" 8
 expect "G6b. aucune fonction technique dans Réglages" nodemo
 shot final-06-reglages
+adb shell input swipe 540 600 540 1700 300; sleep 1   # retour en haut : « Compte » est dans l'en-tête
 tapt "Compte"
 expect "G7. Compte : profil réel, sans serveur ni démonstration" bash -c "$UI wait 'Administrateur' 8 && ! $UI has 'Écrans de démo' && ! $UI has 'Serveur :'"
 shot final-07-compte
@@ -353,7 +356,7 @@ adb shell input keyevent KEYCODE_BACK; sleep 1
 tapt "Ajouter un profil"
 fill "Nom affiché" "Zoe"; hide_kb; fill "Identifiant personnel" zoe; hide_kb
 $UI tap "Personnel" >/dev/null; sleep 1
-expect "S1c. ville reprise de l'administrateur" $UI has "Ville : Casablanca"
+expect "S1c. pays de la famille confirmé : pas de ville à choisir (le membre hérite de celle de la famille)" bash -c "! $UI has 'Choisir la ville'"
 expect "S2. aucun code à choisir par l'administrateur : code provisoire annoncé" bash -c "$UI has \"Un code d'accès provisoire sera créé\" && ! $UI has 'Confirmer le code'"
 $UI tap "Créer le profil" --scroll >/dev/null; sleep 5
 $UI wait "Partager l'accès de Zoe" 15 >/dev/null

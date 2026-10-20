@@ -287,6 +287,19 @@ describe("codes d'accès provisoires des nouveaux membres", () => {
     expect(await count("SELECT count(*) n FROM profiles WHERE secret_hash LIKE '%70315826%'")).toBe(0);
   });
 
+  it("famille au pays confirmé (règle de production : ville obligatoire) : un membre ajouté sans ville hérite de celle de la famille", async () => {
+    const strict = await buildApp({ db, store: testStore(), recovery, requireCity: true, loginRateLimit: WIDE });
+    await strict.ready();
+    const f = await createFamily(); // créée au Maroc, Casablanca : pays confirmé
+    const r = await strict.inject({ method: "POST", url: "/api/profiles", cookies: f.admin, payload: { displayName: "Sami", login: "sami", role: "staff" } });
+    expect([r.statusCode, r.json().profile?.city, /^\d{6}$/.test(r.json().provisional?.code ?? "")]).toEqual([201, "Casablanca", true]);
+    // Pays non confirmé (famille ancienne) : la ville reste demandée, comme avant
+    await db.query("UPDATE families SET location_confirmed_at = NULL WHERE id = $1", [f.familyId]);
+    const r2 = await strict.inject({ method: "POST", url: "/api/profiles", cookies: f.admin, payload: { displayName: "Sara2", login: "sara2", role: "staff" } });
+    expect([r2.statusCode, r2.json().error]).toEqual([400, "city_required"]);
+    await strict.close();
+  });
+
   it("connexions simultanées avec le même code provisoire : une seule réussit", async () => {
     const f = await createFamily();
     const m = await addMember(f.admin, "nadia");

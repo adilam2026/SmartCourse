@@ -275,7 +275,9 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     const body = z
       .object({ displayName: nameField, login: loginField, role: roleField, secret: secretField.optional(), secretConfirm: z.string().optional(), city: cityIn })
       .parse(req.body);
-    const city = resolveCity(body.city, requireCity);
+    // Famille au pays (et à la ville) confirmés : l'application n'envoie pas de ville, le nouveau membre hérite de celle de la famille.
+    const located = !!(await db.query("SELECT location_confirmed_at IS NOT NULL AS l FROM families WHERE id = $1", [req.auth!.familyId])).rows[0]?.l;
+    const city = resolveCity(body.city, requireCity && !located);
     return reply.code(201).send(await createProfile(db, req.auth!, { ...body, city }));
   });
 
