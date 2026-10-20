@@ -231,7 +231,7 @@ $UI tap "Terminer ma sélection" >/dev/null
 expect "P2. « Sélection enregistrée »" $UI wait "Sélection enregistrée" 10
 expect "P2b. reste sur Choisir" $UI has "Choisir mes articles"
 expect "P2c. serveur : liste du jour créée par la demande ($(st Tomates))" test "$(st Tomates)" = "1.000 kg to_buy"
-expect "P2d. quantité enregistrée affichée" $UI wait "Enregistré · 1 kg" 10
+expect "P2d. quantité enregistrée affichée" $UI wait "Dans la liste · 1 kg" 10
 shot final-10-personnel-enregistre
 docker stop sc-recette-app >/dev/null
 $UI tap "Modifier la quantité : Tomates" >/dev/null; sleep 2; $UI tap "Augmenter" >/dev/null; sleep 1; $UI tap "Mettre à jour" >/dev/null; sleep 2
@@ -270,16 +270,16 @@ expect "J1. sélection enregistrée sur la liste ouverte ($(items_of $LJ))" test
 D0=$(adb shell date +%Y-%m-%d | tr -d '\r'); setclock "$(date -u -d "$D0 23:59:20" +%s)"; sleep 75
 D1=$(adb shell date +%Y-%m-%d | tr -d '\r')
 expect "J2. l'horloge du téléphone est passée minuit ($D0 → $D1)" test "$D1" != "$D0"
-expect "J2b. après minuit, application ouverte : sélection toujours affichée (Enregistré · 1 kg)" $UI wait "Enregistré · 1 kg" 15
+expect "J2b. après minuit, application ouverte : sélection toujours affichée (Dans la liste · 1 kg)" $UI wait "Dans la liste · 1 kg" 15
 launch
-expect "J2c. après minuit, application relancée : toujours sur Choisir, sélection conservée" bash -c "$UI wait 'Choisir mes articles' 20 && $UI wait 'Enregistré · 1 kg' 15"
+expect "J2c. après minuit, application relancée : toujours sur Choisir, sélection conservée" bash -c "$UI wait 'Choisir mes articles' 20 && $UI wait 'Dans la liste · 1 kg' 15"
 expect "J2d. serveur : même liste, toujours ouverte" test "$(sql "SELECT status FROM lists WHERE id='$LJ'")" = active
 shot final-12-apres-minuit
 # Liste ouverte plusieurs jours : créée il y a 3 jours côté serveur, téléphone 3 jours plus tard
 sql "UPDATE lists SET created_at = now() - interval '3 days' WHERE id='$LJ'" >/dev/null
 setclock $(( $(devnow) + 3*86400 )); sleep 3
 launch
-expect "J3. trois jours plus tard : sélection et quantité conservées" bash -c "$UI wait 'Choisir mes articles' 20 && $UI wait 'Enregistré · 1 kg' 15"
+expect "J3. trois jours plus tard : sélection et quantité conservées" bash -c "$UI wait 'Choisir mes articles' 20 && $UI wait 'Dans la liste · 1 kg' 15"
 $UI tap "Modifier la quantité : Tomates" >/dev/null; sleep 2; $UI tap "Augmenter" >/dev/null; sleep 1; $UI tap "Mettre à jour" >/dev/null; sleep 2
 $UI tap "Terminer ma sélection" >/dev/null; sleep 4
 expect "J3b. modification enregistrée sur la MÊME liste ($(items_of $LJ))" test "$(items_of $LJ)" = "Tomates 1.500 to_buy"
@@ -345,7 +345,8 @@ $UI tap "•" >/dev/null; clear_field; hide_kb
 fi
 
 check_or_stop() { local l=$1; shift; if "$@"; then ok "$l"; else ko "$l${T_ERR:+ — $T_ERR}"; fi; T_ERR=""; }
-login_code() { curl -s -o /tmp/lc.out -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d "{\"familyCode\":\"$1\",\"login\":\"$2\",\"secret\":\"$3\"}"; }
+# Connexion directe comme la nouvelle application (elle déclare savoir faire choisir le code personnel après un code provisoire).
+login_code() { curl -s -o /tmp/lc.out -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d "{\"familyCode\":\"$1\",\"login\":\"$2\",\"secret\":\"$3\",\"clientFeatures\":[\"provisional\"]}"; }
 prov_on_screen() { screen_grep "provisoire : [0-9]{6}" | grep -oE "[0-9]{6}"; }
 
 if want_s S; then
@@ -394,7 +395,7 @@ if [ -n "${WA_STUB:-}" ] && adb install -r "$WA_STUB" >/dev/null 2>&1; then
   $UI tap "Générer et partager" >/dev/null; sleep 5
   NEWC=$(prov_on_screen)
   expect "S7. nouveau code provisoire généré et affiché ($NEWC)" bash -c "[[ '$NEWC' =~ ^[0-9]{6}$ ]] && test '$NEWC' != '$PROV'"
-  expect "S7b. l'ancien code ne fonctionne plus ; le nouveau ouvre une session limitée au choix du code" bash -c "test \"\$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"$FAMILY\",\"login\":\"zoe\",\"secret\":\"$PROV\"}')\" = 401 && curl -s -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"$FAMILY\",\"login\":\"zoe\",\"secret\":\"$NEWC\"}' | grep -q '\"mustChangeSecret\":true'"
+  expect "S7b. l'ancien code ne fonctionne plus ; le nouveau ouvre une session limitée au choix du code" bash -c "test \"\$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"$FAMILY\",\"login\":\"zoe\",\"secret\":\"$PROV\"}')\" = 401 && curl -s -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"$FAMILY\",\"login\":\"zoe\",\"secret\":\"$NEWC\",\"clientFeatures\":[\"provisional\"]}' | grep -q '\"mustChangeSecret\":true'"
   shot final-s4-nouveau-code-partage
   adb logcat -c
   $UI tap "Partager l'accès" --last >/dev/null; sleep 3
@@ -507,7 +508,7 @@ expect "I11. code provisoire expiré ($OPROV) : message générique" $UI wait "I
 tf_login "LesRecette05" adil 482913; $UI wait "Compte" 20 >/dev/null
 tapt "Réglages"; tapt "Profils"; $UI tap "Actions pour Omar" >/dev/null; sleep 1; tapt "Nouveau code provisoire"; tapt "Générer et partager"; sleep 3
 ONEW=$(prov_on_screen)
-expect "I12. renouvellement : nouveau code affiché ($ONEW) ; l'ancien refusé, le nouveau accepté" bash -c "[[ '$ONEW' =~ ^[0-9]{6}$ ]] && test '$ONEW' != '$OPROV' && test \"\$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"LesRecette05\",\"login\":\"omar\",\"secret\":\"$OPROV\"}')\$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"LesRecette05\",\"login\":\"omar\",\"secret\":\"$ONEW\"}')\" = 401200"
+expect "I12. renouvellement : nouveau code affiché ($ONEW) ; l'ancien refusé, le nouveau accepté" bash -c "[[ '$ONEW' =~ ^[0-9]{6}$ ]] && test '$ONEW' != '$OPROV' && test \"\$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"LesRecette05\",\"login\":\"omar\",\"secret\":\"$OPROV\"}')\$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"LesRecette05\",\"login\":\"omar\",\"secret\":\"$ONEW\",\"clientFeatures\":[\"provisional\"]}')\" = 401200"
 shot final-i10-renouvellement
 sleep 6; $UI tap "Fermer" --last >/dev/null; sleep 2
 logout
