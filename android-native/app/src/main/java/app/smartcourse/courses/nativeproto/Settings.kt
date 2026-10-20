@@ -53,7 +53,7 @@ fun AdminHubScreen(nav: (String) -> Unit) {
                 PrimaryButton("Confirmer", { nav("v15") }, Modifier.fillMaxWidth())
             }
             // Identifiant famille pas encore choisi (familles existantes) : invitation discrète, rien n'est imposé.
-            val fam = demo.data?.me?.family
+            val fam = demo.data?.session?.signedMe?.family   // profil actualisé (l'identifiant vient peut-être d'être choisi)
             if (fam != null && fam.loginId == null && demo.data?.me?.role == "admin" && schemaNumber(demo.serverSchema)?.let { it >= 26 } == true) SCard(padding = PaddingValues(14.dp)) {
                 Text("Choisissez votre identifiant famille", style = MaterialTheme.typography.titleSmall)
                 Text("Plus simple à dicter que le code ${fam.code}, par exemple ${FamilyIdRules.propose(fam.name)}. L'ancien code famille restera valable pour se connecter. Vous pourrez le modifier plus tard.", style = MaterialTheme.typography.bodySmall)

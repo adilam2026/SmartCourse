@@ -36,16 +36,17 @@ tf_secret() {
   $UI tap "Masquer le code" >/dev/null; sleep 1; $UI has "$1" && { T_ERR="code resté visible"; r=1; }
   return $r
 }
-tf_login() { # $1 famille, $2 identifiant, $3 code : formulaire rempli et vérifié, puis envoyé
-  # Champ retrouvé par sa valeur précédente si elle est affichée, sinon par son libellé (ex. code famille non mémorisé pour le personnel).
-  local tf=Code\ famille tl=Identifiant
-  [ -n "${PREV_FAMILY:-}" ] && $UI has "$PREV_FAMILY" && tf="$PREV_FAMILY"
-  [ -n "${PREV_LOGIN:-}" ] && $UI has "$PREV_LOGIN" && tl="$PREV_LOGIN"
-  tf_text "$tf" "$1" || return 1; PREV_FAMILY="$1"
-  tf_text "$tl" "$2" || return 1; PREV_LOGIN="$2"
+# Champs de connexion retrouvés par leur position (identifiant famille, identifiant personnel, code), quel que soit leur contenu
+# (le téléphone retient la famille : son identifiant s'il est choisi, sinon le code famille).
+fill_field() { $UI field "$1" >/dev/null || return 1; sleep 1; clear_field; adb shell input text "$2"; sleep 1; }
+tf_field() { fill_field "$1" "$2" || { T_ERR="champ n°$1 introuvable"; return 1; }; hide_kb; $UI has "$2" || { T_ERR="« $2 » absent après saisie"; return 1; }; }
+tf_login() { # $1 famille (identifiant ou code), $2 identifiant personnel, $3 code : formulaire rempli et vérifié, puis envoyé
+  tf_field 0 "$1" || return 1; PREV_FAMILY="$1"
+  tf_field 1 "$2" || return 1; PREV_LOGIN="$2"
   tf_secret "$3" || return 1
   $UI tap "Se connecter" --last >/dev/null; sleep 4
 }
+signin() { fill_field 0 "$1"; hide_kb; fill_field 1 "$2"; hide_kb; fill_field 2 "$3"; hide_kb; $UI tap "Se connecter" --last >/dev/null; sleep 3; PREV_FAMILY="$1"; PREV_LOGIN="$2"; }
 if want_s F; then
 echo "═══ F. Version finale : identifiant, nom, serveur fixe ═══" | tee -a "$OUT/resultats.txt"
 expect "F0. identifiant app.smartcourse.courses.natif installé" bash -c "adb shell pm list packages | grep -qx 'package:app.smartcourse.courses.natif'"
@@ -73,10 +74,12 @@ mails() { docker exec sc-recette-app node -e "fetch('http://127.0.0.1:3199/__sen
 lastcode() { docker exec sc-recette-app node -e "fetch('http://127.0.0.1:3199/__sent?to=$NEWMAIL').then(r=>r.json()).then(j=>console.log((j.at(-1)||{subject:''}).subject.match(/(\d{6})/)?.[1]||''))"; }
 FAM_BEFORE=$(sql "SELECT count(*) FROM families")
 $UI tap "Première connexion" >/dev/null; sleep 1; $UI tap "Créer ma famille" >/dev/null; sleep 2
-expect "C1. formulaire direct (aucun lien, jeton ni serveur)" bash -c "$UI wait 'Nom de la famille' 10 && ! $UI has 'jeton' && ! $UI has 'installé le serveur' && ! $UI has 'Serveur'"
-fill "Nom de la famille" "Famille Benali" --scroll; hide_kb
+expect "C1. formulaire direct (aucun lien, jeton ni serveur)" bash -c "$UI wait 'Nom affiché de la famille' 10 && ! $UI has 'jeton' && ! $UI has 'installé le serveur' && ! $UI has 'Serveur'"
+fill "Nom affiché de la famille" "Famille Benali" --scroll; hide_kb
+NEWID=FamilleBenali
+expect "C1a. identifiant famille proposé d'après le nom et disponible ($NEWID)" bash -c "$UI wait '$NEWID' 8 && $UI wait 'Disponible' 10"
 fill "Votre prénom" "Karim" --scroll; hide_kb
-fill "Votre identifiant" "$NEWLOGIN" --scroll; hide_kb
+fill "Identifiant personnel" "$NEWLOGIN" --scroll; hide_kb
 # Ville choisie sans ambiguïté (la liste contient « Casablanca » et « Casablanca Anfa ») : la valeur attendue en base est exactement celle-ci.
 NEWCITY="Casablanca Anfa"
 $UI tap "Pays : " --scroll >/dev/null; sleep 2; fill "Rechercher un pays" "maroc"; hide_kb; $UI tap "Maroc" --last >/dev/null; sleep 2
@@ -110,15 +113,16 @@ $UI tap "Recevoir un nouveau code" >/dev/null; sleep 5
 expect "C4c. nouveau code envoyé ($(mails) e-mails au total)" test "$(mails)" = 2
 fill "Code reçu par e-mail" "$(lastcode)"; hide_kb   # champ vidé par le renvoi : libellé de nouveau visible
 $UI tap "Créer ma famille" --last >/dev/null; sleep 6
-expect "C5. famille créée et utilisateur connecté : code famille affiché" $UI wait "Votre famille est créée" 20
+expect "C5. famille créée et utilisateur connecté : identifiant famille affiché" $UI wait "Votre famille est créée" 20
 NEWCODE=$(sql "SELECT f.code FROM families f JOIN profiles p ON p.family_id=f.id WHERE p.recovery_email='$NEWMAIL'")
-expect "C5b. code famille généré ($NEWCODE) affiché à l'écran" $UI has "${NEWCODE:-ABSENT}"
+NEWALIAS=$(sql "SELECT a.alias FROM family_aliases a JOIN families f ON f.id=a.family_id WHERE f.code='${NEWCODE:-X}' AND a.kind='current'")
+expect "C5b. identifiant famille ($NEWID) affiché à l'écran et enregistré pour la famille (« $NEWALIAS »)" bash -c "$UI has 'Identifiant famille' && $UI has '$NEWID' && test '$NEWALIAS' = '$NEWID'"
 NBF=$(sql "SELECT count(*) FROM families"); PROF=$(sql "SELECT p.is_primary::text||' '||(p.recovery_email_verified_at IS NOT NULL)::text||' '||p.city||' '||p.login FROM profiles p WHERE p.recovery_email='$NEWMAIL'")
 expect "C5c. serveur : une seule famille créée ($FAM_BEFORE → $NBF)" test "$NBF" = "$((FAM_BEFORE + 1))"
 expect "C5d. serveur : administrateur principal, adresse vérifiée, ville, identifiant (attendu « true true $NEWCITY $NEWLOGIN », obtenu « $PROF »)" test "$PROF" = "true true $NEWCITY $NEWLOGIN"
 shot final-c3-famille-creee
 $UI tap "Copier" >/dev/null
-expect "C6. Copier : confirmation visible dans le panneau" $UI wait "Code famille copié" 8
+expect "C6. Copier : confirmation visible dans le panneau" $UI wait "Identifiant famille copié" 8
 $UI tap "Partager" >/dev/null; sleep 3
 expect "C7. Partager : fenêtre de partage Android" bash -c "adb shell dumpsys activity activities | grep -qE 'ChooserActivity|ResolverActivity'"
 adb shell input keyevent KEYCODE_BACK; sleep 2
@@ -129,10 +133,10 @@ login_api adil 482913
 S=$(curl -s -o /tmp/api.out -w '%{http_code}' -X POST "$BASE/api/signup/start" -H 'content-type: application/json' -d "{\"requestId\":\"$(cat /proc/sys/kernel/random/uuid)\",\"familyName\":\"Doublon\",\"displayName\":\"K\",\"login\":\"k2\",\"city\":\"Casablanca\",\"email\":\"$NEWMAIL\",\"secret\":\"274915\",\"secretConfirm\":\"274915\"}")
 expect "C9. doublon : la même adresse ne crée pas une seconde famille ($S $(jq -r .error /tmp/api.out))" test "$S" = 409 -a "$(jq -r .error /tmp/api.out)" = email_in_use
 logout
-# Après déconnexion, le formulaire est déjà rempli avec le code famille et l'identifiant du dernier profil : seul le code d'accès est saisi.
-expect "C10. formulaire de connexion prérempli avec le code famille généré" bash -c "$UI has '$NEWCODE' && $UI has '$NEWLOGIN'"
+# Après déconnexion, le formulaire est déjà rempli avec l'identifiant famille et l'identifiant du dernier profil : seul le code d'accès est saisi.
+expect "C10. formulaire de connexion prérempli avec l'identifiant famille ($NEWID)" bash -c "$UI has '$NEWID' && $UI has '$NEWLOGIN'"
 fill "Code d'accès" 274915; hide_kb
-$UI tap "Se connecter" --last >/dev/null; sleep 4; PREV_FAMILY="$NEWCODE"; PREV_LOGIN="$NEWLOGIN"
+$UI tap "Se connecter" --last >/dev/null; sleep 4; PREV_FAMILY="$NEWID"; PREV_LOGIN="$NEWLOGIN"
 expect "C10b. connecté à la nouvelle famille avec ses accès" $UI wait "Ma liste" 20
 logout
 # Plafond quotidien (100 familles par défaut) atteint : base de recette JETABLE remplie de 100 créations fictives du jour
@@ -140,7 +144,7 @@ sql "INSERT INTO family_signups (request_id, email, email_hash, family_name, dis
      SELECT gen_random_uuid(), 'plafond'||g||'@example.org', md5('plafond'||g), 'P', 'P', 'p', 'Casablanca', 'x', 'x', now(), now() FROM generate_series(1, 100) g" >/dev/null
 CAPMAIL="plafond.$(date +%s)@example.org"
 $UI tap "Première connexion" >/dev/null; sleep 1; $UI tap "Créer ma famille" >/dev/null; sleep 2
-fill "Nom de la famille" "Famille Plafond" --scroll; hide_kb; fill "Votre prénom" "Nadia" --scroll; hide_kb; fill "Votre identifiant" "nadia" --scroll; hide_kb
+fill "Nom affiché de la famille" "Famille Plafond" --scroll; hide_kb; fill "Votre prénom" "Nadia" --scroll; hide_kb; fill "Identifiant personnel" "nadia" --scroll; hide_kb
 $UI tap "Pays : " --scroll >/dev/null; sleep 2; fill "Rechercher un pays" "maroc"; hide_kb; $UI tap "Maroc" --last >/dev/null; sleep 2
 $UI tap "Ville : " --scroll >/dev/null; sleep 2; fill "Rechercher une ville" "rabat"; hide_kb; $UI tap "Rabat" --last >/dev/null; sleep 2
 fill "E-mail de récupération" "$CAPMAIL" --scroll; hide_kb; fill "Code d'accès" 583014 --scroll; hide_kb; fill "Confirmez le code" 583014 --scroll; hide_kb
@@ -331,33 +335,32 @@ expect "K3. code remasqué" bash -c "! $UI has '04719328'"
 $UI tap "•" >/dev/null; clear_field; hide_kb
 fi
 
+check_or_stop() { local l=$1; shift; if "$@"; then ok "$l"; else ko "$l${T_ERR:+ — $T_ERR}"; fi; T_ERR=""; }
+login_code() { curl -s -o /tmp/lc.out -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d "{\"familyCode\":\"$1\",\"login\":\"$2\",\"secret\":\"$3\"}"; }
+prov_on_screen() { screen_grep "provisoire : [0-9]{6}" | grep -oE "[0-9]{6}"; }
+
 if want_s S; then
-echo "═══ S. Partager l'accès d'un membre (famille JETABLE) ═══" | tee -a "$OUT/resultats.txt"
+echo "═══ S. Accès d'un nouveau membre : code provisoire, partage, nouveau code (famille JETABLE) ═══" | tee -a "$OUT/resultats.txt"
 export -f sql   # utilisée dans les contrôles « bash -c »
 FID=$(sql "SELECT id FROM families WHERE code='$FAMILY'")
 launch; $UI wait "Bienvenue" 25 >/dev/null
-check_or_stop() { local l=$1; shift; if "$@"; then ok "$l"; else ko "$l${T_ERR:+ — $T_ERR}"; fi; T_ERR=""; }
 check_or_stop "S0. administrateur connecté (saisies vérifiées)" tf_login "$FAMILY" adil 482913
 $UI wait "Compte" 25 >/dev/null
 tapt "Réglages"; tapt "Profils"
-expect "S1. code famille affiché avec « Partager le code famille » et « Copier »" bash -c "$UI wait 'Code famille : $FAMILY' 15 && $UI has 'Partager le code famille' && $UI has 'Copier'"
-expect "S1b. son propre profil : partage impossible" bash -c "$UI tap 'Actions pour Adil' >/dev/null; sleep 1; $UI has 'Partage impossible'"
+expect "S1. identifiant famille (ici l'ancien code, aucun identifiant choisi) avec « Partager » et « Copier »" bash -c "$UI wait 'Identifiant famille : $FAMILY' 15 && $UI has 'Partager' && $UI has 'Copier'"
+expect "S1b. son propre profil : « Modifier mon code d'accès », jamais de code provisoire" bash -c "$UI tap 'Actions pour Adil' >/dev/null; sleep 1; $UI has \"Modifier mon code d'accès\" && ! $UI has 'Nouveau code provisoire'"
 adb shell input keyevent KEYCODE_BACK; sleep 1
-# Création d'un membre (code commençant par zéro), clavier numérique, puis partage proposé tout de suite
 tapt "Ajouter un profil"
-fill "Nom affiché" "Zoe"; hide_kb; fill "Identifiant de connexion" zoe; hide_kb
+fill "Nom affiché" "Zoe"; hide_kb; fill "Identifiant personnel" zoe; hide_kb
 $UI tap "Personnel" >/dev/null; sleep 1
 expect "S1c. ville reprise de l'administrateur" $UI has "Ville : Casablanca"
-$UI tap "Code d'accès" --scroll >/dev/null; sleep 1
-expect "S2. création : clavier numérique ($(ime_type))" test "$(ime_type)" = 0x12
-adb shell input text 047193; hide_kb
-fill "Confirmer le code" 047193 --scroll; hide_kb
-$UI tap "Afficher le code" >/dev/null; sleep 1
-expect "S2b. code saisi avec son zéro initial (047193)" $UI has "047193"
-$UI tap "Masquer le code" >/dev/null; sleep 1
+expect "S2. aucun code à choisir par l'administrateur : code provisoire annoncé" bash -c "$UI has \"Un code d'accès provisoire sera créé\" && ! $UI has 'Confirmer le code'"
 $UI tap "Créer le profil" --scroll >/dev/null; sleep 5
-expect "S3. partage proposé dès la création" bash -c "$UI wait \"Partager l'accès de Zoe\" 15 && $UI has 'Code famille : $FAMILY' && $UI has 'Identifiant : zoe' && $UI has \"Code d'accès : 047193\""
-expect "S3b. serveur : profil créé, code non stocké en clair" bash -c "test \"\$(sql \"SELECT count(*) FROM profiles WHERE family_id='$FID' AND login='zoe' AND secret_hash NOT LIKE '%047193%'\")\" = 1"
+$UI wait "Partager l'accès de Zoe" 15 >/dev/null
+PROV=$(prov_on_screen)
+expect "S3. partage proposé dès la création : identifiant famille, identifiant personnel, code provisoire 7 jours ($PROV)" bash -c "$UI has 'Identifiant famille : $FAMILY' && $UI has 'Identifiant personnel : zoe' && $UI has 'valable 7 jours' && [[ '$PROV' =~ ^[0-9]{6}$ ]]"
+expect "S3b. serveur : code provisoire valable 7 jours, non stocké en clair" test "$(sql "SELECT count(*) FROM profiles WHERE family_id='$FID' AND login='zoe' AND secret_temporary AND secret_used_at IS NULL AND secret_expires_at BETWEEN now() + interval '6 days 23 hours' AND now() + interval '7 days 1 minute' AND secret_hash NOT LIKE '%${PROV:-X}%'")" = 1
+expect "S3c. « Code d'accès provisoire », jamais « mot de passe »" bash -c "$UI has \"Code d'accès provisoire\" && ! $UI has 'ot de passe'"
 shot final-s1-partage-apres-creation
 $UI tap "Copier les informations" >/dev/null; sleep 1
 expect "S4b. « Copier les informations »" $UI wait "Informations copiées" 5
@@ -366,26 +369,23 @@ expect "S4b. « Copier les informations »" $UI wait "Informations copiées" 5
 sleep 10
 $UI tap "Fermer" --last >/dev/null; sleep 2
 expect "S4d. panneau de partage de l'application fermé" $UI gone "Informations copiées" 5
-expect "S5. le code partagé fonctionne (zéro initial) : connexion de Zoé" test "$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d "{\"familyCode\":\"$FAMILY\",\"login\":\"zoe\",\"secret\":\"047193\"}")" = 200
-# Profil existant : le code n'est pas récupérable ; annulation sans aucun changement
+# Profil existant : un code n'est jamais réaffiché ; « Nouveau code provisoire » annulé sans aucun changement
 HASH0=$(sql "SELECT secret_hash FROM profiles WHERE family_id='$FID' AND login='zoe'")
 $UI tap "Actions pour Zoe" >/dev/null; sleep 1
-expect "S6. menu : « Partager l'accès » (rien ne change à l'ouverture)" bash -c "$UI has \"Partager l'accès\" && test \"\$(sql \"SELECT secret_hash FROM profiles WHERE family_id='$FID' AND login='zoe'\")\" = '$HASH0'"
-$UI tap "Partager l'accès" >/dev/null; sleep 2
-expect "S6b. explication : code non conservé, l'ancien cessera de fonctionner" bash -c "$UI has 'pas conservé en clair' && $UI has \"L'ancien code cessera de fonctionner\""
+expect "S6. menu : « Nouveau code provisoire » (rien ne change à l'ouverture)" bash -c "$UI has 'Nouveau code provisoire' && test \"\$(sql \"SELECT secret_hash FROM profiles WHERE family_id='$FID' AND login='zoe'\")\" = '$HASH0'"
+$UI tap "Nouveau code provisoire" >/dev/null; sleep 2
+expect "S6b. explication : code jamais affiché, l'ancien cesse aussitôt de fonctionner, 7 jours" bash -c "$UI has 'jamais affiché' && $UI has 'cessera aussitôt de fonctionner' && $UI has '7 jours'"
 shot final-s3-nouveau-code-confirmation
 $UI tap "Annuler" >/dev/null; sleep 2
-expect "S6c. annulation : code inchangé (empreinte identique, connexion 047193 toujours valable)" bash -c "test \"\$(sql \"SELECT secret_hash FROM profiles WHERE family_id='$FID' AND login='zoe'\")\" = '$HASH0' && test \"\$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"$FAMILY\",\"login\":\"zoe\",\"secret\":\"047193\"}')\" = 200"
+expect "S6c. annulation : code inchangé (empreinte identique)" test "$(sql "SELECT secret_hash FROM profiles WHERE family_id='$FID' AND login='zoe'")" = "$HASH0"
 # Avec WhatsApp (application d'essai portant l'identifiant com.whatsapp) : nouveau code après confirmation, puis partage
 if [ -n "${WA_STUB:-}" ] && adb install -r "$WA_STUB" >/dev/null 2>&1; then
   back_to_app
-  $UI tap "Actions pour Zoe" >/dev/null; sleep 1; $UI tap "Partager l'accès" >/dev/null; sleep 2
-  $UI tap "Générer un nouveau code et partager" >/dev/null; sleep 5
-  NEWC=$(screen_grep "accès : [0-9]{6}" | grep -oE "[0-9]{6}")   # XML : l'apostrophe y est échappée
-  expect "S7. nouveau code généré et affiché ($NEWC)" bash -c "[[ '$NEWC' =~ ^[0-9]{6}$ ]] && test '$NEWC' != 047193"
-  expect "S7b. l'ancien code ne fonctionne plus ; le nouveau, si" bash -c "
-    test \"\$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"$FAMILY\",\"login\":\"zoe\",\"secret\":\"047193\"}')\" = 401 &&
-    test \"\$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"$FAMILY\",\"login\":\"zoe\",\"secret\":\"$NEWC\"}')\" = 200"
+  $UI tap "Actions pour Zoe" >/dev/null; sleep 1; $UI tap "Nouveau code provisoire" >/dev/null; sleep 2
+  $UI tap "Générer et partager" >/dev/null; sleep 5
+  NEWC=$(prov_on_screen)
+  expect "S7. nouveau code provisoire généré et affiché ($NEWC)" bash -c "[[ '$NEWC' =~ ^[0-9]{6}$ ]] && test '$NEWC' != '$PROV'"
+  expect "S7b. l'ancien code ne fonctionne plus ; le nouveau ouvre une session limitée au choix du code" bash -c "test \"\$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"$FAMILY\",\"login\":\"zoe\",\"secret\":\"$PROV\"}')\" = 401 && curl -s -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"$FAMILY\",\"login\":\"zoe\",\"secret\":\"$NEWC\"}' | grep -q '\"mustChangeSecret\":true'"
   shot final-s4-nouveau-code-partage
   adb logcat -c
   $UI tap "Partager l'accès" --last >/dev/null; sleep 3
@@ -393,26 +393,126 @@ if [ -n "${WA_STUB:-}" ] && adb install -r "$WA_STUB" >/dev/null 2>&1; then
   back_to_app
   $UI tap "Fermer" --last >/dev/null; sleep 2
   adb logcat -c
-  $UI tap "Partager le code famille" >/dev/null; sleep 3
-  expect "S9. code famille : WhatsApp s'ouvre" test "$(started 'com.whatsapp')" -ge 1
+  $UI tap "Partager" >/dev/null; sleep 3
+  expect "S9. identifiant famille : WhatsApp s'ouvre" test "$(started 'com.whatsapp')" -ge 1
   back_to_app
   adb uninstall com.whatsapp >/dev/null 2>&1
 else
   ko "S7. application d'essai WhatsApp non installée (WA_STUB=${WA_STUB:-absent})"
 fi
 $UI tap "Copier" --last >/dev/null; sleep 1
-expect "S9b. « Copier » le code famille" $UI wait "Copié" 5
+expect "S9b. « Copier » l'identifiant famille" $UI wait "Copié" 5
 sleep 10   # aperçu du presse-papiers d'Android
 shot final-s5-profils-code-famille
 # Partage Android sans WhatsApp, joué en dernier : l'émulateur Google peut ouvrir ensuite, avec un délai variable, l'accueil de
 # Quick Share (hors application), qui masquerait les étapes suivantes.
 adb uninstall com.whatsapp >/dev/null 2>&1; adb logcat -c
-$UI tap "Partager le code famille" >/dev/null; sleep 3
+$UI tap "Partager" >/dev/null; sleep 3
 expect "S4. sans WhatsApp : partage Android ouvert (rien n'est envoyé)" test "$(started 'android.intent.action.CHOOSER')" -ge 1
 shot final-s2-partage-android
 sleep 8
 expect "S4c. panneau de partage refermé sans rien envoyer, retour à l'application" back_to_app
 logout
+fi
+
+if want_s I; then
+echo "═══ I. Identifiant famille : choix, connexion, changement, alias, invitation, expiration, renouvellement, isolation ═══" | tee -a "$OUT/resultats.txt"
+export -f sql
+FID=$(sql "SELECT id FROM families WHERE code='$FAMILY'")
+footprint() { sql "SELECT md5((SELECT count(*) FROM profiles WHERE family_id='$FID')||'/'||(SELECT count(*) FROM lists WHERE family_id='$FID')||'/'||(SELECT count(*) FROM list_items WHERE family_id='$FID')||'/'||(SELECT count(*) FROM purchases WHERE family_id='$FID')||'/'||(SELECT count(*) FROM products WHERE family_id='$FID')||'/'||(SELECT string_agg(secret_hash, ',' ORDER BY id) FROM profiles WHERE family_id='$FID')||'/'||(SELECT name FROM families WHERE id='$FID'))"; }
+FP0=$(footprint)
+launch; $UI wait "Bienvenue" 25 >/dev/null
+check_or_stop "I0. connexion avec l'ancien code famille (accès existants inchangés)" tf_login "$FAMILY" adil 482913
+$UI wait "Compte" 25 >/dev/null
+tapt "Réglages"
+expect "I1. Réglages : invitation à choisir l'identifiant famille (ancien code rappelé)" bash -c "$UI wait 'Choisissez votre identifiant famille' 10 && $UI has '$FAMILY'"
+shot final-i1-reglages
+tapt "Choisir l'identifiant"
+expect "I2. écran de choix : proposition d'après le nom (Recette), disponible ; ce qui ne change pas" bash -c "$UI wait 'Disponible' 15 && $UI has 'Recette' && $UI has 'Ce qui ne change pas' && $UI has '$FAMILY'"
+shot final-i2-choix
+# Identifiant déjà réservé ailleurs (empreinte insérée dans la base JETABLE de recette)
+sql "INSERT INTO family_aliases (alias_hash, alias, kind) VALUES (sha256(convert_to('pris_ailleurs','UTF8')), 'Pris_Ailleurs', 'former') ON CONFLICT DO NOTHING" >/dev/null
+fill_field 0 "pris_ailleurs"; hide_kb
+expect "I3. « Cet identifiant famille est déjà utilisé » (majuscules indifférentes) et propositions disponibles" bash -c "$UI wait 'déjà utilisé' 15 && $UI has 'Identifiants disponibles'"
+expect "I3b. enregistrement impossible avec cet identifiant" bash -c "! $UI enabled 'Enregistrer pris_ailleurs'"
+shot final-i3-indisponible
+$UI tap "_20" >/dev/null; sleep 3   # proposition « …_<année> »
+expect "I3c. proposition touchée : disponible" $UI wait "Disponible" 15
+fill_field 0 "LesRecette04"; hide_kb
+$UI wait "Disponible" 15 >/dev/null
+tapt "Enregistrer LesRecette04"
+expect "I4. confirmation : l'ancien code reste valable" bash -c "$UI wait 'Enregistrer LesRecette04 ?' 10 && $UI has '$FAMILY'"
+shot final-i4-confirmation
+$UI tap "Enregistrer" --last >/dev/null; sleep 4
+expect "I4b. identifiant enregistré et affiché ; ancien code accepté" bash -c "$UI wait 'Ancien code accepté' 15 && $UI has 'LesRecette04'"
+expect "I4c. serveur : identifiant actuel + code famille conservé" test "$(sql "SELECT string_agg(kind||':'||alias, ',' ORDER BY kind) FROM family_aliases WHERE family_id='$FID'")" = "code:$FAMILY,current:LesRecette04"
+expect "I4d. membres, listes, achats, produits, codes et nom de la famille inchangés" test "$(footprint)" = "$FP0"
+shot final-i5-identifiant-enregistre
+logout
+expect "I5. connexion : identifiant famille retenu sur le téléphone (LesRecette04)" $UI has "LesRecette04"
+shot final-i6-connexion
+check_or_stop "I5b. connexion avec l'identifiant en minuscules" tf_login "lesrecette04" adil 482913
+expect "I5c. connecté" $UI wait "Compte" 20
+logout
+check_or_stop "I6. ancien code famille toujours accepté (membre du personnel)" tf_login "$FAMILY" marie 573918
+expect "I6b. connectée" $UI wait "Compte" 20
+logout
+# Message générique : identifiant inconnu, code faux, membre d'une autre famille
+expect "I7. serveur : réponse identique (identifiant inconnu / code faux)" test "$(login_code Inconnue_42 adil 482913; cat /tmp/lc.out)" = "$(login_code LesRecette04 adil 999999; cat /tmp/lc.out)"
+tf_login "Inconnue_42" adil 482913
+expect "I7b. application : message générique" $UI wait "Identifiants incorrects ou accès temporairement bloqué" 10
+shot final-i7-erreur
+# Changement d'identifiant : l'ancien reste un alias permanent
+tf_login "LesRecette04" adil 482913; $UI wait "Compte" 20 >/dev/null
+tapt "Réglages"; tapt "Identifiant famille"
+expect "I8. réglages : identifiant actuel avec Partager et Modifier" bash -c "$UI wait 'LesRecette04' 10 && $UI has 'Modifier' && $UI has 'Partager'"
+tapt "Modifier"; fill_field 0 "LesRecette05"; hide_kb; $UI wait "Disponible" 15 >/dev/null
+tapt "Enregistrer LesRecette05"; $UI tap "Enregistrer" --last >/dev/null; sleep 4
+expect "I8b. nouvel identifiant enregistré ; l'ancien devient un alias" bash -c "$UI wait 'LesRecette05' 10 && test \"\$(sql \"SELECT string_agg(kind||':'||alias, ',' ORDER BY alias) FROM family_aliases WHERE family_id='$FID' AND kind<>'code'\")\" = 'former:LesRecette04,current:LesRecette05'"
+expect "I8c. connexion acceptée avec l'ancien identifiant, le nouveau et le code famille" bash -c "test \"\$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"LesRecette04\",\"login\":\"adil\",\"secret\":\"482913\"}')\$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"lesrecette05\",\"login\":\"adil\",\"secret\":\"482913\"}')\$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"$FAMILY\",\"login\":\"adil\",\"secret\":\"482913\"}')\" = 200200200"
+# Invitation d'un nouveau membre et première connexion
+adb shell input keyevent KEYCODE_BACK; sleep 2; tapt "Profils"; tapt "Ajouter un profil"
+fill "Nom affiché" "Lina"; hide_kb; fill "Identifiant personnel" lina; hide_kb; $UI tap "Parent" >/dev/null; sleep 1
+$UI tap "Créer le profil" --scroll >/dev/null; sleep 5
+$UI wait "Partager l'accès de Lina" 15 >/dev/null
+LPROV=$(prov_on_screen)
+expect "I9. invitation : identifiant famille actuel et code provisoire ($LPROV)" bash -c "$UI has 'Identifiant famille : LesRecette05' && [[ '$LPROV' =~ ^[0-9]{6}$ ]]"
+shot final-i8-invitation
+sleep 6; $UI tap "Fermer" --last >/dev/null; sleep 2
+logout
+check_or_stop "I10. Lina se connecte avec le code provisoire" tf_login "lesrecette05" lina "$LPROV"
+expect "I10b. première connexion : choix du code personnel obligatoire" bash -c "$UI wait 'Bienvenue Lina' 15 && $UI has 'Enregistrer mon code' && ! $UI has 'Ma liste'"
+expect "I10c. code provisoire à usage unique : une seconde connexion est refusée" test "$(login_code LesRecette05 lina "$LPROV")" = 401
+shot final-i9-premier-code
+fill_field 0 70315826; hide_kb; fill_field 1 70315826; hide_kb
+tapt "Enregistrer mon code"; sleep 3
+expect "I10d. code enregistré : l'application s'ouvre" $UI wait "Compte" 20
+expect "I10e. code personnel accepté, code provisoire refusé" test "$(login_code LesRecette05 lina 70315826)$(login_code LesRecette05 lina "$LPROV")" = 200401
+logout
+# Expiration (7 jours) puis renouvellement par l'administrateur
+login_api adil 482913
+api POST /api/profiles -d '{"displayName":"Omar","login":"omar","role":"staff"}' >/dev/null; OPROV=$(jq -r '.provisional.code // empty' /tmp/api.out)
+sql "UPDATE profiles SET secret_expires_at = now() - interval '1 minute' WHERE family_id='$FID' AND login='omar'" >/dev/null
+tf_login "LesRecette05" omar "$OPROV"
+expect "I11. code provisoire expiré ($OPROV) : message générique" $UI wait "Identifiants incorrects" 10
+tf_login "LesRecette05" adil 482913; $UI wait "Compte" 20 >/dev/null
+tapt "Réglages"; tapt "Profils"; $UI tap "Actions pour Omar" >/dev/null; sleep 1; tapt "Nouveau code provisoire"; tapt "Générer et partager"; sleep 3
+ONEW=$(prov_on_screen)
+expect "I12. renouvellement : nouveau code affiché ($ONEW) ; l'ancien refusé, le nouveau accepté" bash -c "[[ '$ONEW' =~ ^[0-9]{6}$ ]] && test '$ONEW' != '$OPROV' && test \"\$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"LesRecette05\",\"login\":\"omar\",\"secret\":\"$OPROV\"}')\$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"familyCode\":\"LesRecette05\",\"login\":\"omar\",\"secret\":\"$ONEW\"}')\" = 401200"
+shot final-i10-renouvellement
+sleep 6; $UI tap "Fermer" --last >/dev/null; sleep 2
+logout
+# Isolation : une seconde famille, créée par l'API (création autonome avec code reçu par e-mail du faux service d'envoi)
+BMAIL="iso.$(date +%s)@example.org"
+curl -s -o /tmp/b1.out -X POST $BASE/api/signup/start -H 'content-type: application/json' -d "{\"requestId\":\"$(cat /proc/sys/kernel/random/uuid)\",\"familyName\":\"Famille Iso\",\"displayName\":\"Ines\",\"login\":\"ines\",\"city\":\"Casablanca\",\"email\":\"$BMAIL\",\"secret\":\"582014\",\"secretConfirm\":\"582014\",\"familyLoginId\":\"Famille_Iso\"}"
+BCODEMAIL=$(docker exec sc-recette-app node -e "fetch('http://127.0.0.1:3199/__sent?to=$BMAIL').then(r=>r.json()).then(j=>console.log((j.at(-1)||{subject:''}).subject.match(/(\d{6})/)?.[1]||''))")
+BCOOKIE=$(curl -s -D - -o /tmp/b2.out -X POST $BASE/api/signup/verify -H 'content-type: application/json' -d "{\"signupId\":\"$(jq -r .signupId /tmp/b1.out)\",\"code\":\"$BCODEMAIL\"}" | tr -d '\r' | grep -i '^set-cookie: sc_session=' | sed -E 's/.*sc_session=([^;]*);.*/\1/')
+expect "I13. seconde famille créée avec son identifiant (Famille_Iso)" test "$(jq -r .loginId /tmp/b2.out)" = Famille_Iso
+expect "I13b. l'identifiant d'une famille ne donne aucun accès à l'autre (membre de A avec l'identifiant de B : refusé)" test "$(login_code Famille_Iso adil 482913)" = 401
+expect "I13c. chaque famille ne voit que ses membres" test "$(curl -s $BASE/api/profiles -H "Cookie: sc_session=$BCOOKIE" | jq -r '[.profiles[].login] | join(",")')" = ines
+expect "I13d. ancien identifiant de A jamais réattribué à B" test "$(curl -s -o /tmp/b3.out -w '%{http_code}' -X PUT $BASE/api/family/login-id -H "Cookie: sc_session=$BCOOKIE" -H 'content-type: application/json' -d '{"loginId":"lesrecette04"}')$(jq -r .error /tmp/b3.out)" = 409family_id_taken
+expect "I13e. contrôle de disponibilité : aucune information sur la famille qui l'utilise" test "$(curl -s -X POST $BASE/api/family-id/check -H 'content-type: application/json' -d '{"id":"LesRecette05"}' | jq -c 'keys')" = '["available","message","suggestions","valid"]'
+expect "I14. données de la famille A toujours intactes hors nouveaux membres (codes des anciens membres inchangés)" test "$(sql "SELECT count(*) FROM profiles WHERE family_id='$FID' AND login IN ('adil','lamiaa','marie') AND NOT secret_temporary")" = 3
 fi
 
 if want_s A; then
@@ -453,9 +553,9 @@ if want_s V; then
 echo "═══ V. Créer ma famille : le bouton dit ce qui manque (ville oubliée) — contrôle rapide ═══" | tee -a "$OUT/resultats.txt"
 launch; $UI wait "Bienvenue" 25 >/dev/null
 $UI tap "Première connexion" >/dev/null; sleep 1; $UI tap "Créer ma famille" >/dev/null; sleep 2
-fill "Nom de la famille" "Famille Test" --scroll; hide_kb
+fill "Nom affiché de la famille" "Famille Test" --scroll; hide_kb
 fill "Votre prénom" "Test" --scroll; hide_kb
-fill "Votre identifiant" "testv" --scroll; hide_kb
+fill "Identifiant personnel" "testv" --scroll; hide_kb
 fill "E-mail de récupération" "v.$(date +%s)@example.org" --scroll; hide_kb
 fill "Code d'accès" 274915 --scroll; hide_kb
 fill "Confirmez le code" 274915 --scroll; hide_kb

@@ -42,7 +42,7 @@ adb install -r "$APK" >/dev/null; adb shell pm clear $PKG >/dev/null; adb shell 
 adb shell am start -W -n "$ACT" >/dev/null 2>&1; sleep 4
 $UI wait "Bienvenue" 25 >/dev/null
 # Écran de 1920 px : le clavier masque les champs suivants, il est refermé après chaque saisie.
-fill "Code famille" "$FAMILY"; hide_kb; fill "Identifiant" sophie; hide_kb; fill "Code d'accès" 482913; hide_kb
+fill "Identifiant famille" "$FAMILY"; hide_kb; fill "Identifiant personnel" sophie; hide_kb; fill "Code d'accès" 482913; hide_kb
 $UI tap "Se connecter" --last >/dev/null; sleep 4
 expect "S1. liste partagée affichée (liste de la semaine, sélecteur de listes)" bash -c "$UI wait 'Ma liste' 25 && $UI wait 'Courses de la semaine' 10"
 sleep 3; shot play-1-liste-partagee
