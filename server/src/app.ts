@@ -28,7 +28,8 @@ import { budgetRoutes } from "./budget.js";
 import { priceRoutes } from "./prices.js";
 import { templateRoutes } from "./templates.js";
 import { priceCommunityRoutes } from "./price-community.js";
-import { createProfile, deleteOwnAccount, deleteProfile, listProfiles, resetSecret, setOwnCity, transferPrimary, updateProfile } from "./profiles.js";
+import { createProfile, deleteOwnAccount, deleteProfile, issueProvisionalCode, listProfiles, resetSecret, setOwnCity, setOwnSecretFromProvisional, transferPrimary, updateProfile } from "./profiles.js";
+import { checkAvailability, checkFormat, currentFamilyId, FamilyIdTaken, familyIdRoutes } from "./family-id.js";
 import { mailerFromEnv } from "./mail.js";
 import { countFamilyData, identifyFamily, purgeFamily } from "./family-purge.js";
 import { RecoveryService, secretMatches } from "./recovery.js";
@@ -70,11 +71,14 @@ export interface AppDeps {
   requireRecoveryEmail?: boolean;
   /** Ville obligatoire à la création d'un profil et du premier administrateur (toujours vrai en production ; levée seulement par SC_CITY_OPTIONAL=1 sous NODE_ENV=test). */
   requireCity?: boolean;
+  /** Contrôles de disponibilité d'un identifiant famille et changements d'identifiant, par IP. */
+  familyIdRateLimit?: { max: number; timeWindow: string };
 }
 
 
 const loginSchema = z.object({
-  familyCode: z.string().trim().toUpperCase().min(1).max(20),
+  // Identifiant famille (actuel ou ancien) ou code famille d'origine, sans distinction de majuscules.
+  familyCode: z.string().trim().min(1).max(40),
   login: z.string().trim().toLowerCase().min(1).max(40),
   secret: z.string().regex(SECRET_PATTERN),
 });
@@ -117,6 +121,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   await app.register(rateLimit, { global: false });
 
   app.setErrorHandler((err, _req, reply) => {
+    if (err instanceof FamilyIdTaken) return reply.code(err.status).send({ error: err.code, message: err.message, suggestions: err.suggestions });
     if (err instanceof HttpError) return reply.code(err.status).send({ error: err.code, message: err.message });
     if (err instanceof ZodError) {
       // Nouveau code d'accès mal formé : message précis et identique partout (application, site, serveur).
@@ -197,6 +202,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     email: emailField,
     secret: secretField,
     secretConfirm: z.string(),
+    // Identifiant famille choisi (ancienne application : absent, la famille pourra le choisir plus tard dans Réglages).
+    familyLoginId: z.string().max(60).optional(),
   });
   app.post("/api/signup/start", { config: { rateLimit: deps.signupRateLimit ?? { max: 10, timeWindow: "1 hour" } } }, async (req, reply) => {
     signupOpen();
@@ -206,7 +213,13 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     if (!country) throw new HttpError(400, "country_required", "Choisissez le pays de la famille");
     if (!isCountry(country)) throw new HttpError(400, "invalid_country", "Choisissez un pays dans la liste");
     const city = country === "MA" ? resolveCity(b.city, true)! : null;
-    const v = await startSignup(db, recovery, { requestId: b.requestId, familyName: b.familyName, displayName: b.displayName, login: b.login, city, country, email: b.email, secret: b.secret }, ipKey(req.ip), signupLimits);
+    // Identifiant famille : format et disponibilité vérifiés avant tout envoi d'e-mail (puis de nouveau au moment de créer).
+    const familyLoginId = b.familyLoginId?.trim() ? checkFormat(b.familyLoginId) : null;
+    if (familyLoginId) {
+      const av = await checkAvailability(db, familyLoginId, null);
+      if (!av.available) throw new FamilyIdTaken(av.suggestions);
+    }
+    const v = await startSignup(db, recovery, { requestId: b.requestId, familyName: b.familyName, displayName: b.displayName, login: b.login, city, country, email: b.email, secret: b.secret, familyLoginId }, ipKey(req.ip), signupLimits);
     return reply.code(201).send(v);
   });
   app.post("/api/signup/resend", { config: { rateLimit: deps.signupRateLimit ?? { max: 10, timeWindow: "1 hour" } } }, async (req) => {
@@ -219,7 +232,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     const { signupId, code } = z.object({ signupId: z.string().uuid(), code: z.string().trim().max(12) }).parse(req.body);
     const r = await verifySignup(db, signupId, code, signupLimits);
     setSessionCookie(reply, r.token);
-    return reply.code(201).send({ familyCode: r.familyCode, me: publicMe(r.auth) });
+    return reply.code(201).send({ familyCode: r.familyCode, loginId: r.loginId, me: publicMe(r.auth) });
   });
 
   app.post("/api/auth/login", { config: { rateLimit: limit } }, async (req, reply) => {
@@ -228,14 +241,14 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     return { me: publicMe(r.auth) };
   });
 
-  app.post("/api/auth/logout", { preHandler: guard(undefined, { allowPending: true }) }, async (req, reply) => {
+  app.post("/api/auth/logout", { preHandler: guard(undefined, { allowPending: true, allowTemporary: true }) }, async (req, reply) => {
     await revokeSession(db, req.auth!.sessionId);
     hub.disconnectSession(req.auth!.sessionId);
     reply.clearCookie(COOKIE, { path: "/" });
     return { ok: true };
   });
 
-  app.get("/api/me", { preHandler: guard(undefined, { allowPending: true }) }, async (req) => {
+  app.get("/api/me", { preHandler: guard(undefined, { allowPending: true, allowTemporary: true }) }, async (req) => {
     const a = req.auth!;
     const me: Record<string, unknown> = publicMe(a);
     const pr = (await db.query("SELECT show_prices, show_totals, prefs_rev, city FROM profiles WHERE id = $1", [a.profileId])).rows[0];
@@ -245,7 +258,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     me.features = await familyFeatures(db, a.familyId);
     if (can(a.role, "family.manage")) {
       const f = await db.query("SELECT code, name FROM families WHERE id = $1", [a.familyId]);
-      me.family = { code: f.rows[0].code, name: f.rows[0].name };
+      me.family = { code: f.rows[0].code, name: f.rows[0].name, loginId: await currentFamilyId(db, a.familyId) };
       me.primary = !!(await db.query("SELECT is_primary FROM profiles WHERE id = $1", [a.profileId])).rows[0]?.is_primary;
     }
     return { me };
@@ -257,11 +270,26 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   }));
 
   app.post("/api/profiles", { preHandler: guard("family.manage") }, async (req, reply) => {
+    // Sans code : code provisoire généré (7 jours, usage unique), renvoyé UNE fois pour être transmis au membre.
+    // Avec code (ancienne application) : code choisi par l'administrateur, jamais renvoyé.
     const body = z
-      .object({ displayName: nameField, login: loginField, role: roleField, secret: secretField, secretConfirm: z.string(), city: cityIn })
+      .object({ displayName: nameField, login: loginField, role: roleField, secret: secretField.optional(), secretConfirm: z.string().optional(), city: cityIn })
       .parse(req.body);
     const city = resolveCity(body.city, requireCity);
-    return reply.code(201).send(await createProfile(db, req.auth!, { ...body, city })); // le mot de passe est choisi par l'administrateur : il n'est jamais renvoyé
+    return reply.code(201).send(await createProfile(db, req.auth!, { ...body, city }));
+  });
+
+  // « Nouveau code provisoire » d'un membre : l'ancien code cesse de fonctionner immédiatement.
+  app.post("/api/profiles/:id/provisional-code", { preHandler: guard("family.manage"), config: { rateLimit: limit } }, async (req) => {
+    const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    return { provisional: await issueProvisionalCode(db, hub, req.auth!, id) };
+  });
+
+  // Première connexion avec un code provisoire : la personne choisit son propre code d'accès personnel.
+  app.post("/api/me/secret", { preHandler: guard(undefined, { allowTemporary: true }), config: { rateLimit: limit } }, async (req) => {
+    const b = z.object({ secret: secretField, secretConfirm: z.string() }).parse(req.body ?? {});
+    await setOwnSecretFromProvisional(db, req.auth!, b.secret, b.secretConfirm);
+    return { ok: true };
   });
 
   app.patch("/api/profiles/:id", { preHandler: guard("family.manage") }, async (req) => {
@@ -378,7 +406,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     return NEUTRAL;
   });
   app.post("/api/auth/forgot-password", { config: { rateLimit: recoveryLimit } }, async (req) => {
-    const b = z.object({ email: emailField, familyCode: z.string().trim().max(20).optional() }).parse(req.body);
+    const b = z.object({ email: emailField, familyCode: z.string().trim().max(40).optional() }).parse(req.body);
     await recovery.forgotPassword(b.email, b.familyCode || undefined);
     return NEUTRAL;
   });
@@ -406,6 +434,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   familyProductRoutes(app, { db, store: deps.store, guard, hub, managers: deps.catalogManagers });
   locationRoutes(app, { db, guard, hub, resolveCity: (c) => resolveCity(c, true)! });
   featureRoutes(app, { db, guard, hub });
+  familyIdRoutes(app, { db, guard, hub, checkLimit: deps.familyIdRateLimit ?? { max: 30, timeWindow: "1 minute" } });
   budgetRoutes(app, { db, guard, hub });
   app.get("/api/countries", async () => ({ countries: COUNTRIES }));
   listRoutes(app, { db, hub, guard, push });
@@ -500,4 +529,4 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   return app;
 }
 
-const publicMe = (a: AuthContext) => ({ id: a.profileId, familyId: a.familyId, displayName: a.displayName, login: a.login, role: a.role, setupPending: !!a.setupPending });
+const publicMe = (a: AuthContext) => ({ id: a.profileId, familyId: a.familyId, displayName: a.displayName, login: a.login, role: a.role, setupPending: !!a.setupPending, mustChangeSecret: !!a.mustChangeSecret });

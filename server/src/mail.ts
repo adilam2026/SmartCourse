@@ -192,13 +192,19 @@ export const templates = {
       html: layout("E-mail de test", "<p>Si vous lisez ce message, l'envoi d'e-mails de SmartCourse fonctionne jusqu'à votre boîte.</p><p>Aucune action n'est nécessaire.</p>"),
     };
   },
-  familyCode(to: string, families: { name: string; code: string }[]): OutgoingMail {
-    const lines = families.map((f) => `${f.name} : ${f.code}`).join("\n");
+  familyCode(to: string, families: { name: string; code: string; loginId?: string | null }[]): OutgoingMail {
+    // Identifiant famille quand la famille en a choisi un ; le code famille d'origine reste valable dans tous les cas.
+    const lines = families.map((f) => (f.loginId ? `${f.name} : identifiant famille ${f.loginId} (ou code famille ${f.code})` : `${f.name} : ${f.code}`)).join("\n");
     return {
       to,
       subject: "SmartCourse — votre code famille",
-      text: `Voici le code famille associé à cette adresse :\n${lines}\n\nPour vous connecter : code famille, identifiant et mot de passe. Si vous n'êtes pas à l'origine de cette demande, ignorez ce message.`,
-      html: layout("Votre code famille", `<p>Code famille associé à cette adresse :</p>${families.map((f) => `<p>${esc(f.name)} : <b style="font-size:20px;letter-spacing:2px">${esc(f.code)}</b></p>`).join("")}<p>Pour vous connecter : code famille, identifiant et mot de passe.</p>`),
+      text: `Voici le code famille associé à cette adresse :\n${lines}\n\nPour vous connecter : identifiant famille (ou code famille), identifiant personnel et code d'accès personnel. Si vous n'êtes pas à l'origine de cette demande, ignorez ce message.`,
+      html: layout(
+        "Votre code famille",
+        `<p>Code famille associé à cette adresse :</p>${families
+          .map((f) => (f.loginId ? `<p>${esc(f.name)} : <b style="font-size:20px">${esc(f.loginId)}</b><br>ou code famille ${esc(f.code)}</p>` : `<p>${esc(f.name)} : <b style="font-size:20px;letter-spacing:2px">${esc(f.code)}</b></p>`))
+          .join("")}<p>Pour vous connecter : identifiant famille (ou code famille), identifiant personnel et code d'accès personnel.</p>`,
+      ),
     };
   },
 };

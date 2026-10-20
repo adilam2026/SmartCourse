@@ -1,3 +1,4 @@
+import { aliasKey } from "./family-id.js";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { withTx, type Db } from "./db.js";
 import { revokeProfileSessions } from "./auth.js";
@@ -220,13 +221,14 @@ export class RecoveryService {
     const e = normalizeEmail(email);
     const rows = (
       await this.db.query(
-        `SELECT p.id, f.code, f.name FROM profiles p JOIN families f ON f.id = p.family_id
+        `SELECT p.id, f.code, f.name, (SELECT alias FROM family_aliases a WHERE a.family_id = f.id AND a.kind = 'current') AS login_id
+           FROM profiles p JOIN families f ON f.id = p.family_id
           WHERE lower(p.recovery_email) = $1 AND p.recovery_email_verified_at IS NOT NULL AND p.is_primary AND p.active ORDER BY f.created_at`,
         [e],
       )
     ).rows;
     if (!rows.length || (await this.recentMails("family_code", emailHash(e))) >= MAX_MAILS_PER_HOUR) return;
-    this.background(this.deliver("family_code", rows[0].id, templates.familyCode(e, rows.map((r) => ({ name: r.name, code: r.code })))));
+    this.background(this.deliver("family_code", rows[0].id, templates.familyCode(e, rows.map((r) => ({ name: r.name, code: r.code, loginId: r.login_id ?? null })))));
   }
 
   /** A link to choose a NEW password; the old one is never sent nor shown. */
@@ -236,8 +238,8 @@ export class RecoveryService {
       await this.db.query(
         `SELECT p.id FROM profiles p JOIN families f ON f.id = p.family_id
           WHERE lower(p.recovery_email) = $1 AND p.recovery_email_verified_at IS NOT NULL AND p.is_primary AND p.active
-            AND ($2::text IS NULL OR f.code = $2)`,
-        [e, familyCode ? familyCode.trim().toUpperCase() : null],
+            AND ($2::bytea IS NULL OR f.id = (SELECT family_id FROM family_aliases WHERE alias_hash = $2))`,
+        [e, familyCode?.trim() ? aliasKey(familyCode) : null],
       )
     ).rows;
     for (const r of rows) {
@@ -267,7 +269,7 @@ export class RecoveryService {
       // Still the verified address of an active primary administrator at the time of use.
       const p = (await c.query("SELECT family_id FROM profiles WHERE id = $1 AND active AND is_primary AND lower(recovery_email) = $2 AND recovery_email_verified_at IS NOT NULL FOR UPDATE", [t.profile_id, t.email])).rows[0];
       if (!p) throw new HttpError(400, "invalid_link", "Ce lien n'est plus valable : demandez-en un nouveau");
-      await c.query("UPDATE profiles SET secret_hash = $2, failed_attempts = 0, locked_until = NULL WHERE id = $1", [t.profile_id, hash]);
+      await c.query("UPDATE profiles SET secret_hash = $2, failed_attempts = 0, locked_until = NULL, secret_temporary = false, secret_expires_at = NULL, secret_used_at = NULL WHERE id = $1", [t.profile_id, hash]);
       await c.query("UPDATE auth_tokens SET used_at = now() WHERE profile_id = $1 AND used_at IS NULL", [t.profile_id]);
       await revokeProfileSessions(c, t.profile_id);
       await c.query("INSERT INTO audit_log (family_id, actor_profile_id, action, target_profile_id) VALUES ($1,NULL,'profile.secret_reset_by_email',$2)", [p.family_id, t.profile_id]);
