@@ -26,7 +26,8 @@ import javax.net.ssl.SSLException
 
 /** Profil connecté, tel que renvoyé par /api/auth/login et /api/me. */
 @Serializable
-data class FamilyInfo(val code: String, val name: String)
+/** [loginId] : identifiant famille choisi (null tant qu'aucun n'est choisi) ; [code] : code famille d'origine, toujours valable. */
+data class FamilyInfo(val code: String, val name: String, val loginId: String? = null)
 
 @Serializable
 data class Me(
@@ -36,6 +37,8 @@ data class Me(
     val login: String,
     val role: String,
     val setupPending: Boolean = false,
+    /** Connecté avec un code provisoire : il faut d'abord choisir son propre code d'accès personnel. */
+    val mustChangeSecret: Boolean = false,
     val city: String? = null,
     val family: FamilyInfo? = null,
     val primary: Boolean? = null,
@@ -257,7 +260,10 @@ class ApiClient(private val store: SessionStorage, client: OkHttpClient? = null)
     }
 
     /** Création de famille : code de vérification de l'adresse exact → famille créée et session ouverte (cookie gardé comme à la connexion). */
-    suspend fun signupVerify(signupId: String, code: String): Outcome<Pair<Me, String>> {
+    /** Famille créée : le code famille d'origine et l'identifiant famille choisi (null avec un serveur plus ancien). */
+    data class SignupDone(val me: Me, val familyCode: String, val loginId: String?)
+
+    suspend fun signupVerify(signupId: String, code: String): Outcome<SignupDone> {
         val base = store.server ?: return Outcome.Fail(Failure.BAD_ADDRESS)
         val payload = buildJsonObject { put("signupId", JsonPrimitive(signupId)); put("code", JsonPrimitive(code)) }.toString()
         return exec(builder(base, "/api/signup/verify", false).post(payload.toRequestBody(media)).build()) { r, body ->
@@ -266,8 +272,9 @@ class ApiClient(private val store: SessionStorage, client: OkHttpClient? = null)
                 val o = try { json.parseToJsonElement(body).jsonObject } catch (_: Exception) { null }
                 val me = try { json.decodeFromJsonElement(Me.serializer(), o?.get("me") as JsonObject) } catch (_: Exception) { null }
                 val fc = (o?.get("familyCode") as? JsonPrimitive)?.content
+                val lid = (o?.get("loginId") as? JsonPrimitive)?.takeIf { it.isString }?.content
                 if (cookie == null || me == null || fc == null) Outcome.Fail(Failure.NOT_COURSES_SERVER, r.code)
-                else { store.cookie = cookie; Outcome.Ok(me to fc) }
+                else { store.cookie = cookie; Outcome.Ok(SignupDone(me, fc, lid)) }
             } else (classify(r, body) as? Outcome.Fail) ?: Outcome.Fail(Failure.UNKNOWN, r.code)
         }
     }

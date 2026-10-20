@@ -36,7 +36,8 @@ fun AdminHubScreen(nav: (String) -> Unit) {
         // Hors du Maroc : ni prix indicatifs ni gestion des prix.
         "Produits et prix" to (listOf(Entry("Catalogue", Icons.Rounded.Inventory2, "v09")) + if (demo.pricesAvailable) listOf(Entry("Gestion des prix", Icons.Rounded.LocalOffer, "v10")) else emptyList()),
         "Famille et accès" to listOf(Entry("Profils", Icons.Rounded.Groups, "v08"), Entry("Récupération", Icons.Rounded.Key, "stub/Récupération")),
-        "Famille" to listOf(Entry("Pays et ville", Icons.Rounded.Public, "v15"), Entry("Paramètres avancés", Icons.Rounded.Tune, "v17")),
+        "Famille" to ((if (serverSupports(demo.serverSchema, 26)) listOf(Entry("Identifiant famille", Icons.Rounded.Badge, "v18")) else emptyList()) +
+            listOf(Entry("Pays et ville", Icons.Rounded.Public, "v15"), Entry("Paramètres avancés", Icons.Rounded.Tune, "v17"))),
         "Préférences" to listOf(Entry("Affichage", Icons.Rounded.Palette, "v11"), Entry("Notifications et rappels", Icons.Rounded.Notifications, "stub/Notifications")),
         "Application" to listOf(Entry("Sauvegarde", Icons.Rounded.Cloud, "stub/Sauvegarde"), Entry("À propos", Icons.Rounded.Info, "stub/À propos")),
     )
@@ -51,11 +52,22 @@ fun AdminHubScreen(nav: (String) -> Unit) {
                 Spacer(Modifier.height(8.dp))
                 PrimaryButton("Confirmer", { nav("v15") }, Modifier.fillMaxWidth())
             }
+            // Identifiant famille pas encore choisi (familles existantes) : invitation discrète, rien n'est imposé.
+            val fam = demo.data?.me?.family
+            if (fam != null && fam.loginId == null && demo.data?.me?.role == "admin" && schemaNumber(demo.serverSchema)?.let { it >= 26 } == true) SCard(padding = PaddingValues(14.dp)) {
+                Text("Choisissez votre identifiant famille", style = MaterialTheme.typography.titleSmall)
+                Text("Plus simple à dicter que le code ${fam.code}, par exemple ${FamilyIdRules.propose(fam.name)}. L'ancien code famille restera valable pour se connecter. Vous pourrez le modifier plus tard.", style = MaterialTheme.typography.bodySmall)
+                Spacer(Modifier.height(8.dp))
+                PrimaryButton("Choisir l'identifiant", { nav("v18") }, Modifier.fillMaxWidth())
+            }
             groups.forEach { (title, entries) ->
                 Text(title, style = MaterialTheme.typography.titleSmall, color = C.Muted, modifier = Modifier.padding(start = 4.dp, top = 8.dp))
                 SCard {
+                    // Deux entrées par ligne au plus (« Famille » en compte trois).
+                    entries.chunked(2).forEachIndexed { rowIndex, rowEntries ->
+                    if (rowIndex > 0) Box(Modifier.fillMaxWidth().height(1.dp).padding(horizontal = 12.dp).background(C.Line))
                     Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-                        entries.forEachIndexed { i, e ->
+                        rowEntries.forEachIndexed { i, e ->
                             if (i > 0) Box(Modifier.width(1.dp).fillMaxHeight().padding(vertical = 10.dp).background(C.Line))
                             Row(
                                 Modifier.weight(1f).heightIn(min = 60.dp).clickable { nav(e.route) }.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -65,6 +77,8 @@ fun AdminHubScreen(nav: (String) -> Unit) {
                                 Text(e.label, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis)
                             }
                         }
+                        if (rowEntries.size == 1 && entries.size > 1) Spacer(Modifier.weight(1f))
+                    }
                     }
                 }
             }

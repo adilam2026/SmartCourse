@@ -149,7 +149,13 @@ private fun Root(session: Session, demoMode: Boolean) {
                 }
             }
         }
-        is AuthState.SignedIn -> key(st.me.id) { App(session, st.me) }
+        // Code provisoire : la personne choisit d'abord son propre code d'accès personnel (le serveur refuse tout le reste avant).
+        is AuthState.SignedIn -> if (st.me.mustChangeSecret) {
+            val demo = remember { Demo() }
+            CompositionLocalProvider(LocalDemo provides demo, LocalCompact provides false) {
+                Column(Modifier.fillMaxSize().background(C.Bg).statusBarsPadding().imePadding()) { FirstCodeScreen(session, st.me.displayName, st.me.family?.name) }
+            }
+        } else key(st.me.id) { App(session, st.me) }
     }
 }
 
@@ -265,6 +271,7 @@ fun App(session: Session, me: Me?) {
                         composable("v12") { StatsScreen() }
                         composable("v15") { LocationScreen(back) }
                         composable("v17") { AdvancedSettingsScreen(back, go) }
+                        composable("v18") { FamilyIdScreen(back) }
                         // Module Budget (option familiale) : vue d'ensemble, historique, opération, budgets, Mon compte, réglages, droits.
                         composable("b1") { BudgetScreen(go) }
                         composable("b2") { OperationsScreen(back) }
@@ -307,21 +314,26 @@ fun App(session: Session, me: Me?) {
             AppSheet({ session.welcomeFamilyCode = null }) {
                 Text("Votre famille est créée", style = MaterialTheme.typography.titleLarge)
                 Spacer(Modifier.height(6.dp))
-                Text("Voici le code famille. Les autres membres en auront besoin, avec l'identifiant et le code d'accès que vous leur créerez dans Réglages → Profils.", style = MaterialTheme.typography.bodyMedium)
+                val idLabel = if (session.welcomeIsLoginId) "l'identifiant famille" else "le code famille"
+                Text("Voici $idLabel. Chaque membre se connecte avec cet identifiant, son identifiant personnel et son code d'accès personnel, que vous créerez dans Réglages → Profils.", style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.height(14.dp))
-                Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(C.TealSoft).padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
-                    Text(welcome, style = MaterialTheme.typography.headlineMedium, color = C.TealDark, letterSpacing = 3.sp)
+                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(C.TealSoft).padding(vertical = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(if (session.welcomeIsLoginId) "Identifiant famille" else "Code famille", style = MaterialTheme.typography.labelLarge, color = C.TealDark)
+                    Text(welcome, style = MaterialTheme.typography.headlineMedium, color = C.Navy, letterSpacing = if (session.welcomeIsLoginId) 0.5.sp else 3.sp)
+                    me?.family?.name?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
                 }
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     SecondaryButton(if (copied) "Copié" else "Copier", { clipboard.setText(androidx.compose.ui.text.AnnotatedString(welcome)); copied = true }, Modifier.weight(1f), leading = if (copied) Icons.Rounded.Check else Icons.Rounded.ContentCopy)
                     SecondaryButton("Partager", {
-                        val send = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, "Rejoignez notre famille sur Mes Courses. Code famille : $welcome. Je vous donnerai votre identifiant et votre code d'accès.") }
+                        val send = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, AccessShare.familyMessage(welcome)) }
                         try { ctx.startActivity(Intent.createChooser(send, "Partager le code famille").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) { demo.say("Aucune application de partage disponible.") }
                     }, Modifier.weight(1f), leading = Icons.Rounded.Share)
                 }
                 // Confirmation visible dans le panneau lui-même (un message en bas d'écran serait masqué par le panneau).
-                if (copied) { Spacer(Modifier.height(8.dp)); Text("Code famille copié dans le presse-papiers.", style = MaterialTheme.typography.bodyMedium, color = C.TealDark) }
+                if (copied) { Spacer(Modifier.height(8.dp)); Text("${if (session.welcomeIsLoginId) "Identifiant famille" else "Code famille"} copié dans le presse-papiers.", style = MaterialTheme.typography.bodyMedium, color = C.TealDark) }
+                Spacer(Modifier.height(8.dp))
+                Text("L'identifiant famille seul ne donne accès à rien : ni à la liste, ni aux membres.", style = MaterialTheme.typography.bodySmall)
                 Spacer(Modifier.height(12.dp))
                 PrimaryButton("Préparer mes courses", { session.welcomeFamilyCode = null; go("v04") }, Modifier.fillMaxWidth(), trailing = Icons.AutoMirrored.Rounded.ArrowForward)
             }

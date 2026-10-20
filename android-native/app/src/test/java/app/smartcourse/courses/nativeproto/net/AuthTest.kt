@@ -159,6 +159,15 @@ class AuthTest {
         assertNull(store.meJson)
     }
 
+    @Test fun signIn_remembersFamilyIdentifier_whenChosen() = runBlocking {
+        server.enqueue(MockResponse().setBody(meJson).addHeader("Set-Cookie", "sc_session=T1; Path=/"))
+        server.enqueue(MockResponse().setBody("""{"me":{"id":"p1","displayName":"Adil","login":"adil","role":"admin","family":{"code":"ABCD2345","name":"Famille Taha","loginId":"LesTaha04"}}}"""))
+        val s = session()
+        assertNull(s.signIn(" lestaha04 ", "adil", "482913"))
+        assertEquals("LesTaha04", store.lastFamily)
+        assertEquals("LesTaha04", (s.state as AuthState.SignedIn).me.family?.loginId)
+    }
+
     @Test fun signIn_ok_thenSignOut_revokesOnServer() = runBlocking {
         server.enqueue(MockResponse().setBody(meJson).addHeader("Set-Cookie", "sc_session=T1; Path=/"))
         server.enqueue(MockResponse().setBody("""{"me":{"id":"p1","displayName":"Adil","login":"adil","role":"admin","primary":true,"family":{"code":"ABCD","name":"Recette"}}}"""))
@@ -170,7 +179,8 @@ class AuthTest {
         assertEquals("adil", store.lastLogin)
         val loginBody = server.takeRequest().body.readUtf8()
         assertEquals("/api/me", server.takeRequest().path)
-        assertTrue(loginBody.contains("\"familyCode\":\"ABCD\"") && loginBody.contains("\"login\":\"adil\""))
+        // Identifiant famille ou ancien code : envoyé tel que saisi (sans espaces) ; le serveur ignore les majuscules.
+        assertTrue(loginBody.contains("\"familyCode\":\"abcd\"") && loginBody.contains("\"login\":\"adil\""))
         server.enqueue(MockResponse().setBody("""{"ok":true}"""))
         s.signOut()
         assertEquals(AuthState.SignedOut, s.state)

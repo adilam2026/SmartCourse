@@ -28,17 +28,20 @@ class Session(val storage: SessionStorage, val api: ApiClient, private val scope
         private set
     /** Message d'adieu montré sur l'écran de connexion après la suppression du compte (ou de la famille) par cette personne. */
     var farewell: String? by mutableStateOf(null)
-    /** Famille tout juste créée depuis l'application : son code est montré une fois (Copier / Partager) après la connexion. */
+    /** Famille tout juste créée depuis l'application : son identifiant (ou, serveur ancien, son code) est montré une fois (Copier / Partager). */
     var welcomeFamilyCode: String? by mutableStateOf(null)
+    /** Vrai quand [welcomeFamilyCode] est l'identifiant famille choisi (faux : code famille d'un serveur plus ancien). */
+    var welcomeIsLoginId: Boolean = false
 
     /** Code de vérification exact : la famille est créée côté serveur et l'utilisateur est connecté directement. */
     suspend fun completeSignup(signupId: String, code: String): Outcome.Fail? {
         notice = null
         return when (val r = api.signupVerify(signupId, code.trim())) {
             is Outcome.Ok -> {
-                val (me, familyCode) = r.value
-                val full = (api.me() as? Outcome.Ok)?.value ?: me
-                online = true; remember(full); welcomeFamilyCode = familyCode; state = AuthState.SignedIn(full); null
+                val done = r.value
+                val full = (api.me() as? Outcome.Ok)?.value ?: done.me
+                welcomeIsLoginId = done.loginId != null
+                online = true; remember(full); welcomeFamilyCode = done.loginId ?: done.familyCode; state = AuthState.SignedIn(full); null
             }
             is Outcome.Fail -> r
         }
@@ -63,7 +66,8 @@ class Session(val storage: SessionStorage, val api: ApiClient, private val scope
     private fun remember(me: Me) {
         storage.meJson = json.encodeToString(Me.serializer(), me)
         storage.lastLogin = me.login
-        me.family?.code?.let { storage.lastFamily = it }
+        // Famille retenue pour la prochaine connexion : son identifiant s'il est choisi, sinon son code famille.
+        me.family?.let { storage.lastFamily = it.loginId ?: it.code }
     }
 
     private fun forgetSessionLocally() {
@@ -104,7 +108,8 @@ class Session(val storage: SessionStorage, val api: ApiClient, private val scope
     /** Connexion. Renvoie null en cas de succès, sinon la cause. */
     suspend fun signIn(familyCode: String, login: String, secret: String): Failure? {
         notice = null
-        return when (val r = api.login(familyCode.trim().uppercase(), login.trim().lowercase(), secret)) {
+        // Identifiant famille ou ancien code : envoyé tel quel (le serveur ignore les majuscules).
+        return when (val r = api.login(familyCode.trim(), login.trim().lowercase(), secret)) {
             is Outcome.Ok -> {
                 if (r.value.setupPending) {
                     storage.clearSession()
@@ -113,7 +118,7 @@ class Session(val storage: SessionStorage, val api: ApiClient, private val scope
                 // /api/auth/login ne renvoie ni la famille ni le rang « principal » : on complète tout de suite avec /api/me.
                 val full = (api.me() as? Outcome.Ok)?.value ?: r.value
                 // Le serveur ne renvoie le code famille qu'aux administrateurs : celui qui vient d'être saisi est mémorisé pour tous les rôles.
-                storage.lastFamily = familyCode.trim().uppercase()
+                storage.lastFamily = familyCode.trim()
                 online = true; remember(full); state = AuthState.SignedIn(full); null
             }
             is Outcome.Fail -> r.failure

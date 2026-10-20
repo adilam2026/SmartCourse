@@ -9,8 +9,21 @@ import java.security.SecureRandom
 
 class AccessShareTest {
     @Test fun accessMessage_containsEverythingNeeded() {
-        val m = AccessShare.accessMessage("Nadia", "KD36DY9C", "nadia", "047193")
-        for (part in listOf("Mes Courses", "Nadia", "Code famille : KD36DY9C", "Identifiant : nadia", "Code d'accès : 047193", "Se connecter")) assertTrue(part, m.contains(part))
+        val m = AccessShare.accessMessage("Nadia", "LesTaha04", "nadia", "047193")
+        for (part in listOf("Mes Courses", "Nadia", "Identifiant famille : LesTaha04", "Identifiant personnel : nadia", "Code d'accès provisoire : 047193 (valable 7 jours)", "Se connecter", "votre propre code d'accès personnel")) assertTrue(part, m.contains(part))
+        assertFalse(m.contains("Mot de passe") || m.contains("mot de passe"))
+    }
+
+    @Test fun familyIdRules_proposalAndInput() {
+        assertEquals("FamilleTaha", FamilyIdRules.propose("Famille Taha"))
+        assertEquals("LesTaha", FamilyIdRules.propose("Les Taha"))
+        assertEquals("FamilleHeleneEa", FamilyIdRules.propose("Famille Hélène-Éa"))
+        assertEquals("FamilleAl", FamilyIdRules.propose("Al"))
+        assertEquals(30, FamilyIdRules.propose("x".repeat(50)).length)
+        assertEquals("LesTaha_04", FamilyIdRules.clean("Les Taha_04 !"))
+        assertEquals("Helene", FamilyIdRules.clean("Hélène"))
+        assertTrue(FamilyIdRules.valid("super_family"))
+        for (bad in listOf("abc", "a".repeat(31), "Les Taha", "taha-04", "Hélène")) assertFalse(bad, FamilyIdRules.valid(bad))
     }
 
     @Test fun familyMessage_neverContainsAnAccessCode() {

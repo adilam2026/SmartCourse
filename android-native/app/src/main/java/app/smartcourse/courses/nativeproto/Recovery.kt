@@ -105,6 +105,13 @@ fun AskAdminSheet(title: String, text: String, onDismiss: () -> Unit) {
 fun CreateFamilyForm(session: Session) {
     val scope = rememberCoroutineScope()
     var famName by remember { mutableStateOf("") }
+    // Identifiant famille : proposé d'après le nom tant que la personne ne l'a pas modifié elle-même.
+    var familyId by remember { mutableStateOf("") }
+    var familyIdEdited by remember { mutableStateOf(false) }
+    var takenNow by remember { mutableStateOf<FamilyIdStatus.Taken?>(null) }
+    val checked = rememberFamilyIdCheck(session.api, familyId, withSession = false)
+    val idStatus = takenNow ?: checked
+    LaunchedEffect(familyId) { takenNow = null }
     var name by remember { mutableStateOf("") }
     var login by remember { mutableStateOf("") }
     var country by remember { mutableStateOf<String?>(null) }
@@ -140,7 +147,9 @@ fun CreateFamilyForm(session: Session) {
         "secret_mismatch" -> "Les deux codes d'accès ne sont pas identiques."
         "invalid_city", "city_required" -> "Choisissez une ville dans la liste."
         "signup_in_progress" -> "Une demande est déjà en cours pour cette adresse : réessayez dans un instant."
-        "invalid_request" -> "Vérifiez les champs : identifiant de 2 à 30 caractères (lettres minuscules, chiffres, point, tiret)."
+        "invalid_request" -> "Vérifiez les champs : identifiant personnel de 2 à 30 caractères (lettres minuscules, chiffres, point, tiret)."
+        "family_id_taken" -> "Cet identifiant famille est déjà utilisé : choisissez une proposition ou modifiez-le."
+        "invalid_family_id" -> "Identifiant famille : ${FamilyIdRules.RULE}."
         else -> if (f.failure == Failure.NETWORK || f.failure == Failure.TIMEOUT || f.failure == Failure.TLS) "Pas de connexion : réessayez quand le réseau revient." else "Création impossible pour le moment : réessayez."
     }
     fun verifyMessage(f: Outcome.Fail): String = when (f.code) {
@@ -149,7 +158,8 @@ fun CreateFamilyForm(session: Session) {
         "too_many_attempts" -> "Trop d'essais avec ce code : recevez un nouveau code, vos informations sont conservées."
         "code_expired" -> "Ce code a expiré (il est valable 30 minutes) : recevez un nouveau code, vos informations sont conservées."
         "signup_expired", "signup_not_found" -> "Demande expirée : recommencez."
-        "already_completed" -> "Cette famille est déjà créée : connectez-vous avec son code famille."
+        "already_completed" -> "Cette famille est déjà créée : connectez-vous avec son identifiant famille."
+        "family_id_taken" -> "Cet identifiant famille vient d'être pris par une autre famille : rien n'a été créé. Choisissez-en un autre, puis recevez un nouveau code."
         "email_in_use" -> "Cette adresse gère déjà une famille. Utilisez « Récupérer ma famille »."
         "too_soon" -> "Patientez avant de renvoyer le code."
         "too_many_mails" -> "Trop d'envois : réessayez plus tard."
@@ -192,7 +202,12 @@ fun CreateFamilyForm(session: Session) {
             busy = true; error = null
             scope.launch {
                 val f = session.completeSignup(sid, otp)
-                if (f != null) {
+                if (f != null && f.code == "family_id_taken") {
+                    // Pris entre la demande et la validation : retour au formulaire, avec de nouvelles propositions.
+                    takenNow = (checkFamilyId(session.api, familyId, false) as? FamilyIdStatus.Taken) ?: FamilyIdStatus.Taken(emptyList())
+                    signupId = null; otp = ""; requestId = java.util.UUID.randomUUID().toString()
+                    error = verifyMessage(f)
+                } else if (f != null) {
                     error = verifyMessage(f)
                     if (f.code == "code_expired" || f.code == "too_many_attempts") needNew = true
                     if (f.code == "signup_expired" || f.code == "signup_not_found") { signupId = null; requestId = java.util.UUID.randomUUID().toString() }
@@ -210,11 +225,19 @@ fun CreateFamilyForm(session: Session) {
         return
     }
 
-    FormField(famName, { famName = it }, "Nom de la famille", leading = Icons.Rounded.Group)
-    Spacer(Modifier.height(10.dp))
+    Text("Votre famille", style = MaterialTheme.typography.titleSmall)
+    Spacer(Modifier.height(8.dp))
+    FormField(famName, { famName = it; if (!familyIdEdited) familyId = if (it.isBlank()) "" else FamilyIdRules.propose(it) }, "Nom affiché de la famille", leading = Icons.Rounded.Group)
+    Text("Visible par les membres. Plusieurs familles peuvent porter le même nom.", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 4.dp, top = 4.dp))
+    Spacer(Modifier.height(12.dp))
+    FamilyIdField(familyId, { familyId = it; familyIdEdited = true }, idStatus,
+        "Proposé d'après le nom, modifiable. ${FamilyIdRules.RULE}. Majuscules et minuscules sont équivalentes.")
+    Spacer(Modifier.height(16.dp))
+    Text("Vous (administrateur)", style = MaterialTheme.typography.titleSmall)
+    Spacer(Modifier.height(8.dp))
     FormField(name, { name = it }, "Votre prénom", leading = Icons.Rounded.Person)
     Spacer(Modifier.height(10.dp))
-    FormField(login, { login = it.trim().lowercase().filter { ch -> ch.isLetterOrDigit() || ch in "._-" }.take(30) }, "Votre identifiant", leading = Icons.Rounded.Person)
+    FormField(login, { login = it.trim().lowercase().filter { ch -> ch.isLetterOrDigit() || ch in "._-" }.take(30) }, "Identifiant personnel", leading = Icons.Rounded.Person)
     Spacer(Modifier.height(10.dp))
     // Pays d'abord ; la ville seulement pour le Maroc (jamais déduite du GPS ni de l'adresse IP).
     SecondaryButton(if (country == null) "Pays : à choisir (obligatoire)" else "Pays : ${countryName(country)}", { countrySheet = true }, Modifier.fillMaxWidth(), height = 54.dp)
@@ -228,23 +251,28 @@ fun CreateFamilyForm(session: Session) {
     Spacer(Modifier.height(10.dp))
     FormField(email, { email = it.trim() }, "E-mail de récupération", leading = Icons.Rounded.Email, keyboard = KeyboardOptions(keyboardType = KeyboardType.Email))
     Spacer(Modifier.height(10.dp))
-    CodeField(code, { code = it }, "Code d'accès", rule = true)
+    CodeField(code, { code = it }, "Code d'accès personnel", rule = true)
+    Text("Propre à vous. Chaque membre aura son propre code.", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 4.dp, top = 4.dp))
     Spacer(Modifier.height(10.dp))
-    CodeField(code2, { code2 = it }, "Confirmez le code d'accès")
+    CodeField(code2, { code2 = it }, "Confirmez le code d'accès personnel")
     error?.let { Spacer(Modifier.height(8.dp)); Text(it, color = C.Danger, style = MaterialTheme.typography.bodyMedium) }
     Spacer(Modifier.height(16.dp))
     // Le bouton n'est jamais grisé sans explication : un appui dit précisément ce qui manque (ex. la ville, souvent oubliée).
     val missing = buildList {
         if (famName.isBlank()) add("le nom de la famille")
+        if (idStatus != FamilyIdStatus.Unsupported && !FamilyIdRules.valid(familyId)) add("un identifiant famille")
         if (name.isBlank()) add("votre prénom")
-        if (login.length < 2) add("votre identifiant (2 caractères au moins)")
+        if (login.length < 2) add("votre identifiant personnel (2 caractères au moins)")
         if (country == null) add("le pays")
         if (country == "MA" && city == null) add("votre ville")
         if (!email.contains("@") || !email.substringAfter("@").contains(".")) add("une adresse e-mail valide")
-        if (!isNewCode(code)) add("un code d'accès de 6 à 8 chiffres")
+        if (!isNewCode(code)) add("un code d'accès personnel de 6 à 8 chiffres")
         if (code2.isEmpty()) add("la confirmation du code d'accès")
     }
     if (missing.isNotEmpty()) Text("Il manque : ${missing.joinToString(", ")}.", style = MaterialTheme.typography.bodySmall, color = C.Muted, modifier = Modifier.padding(bottom = 8.dp))
+    // Identifiant déjà utilisé : on ne continue qu'avec un identifiant disponible.
+    val idBlocked = idStatus is FamilyIdStatus.Taken || idStatus == FamilyIdStatus.Invalid
+    if (idBlocked) Text("Choisissez un identifiant famille disponible pour continuer.", style = MaterialTheme.typography.bodySmall, color = C.Muted, modifier = Modifier.padding(bottom = 8.dp))
     PrimaryButton(if (busy) "Envoi du code…" else "Recevoir le code par e-mail", {
         if (missing.isNotEmpty()) { error = "Pour continuer, renseignez ${missing.joinToString(", ")}."; if (country == null) countrySheet = true else if (country == "MA" && city == null) citySheet = true; return@PrimaryButton }
         if (code != code2) { error = "Les deux codes d'accès ne sont pas identiques."; return@PrimaryButton }
@@ -253,6 +281,7 @@ fun CreateFamilyForm(session: Session) {
             val body = buildJsonObject {
                 put("requestId", requestId); put("familyName", famName.trim()); put("displayName", name.trim()); put("login", login)
                 put("country", country!!); if (country == "MA") put("city", city!!); put("email", email); put("secret", code); put("secretConfirm", code2)
+                if (idStatus != FamilyIdStatus.Unsupported) put("familyLoginId", familyId)
             }
             when (val r = session.api.callPublic("POST", "/api/signup/start", body)) {
                 is Outcome.Ok -> {
@@ -261,11 +290,14 @@ fun CreateFamilyForm(session: Session) {
                     wait = r.value["resendInSeconds"]?.jsonPrimitive?.intOrNull ?: 60
                     uncertain = r.value["delivery"]?.jsonPrimitive?.contentOrNull == "uncertain"; needNew = false
                 }
-                is Outcome.Fail -> { error = startMessage(r); requestId = java.util.UUID.randomUUID().toString() }
+                is Outcome.Fail -> {
+                    error = startMessage(r); requestId = java.util.UUID.randomUUID().toString()
+                    if (r.code == "family_id_taken") takenNow = (checkFamilyId(session.api, familyId, false) as? FamilyIdStatus.Taken) ?: FamilyIdStatus.Taken(emptyList())
+                }
             }
             busy = false
         }
-    }, Modifier.fillMaxWidth(), enabled = !busy)
+    }, Modifier.fillMaxWidth(), enabled = !busy && !idBlocked)
     if (citySheet) CityPickerSheet(city, { city = it; citySheet = false; error = null }, { citySheet = false })
     if (countrySheet) CountryPickerSheet(country, { country = it.code; if (it.code != "MA") city = null; countrySheet = false; error = null }, { countrySheet = false })
 }
