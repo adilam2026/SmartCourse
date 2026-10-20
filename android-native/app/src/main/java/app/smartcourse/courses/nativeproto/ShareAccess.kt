@@ -38,7 +38,8 @@ object AccessShare {
             "Identifiant famille : $familyId\n" +
             "Identifiant personnel : $login\n" +
             "Code d'accès provisoire : $code (valable 7 jours)\n\n" +
-            "Installez $APP, touchez « Se connecter » et saisissez ces informations. Vous choisirez ensuite votre propre code d'accès personnel."
+            // « mettez à jour » : une ancienne version de l'application refuse un code provisoire sans pouvoir l'expliquer elle-même.
+            "Installez ou mettez à jour $APP depuis Google Play, touchez « Se connecter » et saisissez ces informations. Vous choisirez ensuite votre propre code d'accès personnel."
 
     fun familyMessage(familyId: String): String =
         "Rejoignez notre famille sur $APP.\nIdentifiant famille : $familyId\n\n" +
