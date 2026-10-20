@@ -240,6 +240,8 @@ class ApiClient(private val store: SessionStorage, client: OkHttpClient? = null)
         val base = store.server ?: return Outcome.Fail(Failure.BAD_ADDRESS)
         val payload = buildJsonObject {
             put("familyCode", JsonPrimitive(familyCode)); put("login", JsonPrimitive(login)); put("secret", JsonPrimitive(secret))
+            // Cette application sait faire choisir le code personnel après un code provisoire (l'APK 1166 et le site, non).
+            put("clientFeatures", kotlinx.serialization.json.JsonArray(listOf(JsonPrimitive("provisional"))))
         }.toString()
         return exec(builder(base, "/api/auth/login", false).post(payload.toRequestBody(media)).build()) { r, body ->
             when {

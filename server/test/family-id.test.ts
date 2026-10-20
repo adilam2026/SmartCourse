@@ -45,7 +45,10 @@ const cookieOf = (res: { cookies: { name: string; value: string }[] }): Cookies 
 const post = (url: string, payload: object, cookies?: Cookies) => app.inject({ method: "POST", url, payload, ...(cookies ? { cookies } : {}) });
 const put = (url: string, payload: object, cookies?: Cookies) => app.inject({ method: "PUT", url, payload, ...(cookies ? { cookies } : {}) });
 const get = (url: string, cookies?: Cookies) => app.inject({ method: "GET", url, ...(cookies ? { cookies } : {}) });
-const login = (familyCode: string, user: string, secret: string) => post("/api/auth/login", { familyCode, login: user, secret });
+// Comme la nouvelle application : elle déclare savoir faire choisir le code personnel après un code provisoire.
+const login = (familyCode: string, user: string, secret: string) => post("/api/auth/login", { familyCode, login: user, secret, clientFeatures: ["provisional"] });
+// Comme l'APK 1166 et le site web : rien n'est déclaré.
+const oldLogin = (familyCode: string, user: string, secret: string) => post("/api/auth/login", { familyCode, login: user, secret });
 const check = (id: string, cookies?: Cookies) => post("/api/family-id/check", { id }, cookies);
 const codeTo = (to: string) => mailer.sent.filter((m) => m.to === to).at(-1)!.text.match(/(\d{6})/)![1]!;
 const count = async (sql: string, p: unknown[] = []) => Number((await db.query(sql, p)).rows[0].n);
@@ -297,6 +300,53 @@ describe("codes d'accès provisoires des nouveaux membres", () => {
     await db.query("UPDATE families SET location_confirmed_at = NULL WHERE id = $1", [f.familyId]);
     const r2 = await strict.inject({ method: "POST", url: "/api/profiles", cookies: f.admin, payload: { displayName: "Sara2", login: "sara2", role: "staff" } });
     expect([r2.statusCode, r2.json().error]).toEqual([400, "city_required"]);
+    await strict.close();
+  });
+
+  it("APK 1166 et site web : code provisoire refusé avec un message de mise à jour, sans session ni consommation du code ; comptes existants inchangés", async () => {
+    const f = await createFamily();
+    const m = await addMember(f.admin, "nour");
+    const r = await oldLogin(f.familyCode, "nour", m.provisional!.code);
+    expect([r.statusCode, r.json().error]).toEqual([426, "app_update_required"]);
+    expect(r.json().message).toContain("dernière version de l'application Mes Courses");
+    expect(r.cookies.find((c) => c.name === "sc_session")).toBeUndefined();
+    expect((await db.query("SELECT secret_used_at FROM profiles WHERE id = $1", [m.profile.id])).rows[0].secret_used_at).toBeNull();
+    // Code faux, expiré ou déjà utilisé : toujours le message générique (aucune information sans identifiants exacts)
+    expect((await oldLogin(f.familyCode, "nour", "999999")).json().error).toBe("invalid_credentials");
+    // La suppression publique de compte n'est pas un contournement
+    expect((await post("/api/account/delete", { familyCode: f.familyCode, login: "nour", secret: m.provisional!.code })).statusCode).toBe(426);
+    // Nouvelle application : la même personne se connecte avec le même code, encore valable
+    expect((await login(f.familyCode, "nour", m.provisional!.code)).json().me.mustChangeSecret).toBe(true);
+    // Comptes existants : l'ancien APK et le site se connectent comme avant (par code famille ou identifiant)
+    expect((await oldLogin(f.familyCode, "sara", "482913")).statusCode).toBe(200);
+    await put("/api/family/login-id", { loginId: `Ancien_${n}` }, f.admin);
+    expect((await oldLogin(`ANCIEN_${n}`, "sara", "482913")).statusCode).toBe(200); // l'ancien APK met tout en majuscules
+  });
+
+  it("ajout d'un membre, règle de production : Maroc avec ville confirmée, pays hors Maroc sans ville, famille sans pays confirmé", async () => {
+    const strict = await buildApp({ db, store: testStore(), recovery, requireCity: true, loginRateLimit: WIDE, signupRateLimit: WIDE, signupVerifyRateLimit: WIDE, signupLimits: OPEN });
+    await strict.ready();
+    const add = (admin: Cookies, user: string, extra: object = {}) => strict.inject({ method: "POST", url: "/api/profiles", cookies: admin, payload: { displayName: user, login: user, role: "parent", ...extra } });
+    // 1. Maroc, ville confirmée : sans ville → ville de la famille
+    const ma = await createFamily();
+    const r1 = await add(ma.admin, "membre_ma");
+    expect([r1.statusCode, r1.json().profile.city]).toEqual([201, "Casablanca"]);
+    // 2. Hors Maroc (France) : pas de ville, ni pour la famille ni pour le membre
+    const email = `fr${++n}@example.org`;
+    const s = await post("/api/signup/start", { requestId: randomUUID(), familyName: "Famille Paris", displayName: "Lou", login: "lou", country: "FR", email, secret: "482913", secretConfirm: "482913" });
+    expect(s.statusCode).toBe(201);
+    const v = await post("/api/signup/verify", { signupId: s.json().signupId, code: codeTo(email) });
+    const fr = cookieOf(v);
+    expect((await db.query("SELECT country, city, location_confirmed_at IS NOT NULL AS ok FROM families WHERE id = $1", [v.json().me.familyId])).rows[0]).toEqual({ country: "FR", city: null, ok: true });
+    const r2 = await add(fr, "membre_fr");
+    expect([r2.statusCode, r2.json().profile.city]).toEqual([201, null]);
+    // 3. Famille existante sans pays confirmé : la ville reste demandée (comme avant), puis acceptée si elle est choisie
+    const old = await createFamily();
+    await db.query("UPDATE families SET location_confirmed_at = NULL, country = NULL, city = NULL WHERE id = $1", [old.familyId]);
+    const r3 = await add(old.admin, "membre_ancien");
+    expect([r3.statusCode, r3.json().error]).toEqual([400, "city_required"]);
+    const r4 = await add(old.admin, "membre_ancien", { city: "rabat" });
+    expect([r4.statusCode, r4.json().profile.city]).toEqual([201, "Rabat"]);
     await strict.close();
   });
 

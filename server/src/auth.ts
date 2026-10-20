@@ -69,7 +69,13 @@ export interface LoginInput {
   familyCode: string;
   login: string;
   secret: string;
+  /** Fonctions déclarées par l'application (« provisional » : elle sait faire choisir le code personnel après un code provisoire). */
+  clientFeatures?: string[];
 }
+
+/** Code provisoire exact, mais application (ancien APK, site web) incapable de faire choisir le code personnel. */
+export const UPDATE_REQUIRED_MESSAGE =
+  "Ce code d'accès est provisoire : installez la dernière version de l'application Mes Courses pour choisir votre code personnel, puis connectez-vous.";
 
 /**
  * Attempts are serialised per profile (row lock) so parallel guesses cannot outrun the lockout.
@@ -109,6 +115,9 @@ export async function login(db: Db, input: LoginInput): Promise<{ token: string;
     }
     // Code provisoire expiré ou déjà utilisé : même réponse qu'un code faux (sans compter d'essai : le code était exact).
     if (p.temp_spent) return { ok: false as const };
+    // Code provisoire valable mais application trop ancienne : aucune session (rien ne contourne le choix du code personnel) et le
+    // code n'est pas consommé ; message clair, donné seulement à qui a saisi des identifiants exacts.
+    if (p.secret_temporary && !input.clientFeatures?.includes("provisional")) return { ok: false as const, update: true as const };
     await c.query("UPDATE profiles SET failed_attempts = 0, locked_until = NULL, secret_used_at = CASE WHEN secret_temporary THEN now() END WHERE id = $1", [p.id]);
     const s = await createSession(c, p.id);
     return {
@@ -126,6 +135,7 @@ export async function login(db: Db, input: LoginInput): Promise<{ token: string;
       },
     };
   });
+  if (!outcome.ok && "update" in outcome) throw new HttpError(426, "app_update_required", UPDATE_REQUIRED_MESSAGE);
   if (!outcome.ok) throw invalidCredentials();
   return { token: outcome.token, auth: outcome.auth };
 }

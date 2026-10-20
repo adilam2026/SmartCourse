@@ -212,15 +212,20 @@ shot final-08-parent
 logout
 
 fi
+# Personnel : depuis les évolutions du 15/10 (affichage « Cartes, par catégories » par défaut, recherche pour le personnel), les
+# articles ne sont nommés qu'en affichage Liste. Le parcours passe donc d'abord en « Liste, tous les articles » (préférence du profil).
+staff_list_view() { $UI tap "Affichage" >/dev/null; sleep 2; $UI tap "Liste" >/dev/null; sleep 1; $UI tap "Tous les articles" >/dev/null; sleep 1; $UI tap "Fermer" --last >/dev/null; sleep 2; }
 if want_s P; then
 echo "═══ P. Personnel : Choisir mes articles, enregistrement, hors connexion ═══" | tee -a "$OUT/resultats.txt"
 signin "$FAMILY" marie 573918
 expect "P1. personnel : « Choisir mes articles » directement" $UI wait "Choisir mes articles" 25
 expect "P1b. aucun onglet en bas" $UI gone "Liste du jour" 3
-expect "P1c. aucune recherche" $UI gone "Rechercher un produit" 2
+expect "P1c. recherche disponible pour le personnel (évolution validée du 15/10)" $UI has "Rechercher un produit"
 expect "P1d. aucun bandeau" nodemo
 expect "P1e. Compte dans l'en-tête" $UI has "Compte"
 shot final-09-personnel
+staff_list_view
+expect "P1f. affichage « Liste, tous les articles »" $UI has "Affichage : Liste, tous les articles"
 show "Tomates"; $UI tap "Tomates" >/dev/null; sleep 2
 $UI tap "Terminer ma sélection" >/dev/null
 expect "P2. « Sélection enregistrée »" $UI wait "Sélection enregistrée" 10
@@ -257,6 +262,7 @@ api GET /api/lists/active >/dev/null; LID=$(jq -r '.list.id // empty' /tmp/api.o
 api POST /api/lists -d '{}' >/dev/null; LJ=$(jq -r .list.id /tmp/api.out)
 signin "$FAMILY" marie 573918
 $UI wait "Choisir mes articles" 25 >/dev/null
+staff_list_view
 show "Tomates"; $UI tap "Tomates" >/dev/null; sleep 2
 $UI tap "Terminer ma sélection" >/dev/null; sleep 4
 expect "J1. sélection enregistrée sur la liste ouverte ($(items_of $LJ))" test "$(items_of $LJ)" = "Tomates 1.000 to_buy"

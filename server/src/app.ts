@@ -81,6 +81,8 @@ const loginSchema = z.object({
   familyCode: z.string().trim().min(1).max(40),
   login: z.string().trim().toLowerCase().min(1).max(40),
   secret: z.string().regex(SECRET_PATTERN),
+  // Fonctions de l'application (absent : ancien APK ou site web).
+  clientFeatures: z.array(z.string().max(30)).max(10).optional(),
 });
 const loginField = z.string().trim().toLowerCase().regex(/^[a-z0-9._-]{2,30}$/);
 /** Un NOUVEAU code : 6 à 8 chiffres (les anciens mots de passe à lettres restent acceptés à la connexion seulement). */
