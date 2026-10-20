@@ -215,7 +215,8 @@ export async function resetSecret(db: Db, hub: SseHub, actor: AuthContext, id: s
   await withTx(db, async (c) => {
     await lockFamily(c, actor.familyId);
     await loadTarget(c, actor.familyId, id);
-    await c.query("UPDATE profiles SET secret_hash = $2, failed_attempts = 0, locked_until = NULL WHERE id = $1", [id, hash]);
+    // Nouveau code choisi par l'administrateur : il remplace un éventuel code provisoire (seule façon de débloquer un membre ici).
+    await c.query("UPDATE profiles SET secret_hash = $2, failed_attempts = 0, locked_until = NULL, secret_temporary = false, secret_expires_at = NULL, secret_used_at = NULL WHERE id = $1", [id, hash]);
     await revokeProfileSessions(c, id);
     await audit(c, actor.familyId, actor.profileId, "profile.secret_reset", id);
   });
@@ -233,7 +234,7 @@ export async function operatorResetSecret(db: Db, familyCode: string, login: str
     );
     const p = r.rows[0];
     if (!p) throw new HttpError(404, "not_found", "Profil introuvable");
-    await c.query("UPDATE profiles SET secret_hash = $2, failed_attempts = 0, locked_until = NULL WHERE id = $1", [p.id, hash]);
+    await c.query("UPDATE profiles SET secret_hash = $2, failed_attempts = 0, locked_until = NULL, secret_temporary = false, secret_expires_at = NULL, secret_used_at = NULL WHERE id = $1", [p.id, hash]);
     await revokeProfileSessions(c, p.id);
     await audit(c, p.family_id, null, "profile.secret_reset_by_operator", p.id);
   });

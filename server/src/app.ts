@@ -74,7 +74,7 @@ export interface AppDeps {
 
 
 const loginSchema = z.object({
-  familyCode: z.string().trim().toUpperCase().min(1).max(20),
+  familyCode: z.string().trim().toUpperCase().min(1).max(40),
   login: z.string().trim().toLowerCase().min(1).max(40),
   secret: z.string().regex(SECRET_PATTERN),
 });
@@ -378,7 +378,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     return NEUTRAL;
   });
   app.post("/api/auth/forgot-password", { config: { rateLimit: recoveryLimit } }, async (req) => {
-    const b = z.object({ email: emailField, familyCode: z.string().trim().max(20).optional() }).parse(req.body);
+    const b = z.object({ email: emailField, familyCode: z.string().trim().max(40).optional() }).parse(req.body);
     await recovery.forgotPassword(b.email, b.familyCode || undefined);
     return NEUTRAL;
   });

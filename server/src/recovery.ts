@@ -267,7 +267,7 @@ export class RecoveryService {
       // Still the verified address of an active primary administrator at the time of use.
       const p = (await c.query("SELECT family_id FROM profiles WHERE id = $1 AND active AND is_primary AND lower(recovery_email) = $2 AND recovery_email_verified_at IS NOT NULL FOR UPDATE", [t.profile_id, t.email])).rows[0];
       if (!p) throw new HttpError(400, "invalid_link", "Ce lien n'est plus valable : demandez-en un nouveau");
-      await c.query("UPDATE profiles SET secret_hash = $2, failed_attempts = 0, locked_until = NULL WHERE id = $1", [t.profile_id, hash]);
+      await c.query("UPDATE profiles SET secret_hash = $2, failed_attempts = 0, locked_until = NULL, secret_temporary = false, secret_expires_at = NULL, secret_used_at = NULL WHERE id = $1", [t.profile_id, hash]);
       await c.query("UPDATE auth_tokens SET used_at = now() WHERE profile_id = $1 AND used_at IS NULL", [t.profile_id]);
       await revokeProfileSessions(c, t.profile_id);
       await c.query("INSERT INTO audit_log (family_id, actor_profile_id, action, target_profile_id) VALUES ($1,NULL,'profile.secret_reset_by_email',$2)", [p.family_id, t.profile_id]);

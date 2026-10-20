@@ -75,7 +75,11 @@ export async function login(db: Db, input: LoginInput): Promise<{ token: string;
     const found = await c.query(
       `SELECT p.*, p.locked_until > now() AS locked, f.setup_completed_at IS NULL AS setup_pending
          FROM profiles p JOIN families f ON f.id = p.family_id
-        WHERE f.code = $1 AND p.login = $2
+        -- Cible de retour arrière après la migration 026 : identifiant famille (actuel ou ancien) ou code famille accepté ;
+        -- un code PROVISOIRE (nouveau membre) n'ouvre jamais de session ici : ce serveur ne saurait ni le faire expirer ni
+        -- imposer le choix du code personnel. Réponse identique à un code faux.
+        WHERE f.id = COALESCE((SELECT family_id FROM family_aliases WHERE alias_hash = sha256(convert_to(lower($1), 'UTF8'))), (SELECT id FROM families WHERE code = $1))
+          AND p.login = $2 AND NOT p.secret_temporary
           FOR UPDATE OF p`,
       [input.familyCode, input.login],
     );
