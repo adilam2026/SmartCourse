@@ -32,16 +32,18 @@ object AccessShare {
     const val APP = "Mes Courses"
     private val WHATSAPP = listOf("com.whatsapp", "com.whatsapp.w4b")
 
-    fun accessMessage(displayName: String, familyCode: String, login: String, code: String): String =
+    /** Accès d'un nouveau membre : identifiant famille, identifiant personnel et code d'accès PROVISOIRE (7 jours, usage unique). */
+    fun accessMessage(displayName: String, familyId: String, login: String, code: String): String =
         "$APP — accès de $displayName\n" +
-            "Code famille : $familyCode\n" +
-            "Identifiant : $login\n" +
-            "Code d'accès : $code\n\n" +
-            "Pour vous connecter : installez $APP, touchez « Se connecter », puis saisissez le code famille, l'identifiant et le code d'accès."
+            "Identifiant famille : $familyId\n" +
+            "Identifiant personnel : $login\n" +
+            "Code d'accès provisoire : $code (valable 7 jours)\n\n" +
+            // « mettez à jour » : une ancienne version de l'application refuse un code provisoire sans pouvoir l'expliquer elle-même.
+            "Installez ou mettez à jour $APP depuis Google Play, touchez « Se connecter » et saisissez ces informations. Vous choisirez ensuite votre propre code d'accès personnel."
 
-    fun familyMessage(familyCode: String): String =
-        "Rejoignez notre famille sur $APP.\nCode famille : $familyCode\n\n" +
-            "Votre identifiant et votre code d'accès vous seront donnés par un administrateur de la famille."
+    fun familyMessage(familyId: String): String =
+        "Rejoignez notre famille sur $APP.\nIdentifiant famille : $familyId\n\n" +
+            "Votre identifiant personnel et votre code d'accès personnel vous seront donnés par un administrateur."
 
     /** Même règle que le serveur : 6 à 8 chiffres, ni le même chiffre partout, ni une suite (123456, 654321, 1234567…). */
     fun isWeak(s: String): Boolean {
@@ -85,7 +87,7 @@ object AccessShare {
     }
 }
 
-/** Accès d'un membre à transmettre : nom, code famille, identifiant et code d'accès (connu seulement juste après sa création). */
+/** Accès d'un membre à transmettre : nom, identifiant famille (ou code famille), identifiant personnel et code provisoire (connu seulement ici). */
 data class AccessToShare(val displayName: String, val familyCode: String, val login: String, val code: String, val intro: String)
 
 @Composable
@@ -99,15 +101,11 @@ fun ShareAccessSheet(a: AccessToShare, onDismiss: () -> Unit) {
         Spacer(Modifier.height(6.dp))
         Text(a.intro, style = MaterialTheme.typography.bodyMedium)
         Spacer(Modifier.height(12.dp))
-        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(C.TealSoft).padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Code famille : ${a.familyCode}", style = MaterialTheme.typography.bodyLarge)
-            Text("Identifiant : ${a.login}", style = MaterialTheme.typography.bodyLarge)
-            Text("Code d'accès : ${a.code}", style = MaterialTheme.typography.bodyLarge)
+        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(C.Bg).padding(14.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(text, style = MaterialTheme.typography.bodyMedium)
         }
-        Spacer(Modifier.height(8.dp))
-        Text("Rien n'est envoyé automatiquement : vous choisissez le destinataire dans WhatsApp (ou une autre application) et vous envoyez vous-même. Ce code n'est affiché qu'ici : notez-le ou partagez-le maintenant.", style = MaterialTheme.typography.bodySmall)
         Spacer(Modifier.height(12.dp))
-        PrimaryButton("Partager l'accès", {
+        PrimaryButton("Partager l'accès (WhatsApp)", {
             if (AccessShare.share(ctx, text, "Partager l'accès de ${a.displayName}") == "none") demo.say("Aucune application de partage disponible.")
         }, Modifier.fillMaxWidth(), leading = Icons.Rounded.Share)
         Spacer(Modifier.height(8.dp))
@@ -115,25 +113,33 @@ fun ShareAccessSheet(a: AccessToShare, onDismiss: () -> Unit) {
         if (copied) { Spacer(Modifier.height(6.dp)); Text("Copié dans le presse-papiers.", style = MaterialTheme.typography.bodySmall, color = C.TealDark) }
         Spacer(Modifier.height(8.dp))
         SecondaryButton("Fermer", onDismiss, Modifier.fillMaxWidth())
+        Spacer(Modifier.height(10.dp))
+        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(C.AmberSoft).padding(12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(
+                "Valable 7 jours et une seule fois : il ne fonctionne plus dès que ${a.displayName} a choisi son code. Il n'est plus affiché après fermeture. " +
+                    "Expiré ou perdu : Réglages → Profils → ${a.displayName} → « Nouveau code provisoire ». Un code personnel n'est jamais réaffiché.",
+                style = MaterialTheme.typography.bodySmall, color = C.Ink,
+            )
+        }
     }
 }
 
-/** Code famille seul (sans aucun code d'accès) : partager ou copier. */
+/** Identifiant famille (ou, à défaut, code famille) seul, sans aucun code d'accès : partager ou copier. */
 @Composable
 fun FamilyCodeCard(familyCode: String) {
     val ctx = LocalContext.current
     val demo = LocalDemo.current
     var copied by remember { mutableStateOf(false) }
     SCard(padding = PaddingValues(14.dp)) {
-        Text("Code famille : $familyCode", style = MaterialTheme.typography.titleSmall)
-        Text("À donner aux membres avec leur identifiant et leur code d'accès. Ce message ne contient aucun code d'accès.", style = MaterialTheme.typography.bodySmall)
+        Text("Identifiant famille : $familyCode", style = MaterialTheme.typography.titleSmall)
+        Text("À donner aux membres avec leur identifiant personnel et leur code d'accès. Ce message ne contient aucun code d'accès.", style = MaterialTheme.typography.bodySmall)
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SecondaryButton("Partager le code famille", {
-                if (AccessShare.share(ctx, AccessShare.familyMessage(familyCode), "Partager le code famille") == "none") demo.say("Aucune application de partage disponible.")
+            SecondaryButton("Partager", {
+                if (AccessShare.share(ctx, AccessShare.familyMessage(familyCode), "Partager l'identifiant famille") == "none") demo.say("Aucune application de partage disponible.")
             }, Modifier.weight(1.4f), leading = Icons.Rounded.Share)
             SecondaryButton(if (copied) "Copié" else "Copier", {
-                AccessShare.copy(ctx, "Code famille ${AccessShare.APP}", familyCode); copied = true
+                AccessShare.copy(ctx, "Identifiant famille ${AccessShare.APP}", familyCode); copied = true
             }, Modifier.weight(1f), leading = Icons.Rounded.ContentCopy)
         }
     }

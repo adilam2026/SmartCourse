@@ -2,6 +2,7 @@ import type pg from "pg";
 import { withTx, type Db } from "./db.js";
 import { HttpError, invalidCredentials } from "./errors.js";
 import type { Role } from "./permissions.js";
+import { aliasKey, assignFamilyId, reserveCode } from "./family-id.js";
 import { dummyHash, generateFamilyCode, hashSecret, hashToken, isValidNewSecret, isWeakSecret, NEW_SECRET_RULE, newToken, verifySecret } from "./security.js";
 
 export interface AuthContext {
@@ -13,6 +14,8 @@ export interface AuthContext {
   login: string;
   /** Famille créée mais adresse de récupération pas encore vérifiée : tout est refusé sauf la finalisation de l'installation. */
   setupPending?: boolean;
+  /** Connecté avec un code provisoire : rien n'est possible avant d'avoir choisi son propre code d'accès personnel. */
+  mustChangeSecret?: boolean;
 }
 
 export const SESSION_DAYS = 90;
@@ -32,7 +35,7 @@ export async function authenticate(db: Db, token: string | undefined): Promise<A
   if (!token) return null;
   const r = await db.query(
     `SELECT s.id AS session_id, s.last_seen_at < now() - interval '1 minute' AS stale,
-            p.id AS profile_id, p.family_id, p.role, p.display_name, p.login, f.setup_completed_at IS NULL AS setup_pending
+            p.id AS profile_id, p.family_id, p.role, p.display_name, p.login, p.secret_temporary, f.setup_completed_at IS NULL AS setup_pending
        FROM sessions s JOIN profiles p ON p.id = s.profile_id JOIN families f ON f.id = p.family_id
       WHERE s.token_hash = $1 AND s.revoked_at IS NULL AND p.active
         AND s.last_seen_at > now() - make_interval(days => $2)`,
@@ -49,6 +52,7 @@ export async function authenticate(db: Db, token: string | undefined): Promise<A
     displayName: row.display_name,
     login: row.login,
     setupPending: row.setup_pending,
+    mustChangeSecret: row.secret_temporary,
   };
 }
 
@@ -61,23 +65,35 @@ export async function revokeProfileSessions(c: pg.PoolClient | Db, profileId: st
 }
 
 export interface LoginInput {
+  /** Identifiant famille (actuel ou ancien) ou code famille d'origine, sans distinction de majuscules. */
   familyCode: string;
   login: string;
   secret: string;
+  /** Fonctions déclarées par l'application (« provisional » : elle sait faire choisir le code personnel après un code provisoire). */
+  clientFeatures?: string[];
 }
+
+/** Code provisoire exact, mais application (ancien APK, site web) incapable de faire choisir le code personnel. */
+export const UPDATE_REQUIRED_MESSAGE =
+  "Ce code d'accès est provisoire : installez la dernière version de l'application Mes Courses pour choisir votre code personnel, puis connectez-vous.";
 
 /**
  * Attempts are serialised per profile (row lock) so parallel guesses cannot outrun the lockout.
  * Every failure mode answers identically and spends comparable time.
+ * Code provisoire : valable jusqu'à son expiration et une seule fois. La ligne du profil est verrouillée, donc deux connexions
+ * simultanées avec le même code provisoire ne réussissent jamais toutes les deux.
  */
 export async function login(db: Db, input: LoginInput): Promise<{ token: string; auth: AuthContext }> {
   const outcome = await withTx(db, async (c) => {
     const found = await c.query(
-      `SELECT p.*, p.locked_until > now() AS locked, f.setup_completed_at IS NULL AS setup_pending
-         FROM profiles p JOIN families f ON f.id = p.family_id
-        WHERE f.code = $1 AND p.login = $2
+      `SELECT p.*, p.locked_until > now() AS locked, f.setup_completed_at IS NULL AS setup_pending,
+              p.secret_temporary AND (p.secret_used_at IS NOT NULL OR p.secret_expires_at IS NULL OR p.secret_expires_at <= now()) AS temp_spent
+         FROM families f JOIN profiles p ON p.family_id = f.id
+        -- Identifiant actuel, ancien identifiant ou code famille ; en dernier recours le code lui-même (famille créée par un ancien serveur).
+        WHERE f.id = COALESCE((SELECT family_id FROM family_aliases WHERE alias_hash = $1), (SELECT id FROM families WHERE code = upper($3)))
+          AND p.login = $2
           FOR UPDATE OF p`,
-      [input.familyCode, input.login],
+      [aliasKey(input.familyCode), input.login, input.familyCode.trim()],
     );
     const p = found.rows[0];
     if (!p) {
@@ -97,7 +113,12 @@ export async function login(db: Db, input: LoginInput): Promise<{ token: string;
       );
       return { ok: false as const };
     }
-    await c.query("UPDATE profiles SET failed_attempts = 0, locked_until = NULL WHERE id = $1", [p.id]);
+    // Code provisoire expiré ou déjà utilisé : même réponse qu'un code faux (sans compter d'essai : le code était exact).
+    if (p.temp_spent) return { ok: false as const };
+    // Code provisoire valable mais application trop ancienne : aucune session (rien ne contourne le choix du code personnel) et le
+    // code n'est pas consommé ; message clair, donné seulement à qui a saisi des identifiants exacts.
+    if (p.secret_temporary && !input.clientFeatures?.includes("provisional")) return { ok: false as const, update: true as const };
+    await c.query("UPDATE profiles SET failed_attempts = 0, locked_until = NULL, secret_used_at = CASE WHEN secret_temporary THEN now() END WHERE id = $1", [p.id]);
     const s = await createSession(c, p.id);
     return {
       ok: true as const,
@@ -110,9 +131,11 @@ export async function login(db: Db, input: LoginInput): Promise<{ token: string;
         displayName: p.display_name,
         login: p.login,
         setupPending: p.setup_pending,
+        mustChangeSecret: p.secret_temporary,
       },
     };
   });
+  if (!outcome.ok && "update" in outcome) throw new HttpError(426, "app_update_required", UPDATE_REQUIRED_MESSAGE);
   if (!outcome.ok) throw invalidCredentials();
   return { token: outcome.token, auth: outcome.auth };
 }
@@ -188,14 +211,17 @@ export async function setupFamily(db: Db, input: SetupInput): Promise<{ token: s
  */
 export async function createFamilyRecords(
   c: pg.PoolClient,
-  input: { familyName: string; admin: { displayName: string; login: string; secretHash: string; city: string | null; recoveryEmail: string | null; emailVerified: boolean }; completed: boolean; country?: string | null },
-): Promise<{ familyId: string; profileId: string; code: string }> {
+  input: { familyName: string; admin: { displayName: string; login: string; secretHash: string; city: string | null; recoveryEmail: string | null; emailVerified: boolean }; completed: boolean; country?: string | null; loginId?: string | null },
+): Promise<{ familyId: string; profileId: string; code: string; loginId: string | null }> {
   let code = "";
   let familyId = "";
   for (let i = 0; i < 6 && !familyId; i++) {
     code = generateFamilyCode();
+    // Le code est réservé dans l'espace de noms commun : il ne peut pas être l'identifiant (actuel ou ancien) d'une autre famille.
+    if (!(await reserveCode(c, code))) continue;
     const fam = await c.query<{ id: string }>("INSERT INTO families (code, name) VALUES ($1, $2) ON CONFLICT (code) DO NOTHING RETURNING id", [code, input.familyName]);
     familyId = fam.rows[0]?.id ?? "";
+    if (familyId) await c.query("UPDATE family_aliases SET family_id = $2 WHERE alias_hash = $1", [aliasKey(code), familyId]);
   }
   if (!familyId) throw new HttpError(503, "family_code_unavailable", "Création impossible pour le moment : réessayez");
   if (input.completed) await c.query("UPDATE families SET setup_completed_at = now() WHERE id = $1", [familyId]);
@@ -208,6 +234,8 @@ export async function createFamilyRecords(
     [familyId, input.admin.displayName, input.admin.login, input.admin.secretHash, input.admin.recoveryEmail ? input.admin.recoveryEmail.trim().toLowerCase() : null, input.admin.emailVerified, input.admin.city],
   );
   const profileId = prof.rows[0]!.id;
+  // Identifiant famille choisi à la création : vérifié de nouveau ici (une autre famille a pu le prendre entre-temps → 409, tout est annulé).
+  const loginId = input.loginId ? (await assignFamilyId(c, familyId, input.loginId, profileId)).loginId : null;
   // Catalogue familial de départ : copie des 80 références génériques.
   await c.query(
     `INSERT INTO products (family_id, category, name, catalog_key, photo_asset_id, position, unit)
@@ -215,7 +243,7 @@ export async function createFamilyRecords(
     [familyId],
   );
   await c.query("INSERT INTO audit_log (family_id, actor_profile_id, action, target_profile_id) VALUES ($1, $2, 'family.created', $2)", [familyId, profileId]);
-  return { familyId, profileId, code };
+  return { familyId, profileId, code, loginId };
 }
 
 /** Registers the INSTALL_TOKEN environment variable as a one-shot install token (idempotent). */

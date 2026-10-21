@@ -1,3 +1,4 @@
+import { reserveExistingCodes } from "./family-id.js";
 import { buildApp } from "./app.js";
 import { ensureInstallToken } from "./auth.js";
 import { existsSync, readFileSync } from "node:fs";
@@ -33,6 +34,9 @@ if (pending.length > 0 && config.BACKUP_MODE !== "external") {
   console.log(`Sauvegarde avant migration : ${r.backup.key}, restaurée et conforme (${r.verify.restoredTables} tables). Migrations à appliquer : ${pending.join(", ")}.`);
 }
 await migrate(db);
+// Codes famille sans alias (famille créée par un ancien serveur pendant un retour arrière) : réservés à nouveau, sans rien modifier d'autre.
+const codes = await reserveExistingCodes(db);
+if (codes) console.log(`Codes famille réservés comme identifiants de connexion : ${codes}.`);
 // Managed PostgreSQL with a public Data API (Supabase): our tables must be reachable only through this server. Throws if not closed.
 const hardened = await hardenApiRoles(db);
 if (hardened.applied) console.log(`Tables protégées contre l'API de données (${hardened.tables} tables, rôles ${hardened.roles.join(", ")}).`);

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Pilote l'interface de l'application native sur l'émulateur (adb + uiautomator), comme le ferait un utilisateur.
-Usage : native-ui.py tap TEXTE [--last|--first] | has TEXTE | wait TEXTE [secondes] | gone TEXTE [secondes] | above A B"""
+Usage : native-ui.py tap TEXTE [--last|--first] | has TEXTE | wait TEXTE [secondes] | gone TEXTE [secondes] | above A B | field N"""
 import re, subprocess, sys, time
 import xml.etree.ElementTree as ET
 
@@ -72,6 +72,26 @@ def main():
                 swipes += 1
             time.sleep(1)
         print(f"INTROUVABLE: {needle}")
+        return 1
+    if cmd == "field":  # field N : touche le N-ième champ de saisie de l'écran (0 = le plus haut), quel que soit son contenu
+        deadline = time.time() + 12
+        while time.time() < deadline:
+            xml = dump()
+            fields = []
+            if xml:
+                for n in ET.fromstring(xml).iter("node"):
+                    if n.get("class") == "android.widget.EditText":
+                        m = re.findall(r"\d+", n.get("bounds") or "")
+                        if len(m) == 4:
+                            x1, y1, x2, y2 = map(int, m)
+                            fields.append(((x1 + x2) // 2, (y1 + y2) // 2))
+            fields.sort(key=lambda c: c[1])
+            if len(fields) > int(needle):
+                x, y = fields[int(needle)]
+                subprocess.run(["adb", "shell", "input", "tap", str(x), str(y)])
+                return 0
+            time.sleep(1)
+        print(f"CHAMP INTROUVABLE: {needle}")
         return 1
     if cmd == "bounds":  # bounds TEXTE : « x1 y1 x2 y2 » du dernier élément portant ce texte
         if not (xml := dump()):

@@ -6,6 +6,8 @@ import { ApiError, NetworkError } from "./api";
  */
 const BY_CODE: Record<string, string> = {
   invalid_credentials: "Identifiants incorrects ou accès temporairement bloqué. Vérifiez la saisie ou réessayez plus tard.",
+  // Code d'accès provisoire d'un nouveau membre : le site ne fait pas choisir le code personnel (application Android seulement).
+  app_update_required: "Ce code d'accès est provisoire : choisissez d'abord votre code personnel dans l'application Mes Courses (dernière version sur Google Play), puis connectez-vous ici avec ce code.",
   unauthenticated: "Votre session a expiré. Reconnectez-vous.",
   wrong_password: "Mot de passe incorrect.",
   code_mismatch: "Le code famille saisi ne correspond pas.",

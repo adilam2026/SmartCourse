@@ -57,6 +57,20 @@ class ProfilesRepo(private val api: ApiClient) {
 
     suspend fun delete(id: String): Outcome<Unit> = api.call("DELETE", "/api/profiles/$id").map { Unit }
 
+    /** Nouveau membre sans code : le serveur génère un code provisoire (7 jours, usage unique), connu seulement dans cette réponse. */
+    suspend fun createWithProvisional(displayName: String, login: String, role: String, city: String?): Outcome<Pair<ProfileDto, String>> =
+        api.call("POST", "/api/profiles", buildJsonObject {
+            put("displayName", displayName); put("login", login); put("role", role); if (city != null) put("city", city)
+        }).map { o ->
+            val p = o["profile"]?.jsonObject?.let(::parseProfile)
+            val code = o["provisional"]?.jsonObject?.get("code")?.jsonPrimitive?.contentOrNull
+            if (p == null || code == null) null else p to code
+        }
+
+    /** « Nouveau code provisoire » : l'ancien code du membre cesse aussitôt de fonctionner. */
+    suspend fun provisionalCode(id: String): Outcome<String> =
+        api.call("POST", "/api/profiles/$id/provisional-code").map { o -> o["provisional"]?.jsonObject?.get("code")?.jsonPrimitive?.contentOrNull }
+
     suspend fun resetSecret(id: String, secret: String, confirm: String): Outcome<Unit> =
         api.call("POST", "/api/profiles/$id/reset-secret", buildJsonObject { put("secret", secret); put("secretConfirm", confirm) }).map { Unit }
 
@@ -137,7 +151,11 @@ fun serverMessage(f: Outcome.Fail, general: (Failure) -> String): String = when 
     "admin_cannot_delete" -> "Retirez d'abord le rôle administrateur de ce profil avant de le supprimer."
     "primary_cannot_delete" -> "L'administrateur principal ne peut pas être supprimé."
     "use_own_deletion" -> "Pour supprimer votre propre compte, utilisez « Supprimer mon compte »."
-    "login_taken" -> "Cet identifiant existe déjà dans la famille."
+    "login_taken" -> "Cet identifiant personnel existe déjà dans la famille."
+    "family_id_taken" -> "Cet identifiant famille est déjà utilisé"
+    "invalid_family_id" -> "Identifiant famille : lettres sans accents, chiffres et « _ », de 4 à 30 caractères."
+    "use_own_code" -> "Pour votre propre code, utilisez la récupération par e-mail."
+    "secret_change_required" -> "Choisissez d'abord votre code d'accès personnel."
     "city_required" -> "Choisissez une ville."
     "invalid_city" -> "Choisissez une ville dans la liste."
     "invalid_secret" -> "Le code d'accès doit contenir entre 6 et 8 chiffres."

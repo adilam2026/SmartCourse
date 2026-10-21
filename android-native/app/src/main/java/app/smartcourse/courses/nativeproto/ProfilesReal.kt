@@ -51,7 +51,8 @@ fun ProfilesScreenReal(session: Session, onBack: () -> Unit) {
     // Accès à partager : le code n'est connu qu'ici, juste après sa création ; il n'est ni journalisé ni enregistré.
     var shareFor by remember { mutableStateOf<AccessToShare?>(null) }
     var regenFor by remember { mutableStateOf<ProfileDto?>(null) }
-    val familyCode = me?.family?.code
+    // Identifiant famille s'il est choisi, sinon le code famille (toujours valable) : c'est ce que le membre saisira.
+    val familyCode = me?.family?.let { it.loginId ?: it.code }
 
     suspend fun reload() {
         when (val r = repo.list()) {
@@ -106,14 +107,16 @@ fun ProfilesScreenReal(session: Session, onBack: () -> Unit) {
                             IconButton({ menuFor = pr.id }, enabled = !busy) { Icon(Icons.Rounded.MoreVert, "Actions pour ${pr.displayName}", tint = C.Ink) }
                             DropdownMenu(menuFor == pr.id, { menuFor = null }, containerColor = Color.White, shape = RoundedCornerShape(16.dp)) {
                                 val canShare = ProfileRules.canShareAccess(pr, me?.id) && familyCode != null
-                                DropdownMenuItem(
-                                    text = { Text(if (canShare) "Partager l'accès" else "Partage impossible", color = if (canShare) C.Ink else C.Muted) },
+                                // Code oublié, code provisoire expiré ou perdu : nouveau code provisoire (l'ancien cesse aussitôt de fonctionner).
+                                if (pr.id != me?.id) DropdownMenuItem(
+                                    text = { Text(if (canShare) "Nouveau code provisoire" else "Nouveau code impossible", color = if (canShare) C.Ink else C.Muted) },
                                     leadingIcon = { Icon(Icons.Rounded.Share, null, tint = if (canShare) C.Ink else C.Muted) },
                                     enabled = canShare, onClick = { menuFor = null; regenFor = pr },
                                 )
                                 DropdownMenuItem(text = { Text("Modifier") }, leadingIcon = { Icon(Icons.Rounded.Edit, null, tint = C.Ink) },
                                     onClick = { menuFor = null; editFor = pr })
-                                DropdownMenuItem(text = { Text("Modifier le code d'accès") }, leadingIcon = { Icon(Icons.Rounded.Key, null, tint = C.Ink) },
+                                // Un code personnel n'est choisi que par la personne elle-même.
+                                if (pr.id == me?.id) DropdownMenuItem(text = { Text("Modifier mon code d'accès") }, leadingIcon = { Icon(Icons.Rounded.Key, null, tint = C.Ink) },
                                     onClick = { menuFor = null; codeFor = pr })
                                 if (!pr.active) DropdownMenuItem(
                                     text = { Text("Réactiver") }, leadingIcon = { Icon(Icons.Rounded.CheckCircle, null, tint = C.Ink) },
@@ -150,36 +153,35 @@ fun ProfilesScreenReal(session: Session, onBack: () -> Unit) {
         codeFor = null
         act("Code d'accès modifié : ${p.displayName} est déconnecté de ses téléphones.") { repo.resetSecret(p.id, a, b) }
     } }
-    if (create) CreateProfileSheet(defaultCity = me?.city, familyLocated = me?.location?.confirmed == true, onDismiss = { create = false }) { name, login, role, a, b, city ->
+    if (create) CreateProfileSheet(defaultCity = me?.city, familyLocated = me?.location?.confirmed == true, onDismiss = { create = false }) { name, login, role, city ->
         create = false
         scope.launch {
             busy = true
-            when (val r = repo.create(name, login, role, a, b, city)) {
+            when (val r = repo.createWithProvisional(name, login, role, city)) {
                 is Outcome.Ok -> {
                     reload()
-                    // Partage proposé tout de suite : c'est le seul moment où le code est connu.
-                    if (familyCode != null) shareFor = AccessToShare(name, familyCode, login, a, "Profil créé. Transmettez maintenant son accès : son code d'accès ne pourra plus être affiché ensuite.")
+                    // Partage proposé tout de suite : c'est le seul moment où le code provisoire est connu.
+                    if (familyCode != null) shareFor = AccessToShare(name, familyCode, login, r.value.second, "Profil créé avec un code d'accès provisoire. $name choisira son propre code à sa première connexion.")
                     else demo.say("Profil créé : $name.")
                 }
-                is Outcome.Fail -> demo.say(explain(r))
+                is Outcome.Fail -> demo.say(if (r.code == "invalid_request" && !serverSupports(demo.serverSchema, 26)) SERVER_UPDATE_MSG else explain(r))
             }
             busy = false
         }
     }
     regenFor?.let { p -> ConfirmDialog(
-        "Partager l'accès de ${p.displayName}",
-        "Son code d'accès actuel n'est pas conservé en clair : il ne peut pas être affiché. Pour partager son accès, un nouveau code va être généré. " +
-            "L'ancien code cessera de fonctionner et ${p.displayName} sera déconnecté de ses téléphones jusqu'à ce qu'il saisisse le nouveau.",
-        "Générer un nouveau code et partager",
+        "Nouveau code provisoire pour ${p.displayName}",
+        "Son code d'accès n'est jamais affiché. Un code provisoire valable 7 jours va être généré : l'ancien code de ${p.displayName} cessera aussitôt de fonctionner " +
+            "et ses téléphones seront déconnectés. À sa prochaine connexion, ${p.displayName} choisira son propre code.",
+        "Générer et partager",
         {
             regenFor = null
             val fc = familyCode
             if (fc != null) scope.launch {
                 busy = true
-                val code = AccessShare.generateCode()
-                when (val r = repo.resetSecret(p.id, code, code)) {
-                    is Outcome.Ok -> { reload(); shareFor = AccessToShare(p.displayName, fc, p.login, code, "Nouveau code créé : l'ancien ne fonctionne plus. Transmettez maintenant ce nouvel accès.") }
-                    is Outcome.Fail -> demo.say(explain(r))
+                when (val r = repo.provisionalCode(p.id)) {
+                    is Outcome.Ok -> { reload(); shareFor = AccessToShare(p.displayName, fc, p.login, r.value, "Nouveau code provisoire : l'ancien code ne fonctionne plus. ${p.displayName} choisira son propre code à sa prochaine connexion.") }
+                    is Outcome.Fail -> demo.say(settingFailure(r) { explain(it) })
                 }
                 busy = false
             }
@@ -239,24 +241,22 @@ private fun ResetCodeSheet(p: ProfileDto, onDismiss: () -> Unit, onSave: (String
 }
 
 @Composable
-private fun CreateProfileSheet(defaultCity: String?, familyLocated: Boolean, onDismiss: () -> Unit, onSave: (String, String, String, String, String, String?) -> Unit) {
+private fun CreateProfileSheet(defaultCity: String?, familyLocated: Boolean, onDismiss: () -> Unit, onSave: (String, String, String, String?) -> Unit) {
     var name by remember { mutableStateOf("") }
     var login by remember { mutableStateOf("") }
     var role by remember { mutableStateOf("staff") }
     var city by remember { mutableStateOf(defaultCity) }
-    var a by remember { mutableStateOf("") }
-    var b by remember { mutableStateOf("") }
     var pickCity by remember { mutableStateOf(false) }
     val loginOk = Regex("^[a-z0-9._-]{2,30}$").matches(login)
     // Pays et ville confirmés pour la famille : le nouveau membre en hérite (aucune ville à choisir).
-    val ok = name.isNotBlank() && loginOk && isNewCode(a) && a == b && (familyLocated || city != null)
+    val ok = name.isNotBlank() && loginOk && (familyLocated || city != null)
     AppSheet(onDismiss) {
         Column(Modifier.verticalScroll(rememberScrollState())) {
             Text("Nouveau profil", style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.height(12.dp))
             FormField(name, { name = it }, "Nom affiché (ex. Marie)", leading = Icons.Rounded.Person)
             Spacer(Modifier.height(10.dp))
-            FormField(login, { login = it.lowercase().filter { c -> c.isLetterOrDigit() || c in "._-" }.take(30) }, "Identifiant de connexion (ex. marie)", leading = Icons.Rounded.Person,
+            FormField(login, { login = it.lowercase().filter { c -> c.isLetterOrDigit() || c in "._-" }.take(30) }, "Identifiant personnel (ex. marie)", leading = Icons.Rounded.Person,
                 keyboard = KeyboardOptions(keyboardType = KeyboardType.Ascii))
             if (login.isNotEmpty() && !loginOk) Text("2 à 30 caractères : lettres, chiffres, point, tiret.", color = C.Danger, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
             Spacer(Modifier.height(12.dp))
@@ -268,12 +268,10 @@ private fun CreateProfileSheet(defaultCity: String?, familyLocated: Boolean, onD
                 SecondaryButton(city?.let { "Ville : $it" } ?: "Choisir la ville", { pickCity = true }, Modifier.fillMaxWidth(), height = 52.dp)
                 Spacer(Modifier.height(10.dp))
             }
-            CodeField(a, { a = it }, "Code d'accès", rule = true)
-            Spacer(Modifier.height(10.dp))
-            CodeField(b, { b = it }, "Confirmer le code")
-            if (b.isNotEmpty() && a != b) Text("Les deux codes ne sont pas identiques.", color = C.Danger, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp))
+            // Pas de code à choisir ici : un code provisoire (7 jours, usage unique) est généré et à partager ; le membre choisira le sien.
+            Text("Un code d'accès provisoire sera créé, à partager avec ce membre. Il choisira son propre code à sa première connexion.", style = MaterialTheme.typography.bodySmall)
             Spacer(Modifier.height(16.dp))
-            PrimaryButton("Créer le profil", { onSave(name.trim(), login, role, a, b, if (familyLocated) null else city) }, Modifier.fillMaxWidth(), enabled = ok)
+            PrimaryButton("Créer le profil", { onSave(name.trim(), login, role, if (familyLocated) null else city) }, Modifier.fillMaxWidth(), enabled = ok)
         }
     }
     if (pickCity) CityPickerSheet(city, { city = it; pickCity = false }, { pickCity = false })

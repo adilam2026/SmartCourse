@@ -4,7 +4,7 @@ import { revokeProfileSessions, type AuthContext } from "./auth.js";
 import { HttpError } from "./errors.js";
 import type { SseHub } from "./hub.js";
 import type { Role } from "./permissions.js";
-import { generateSecret, hashSecret, isValidNewSecret, isWeakSecret, NEW_SECRET_RULE } from "./security.js";
+import { generateSecret, hashSecret, isValidNewSecret, isWeakSecret, NEW_SECRET_RULE, verifySecret } from "./security.js";
 
 export interface ProfileView {
   id: string;
@@ -67,9 +67,9 @@ export interface CreateProfileInput {
   displayName: string;
   login: string;
   role: Role;
-  /** Choisi et saisi par l'administrateur : jamais généré automatiquement. */
-  secret: string;
-  secretConfirm: string;
+  /** Ancienne application : code choisi et saisi par l'administrateur (permanent). Absent : code provisoire généré (7 jours, usage unique). */
+  secret?: string;
+  secretConfirm?: string;
   city?: string;
 }
 
@@ -80,19 +80,31 @@ export function checkChosenSecret(secret: string, confirm: string): void {
   if (isWeakSecret(secret)) throw new HttpError(400, "weak_secret", "Code secret trop simple (évitez 123456, 111111…)");
 }
 
-export async function createProfile(db: Db, actor: AuthContext, input: CreateProfileInput): Promise<{ profile: ProfileView }> {
-  checkChosenSecret(input.secret, input.secretConfirm);
-  const hash = await hashSecret(input.secret);
+/** Durée de validité d'un code provisoire. */
+export const PROVISIONAL_DAYS = 7;
+export interface ProvisionalCode {
+  /** Affiché une seule fois à l'administrateur, pour être transmis au membre ; seule son empreinte est conservée. */
+  code: string;
+  expiresAt: string;
+}
+
+export async function createProfile(db: Db, actor: AuthContext, input: CreateProfileInput): Promise<{ profile: ProfileView; provisional?: ProvisionalCode }> {
+  const chosen = input.secret !== undefined;
+  if (chosen) checkChosenSecret(input.secret!, input.secretConfirm ?? "");
+  const code = chosen ? input.secret! : generateSecret();
+  const hash = await hashSecret(code);
   return withTx(db, async (c) => {
     await lockFamily(c, actor.familyId);
     try {
       const r = await c.query(
-        `INSERT INTO profiles (family_id, display_name, login, role, secret_hash, city) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+        `INSERT INTO profiles (family_id, display_name, login, role, secret_hash, city, secret_temporary, secret_expires_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7, CASE WHEN $7 THEN now() + make_interval(days => $8) END) RETURNING *`,
         // Sans ville choisie, le nouveau membre hérite de celle de la famille.
-        [actor.familyId, input.displayName, input.login, input.role, hash, input.city ?? (await c.query("SELECT city FROM families WHERE id = $1", [actor.familyId])).rows[0]?.city ?? null],
+        [actor.familyId, input.displayName, input.login, input.role, hash, input.city ?? (await c.query("SELECT city FROM families WHERE id = $1", [actor.familyId])).rows[0]?.city ?? null, !chosen, PROVISIONAL_DAYS],
       );
-      await audit(c, actor.familyId, actor.profileId, "profile.created", r.rows[0].id, { role: input.role });
-      return { profile: toView(r.rows[0]) };
+      await audit(c, actor.familyId, actor.profileId, "profile.created", r.rows[0].id, { role: input.role, provisional: !chosen });
+      if (chosen) return { profile: toView(r.rows[0]) };
+      return { profile: toView(r.rows[0]), provisional: { code, expiresAt: (r.rows[0].secret_expires_at as Date).toISOString() } };
     } catch (err: any) {
       if (err.code === "23505") throw new HttpError(409, "login_taken", "Cet identifiant existe déjà dans la famille");
       throw err;
@@ -215,11 +227,56 @@ export async function resetSecret(db: Db, hub: SseHub, actor: AuthContext, id: s
   await withTx(db, async (c) => {
     await lockFamily(c, actor.familyId);
     await loadTarget(c, actor.familyId, id);
-    await c.query("UPDATE profiles SET secret_hash = $2, failed_attempts = 0, locked_until = NULL WHERE id = $1", [id, hash]);
+    await c.query("UPDATE profiles SET secret_hash = $2, failed_attempts = 0, locked_until = NULL, secret_temporary = false, secret_expires_at = NULL, secret_used_at = NULL WHERE id = $1", [id, hash]);
     await revokeProfileSessions(c, id);
     await audit(c, actor.familyId, actor.profileId, "profile.secret_reset", id);
   });
   hub.disconnectProfile(id);
+}
+
+/**
+ * « Nouveau code provisoire » : l'administrateur en génère un pour un membre (code oublié, code provisoire expiré ou perdu).
+ * L'ancien code (provisoire ou personnel) cesse de fonctionner immédiatement et les sessions du membre sont fermées.
+ */
+export async function issueProvisionalCode(db: Db, hub: SseHub, actor: AuthContext, id: string): Promise<ProvisionalCode> {
+  if (id === actor.profileId) throw new HttpError(400, "use_own_code", "Pour votre propre code, utilisez la récupération par e-mail");
+  const code = generateSecret();
+  const hash = await hashSecret(code);
+  const expires = await withTx(db, async (c) => {
+    await lockFamily(c, actor.familyId);
+    const t = await loadTarget(c, actor.familyId, id);
+    if (t.deleted_at) throw new HttpError(404, "not_found", "Profil introuvable");
+    const r = await c.query(
+      `UPDATE profiles SET secret_hash = $2, secret_temporary = true, secret_expires_at = now() + make_interval(days => $3), secret_used_at = NULL,
+              failed_attempts = 0, locked_until = NULL WHERE id = $1 RETURNING secret_expires_at`,
+      [id, hash, PROVISIONAL_DAYS],
+    );
+    await revokeProfileSessions(c, id);
+    await audit(c, actor.familyId, actor.profileId, "profile.provisional_code", id);
+    return r.rows[0].secret_expires_at as Date;
+  });
+  hub.disconnectProfile(id);
+  return { code, expiresAt: expires.toISOString() };
+}
+
+/**
+ * Première connexion avec un code provisoire : la personne choisit son propre code (6 à 8 chiffres, tapé deux fois, différent du
+ * provisoire). Le code provisoire cesse de fonctionner ; les autres sessions éventuelles du profil sont fermées.
+ */
+export async function setOwnSecretFromProvisional(db: Db, actor: AuthContext, secret: string, secretConfirm: string): Promise<void> {
+  checkChosenSecret(secret, secretConfirm);
+  const hash = await hashSecret(secret);
+  await withTx(db, async (c) => {
+    const p = (await c.query("SELECT secret_hash, secret_temporary FROM profiles WHERE id = $1 FOR UPDATE", [actor.profileId])).rows[0];
+    if (!p?.secret_temporary) throw new HttpError(409, "no_provisional_code", "Votre code d'accès personnel est déjà choisi");
+    if (await verifySecret(secret, p.secret_hash)) throw new HttpError(400, "same_as_provisional", "Choisissez un code différent du code provisoire");
+    await c.query(
+      "UPDATE profiles SET secret_hash = $2, secret_temporary = false, secret_expires_at = NULL, secret_used_at = NULL, failed_attempts = 0, locked_until = NULL WHERE id = $1",
+      [actor.profileId, hash],
+    );
+    await c.query("UPDATE sessions SET revoked_at = now() WHERE profile_id = $1 AND id <> $2 AND revoked_at IS NULL", [actor.profileId, actor.sessionId]);
+    await audit(c, actor.familyId, actor.profileId, "profile.secret_chosen", actor.profileId);
+  });
 }
 
 /** Emergency path for the operator (no session): see admin-cli.ts. */
@@ -233,7 +290,7 @@ export async function operatorResetSecret(db: Db, familyCode: string, login: str
     );
     const p = r.rows[0];
     if (!p) throw new HttpError(404, "not_found", "Profil introuvable");
-    await c.query("UPDATE profiles SET secret_hash = $2, failed_attempts = 0, locked_until = NULL WHERE id = $1", [p.id, hash]);
+    await c.query("UPDATE profiles SET secret_hash = $2, failed_attempts = 0, locked_until = NULL, secret_temporary = false, secret_expires_at = NULL, secret_used_at = NULL WHERE id = $1", [p.id, hash]);
     await revokeProfileSessions(c, p.id);
     await audit(c, p.family_id, null, "profile.secret_reset_by_operator", p.id);
   });

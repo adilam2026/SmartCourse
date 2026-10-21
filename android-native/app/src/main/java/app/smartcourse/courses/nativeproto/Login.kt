@@ -69,7 +69,7 @@ import androidx.compose.ui.unit.dp
 
 /** Message clair pour chaque cause d'échec réseau ou serveur. */
 fun failureMessage(f: Failure): String = when (f) {
-    Failure.INVALID_CREDENTIALS -> "Identifiants incorrects ou accès temporairement bloqué. Vérifiez le code famille, l'identifiant et le code d'accès."
+    Failure.INVALID_CREDENTIALS -> "Identifiants incorrects ou accès temporairement bloqué. Vérifiez l'identifiant famille, l'identifiant personnel et le code d'accès personnel."
     Failure.RATE_LIMITED -> "Trop de tentatives. Patientez une minute avant de réessayer."
     Failure.SETUP_INCOMPLETE -> "Installation à terminer : l'administrateur doit d'abord vérifier son adresse e-mail de récupération."
     Failure.SESSION_EXPIRED -> "Votre session a expiré ou a été fermée. Reconnectez-vous."
@@ -136,12 +136,15 @@ fun LoginScreen(session: Session?, onSimulated: (Role) -> Unit) {
             Spacer(Modifier.height(14.dp))
 
             if (tab == 0) {
-                FormField(family, { family = it }, "Code famille", leading = Icons.Rounded.Group, focus = focus,
-                    keyboard = KeyboardOptions(keyboardType = KeyboardType.Ascii, capitalization = KeyboardCapitalization.Characters))
+                // Identifiant famille (ex. LesTaha04) ou ancien code famille : majuscules indifférentes, aucune majuscule imposée.
+                FormField(family, { family = it.trim() }, "Identifiant famille", leading = Icons.Rounded.Group, focus = focus,
+                    keyboard = KeyboardOptions(keyboardType = KeyboardType.Ascii, capitalization = KeyboardCapitalization.None))
+                Text("Ex. LesTaha04. L'ancien code famille à 8 caractères reste accepté.", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 4.dp, top = 4.dp))
                 Spacer(Modifier.height(10.dp))
-                FormField(login, { login = it }, "Identifiant", leading = Icons.Rounded.Person)
+                FormField(login, { login = it }, "Identifiant personnel", leading = Icons.Rounded.Person)
                 Spacer(Modifier.height(10.dp))
-                CodeField(code, { code = it }, "Code d'accès", legacy = true)
+                CodeField(code, { code = it }, "Code d'accès personnel", legacy = true)
+                Text("Votre code à vous. Il n'existe pas de mot de passe commun à la famille.", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 4.dp, top = 4.dp))
                 Spacer(Modifier.height(16.dp))
                 val notice = session?.notice
                 val farewell = session?.farewell
@@ -157,9 +160,9 @@ fun LoginScreen(session: Session?, onSimulated: (Role) -> Unit) {
                         onSimulated(if (login.trim().lowercase() == "marie") Role.STAFF else Role.ADMIN)
                     } else if (session.serverAddress == null) {
                         error = failureMessage(Failure.BAD_ADDRESS); serverSheet = true
-                    } else if (family.isBlank()) error = "Renseignez le code famille."
-                    else if (login.isBlank()) error = "Renseignez votre identifiant."
-                    else if (code.isBlank()) error = "Renseignez votre code d'accès."
+                    } else if (family.isBlank()) error = "Renseignez l'identifiant famille."
+                    else if (login.isBlank()) error = "Renseignez votre identifiant personnel."
+                    else if (code.isBlank()) error = "Renseignez votre code d'accès personnel."
                     else {
                         busy = true
                         scope.launch {
@@ -175,6 +178,10 @@ fun LoginScreen(session: Session?, onSimulated: (Role) -> Unit) {
                     "Besoin d'aide ?", color = C.TealDark, style = MaterialTheme.typography.labelLarge, textDecoration = TextDecoration.Underline,
                     modifier = Modifier.align(Alignment.CenterHorizontally).clip(RoundedCornerShape(8.dp)).clickable { help = true }.padding(horizontal = 12.dp, vertical = 16.dp),
                 )
+                Text(
+                    "Après une connexion réussie, l'identifiant famille et votre identifiant personnel sont retenus sur ce téléphone.",
+                    style = MaterialTheme.typography.bodySmall, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.fillMaxWidth(),
+                )
                 if (session != null && !BuildConfig.FINAL) Text(
                     "Serveur : ${session.serverAddress?.substringAfter("://") ?: "à définir"} · Modifier",
                     color = C.Muted, style = MaterialTheme.typography.bodySmall, textDecoration = TextDecoration.Underline,
@@ -187,7 +194,7 @@ fun LoginScreen(session: Session?, onSimulated: (Role) -> Unit) {
                     SCard(padding = PaddingValues(16.dp)) {
                         Text("Votre profil est créé par un administrateur", style = MaterialTheme.typography.titleMedium)
                         Spacer(Modifier.height(6.dp))
-                        Text("Demandez à un administrateur de la famille de créer votre profil : il vous donnera le code famille, votre identifiant et un code d'accès (entre 6 et 8 chiffres). Vous pourrez alors vous connecter.", style = MaterialTheme.typography.bodyMedium)
+                        Text("Demandez à un administrateur de la famille de créer votre profil : il vous donnera l'identifiant famille, votre identifiant personnel et un code d'accès provisoire. À la première connexion, vous choisirez votre propre code d'accès personnel.", style = MaterialTheme.typography.bodyMedium)
                         Spacer(Modifier.height(12.dp))
                         PrimaryButton("Aller à la connexion", { tab = 0 }, Modifier.fillMaxWidth())
                     }
@@ -223,7 +230,7 @@ fun LoginScreen(session: Session?, onSimulated: (Role) -> Unit) {
     if (session != null) when (helpKind) {
         1 -> RecoveryHelpSheet(session, true) { helpKind = 0 }
         2 -> RecoveryHelpSheet(session, false) { helpKind = 0 }
-        3 -> AskAdminSheet("Code famille inconnu", "Le code famille se trouve dans l'écran Compte d'un administrateur de la famille. Demandez-le lui, ou utilisez « Récupérer ma famille » si vous êtes l'administrateur principal.") { helpKind = 0 }
+        3 -> AskAdminSheet("Identifiant famille inconnu", "L'identifiant famille se trouve dans Réglages → Identifiant famille d'un administrateur de la famille. Demandez-le lui, ou utilisez « Récupérer ma famille » si vous êtes l'administrateur principal.") { helpKind = 0 }
     }
     if (help) {
         AppSheet({ help = false }) {
@@ -233,7 +240,7 @@ fun LoginScreen(session: Session?, onSimulated: (Role) -> Unit) {
             Spacer(Modifier.height(10.dp))
             HelpRow(Icons.Rounded.Key, "J'ai oublié mon code d'accès", "Administrateur principal : lien par e-mail. Sinon, demandez à un administrateur") { help = false; if (session != null) helpKind = 1 else demo.simulated("demande de nouveau code") }
             HelpRow(Icons.Rounded.Email, "Récupérer ma famille", "Recevoir le code famille par e-mail") { help = false; if (session != null) helpKind = 2 else demo.simulated("envoi du lien de récupération") }
-            HelpRow(Icons.Rounded.Group, "Je ne connais pas le code famille", "Le demander à un administrateur de la famille") { help = false; if (session != null) helpKind = 3 else demo.simulated("aide code famille") }
+            HelpRow(Icons.Rounded.Group, "Je ne connais pas l'identifiant famille", "Le demander à un administrateur de la famille") { help = false; if (session != null) helpKind = 3 else demo.simulated("aide code famille") }
         }
     }
 }

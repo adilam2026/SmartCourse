@@ -1,10 +1,61 @@
-═══ X. Options avancées : activation des listes, choix et sélection de la devise, activation du budget, réglages gardés après réouverture — contrôle ciblé ═══
-PASS  X0. serveur à jour : aucune option bloquée
-PASS  X1. « Plusieurs listes actives » activée sans message d'erreur (true:false:-)
-PASS  X2. choix de devise ouvert : liste des devises avec leurs pays
-PASS  X3. devise sélectionnée affichée, confirmation possible
-PASS  X4. budget activé avec la devise choisie (true:true:EUR)
-PASS  X5. après fermeture et réouverture : options toujours activées, onglet Budget présent
+═══ I. Identifiant famille : choix, connexion, changement, alias, invitation, expiration, renouvellement, isolation ═══
+PASS  I0. connexion avec l'ancien code famille (accès existants inchangés)
+PASS  I1. Réglages : invitation à choisir l'identifiant famille (ancien code rappelé)
+PASS  I2. écran de choix : proposition d'après le nom (Recette), disponible ; ce qui ne change pas
+PASS  I3. « Cet identifiant famille est déjà utilisé » (majuscules indifférentes) et propositions disponibles
+PASS  I3b. enregistrement impossible avec cet identifiant
+PASS  I3c. proposition touchée : disponible
+PASS  I4. confirmation : l'ancien code reste valable
+PASS  I4b. identifiant enregistré et affiché ; ancien code accepté
+PASS  I4c. serveur : identifiant actuel + code famille conservé
+PASS  I4d. membres, listes, achats, produits, codes et nom de la famille inchangés
+PASS  I5. connexion : identifiant famille retenu sur le téléphone (LesRecette04)
+PASS  I5b. connexion avec l'identifiant en minuscules
+PASS  I5c. connecté
+PASS  I6. ancien code famille toujours accepté (membre du personnel)
+PASS  I6b. connectée
+PASS  I7. serveur : réponse identique (identifiant inconnu / code faux)
+PASS  I7b. application : message générique
+PASS  I8. réglages : identifiant actuel avec Partager et Modifier
+PASS  I8b. nouvel identifiant enregistré ; l'ancien devient un alias
+PASS  I8c. connexion acceptée avec l'ancien identifiant, le nouveau et le code famille
+PASS  I9. invitation : identifiant famille actuel et code provisoire (363965)
+PASS  I10. Lina se connecte avec le code provisoire
+PASS  I10b. première connexion : choix du code personnel obligatoire
+PASS  I10c. code provisoire à usage unique : une seconde connexion est refusée
+PASS  I10d. code enregistré : l'application s'ouvre
+PASS  I10e. code personnel accepté, code provisoire refusé
+PASS  I11. code provisoire expiré (729592) : message générique
+PASS  I12. renouvellement : nouveau code affiché (012111) ; l'ancien refusé, le nouveau accepté
+PASS  I13. seconde famille créée avec son identifiant (Famille_Iso)
+PASS  I13b. l'identifiant d'une famille ne donne aucun accès à l'autre (membre de A avec l'identifiant de B : refusé)
+PASS  I13c. chaque famille ne voit que ses membres
+PASS  I13d. ancien identifiant de A jamais réattribué à B
+PASS  I13e. contrôle de disponibilité : aucune information sur la famille qui l'utilise
+PASS  I14. données de la famille A toujours intactes hors nouveaux membres (codes des anciens membres inchangés)
+ECHECS=0
+CRASH_APPLICATION=0
+═══ S. Accès d'un nouveau membre : code provisoire, partage, nouveau code (famille JETABLE) ═══
+PASS  S0. administrateur connecté (saisies vérifiées)
+PASS  S1. identifiant famille (ici l'ancien code, aucun identifiant choisi) avec « Partager » et « Copier »
+PASS  S1b. son propre profil : « Modifier mon code d'accès », jamais de code provisoire
+PASS  S1c. pays de la famille confirmé : pas de ville à choisir (le membre hérite de celle de la famille)
+PASS  S2. aucun code à choisir par l'administrateur : code provisoire annoncé
+PASS  S3. partage proposé dès la création : identifiant famille, identifiant personnel, code provisoire 7 jours (072901)
+PASS  S3b. serveur : code provisoire valable 7 jours, non stocké en clair
+PASS  S3c. « Code d'accès provisoire », jamais « mot de passe »
+PASS  S4b. « Copier les informations »
+PASS  S4d. panneau de partage de l'application fermé
+PASS  S6. menu : « Nouveau code provisoire » (rien ne change à l'ouverture)
+PASS  S6b. explication : code jamais affiché, l'ancien cesse aussitôt de fonctionner, 7 jours
+PASS  S6c. annulation : code inchangé (empreinte identique)
+PASS  S7. nouveau code provisoire généré et affiché (317532)
+PASS  S7b. l'ancien code ne fonctionne plus ; le nouveau ouvre une session limitée au choix du code
+PASS  S8. avec WhatsApp : WhatsApp s'ouvre avec le message (envoi par l'administrateur)
+PASS  S9. identifiant famille : WhatsApp s'ouvre
+PASS  S9b. « Copier » l'identifiant famille
+PASS  S4. sans WhatsApp : partage Android ouvert (rien n'est envoyé)
+PASS  S4c. panneau de partage refermé sans rien envoyer, retour à l'application
 ECHECS=0
 CRASH_APPLICATION=0
 TOTAL_ECHECS=0

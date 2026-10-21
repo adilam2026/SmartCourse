@@ -157,6 +157,8 @@ export async function purgeFamily(db: Db, store: PhotoStore, familyId: string, e
     // Pictures that belong to this family (never a shared catalogue picture): every reference to them is gone by now.
     const photos = (await c.query("DELETE FROM photo_assets WHERE owner_family_id = $1 RETURNING storage_key", [familyId])).rows.map((r) => r.storage_key as string);
     await c.query("UPDATE install_tokens SET family_id = NULL WHERE family_id = $1", [familyId]); // the consumed token stays consumed
+    // Codes et identifiants de la famille : seule leur empreinte reste (aucun nom), pour qu'ils ne soient jamais réattribués.
+    await c.query("UPDATE family_aliases SET alias = NULL, family_id = NULL, created_by = NULL WHERE family_id = $1", [familyId]);
     await c.query("DELETE FROM profiles WHERE family_id = $1", [familyId]);
     await c.query("DELETE FROM families WHERE id = $1", [familyId]);
     // Verification before commit: nothing of this family is left, nothing of any other family has changed.

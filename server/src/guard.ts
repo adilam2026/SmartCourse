@@ -13,11 +13,13 @@ declare module "fastify" {
 }
 
 /** Rejects with 401 if there is no valid session, 403 if the role lacks `action`. Identity always comes from the session. */
-export const makeGuard = (db: Db) => (action?: Action, opts: { allowPending?: boolean } = {}) => async (req: FastifyRequest) => {
+export const makeGuard = (db: Db) => (action?: Action, opts: { allowPending?: boolean; allowTemporary?: boolean } = {}) => async (req: FastifyRequest) => {
   const auth = await authenticate(db, req.cookies[COOKIE]);
   if (!auth) throw new HttpError(401, "unauthenticated", "Connexion requise");
   // Installation inachevée (adresse de récupération non vérifiée) : rien d'autre que sa finalisation n'est possible.
   if (auth.setupPending && !opts.allowPending) throw new HttpError(403, "setup_incomplete", "Installation à terminer : vérifiez votre adresse e-mail");
+  // Connecté avec un code provisoire : seul le choix de son propre code d'accès personnel est possible.
+  if (auth.mustChangeSecret && !opts.allowTemporary) throw new HttpError(403, "secret_change_required", "Choisissez d'abord votre code d'accès personnel");
   if (action && !can(auth.role, action)) throw new HttpError(403, "forbidden", "Action non autorisée");
   req.auth = auth;
 };

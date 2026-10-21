@@ -23,6 +23,10 @@ Préparé à partir du comportement réel de l'application (code de `android-nat
 
 ## 1. Sécurité des données (formulaire « Data safety »)
 
+> **Mise à jour requise pour la version 1166 (module Budget, pays de la famille, rappels)** — à saisir dans la Play Console
+> *avant* d'envoyer l'AAB 1166 en examen. Lignes modifiées ou ajoutées ci-dessous marquées **[1166]**. Le module Budget est
+> facultatif et désactivé par défaut, mais Google demande de déclarer tout type de données que l'application *peut* collecter.
+
 Réponses générales :
 
 | Question | Réponse |
@@ -42,15 +46,17 @@ Types de données **collectés** (envoyés au serveur de l'application) :
 | Informations personnelles → **Nom** | prénom ou nom affiché de chaque profil, nom de la famille | Oui | Fonctionnalité de l'application ; Gestion du compte |
 | Informations personnelles → **Adresse e-mail** | adresse de récupération de l'administrateur principal | Oui (création de la famille) | Gestion du compte ; Fonctionnalité de l'application (code de vérification, récupération) |
 | Informations personnelles → **ID utilisateur** | identifiant de connexion, code famille | Oui | Gestion du compte ; Fonctionnalité de l'application |
-| Position → **Position approximative** | ville choisie dans la liste (pas de GPS), pour le catalogue et les prix indicatifs | Oui | Fonctionnalité de l'application |
-| Informations financières → **Historique des achats** | articles achetés, quantités, prix indicatifs, auteur et heure de l'achat | Oui | Fonctionnalité de l'application |
-| Activité dans l'application → **Autre contenu généré par l'utilisateur** | listes, demandes, quantités, favoris, préférences d'affichage | Oui | Fonctionnalité de l'application |
+| Position → **Position approximative** **[1166]** | **pays de la famille** choisi dans une liste et, au Maroc seulement, ville choisie dans la liste (pas de GPS, aucune permission de position), pour le catalogue, les prix indicatifs et la devise proposée | Oui | Fonctionnalité de l'application |
+| Informations financières → **Historique des achats** **[1166]** | articles achetés, quantités, prix indicatifs, auteur et heure de l'achat ; **si le Budget est activé : paiements enregistrés pour une liste (montant payé, date, magasin, auteur)** | Oui | Fonctionnalité de l'application |
+| Informations financières → **Autres informations financières** **[1166, nouveau]** | module Budget : dépenses et entrées saisies (montant, devise, catégorie, magasin, libellé, note, date), solde de départ de « Mon compte », budgets mensuels par catégorie, historique des corrections et annulations, droits financiers de chaque profil. **Aucune** carte bancaire, aucun numéro de compte, aucun accès bancaire, aucun paiement réel | **Non (facultatif)** : l'utilisateur choisit (option désactivée par défaut, activée par un administrateur) | Fonctionnalité de l'application |
+| Activité dans l'application → **Autre contenu généré par l'utilisateur** **[1166]** | listes (**et leurs noms** avec « Plusieurs listes actives »), demandes, quantités, favoris, préférences d'affichage | Oui | Fonctionnalité de l'application |
 
 Pour chaque type : **collecté = oui**, **partagé = non**, **traité de façon éphémère = non**.
 
 Non collectés : position précise, contacts, photos et vidéos (l'application Android n'envoie aucune photo ; elle affiche
 celles du catalogue), fichiers, agenda, santé, messages, audio, identifiants d'appareil ou publicitaires, rapports de
-plantage, diagnostics. Le code d'accès n'est jamais conservé en clair (empreinte seulement) ; Google ne demande pas de le
+plantage, diagnostics. **[1166]** Les rappels d'achat (jours et horaires) restent **sur le téléphone** : ils ne sont pas envoyés
+au serveur et ne sont pas à déclarer ; au déclenchement, l'application lit seulement la liste de la famille. Le code d'accès n'est jamais conservé en clair (empreinte seulement) ; Google ne demande pas de le
 déclarer comme type distinct, mais il relève de la gestion du compte.
 
 ### Suppression et conservation (réponses « Suppression des données » et texte d'aide)
@@ -59,7 +65,12 @@ déclarer comme type distinct, mais il relève de la gestion du compte.
   réglages, adresse e-mail éventuelle, liens et journal des e-mails, demande de création et abonnements aux notifications
   sont effacés immédiatement ; sessions fermées, reconnexion refusée. Les listes et achats, qui appartiennent à la famille,
   restent sous « Ancien profil ».
-- **Suppression de la famille** (administrateur principal) : toutes les données de la famille sont effacées immédiatement.
+- **Suppression de la famille** (administrateur principal) : toutes les données de la famille sont effacées immédiatement,
+  **[1166]** y compris toutes les données du Budget (opérations, historique des corrections, budgets, « Mon compte », catégories,
+  magasins, droits financiers, réglages).
+- **[1166] Données du Budget à la suppression d'un compte** : les opérations appartiennent à la famille et restent, sous
+  « Ancien profil », comme les achats. Une opération n'est jamais effacée individuellement : elle est annulée de façon traçable.
+  Désactiver le Budget masque le module sans effacer ses données.
 - **Conservation** : demandes de création de famille et e-mails de code effacés par le serveur au-delà de 30 jours (au
   démarrage puis toutes les 6 heures). Aucune durée n'est annoncée pour les sauvegardes ni pour les journaux de l'hébergeur
   (non vérifiées).
@@ -77,9 +88,9 @@ Permissions du manifeste fusionné du bundle (relevées par bundletool, voir `bu
 |---|---|---|
 | `android.permission.INTERNET` | application | Joindre le serveur de la famille (HTTPS). |
 | `android.permission.ACCESS_NETWORK_STATE` | application, WorkManager | Savoir si le réseau est revenu pour envoyer les changements gardés hors connexion. |
-| `android.permission.POST_NOTIFICATIONS` | application | Notifications facultatives des nouvelles demandes (parents et administrateurs) ; demandée seulement si l'utilisateur les active. |
+| `android.permission.POST_NOTIFICATIONS` | application | Notifications facultatives des nouvelles demandes (parents et administrateurs) et **[1166] rappels d'achat** choisis par chaque profil ; demandée seulement si l'utilisateur les active. |
 | `android.permission.WAKE_LOCK` | WorkManager | Laisser finir la vérification périodique en arrière-plan. |
-| `android.permission.RECEIVE_BOOT_COMPLETED` | WorkManager | Reprogrammer la vérification périodique après un redémarrage du téléphone. |
+| `android.permission.RECEIVE_BOOT_COMPLETED` | application **[1166]**, WorkManager | Reprogrammer la vérification périodique et **les rappels d'achat** après un redémarrage, une mise à jour de l'application ou un changement d'heure. Pas d'alarme exacte (`SCHEDULE_EXACT_ALARM` / `USE_EXACT_ALARM` non demandées) : aucune déclaration spéciale. |
 | `android.permission.FOREGROUND_SERVICE` | WorkManager | Déclarée par la bibliothèque ; l'application ne lance aucun service au premier plan. |
 | `app.smartcourse.courses.natif.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` | AndroidX | Permission interne à l'application (protection de ses récepteurs). |
 
@@ -105,6 +116,13 @@ de permission spéciale n'est donc demandée par la Play Console.
 - Annonces : **L'application ne contient pas d'annonces**.
 - Accès à l'application : **Fonctionnalités soumises à restrictions** (connexion requise) → instructions du § 6.
 - Application d'actualités : Non. Application de santé : Non. Application financière : Non. Applications gouvernementales : Non.
+- **[1166] Déclaration « Fonctionnalités financières »** (*Règles et programmes → Contenu de l'application*, obligatoire pour
+  toutes les applications) : cocher **« Mon application ne propose aucune fonctionnalité financière »**. Le module Budget est un
+  carnet de suivi des dépenses saisies à la main : pas de paiement, de virement, de prêt, de crédit, de banque, de portefeuille,
+  de cryptomonnaie, de bourse ni d'assurance, et aucune connexion à un compte bancaire. Si la console propose une rubrique de
+  gestion budgétaire ou de suivi des dépenses personnelles sans service financier, la choisir à la place ; ne jamais cocher une
+  catégorie de service réglementé.
+- **[1166] Catégorie de l'application** : garder la catégorie actuelle (le Budget est une fonction secondaire et facultative).
 - Fonctionnalités d'IA générative : Non.
 
 ## 5. URL publiques (vérifiées le 14 octobre 2026, en lecture seule)

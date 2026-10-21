@@ -352,13 +352,14 @@ describe("codes secrets", () => {
     expect((await doLogin(f.familyCode, "sara", "008213")).statusCode).toBe(200); // le zéro initial est conservé
     expect([400, 401]).toContain((await doLogin(f.familyCode, "sara", "8213")).statusCode); // sans le zéro : refusé
     expect((await doLogin(f.familyCode, "sara", "408213")).statusCode).toBe(401);
-    // refus : trop court / trop long / espace / lettres / symboles / confirmation différente / absence (aucune génération automatique)
+    // refus : trop court / trop long / espace / lettres / symboles / confirmation différente
     for (const [i, secret] of ["40821", "408213412", "408 213", "40\t213", "40821a", "Ab3$xy", "408.13", "٤٠٨٢١٣"].entries())
       expect((await addProfile(f.cookies, { displayName: "x", login: `bad${i}`, role: "staff", secret, secretConfirm: secret })).statusCode).toBe(400);
     const mismatch = await addProfile(f.cookies, { displayName: "x", login: "mism", role: "staff", secret: "408213", secretConfirm: "408214" });
     expect([mismatch.statusCode, mismatch.json().error]).toEqual([400, "secret_mismatch"]);
+    // Sans code (application actuelle) : code PROVISOIRE généré par le serveur, renvoyé une seule fois (voir family-id.test.ts).
     const none = await app.inject({ method: "POST", url: "/api/profiles", cookies: f.cookies, payload: { displayName: "x", login: "none", role: "staff" } });
-    expect(none.statusCode).toBe(400);
+    expect([none.statusCode, /^\d{6}$/.test(none.json().provisional.code)]).toEqual([201, true]);
     for (const weak of ["111111", "123456", "654321", "000000", "1234567", "87654321", "22222222"]) expect((await addProfile(f.cookies, { displayName: "x", login: `w${weak}`, role: "staff", secret: weak, secretConfirm: weak })).statusCode).toBe(400);
     // 7 et 8 chiffres : acceptés, zéros initiaux conservés, message d'erreur précis sinon
     expect((await addProfile(f.cookies, { displayName: "Sept", login: "sept", role: "staff", secret: "0472915", secretConfirm: "0472915" })).statusCode).toBe(201);
@@ -368,7 +369,7 @@ describe("codes secrets", () => {
     expect([400, 401]).toContain((await doLogin(f.familyCode, "huit", "472915")).statusCode);
     const nine = await addProfile(f.cookies, { displayName: "x", login: "neuf", role: "staff", secret: "408213412", secretConfirm: "408213412" });
     expect([nine.statusCode, nine.json().error, nine.json().message]).toEqual([400, "invalid_secret", "Le code d'accès doit contenir entre 6 et 8 chiffres"]);
-    expect((await db.query("SELECT 1 FROM profiles WHERE login ~ '^(mism|none|bad|w|neuf)' AND family_id = (SELECT family_id FROM profiles WHERE id = $1)", [f.adminId])).rowCount).toBe(0);
+    expect((await db.query("SELECT 1 FROM profiles WHERE login ~ '^(mism|bad|w|neuf)' AND family_id = (SELECT family_id FROM profiles WHERE id = $1)", [f.adminId])).rowCount).toBe(0);
   });
 
   it("compatibilité : un mot de passe existant avec lettres ou symboles continue de fonctionner (connexion, confirmation avant suppression) et n'est jamais modifié d'office ; on ne peut pas en choisir de nouveau", async () => {

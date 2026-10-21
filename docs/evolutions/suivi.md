@@ -3,7 +3,33 @@
 Spécification consolidée du 17/10/2026 (elle remplace les consignes antérieures en cas de contradiction).
 Branche de travail : `claude/evolutions-avancees`. Aucune publication Google Play automatique.
 
-## 1. Version de départ (référence)
+## 1. Référence stable actuelle (validée le 17/10/2026)
+
+Recette de la version 1166 et des évolutions livrées **validée par le propriétaire le 17/10/2026**. Cette version remplace la référence 1144 (conservée ci-dessous à titre d'historique).
+
+| Élément | Valeur |
+|---|---|
+| Application Android | versionName **1.0.2**, versionCode **1166**, identifiant `app.smartcourse.courses.natif` |
+| Commit de l'application | `aa1eae4` — branche de référence `reference/android-1.0.2-1166` |
+| Release GitHub | `courses-natif-play-1.0.2-66` (pré-version ; dépôt sur Google Play fait par le propriétaire lui-même) |
+| AAB signé | https://github.com/adilam2026/SmartCourse/releases/download/courses-natif-play-1.0.2-66/MesCourses-1.0.2.aab — SHA-256 `7db67134705f0e14501f000180b6421764620b9280fb49013730996758957bf7` |
+| APK (dérivé du bundle) | https://github.com/adilam2026/SmartCourse/releases/download/courses-natif-play-1.0.2-66/MesCourses-1.0.2-depuis-bundle.apk — SHA-256 `82026f282491b3dc385949155c320202e217b9e57b76e920774620cea6b59822` |
+| Certificat (clé durable, inchangée) | SHA-256 `C2:CB:CE:5E:2F:61:8A:21:7A:C6:7A:15:A7:2C:E2:0F:BB:B3:B9:80:BC:3B:AF:43:DD:8A:4A:EA:E6:69:C8:8E` |
+| Serveur de production | commit `64af689` (branche `claude/family-shopping-list-specs-eqevg8`, fusion de la PR #1) — branche de référence `reference/serveur-025` |
+| Migrations appliquées | `001` à `025_budget.sql` (constaté sur `/health` le 17/10/2026, 17:45 UTC) |
+| Options avancées | « Plusieurs listes actives » et « Gestion du budget » **désactivées par défaut** pour toutes les familles |
+| Sauvegardes protégées | 2 copies hors élagage sous `backups-conservees/` : 17/10/2026 09:18 UTC (schéma 022, restauration vérifiée, run 15) et 17/10/2026 17:44:56 UTC (prise par le serveur juste avant les migrations, schéma 022, restauration vérifiée) |
+| Sauvegarde courante | quotidienne, chiffrée, vérifiée par restauration dans une base de contrôle ; rétention 7 j / 4 sem. / 3 mois (les copies protégées n'en font pas partie) |
+
+### Retour arrière depuis la référence 1166 / 025 (résumé, détail au § 7 et dans `deploiement.md` § 4)
+1. **Une option pose problème** : la désactiver dans Paramètres avancés (données conservées). « Plusieurs listes actives » ne se désactive qu'avec une seule liste en cours.
+2. **Le serveur 025 pose problème** : redéployer sur Railway la branche `reference/serveur-022-compat` (`1796aef`). Les migrations restent en place (additives) ; l'ancien code ignore les tables Budget ; avec plusieurs listes en cours, il travaille sur la plus récente et les autres restent intactes. Aucune liste ni donnée financière n'est supprimée. Ne jamais redéployer `reference/serveur-022` non corrigé si une famille a plusieurs listes en cours.
+3. **L'application 1166 pose problème** : nouvelle version construite depuis `reference/android-1.0.2-1144` avec un versionCode supérieur à 1166 (même clé) ; jamais de désinstallation demandée aux utilisateurs.
+4. **La base** : jamais de restauration en production sans l'accord explicite du propriétaire ; copies protégées disponibles (ci-dessus).
+
+Branches de référence conservées (ne jamais supprimer) : `reference/android-1.0.2-1144`, `reference/serveur-022`, `reference/serveur-022-compat`, `reference/android-1.0.2-1166`, `reference/serveur-025`.
+
+## 1 bis. Version de départ des évolutions (ancienne référence 1144, historique)
 
 | Élément | Valeur |
 |---|---|
@@ -106,12 +132,19 @@ Proposées et appliquées sauf avis contraire :
 
 - 17/10/2026 : **restauration de contrôle de la sauvegarde de production réussie** dans un serveur PostgreSQL 18 isolé et jetable (workflow `verif-sauvegarde.yml`, run 15, sans adresse de la production) : 7 sauvegardes disponibles ; la plus récente du 17/10/2026 à 09:18 UTC (7,6 h avant le contrôle), schéma 022 ; fichier chiffré puis déchiffré avec la clé ; 32 tables restaurées, nombre de lignes de chacune identique au manifeste ; liste des migrations identique ; invariants respectés (articles achetés et achats, une liste active par famille, un administrateur actif par famille) ; 0 photo de famille référencée (aucune à vérifier).
 
+- 17/10/2026 : **déploiement en production** — PR #1 fusionnée par le propriétaire (« Create a merge commit », commit `64af689`, second parent `54872f6`). `/health` : commit `64af689`, migration `025_budget.sql` (17:45 UTC). Sauvegarde prise par le serveur juste avant les migrations (17:44:56 UTC, manifeste en 022), restaurée dans une base isolée : réussie, 32 tables conformes ; copie protégée sous `backups-conservees/` (2 copies protégées : 09:18 et 17:44). Famille jetable « Recette jetable » : options désactivées par défaut, « Plusieurs listes actives » activée, devise proposée MAD pour le Maroc, Budget activé avec EUR choisi, réglages conservés après reconnexion, puis famille supprimée (connexion refusée ensuite). Famille du propriétaire et famille de la revue Google non touchées. Aucune publication Google Play.
+
+- 17/10/2026 : **recette 1166 validée par le propriétaire** ; 1166 / `64af689` / migration 025 deviennent la référence stable (branches `reference/android-1.0.2-1166` → `aa1eae4` et `reference/serveur-025` → `64af689`, § 1). Pas de nouvelle compilation ni de campagne de tests. Dépôt sur Google Play fait par le propriétaire lui-même.
+
 ## 6. Points bloquants / à valider
 1. ~~Sauvegarde vérifiée avant toute migration de production~~ : faite le 17/10/2026 (voir § 5) ; à refaire juste avant le déploiement si la sauvegarde la plus récente date de plus de 24 h.
    Ancien texte : : une sauvegarde récente doit être restaurée sur une base isolée et comparée (la seule présence de variables S3 ne suffit pas). Commande prévue côté serveur : `npm run backup -- verify` : elle restaure la dernière sauvegarde dans une base de contrôle **isolée** (variable `VERIFY_DATABASE_URL`, base vide distincte de la production) et compare les comptages au manifeste. À exécuter dans l'environnement Railway (secrets non partagés). Aucune migration de production avant ce résultat.
-2. **Validation visuelle des maquettes** (21 écrans, Google retiré) : https://claude.ai/artifact/B1cei82u74Zfo3upEbrs7h. Le module Budget n'est pas développé avant cette validation.
+2. **Validation visuelle des maquettes** (21 écrans, Google retiré) : https://claude.ai/artifact/B1cei82u74Zfo3upEbrs7h. Le module Budget n'est pas développé avant cette validation. (Validée ; recette 1166 validée le 17/10/2026.)
+3. **Avant le dépôt de 1166 sur Google Play** (fait par le propriétaire) : mettre à jour la déclaration « Sécurité des données », la déclaration « Fonctionnalités financières » et la page `/confidentialite` (Budget, pays de la famille, rappels). Changements détaillés dans `docs/native/play/play-console.md` § 1, 2 et 4 ; brouillon de page dans `web/public/confidentialite.html` (branche `claude/evolutions-avancees`), **en ligne seulement après un déploiement serveur accordé par le propriétaire**.
 
 ## 7. Retour arrière
+**À jour au 17/10/2026 (référence 1166 / 025)** : la cible serveur est `reference/serveur-022-compat`, pas `reference/serveur-022` ; procédure complète dans `deploiement.md` § 4 et résumé au § 1. Les points ci-dessous datent d'avant le déploiement ; l'index `lists_one_active_per_family` n'est pas à recréer avec `reference/serveur-022-compat`.
+
 - **Revenir à l'ancien code (application)** : réinstaller l'APK de référence n'est possible qu'en désinstallant (versionCode inférieur) ; préférer une nouvelle version construite depuis `reference/android-1.0.2-1144` avec un versionCode supérieur.
 - **Revenir à l'ancien code (serveur)** : redéployer `reference/serveur-022` sur Railway. Les migrations sont additives : l'ancien serveur ignore les nouvelles tables et colonnes. Exception à prévoir : si l'index « une liste active » est levé, l'ancien serveur suppose une seule liste ; il faut d'abord clôturer les listes en trop (procédure documentée à l'étape multi-listes).
 - **Désactiver une fonction** : décocher l'option dans Paramètres avancés (données conservées). « Plusieurs listes actives » ne se désactive que s'il ne reste qu'une liste en cours (le serveur refuse sinon : rien n'est fusionné ni supprimé automatiquement).

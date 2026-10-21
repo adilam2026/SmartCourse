@@ -50,6 +50,8 @@ export interface SignupInput {
   country: string;
   email: string;
   secret: string;
+  /** Identifiant famille choisi (null : ancienne application, à choisir plus tard). */
+  familyLoginId?: string | null;
 }
 
 export interface SignupView {
@@ -149,9 +151,9 @@ export async function startSignup(db: Db, recovery: RecoveryService, input: Sign
     // Une seule demande ouverte par adresse : la précédente est remplacée (son code ne fonctionne plus).
     await c.query("UPDATE family_signups SET superseded_at = now() WHERE email_hash = $1 AND completed_at IS NULL AND superseded_at IS NULL", [eh]);
     const r = await c.query(
-      `INSERT INTO family_signups (request_id, email, email_hash, ip_hash, family_name, display_name, login, city, country, secret_hash, code_hash, expires_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'', now() + make_interval(mins => $11)) RETURNING id, email, expires_at, last_sent_at`,
-      [input.requestId, email, eh, ipHash, input.familyName, input.displayName, input.login, input.city, input.country, secretHash, limits.codeMinutes],
+      `INSERT INTO family_signups (request_id, email, email_hash, ip_hash, family_name, display_name, login, city, country, secret_hash, code_hash, expires_at, family_login_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'', now() + make_interval(mins => $11), $12) RETURNING id, email, expires_at, last_sent_at`,
+      [input.requestId, email, eh, ipHash, input.familyName, input.displayName, input.login, input.city, input.country, secretHash, limits.codeMinutes, input.familyLoginId ?? null],
     );
     await c.query("UPDATE family_signups SET code_hash = $2 WHERE id = $1", [r.rows[0].id, codeHash(r.rows[0].id, code)]);
     return r.rows[0];
@@ -202,6 +204,7 @@ export async function resendSignupCode(db: Db, recovery: RecoveryService, signup
 export interface SignupResult {
   token: string;
   familyCode: string;
+  loginId: string | null;
   auth: AuthContext;
 }
 
@@ -222,7 +225,8 @@ export async function verifySignup(db: Db, signupId: string, code: string, limit
       const fam = (await c.query("SELECT code FROM families WHERE id = $1", [r.family_id])).rows[0];
       if (!fam) return { error: new HttpError(409, "already_completed", "Cette famille est déjà créée : connectez-vous") };
       const s = await createSession(c, r.profile_id);
-      return { ok: { token: s.token, familyCode: fam.code, auth: authOf(s, r) } };
+      const cur = (await c.query("SELECT alias FROM family_aliases WHERE family_id = $1 AND kind = 'current'", [r.family_id])).rows[0];
+      return { ok: { token: s.token, familyCode: fam.code, loginId: cur?.alias ?? null, auth: authOf(s, r) } };
     }
     if (r.superseded_at) return { error: new HttpError(410, "signup_expired", "Demande expirée : recommencez") };
     if ((r.expires_at as Date).getTime() < Date.now()) return { error: new HttpError(410, "code_expired", "Ce code a expiré : recevez un nouveau code (vos informations sont conservées)") };
@@ -243,10 +247,12 @@ export async function verifySignup(db: Db, signupId: string, code: string, limit
       admin: { displayName: r.display_name, login: r.login, secretHash: r.secret_hash, city: r.city, recoveryEmail: r.email, emailVerified: true },
       completed: true,
       country: r.country ?? (r.city ? "MA" : null),
+      // Revérifié ici : pris entre-temps par une autre famille → 409 avec propositions, rien n'est créé (transaction annulée).
+      loginId: r.family_login_id ?? null,
     });
     await c.query("UPDATE family_signups SET completed_at = now(), family_id = $2, profile_id = $3 WHERE id = $1", [r.id, created.familyId, created.profileId]);
     const s = await createSession(c, created.profileId);
-    return { ok: { token: s.token, familyCode: created.code, auth: authOf(s, { ...r, family_id: created.familyId, profile_id: created.profileId }) } };
+    return { ok: { token: s.token, familyCode: created.code, loginId: created.loginId, auth: authOf(s, { ...r, family_id: created.familyId, profile_id: created.profileId }) } };
   });
   if ("error" in out) throw out.error;
   return out.ok;
