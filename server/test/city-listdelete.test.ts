@@ -54,6 +54,8 @@ describe("ville du profil", () => {
     const me = (await app.inject({ method: "GET", url: "/api/me", cookies: cookieOf(ok) })).json().me;
     expect(me.city).toBe("Fès");
     const f = await family();
+    // Cette règle historique ne concerne que les familles sans localisation confirmée.
+    await db.query("UPDATE families SET location_confirmed_at = NULL WHERE code = $1", [f.code]);
     expect((await app.inject({ method: "POST", url: "/api/profiles", cookies: f.admin, payload: { displayName: "X", login: "xx", role: "staff", secret: "573918", secretConfirm: "573918" } })).json().error).toBe("city_required");
     expect((await app.inject({ method: "POST", url: "/api/profiles", cookies: f.admin, payload: { displayName: "X", login: "xx", role: "staff", secret: "573918", secretConfirm: "573918", city: "Gotham" } })).json().error).toBe("invalid_city");
   });
