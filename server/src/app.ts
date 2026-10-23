@@ -260,7 +260,9 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     const body = z
       .object({ displayName: nameField, login: loginField, role: roleField, secret: secretField, secretConfirm: z.string(), city: cityIn })
       .parse(req.body);
-    const city = resolveCity(body.city, requireCity);
+    // La localisation confirmée appartient à la famille : les membres en héritent.
+    const located = !!(await db.query("SELECT location_confirmed_at IS NOT NULL AS confirmed FROM families WHERE id = $1", [req.auth!.familyId])).rows[0]?.confirmed;
+    const city = resolveCity(body.city, requireCity && !located);
     return reply.code(201).send(await createProfile(db, req.auth!, { ...body, city })); // le mot de passe est choisi par l'administrateur : il n'est jamais renvoyé
   });
 
