@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Pilote l'interface de l'application native sur l'émulateur (adb + uiautomator), comme le ferait un utilisateur.
-Usage : native-ui.py tap TEXTE [--last|--first] | has TEXTE | wait TEXTE [secondes] | gone TEXTE [secondes] | above A B | field N"""
+Usage : native-ui.py tap TEXTE [--last|--first] [--exact] | has TEXTE | wait TEXTE [secondes] | gone TEXTE [secondes] | above A B | field N"""
 import re, subprocess, sys, time
 import xml.etree.ElementTree as ET
 
@@ -44,9 +44,10 @@ def matches(xml, needle):
     out = []
     if not xml:
         return out
+    exact = "--exact" in sys.argv  # texte ou description identique (ex. « Pain » sans « Pain et petit-déjeuner »)
     for n in ET.fromstring(xml).iter("node"):
         t = (n.get("text") or "") + "\n" + (n.get("content-desc") or "")
-        if needle in t:
+        if (needle in (n.get("text"), n.get("content-desc"))) if exact else (needle in t):
             m = re.findall(r"\d+", n.get("bounds") or "")
             if len(m) == 4:
                 x1, y1, x2, y2 = map(int, m)
