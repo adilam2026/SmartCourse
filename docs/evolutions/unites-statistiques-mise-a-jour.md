@@ -154,12 +154,19 @@ UPDATE families SET catalog_rev = catalog_rev + 1;
 
 ## Livraison de recette (non publiée)
 
-- APK/AAB signés (clé habituelle) : versionCode **1192**, pré-version
-  [`courses-natif-play-1.0.2-92`](https://github.com/adilam2026/SmartCourse/releases/tag/courses-natif-play-1.0.2-92),
-  construits depuis `f548b98` après les parcours U, L et Z réussis sur le même code (32/32, runs 91 et 92, aucun plantage).
-- Avec le serveur actuel de production (`bb8f627`, 025), cet APK :
-  - garde les unités actuelles (la migration 027 n'est pas appliquée) ;
-  - n'affiche aucun message de mise à jour (route absente) ;
-  - montre « Tout l'historique » en erreur explicite, avec « Réessayer », et jamais comme une absence d'achats.
-
-  Le reste fonctionne normalement.
+- **APK et AAB signés** (clé habituelle) : versionCode **1196**, pré-version
+  [`courses-natif-play-1.0.2-96`](https://github.com/adilam2026/SmartCourse/releases/tag/courses-natif-play-1.0.2-96).
+  Construits depuis `02b81c9` (branche `claude/unites-statistiques`), après les parcours U, L et Z réussis sur ce même code
+  (32/32, run 96, aucun plantage).
+- **Vérifications serveur** : 379 tests (377 réussis, 2 ignorés), dont :
+  - la migration 027 depuis une base en 025, avec 026 et 028 dans l'ordre ;
+  - les familles anciennes et les unités personnalisées ;
+  - les prix personnels et les conversions ;
+  - le format du produit ;
+  - les historiques ;
+  - le retour arrière documenté ;
+  - l'aperçu anonyme ;
+  - la création d'un profil qui hérite de la localisation familiale (tests Codex).
+- **Avec le serveur actuel de production** (`bb8f627`, 025), cet APK garde les anciennes unités. Il n'affiche aucun message de mise
+  à jour, l'historique complet est signalé en erreur avec « Réessayer », et le format ne s'enregistre pas. Le reste fonctionne.
+  Pour une recette complète, il faut le serveur de la branche.
