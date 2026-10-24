@@ -1025,9 +1025,9 @@ fill "Rechercher un produit" "Vermicelles"; hide_kb; sleep 3
 expect "U7. vermicelles : prix converti exactement « 9,90 DH / 500 g »" $UI wait "9,90 DH / 500 g" 10
 fill "Rechercher un produit" "Thon"; hide_kb; sleep 3
 $UI tap "11,17 DH" >/dev/null; sleep 3
-fill "Format du produit" "boîte de 80 g"; hide_kb; sleep 1
+fill "Format du produit" "pack de 3 x 80 g"; hide_kb; sleep 1
 $UI tap "Enregistrer" --last >/dev/null; sleep 4
-expect "U8. format « boîte de 80 g » enregistré ; unité inchangée ; aucun prix personnel créé (prix commun conservé)" test "$(sql "SELECT p.format||'|'||p.unit||'|'||(SELECT count(*) FROM family_prices fp WHERE fp.product_id=p.id) FROM products p JOIN families f ON f.id=p.family_id WHERE f.code='$FAMILY' AND p.name='Thon en conserve'")" = "boîte de 80 g|boite|0"
+expect "U8. format « pack de 3 x 80 g » enregistré ; unité inchangée ; aucun prix personnel créé (prix commun conservé)" test "$(sql "SELECT p.format||'|'||p.unit||'|'||(SELECT count(*) FROM family_prices fp WHERE fp.product_id=p.id) FROM products p JOIN families f ON f.id=p.family_id WHERE f.code='$FAMILY' AND p.name='Thon en conserve'")" = "pack de 3 x 80 g|boite|0"
 shot final-u3-format
 fi
 

@@ -15,51 +15,33 @@ Branche de développement : `claude/unites-statistiques`.
 La branche de travail part de `4dd1ac5` et **intègre le correctif Codex** par une fusion (`5823ca4`) : un nouveau membre reprend la
 localisation confirmée de sa famille, sans ressaisir sa ville. Les tests Codex passent avec l'identifiant famille.
 
-## 1. Unités corrigées (migration 027)
+## 1. Unités, formats et prix (migration 027, régénérée selon les arbitrages du 24/10/2026)
 
-| Unité | Produits |
-|---|---|
-| À la pièce | Persil, Coriandre, Menthe, Brocolis, Céleri (capture 1) ; Poulet (capture 12) |
-| Au poids (kg) | Fenouil, Mangues, Raisins secs, Noix de coco, Fromage en tranches, Mozzarella, Riz, Pâtes, Vermicelles, Lentilles, Pois chiches, Poivre, Cumin, Amandes, Citrons confits, Cornichons, Curcuma, Fécule de maïs, Noix, Noix de cajou, Sucre glace (captures 2 à 11) |
+Le détail article par article est dans [`tableau-unites-prix.md`](tableau-unites-prix.md) (et `.csv`).
 
-- La correction porte sur le catalogue commun **et** sur ce produit dans chaque famille (produits rattachés au catalogue). Un
-  produit créé par une famille sous son propre nom n'est pas modifié.
-- Décimales au kg : 0,25 kg, 0,5 kg… Le bouton +/− avance de 0,25 kg (100 g sous 1 kg).
-- **Capture 13, en attente de confirmation, non modifiée** : Papier toilette (paquet de 4 rouleaux ?), Essuie-tout (paquet de 1
-  rouleau ?), Sacs-poubelle (conditionnement barré, remplacement non précisé).
-
-### Prix
-
-Conversion seulement quand elle est exacte (un conditionnement dont le poids est écrit) ; sinon le prix est **conservé tel quel**,
-signalé « à ressaisir » et jamais utilisé pour un montant.
-
-| Base commune | Avant | Après |
-|---|---|---|
-| Pâtes | 10,00 DH / paquet de 500 g | 10,00 DH / 500 g (= 20 DH/kg) |
-| Vermicelles | 9,90 DH / paquet de 500 g | 9,90 DH / 500 g |
-| Fromage en tranches | 13,75 DH / paquet de 200 g | 13,75 DH / 200 g |
-| Cornichons | 9,80 DH / pot de 210 g | 9,80 DH / 210 g |
-| Citrons confits | 23,00 DH / pot de 950 g | 23,00 DH / 950 g |
-| Noix de coco | 14,50 DH / pièce | conservé, **à ressaisir au kg** (poids inconnu) |
-| Mangues | 13,90 DH / pièce | conservé, **à ressaisir au kg** |
-| Persil | 3,90 DH / sachet (poids non précisé) | conservé, **à ressaisir à la pièce** |
-
-Les prix des familles suivent la même règle (exemple : « 120 DH / paquet de 1 kg » devient « 120 DH / kg » ; « 70 DH / kg » du
-poulet reste tel quel, à ressaisir à la pièce). Dans « Gestion des prix », un ancien prix devenu incompatible apparaît
-« Unité changée : prix à ressaisir ». Le formulaire le rappelle à part et ne reprend jamais l'ancien montant avec la nouvelle unité.
-
-### Ce qui n'est jamais réinterprété
-
-- **Lignes des listes déjà créées** : elles gardent leur unité (« 2 paquets » reste « 2 paquets »), y compris quand on modifie leur
-  quantité. Choisir une nouvelle quantité dans la sélection du personnel remplace explicitement la ligne. Un ajout depuis la
-  sélection, un favori ou « Recommander » ne l'additionne jamais : il est signalé.
-- **Achats et statistiques** : quantité et unité figées à l'achat.
-- **Favoris, « Recommander », brouillons et articles « à reprendre »** : une quantité enregistrée dans l'ancienne unité n'est pas
-  convertie. L'article est signalé par son nom, quantité à choisir de nouveau.
-- Limite connue : un brouillon local enregistré **avant** cette version ne mémorisait pas son unité. Pour les 27 produits corrigés,
-  sa quantité s'affiche dans la nouvelle unité (rien n'a encore été envoyé ; elle reste modifiable avant l'envoi).
-
-Journal : chaque changement est inscrit dans `unit_corrections` (valeurs avant/après, prix compris).
+- **244 références** prennent leur unité retenue. Thé et Tisane, anciennes références en boîte, sont conservés tels quels.
+- **Nouvelles unités comptées** : botte, rouleau, sachet, cube. Poids saisi en g ou kg, volume en mL ou L.
+- **Nouvelles références** :
+  - Lessive en poudre, Capsules de lessive ;
+  - Savon noir en pâte ;
+  - Glace en bac ;
+  - Thé et Tisane en vrac et en sachets.
+- **Renommées, en gardant leur identifiant et leurs achats** : Lessive → Lessive liquide, Savon noir ménager → Savon noir liquide,
+  Glaces → Glace individuelle.
+- **Format du produit** : champ facultatif, propre à chaque famille (« pot de 350 g », « boîte de 16 portions »). Il se modifie dans
+  Gestion des prix et s'affiche au moment de choisir l'article. Il n'entraîne aucune conversion, et l'enregistrer seul ne crée
+  pas de prix personnel.
+- **Familles** :
+  - une unité venue du catalogue est corrigée ;
+  - une unité personnalisée est conservée et inscrite au journal (`unit_kept_custom`) ;
+  - les produits créés par la famille ne sont jamais modifiés.
+- **Prix** : conversion seulement quand la quantité de référence est écrite. Le montant est inchangé (« 9,90 DH / 500 g », soit
+  19,80 DH/kg, jamais arrondi). Sinon le prix est conservé tel quel et signalé « à confirmer » (« Unité changée : prix à
+  ressaisir »). Aucun prix proposé non vérifié n'est importé.
+- **Jamais modifiés** : lignes de listes, achats, événements, favoris. Une ligne de liste, un brouillon, un favori ou un achat
+  gardent l'unité de leur enregistrement : rien n'est additionné ni converti d'une unité à l'autre.
+- **Enchaînement** : la production est en 025 ; au démarrage, 026, 027 puis 028 s'appliquent dans cet ordre, chacune dans sa
+  propre transaction, après la sauvegarde vérifiée. Ce chemin est testé sur une base au schéma 025.
 
 ## 2. Statistiques : tous les produits achetés et historique d'un produit
 
@@ -157,13 +139,18 @@ UPDATE families SET catalog_rev = catalog_rev + 1;
 
 ## Déploiement (soumis à l'accord du propriétaire)
 
-1. Vérifier dans Railway la source actuelle du service (branche et commit fixé par Codex). La nouvelle version contient déjà
+1. Vérifier dans Railway la source actuelle du service (branche, ou commit `bb8f627` fixé par Codex). La nouvelle version contient
    `bb8f627` : rien n'est écrasé.
-2. Contrôle préalable : restauration isolée de la sauvegarde la plus récente (`verif-sauvegarde.yml`), copie protégée.
-3. Pull request `claude/unites-statistiques` → `claude/family-shopping-list-specs-eqevg8` ; au démarrage : sauvegarde vérifiée
-   avant migration, puis migrations 026, 027 et 028.
-4. Contrôles ciblés sur une famille jetable ; `/health` doit afficher `028_app_update.sql`.
-5. Publication Google Play par le propriétaire ; puis, seulement après disponibilité confirmée, réglage de la mise à jour.
+2. Aperçu des cas des familles : workflow `verif-sauvegarde.yml` avec `apercu_027`. La dernière sauvegarde est restaurée dans une
+   base jetable, la 027 y est jouée dans une transaction annulée, et seuls des totaux anonymes sont publiés. Le 24/10, l'aperçu
+   n'a pas pu lire le stockage (403 `SignatureDoesNotMatch`) : les secrets GitHub `S3_*` doivent être recopiés depuis les
+   variables Railway.
+3. Contrôle préalable : restauration isolée de la sauvegarde la plus récente, copie protégée (`conserver_verifiee`).
+4. Pull request `claude/unites-statistiques` → `claude/family-shopping-list-specs-eqevg8`, ou redéploiement Railway sur son
+   commit. Au démarrage : sauvegarde vérifiée avant migration (arrêt sans migrer sinon), puis 026, 027, 028.
+5. Contrôles ciblés sur une famille jetable ; `/health` doit afficher `028_app_update.sql`.
+6. Publication Google Play par le propriétaire. Puis, seulement après disponibilité confirmée pour tous les utilisateurs concernés,
+   réglage de la mise à jour conseillée ou obligatoire.
 
 ## Livraison de recette (non publiée)
 
