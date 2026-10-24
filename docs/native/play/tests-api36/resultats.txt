@@ -6,10 +6,9 @@ PASS  U3. quantité de la ligne modifiée dans SON unité (paquets)
 PASS  U4. ancien prix au kg du poulet signalé « à ressaisir », jamais affiché comme prix actuel
 PASS  U5. formulaire : ancien prix rappelé à part, montant vide (aucune reprise avec la nouvelle unité)
 PASS  U6. serveur : ancien prix conservé tel quel
-FAIL  U7. vermicelles : prix converti exactement « 9,90 DH / 500 g »
-      écran : "Close sheet"|"Poulet"|"Prix indicatif (en dirhams)"|"Ancien prix : 70,00 DH / kg. L'unité de ce produit est maintenant « pièce » : ce prix ne peut pas être converti sans information complémentaire. Saisissez le prix à l'unité (pièce)."|"DH"|"pour"|"1"|"pièce"|"Contenu (facultatif, ex. 250 g)"|"Format du produit (facultatif, ex. pot de 350 g)"|"Enregistrer"|
+PASS  U7. vermicelles : prix converti exactement « 9,90 DH / 500 g »
 FAIL  U8. format « boîte de 80 g » enregistré ; unité inchangée ; aucun prix personnel créé (prix commun conservé)
-      écran : "Close sheet"|"Poulet"|"Prix indicatif (en dirhams)"|"Ancien prix : 70,00 DH / kg. L'unité de ce produit est maintenant « pièce » : ce prix ne peut pas être converti sans information complémentaire. Saisissez le prix à l'unité (pièce)."|"DH"|"pour"|"1"|"pièce"|"Contenu (facultatif, ex. 250 g)"|"Format du produit (facultatif, ex. pot de 350 g)"|"Enregistrer"|
+      écran : "Close sheet"|"Thon en conserve"|"Prix indicatif (en dirhams)"|"11,17"|"DH"|"pour"|"1"|"boîte"|"80 g"|"Format du produit (facultatif, ex. pot de 350 g)"|"D'où vient ce prix ?"|"Enregistrer"|
 ═══ L. Statistiques : tous les produits achetés, recherche, historique d'un produit, tout l'historique ═══
       produits achetés ce mois : 10 ; achats de cumin : 1 ce mois, 2 en tout
 PASS  L0. jeu d'essai : au moins 10 produits ce mois, cumin acheté 1 fois ce mois et 2 fois en tout
@@ -32,13 +31,13 @@ PASS  Z4b. retour au premier plan moins de 30 min après : pas de nouvelle véri
 PASS  Z5. mise à jour obligatoire (à l'ouverture de l'application) : accès bloqué, message attendu
 PASS  Z6. « Mettre à jour » ouvre la fiche Mes Courses (Google Play, sinon navigateur)
 --------- beginning of main
-10-24 14:13:05.967  9106  9106 I CoursesUpdate: navigateur, fiche ouverte : https://play.google.com/store/apps/details?id=app.smartcourse.courses.natif
+10-24 14:27:22.727  9167  9167 I CoursesUpdate: navigateur, fiche ouverte : https://play.google.com/store/apps/details?id=app.smartcourse.courses.natif
 PASS  Z7. retour sans mise à jour : blocage maintenu
 PASS  Z7b. le bouton Retour ne contourne pas le blocage
 PASS  Z8. panne réseau : aucun faux blocage
 PASS  Z9. obligation annulée : accès rétabli
 PASS  Z10. version installée = version minimale : accès normal, aucun message
 PASS  Z11. données conservées : la liste garde ses articles
-ECHECS=2
+ECHECS=1
 CRASH_APPLICATION=0
-TOTAL_ECHECS=2
+TOTAL_ECHECS=1
