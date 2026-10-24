@@ -106,6 +106,7 @@ adb shell settings put global sysui_demo_allowed 1
 adb shell settings put system show_touches 1   # point de contact visible : le geste se lit à l'écran
 demo_bar false
 adb install -r "$APK" >/dev/null
+adb root >/dev/null 2>&1; sleep 3; adb wait-for-device   # émulateur de recette : réglage de l'horloge (séquence B)
 
 # ═══ A. Nadia choisit les articles en photos, change une quantité, envoie sa sélection ═══
 if want A; then
@@ -120,9 +121,10 @@ still A1-quantite-tomates
 act "Mettre à jour"
 act "Pommes de terre" --exact
 act "Catégories"; act "Fruits"; act "Bananes" --exact
-more() { act "Modifier la quantité : $1" --scroll; $UI wait "Mettre à jour" 10 >/dev/null; for _ in $(seq 1 "$2"); do sleep 0.4; $UI tap "Augmenter" >/dev/null; sleep 0.9; done; act "Mettre à jour"; }
-act "Catégories"; act "Laitages et œufs"; act "Œufs" --exact --scroll; more "Œufs" 5
-act "Catégories"; act "Pain et petit-déjeuner"; act "Pain" --exact --scroll; more "Pain" 3
+more() { act "Modifier la quantité : $1"; $UI wait "Mettre à jour" 10 >/dev/null; for _ in $(seq 1 "$2"); do sleep 0.4; $UI tap "Augmenter" >/dev/null; sleep 0.9; done; act "Mettre à jour"; }
+reach() { for _ in 1 2 3 4 5; do $UI has "$1" --exact && return 0; adb shell input swipe 540 1450 540 850 1500; sleep 1.5; done; }   # défilement lent et lisible
+act "Catégories"; act "Laitages et œufs"; reach "Œufs"; act "Œufs" --exact; more "Œufs" 5
+act "Catégories"; act "Pain et petit-déjeuner"; reach "Pain"; act "Pain" --exact; more "Pain" 3
 act "Catégories"
 expect "A2. sélection de 5 articles" $UI has "Terminer ma sélection (5)"
 still A2-selection-5-articles
@@ -143,6 +145,14 @@ for name in karim sophie; do
   rec_start "B-notification-$name"
   other batch; sleep 2; poll_now
   for _ in 1 2 3; do adb shell dumpsys notification --noredact | grep -q 'Nouvelle demande' && break; poll_now; done
+  if ! adb shell dumpsys notification --noredact | grep -q 'Nouvelle demande'; then
+    # WorkManager n'exécute pas une tâche périodique avant son échéance (15 min) : l'horloge de l'émulateur jetable est avancée de
+    # 16 min, la vérification réelle de l'application est lancée, puis l'horloge est remise à l'heure.
+    log "  horloge de l'émulateur avancée de 16 min"
+    adb shell settings put global auto_time 0; adb shell "date -u $(date -u -d '+16 minutes' +%m%d%H%M%Y.%S)" >/dev/null
+    for _ in 1 2 3; do poll_now; adb shell dumpsys notification --noredact | grep -q 'Nouvelle demande' && break; done
+    adb shell "date -u $(date -u +%m%d%H%M%Y.%S)" >/dev/null
+  fi
   if ! adb shell dumpsys notification --noredact | grep -q 'Nouvelle demande'; then
     # Repli : la vérification périodique d'Android (au plus 15 min + marge) ; l'enregistrement reprend quand la notification est là.
     rec_stop; mv "$OUT/videos/B-notification-$name.mp4" "$OUT/diag/B-attente-$name.mp4" 2>/dev/null
