@@ -1017,10 +1017,10 @@ expect "U4. ancien prix au kg du poulet signalé « à ressaisir », jamais affi
 $UI tap "Ajouter un prix" >/dev/null || $UI tap "Poulet" --last >/dev/null; sleep 3
 expect "U5. formulaire : ancien prix rappelé à part, montant vide (aucune reprise avec la nouvelle unité)" bash -c "$UI wait 'Ancien prix : 70,00 DH / kg' 10 && $UI has 'ne peut pas être converti'"
 shot final-u2-prix-a-ressaisir
-adb shell input keyevent KEYCODE_BACK; sleep 1
+for _ in 1 2 3; do $UI has "Ancien prix" || break; adb shell input keyevent KEYCODE_BACK; sleep 1; done   # clavier puis panneau
 expect "U6. serveur : ancien prix conservé tel quel" test "$(sql "SELECT fp.amount||' '||fp.ref_unit FROM family_prices fp JOIN products p ON p.id=fp.product_id JOIN families f ON f.id=fp.family_id WHERE f.code='$FAMILY' AND p.name='Poulet'")" = "70.00 kg"
 # Prix commun converti exactement (9,90 DH pour 500 g, jamais arrondi à 20 DH/kg) ; format du produit facultatif
-back_to_app; $UI has "Gestion des prix" || { tapt "Réglages"; $UI tap "Gestion des prix" --scroll >/dev/null; sleep 3; }
+back_to_app; $UI has "Rechercher un produit" || { tapt "Réglages"; $UI tap "Gestion des prix" --scroll >/dev/null; sleep 3; }
 fill "Rechercher un produit" "Vermicelles"; hide_kb; sleep 3
 expect "U7. vermicelles : prix converti exactement « 9,90 DH / 500 g »" $UI wait "9,90 DH / 500 g" 10
 fill "Rechercher un produit" "Thon"; hide_kb; sleep 3
