@@ -14,6 +14,7 @@ exports
 *.b64
 mots-de-passe*
 android/.gradle
+android-native/.gradle
 android/build
 android/app/build
 android/local.properties
