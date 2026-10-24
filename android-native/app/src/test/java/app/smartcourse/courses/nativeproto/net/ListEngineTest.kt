@@ -152,6 +152,18 @@ class ListEngineTest {
         assertEquals(1, e.orphans.size)
     }
 
+    @Test fun draftKeepsTheUnitOfEachQuantity() {
+        val e = engine()
+        e.saveDraft("L1", mapOf("riz" to 2.0), mapOf("riz" to "paquet"))
+        assertEquals(mapOf("riz" to "paquet"), e.loadDraftUnits("L1"))
+        // Mis de côté : l'unité de la saisie est gardée (jamais celle, nouvelle, du produit)
+        e.stashDraftIfListChanged("L1", "L2") { "Riz" to "kg" }
+        assertEquals("paquet", e.orphans.single().unit); assertTrue(e.loadDraftUnits("L1").isEmpty())
+        // Brouillon d'une version précédente (sans unités) : toujours lisible
+        e.saveDraft("L3", mapOf("tom" to 1.0))
+        assertEquals(mapOf("tom" to 1.0), e.loadDraft("L3")); assertTrue(e.loadDraftUnits("L3").isEmpty())
+    }
+
     @Test fun purchase_requiresNetwork_andIsNeverQueued() = runBlocking {
         json(active(list("L1", "active", item("i1", "tom", "Tomates"))))
         val e = engine(); e.refresh()
