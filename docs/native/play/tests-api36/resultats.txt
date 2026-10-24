@@ -7,8 +7,7 @@ PASS  U4. ancien prix au kg du poulet signalé « à ressaisir », jamais affich
 PASS  U5. formulaire : ancien prix rappelé à part, montant vide (aucune reprise avec la nouvelle unité)
 PASS  U6. serveur : ancien prix conservé tel quel
 PASS  U7. vermicelles : prix converti exactement « 9,90 DH / 500 g »
-FAIL  U8. format « boîte de 80 g » enregistré ; unité inchangée ; aucun prix personnel créé (prix commun conservé)
-      écran : "Close sheet"|"Thon en conserve"|"Prix indicatif (en dirhams)"|"11,17"|"DH"|"pour"|"1"|"boîte"|"80 g"|"Format du produit (facultatif, ex. pot de 350 g)"|"D'où vient ce prix ?"|"Enregistrer"|
+PASS  U8. format « pack de 3 x 80 g » enregistré ; unité inchangée ; aucun prix personnel créé (prix commun conservé)
 ═══ L. Statistiques : tous les produits achetés, recherche, historique d'un produit, tout l'historique ═══
       produits achetés ce mois : 10 ; achats de cumin : 1 ce mois, 2 en tout
 PASS  L0. jeu d'essai : au moins 10 produits ce mois, cumin acheté 1 fois ce mois et 2 fois en tout
@@ -31,13 +30,13 @@ PASS  Z4b. retour au premier plan moins de 30 min après : pas de nouvelle véri
 PASS  Z5. mise à jour obligatoire (à l'ouverture de l'application) : accès bloqué, message attendu
 PASS  Z6. « Mettre à jour » ouvre la fiche Mes Courses (Google Play, sinon navigateur)
 --------- beginning of main
-10-24 14:27:22.727  9167  9167 I CoursesUpdate: navigateur, fiche ouverte : https://play.google.com/store/apps/details?id=app.smartcourse.courses.natif
+10-24 14:40:26.553  8979  8979 I CoursesUpdate: navigateur, fiche ouverte : https://play.google.com/store/apps/details?id=app.smartcourse.courses.natif
 PASS  Z7. retour sans mise à jour : blocage maintenu
 PASS  Z7b. le bouton Retour ne contourne pas le blocage
 PASS  Z8. panne réseau : aucun faux blocage
 PASS  Z9. obligation annulée : accès rétabli
 PASS  Z10. version installée = version minimale : accès normal, aucun message
 PASS  Z11. données conservées : la liste garde ses articles
-ECHECS=1
+ECHECS=0
 CRASH_APPLICATION=0
-TOTAL_ECHECS=1
+TOTAL_ECHECS=0
