@@ -77,10 +77,10 @@ private fun str(o: JsonObject?, k: String) = o?.get(k)?.jsonPrimitive?.contentOr
 /** « 3 achats » : un achat = un article coché « Acheté ». */
 private fun purchasesText(n: Int) = if (n == 1) "1 achat" else "$n achats"
 
-/** Quantité telle qu'enregistrée, dans son unité : « 0,25 kg », « 2 paquets », « 1 pièce ». */
+/** Quantité telle qu'enregistrée, lisible dans sa dimension : « 250 g », « 1,5 kg », « 250 mL », « 2 paquets », « 1 pièce ». */
 private fun recordedQty(unit: String, q: Double): String = when (unit) {
-    "kg" -> "${fmtNum(q)} kg"
-    "litre" -> "${fmtNum(q)} L"
+    "kg" -> if (q < 1) "${fmtNum(q * 1000)} g" else "${fmtNum(q)} kg"
+    "litre" -> if (q < 1) "${fmtNum(q * 1000)} mL" else "${fmtNum(q)} L"
     else -> { val l = countLabelOf(unit); "${fmtNum(q)} " + if (q > 1) "${l}s" else l }
 }
 

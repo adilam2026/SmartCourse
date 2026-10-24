@@ -51,7 +51,15 @@ object AppUpdate {
     var askRecommended by mutableStateOf(false)
         private set
 
+    /** Dernière vérification réussie : au plus une toutes les 30 minutes, sauf obligation en cours ou retour de Google Play. */
+    private var checkedAt = 0L
+    private var storeOpened = false
+    private const val MIN_INTERVAL_MS = 30 * 60_000L
+
     suspend fun check(api: ApiClient, installed: Int) {
+        val due = level == UpdateLevel.REQUIRED || storeOpened || System.currentTimeMillis() - checkedAt >= MIN_INTERVAL_MS
+        if (!due) return
+        storeOpened = false
         when (val r = api.getPublic("/api/app/update?platform=android&versionCode=$installed")) {
             is Outcome.Ok -> {
                 val v = r.value
@@ -59,6 +67,7 @@ object AppUpdate {
                 latest = v["latestVersionCode"]?.jsonPrimitive?.intOrNull
                 level = when (v["update"]?.jsonPrimitive?.contentOrNull) { "required" -> UpdateLevel.REQUIRED; "recommended" -> UpdateLevel.RECOMMENDED; else -> UpdateLevel.NONE }
                 askRecommended = level == UpdateLevel.RECOMMENDED && !shownThisRun && !postponed()
+                checkedAt = System.currentTimeMillis()
             }
             // Vérification impossible (réseau, serveur ancien sans cette route…) : l'état connu est gardé, jamais un nouveau blocage.
             is Outcome.Fail -> Unit
@@ -75,7 +84,7 @@ object AppUpdate {
 
     /** Ouvre la fiche Mes Courses dans Google Play, sinon dans le navigateur. */
     fun openStore(context: Context) {
-        shownThisRun = true; askRecommended = false
+        shownThisRun = true; askRecommended = false; storeOpened = true // au retour : nouvelle vérification immédiate
         val market = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$PACKAGE")).setPackage("com.android.vending").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         try {
             context.startActivity(market)

@@ -1043,13 +1043,13 @@ expect "L1. aperçu conservé (8 produits, Cumin absent) et bouton « Voir tous 
 expect "L2. écran « Tous les produits achetés » avec la période affichée" bash -c "$UI wait 'Tous les produits achetés' 10 && $UI has 'Ce mois' && $UI has '$NP produits'"
 shot final-l1-tous-les-produits
 fill "Rechercher un produit" "CUMI"; hide_kb; sleep 2
-expect "L3. recherche (majuscules ignorées) : Cumin, hors du top 8, trouvé avec « 1 achat » et sa quantité" bash -c "$UI has 'Cumin' && $UI has '1 achat' && $UI has '0,25 kg' && $UI has '1 sur $NP'"
+expect "L3. recherche (majuscules ignorées) : Cumin, hors du top 8, trouvé avec « 1 achat » et sa quantité" bash -c "$UI has 'Cumin' && $UI has '1 achat' && $UI has '250 g' && $UI has '1 sur $NP'"
 shot final-l2-recherche
 $UI tap "Cumin" >/dev/null; sleep 3
-expect "L4. historique du produit : période choisie, 1 achat de 0,25 kg avec sa date" bash -c "$UI wait 'Historique des achats' 10 && $UI has '0,25 kg' && $UI has '1 achat'"
+expect "L4. historique du produit : période choisie, 1 achat de 250 g avec sa date" bash -c "$UI wait 'Historique des achats' 10 && $UI has '250 g' && $UI has '1 achat'"
 shot final-l3-historique
 $UI tap "Tout l'historique" >/dev/null; sleep 3
-expect "L5. « Tout l'historique » : l'achat plus ancien apparaît (2 achats, 0,75 kg cumulés)" bash -c "$UI wait '2 achats' 10 && $UI has '0,5 kg' && $UI has '0,75 kg'"
+expect "L5. « Tout l'historique » : l'achat plus ancien apparaît (2 achats, 750 g cumulés)" bash -c "$UI wait '2 achats' 10 && $UI has '500 g' && $UI has '750 g'"
 shot final-l4-tout-historique
 adb shell input keyevent KEYCODE_BACK; sleep 2
 expect "L6. retour : liste complète, recherche « CUMI » conservée" bash -c "$UI wait 'Tous les produits achetés' 10 && $UI has 'CUMI' && $UI has '1 sur $NP'"
@@ -1082,8 +1082,11 @@ tapt "Historique"; tapt "Liste"
 expect "Z3b. toujours pas de message après un changement d'écran" $UI gone "Une nouvelle version" 3
 expect "Z4. obligation refusée sans confirmation de disponibilité sur Google Play" test "$(api PUT /api/gestion/app-update -d "{\"latestVersionCode\":$((VC+1)),\"minVersionCode\":$((VC+1))}")" = 400
 policy "{\"latestVersionCode\":$((VC+1)),\"minVersionCode\":$((VC+1)),\"availableOnPlay\":true}"
+# Vérification au plus toutes les 30 min au premier plan : l'obligation est vue à la prochaine ouverture de l'application
 adb shell input keyevent KEYCODE_HOME; sleep 2; adb shell am start -n "$ACT" >/dev/null 2>&1; sleep 4
-expect "Z5. mise à jour obligatoire (au retour dans l'application) : accès bloqué, message attendu" bash -c "$UI wait 'Pour continuer à utiliser Mes Courses, veuillez mettre à jour' 15 && $UI has 'Vos données seront conservées'"
+expect "Z4b. retour au premier plan moins de 30 min après : pas de nouvelle vérification (fréquence raisonnable)" $UI gone "Pour continuer à utiliser" 3
+launch
+expect "Z5. mise à jour obligatoire (à l'ouverture de l'application) : accès bloqué, message attendu" bash -c "$UI wait 'Pour continuer à utiliser Mes Courses, veuillez mettre à jour' 15 && $UI has 'Vos données seront conservées'"
 shot final-z2-obligatoire
 adb logcat -c
 $UI tap "Mettre à jour" >/dev/null; sleep 5
@@ -1106,7 +1109,7 @@ adb shell input keyevent KEYCODE_HOME; sleep 2; adb shell am start -n "$ACT" >/d
 expect "Z9. obligation annulée : accès rétabli" bash -c "$UI gone 'Pour continuer à utiliser' 8 && $UI wait 'Ma liste' 10"
 # « Après mise à jour » : la version installée atteint la version exigée
 policy "{\"latestVersionCode\":$VC,\"minVersionCode\":$VC,\"availableOnPlay\":true}"
-adb shell input keyevent KEYCODE_HOME; sleep 2; adb shell am start -n "$ACT" >/dev/null 2>&1; sleep 5
+launch; sleep 3
 expect "Z10. version installée = version minimale : accès normal, aucun message" bash -c "$UI gone 'Pour continuer à utiliser' 8 && $UI gone 'Une nouvelle version' 3"
 TOM=$(st Tomates)
 expect "Z11. données conservées : la liste garde ses articles" bash -c "$UI has 'Tomates' && test '$TOM' = '2.000 kg to_buy'"

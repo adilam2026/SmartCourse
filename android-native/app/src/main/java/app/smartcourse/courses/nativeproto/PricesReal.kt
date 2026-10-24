@@ -161,7 +161,7 @@ private fun PriceSheet(p: CatProduct, onDismiss: () -> Unit, onChanged: () -> Un
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), shape = RoundedCornerShape(14.dp), isError = milli == null,
                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = C.Teal, unfocusedBorderColor = C.Line, cursorColor = C.Teal),
             )
-            if (units.size > 1) units.forEach { u -> ToggleChip(u, unit == u, { unit = u }) } else Text(unitLabel2(p.unit), style = MaterialTheme.typography.titleSmall)
+            if (units.size > 1) units.forEach { u -> ToggleChip(when (u) { "ml" -> "mL"; "litre" -> "L"; else -> u }, unit == u, { unit = u }) } else Text(unitLabel2(p.unit), style = MaterialTheme.typography.titleSmall)
         }
         if (kind == UnitKind.COUNT) {
             Spacer(Modifier.height(8.dp))

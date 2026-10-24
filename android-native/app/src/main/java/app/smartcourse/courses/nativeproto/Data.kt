@@ -34,7 +34,7 @@ object Launch {
 /* ───────────── Unités et quantités ───────────── */
 
 /** Quantités stockées en entier dans la plus petite unité : g, ml ou pièce. kg↔g et L↔ml sont exacts ; aucune conversion vers « pièce ». */
-enum class UnitKind(val big: String?, val small: String) { MASS("kg", "g"), VOLUME("L", "ml"), COUNT(null, "pièce") }
+enum class UnitKind(val big: String?, val small: String) { MASS("kg", "g"), VOLUME("L", "mL"), COUNT(null, "pièce") }
 
 data class Product(
     val id: String,
@@ -72,7 +72,7 @@ fun refLabel(p: Product): String = when (p.unit) { UnitKind.MASS -> "kg"; UnitKi
 
 fun qtyText(p: Product, q: Int): String = when (p.unit) {
     UnitKind.MASS -> if (q >= 1000) "${fmtNum(q / 1000.0)} kg" else "$q g"
-    UnitKind.VOLUME -> if (q >= 1000) "${fmtNum(q / 1000.0)} L" else "$q ml"
+    UnitKind.VOLUME -> if (q >= 1000) "${fmtNum(q / 1000.0)} L" else "$q mL"
     UnitKind.COUNT -> if (q <= 1) "$q ${p.countLabel}" else "$q ${p.countLabel}s"
 }
 
