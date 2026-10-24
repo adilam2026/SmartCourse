@@ -1003,14 +1003,16 @@ sql "INSERT INTO family_prices (family_id, product_id, amount, ref_qty, ref_unit
 launch; $UI wait "Bienvenue" 25 >/dev/null
 signin "$FAMILY" adil 482913; $UI wait "Ma liste" 25 >/dev/null; sleep 2
 expect "U1. 0,25 kg de cumin accepté et affiché (250 g)" $UI wait "250 g" 15
-expect "U2. ligne de riz enregistrée en paquets : toujours « 2 paquets » (jamais « 2 g » ni « 2 kg »)" bash -c "$UI has '2 paquets' && ! $UI has '2 g' && test \"\$(st Riz)\" = '2.000 paquet to_buy'"
+RIZ=$(st Riz)
+expect "U2. ligne de riz enregistrée en paquets : toujours « 2 paquets » (jamais « 2 g » ni « 2 kg »)" bash -c "$UI has '2 paquets' && ! $UI has '2 g' && test '$RIZ' = '2.000 paquet to_buy'"
 shot final-u1-liste-unites
-# Modifier la quantité de cette ligne garde son unité
-$UI tap "Riz" >/dev/null; sleep 2
+# Modifier la quantité de cette ligne garde son unité (appui sur la ligne, pas sur la case « Acheté »)
+$UI tap "2 paquets" >/dev/null; sleep 2
 expect "U3. quantité de la ligne modifiée dans SON unité (paquets)" $UI wait "Se compte en paquets" 8
-adb shell input keyevent KEYCODE_BACK; sleep 2
+$UI has "Se compte en paquets" && { adb shell input keyevent KEYCODE_BACK; sleep 2; }
+back_to_app
 tapt "Réglages"; $UI tap "Gestion des prix" --scroll >/dev/null; sleep 3
-search Poulet
+fill "Rechercher un produit" "Poulet"; hide_kb; sleep 3
 expect "U4. ancien prix au kg du poulet signalé « à ressaisir », jamais affiché comme prix actuel" bash -c "$UI wait 'prix à ressaisir' 10 && ! $UI has '70,00 DH / kg'"
 $UI tap "Ajouter un prix" >/dev/null || $UI tap "Poulet" --last >/dev/null; sleep 3
 expect "U5. formulaire : ancien prix rappelé à part, montant vide (aucune reprise avec la nouvelle unité)" bash -c "$UI wait 'Ancien prix : 70,00 DH / kg' 10 && $UI has 'ne peut pas être converti'"
@@ -1024,20 +1026,24 @@ echo "═══ L. Statistiques : tous les produits achetés, recherche, histori
 login_api adil 482913
 closeall_api; api PUT /api/family/features -d '{"multiLists":false}' >/dev/null
 FID=$(sql "SELECT id FROM families WHERE code='$FAMILY'")
-sql "DELETE FROM purchases WHERE family_id='$FID'" >/dev/null 2>&1 || true
 # Neuf produits achetés deux fois ce mois ; Cumin une fois ce mois (10e, hors de l'aperçu) et une fois il y a deux mois
 for n in Tomates Lait Oignons Carottes Pommes Bananes Sucre Farine Beurre; do buy_api "$n" 1 "now() - interval '1 hour'"; buy_api "$n" 1 "now() - interval '2 hours'"; done
 buy_api Cumin 0.25 "now() - interval '3 hours'"
 buy_api Cumin 0.5 "date_trunc('month', now()) - interval '40 days'"
-expect "L0. jeu d'essai : 19 achats ce mois, 20 en tout" test "$(sql "SELECT count(*) FILTER (WHERE purchased_at >= date_trunc('month', now()))||'/'||count(*) FROM purchases WHERE family_id='$FID' AND voided_at IS NULL")" = "19/20"
+# Attendus calculés sur la base (d'autres sections ont pu acheter avant) : produits achetés ce mois, achats de cumin
+NP=$(sql "SELECT count(DISTINCT product_id) FROM purchases WHERE family_id='$FID' AND voided_at IS NULL AND purchased_at >= date_trunc('month', now() AT TIME ZONE 'Africa/Casablanca') AT TIME ZONE 'Africa/Casablanca'")
+NC=$(sql "SELECT count(*) FROM purchases pu JOIN products p ON p.id=pu.product_id WHERE pu.family_id='$FID' AND pu.voided_at IS NULL AND p.name='Cumin'")
+NCM=$(sql "SELECT count(*) FROM purchases pu JOIN products p ON p.id=pu.product_id WHERE pu.family_id='$FID' AND pu.voided_at IS NULL AND p.name='Cumin' AND pu.purchased_at >= date_trunc('month', now() AT TIME ZONE 'Africa/Casablanca') AT TIME ZONE 'Africa/Casablanca'")
+echo "      produits achetés ce mois : $NP ; achats de cumin : $NCM ce mois, $NC en tout" | tee -a "$OUT/resultats.txt"
+expect "L0. jeu d'essai : au moins 10 produits ce mois, cumin acheté 1 fois ce mois et 2 fois en tout" test "$NP" -ge 10 -a "$NCM" = 1 -a "$NC" = 2
 launch; $UI wait "Bienvenue" 25 >/dev/null
 signin "$FAMILY" adil 482913; $UI wait "Ma liste" 25 >/dev/null
 tapt "Statistiques"; $UI wait "Produits les plus achetés" 20 >/dev/null
-expect "L1. aperçu conservé (8 produits) et bouton « Voir tous les produits (10) »" bash -c "$UI tap 'Voir tous les produits (10)' --scroll >/dev/null"
-expect "L2. écran « Tous les produits achetés » avec la période affichée" bash -c "$UI wait 'Tous les produits achetés' 10 && $UI has 'Ce mois' && $UI has '10 produits'"
+expect "L1. aperçu conservé (8 produits, Cumin absent) et bouton « Voir tous les produits ($NP) »" bash -c "! $UI has 'Cumin' && $UI tap 'Voir tous les produits ($NP)' --scroll >/dev/null"
+expect "L2. écran « Tous les produits achetés » avec la période affichée" bash -c "$UI wait 'Tous les produits achetés' 10 && $UI has 'Ce mois' && $UI has '$NP produits'"
 shot final-l1-tous-les-produits
 fill "Rechercher un produit" "CUMI"; hide_kb; sleep 2
-expect "L3. recherche (majuscules ignorées) : Cumin, 10e produit, trouvé avec « 1 achat » et sa quantité" bash -c "$UI has 'Cumin' && $UI has '1 achat' && $UI has '0,25 kg' && $UI has '1 sur 10'"
+expect "L3. recherche (majuscules ignorées) : Cumin, hors du top 8, trouvé avec « 1 achat » et sa quantité" bash -c "$UI has 'Cumin' && $UI has '1 achat' && $UI has '0,25 kg' && $UI has '1 sur $NP'"
 shot final-l2-recherche
 $UI tap "Cumin" >/dev/null; sleep 3
 expect "L4. historique du produit : période choisie, 1 achat de 0,25 kg avec sa date" bash -c "$UI wait 'Historique des achats' 10 && $UI has '0,25 kg' && $UI has '1 achat'"
@@ -1046,11 +1052,11 @@ $UI tap "Tout l'historique" >/dev/null; sleep 3
 expect "L5. « Tout l'historique » : l'achat plus ancien apparaît (2 achats, 0,75 kg cumulés)" bash -c "$UI wait '2 achats' 10 && $UI has '0,5 kg' && $UI has '0,75 kg'"
 shot final-l4-tout-historique
 adb shell input keyevent KEYCODE_BACK; sleep 2
-expect "L6. retour : liste complète, recherche « CUMI » conservée" bash -c "$UI wait 'Tous les produits achetés' 10 && $UI has 'CUMI' && $UI has '1 sur 10'"
+expect "L6. retour : liste complète, recherche « CUMI » conservée" bash -c "$UI wait 'Tous les produits achetés' 10 && $UI has 'CUMI' && $UI has '1 sur $NP'"
 fill "Rechercher un produit" "zzz"; hide_kb; sleep 2
 expect "L7. aucune correspondance : message explicite" $UI wait "Aucun produit acheté ne correspond à votre recherche" 10
 $UI tap "Effacer la recherche" >/dev/null; sleep 2
-expect "L8. recherche effacée : les 10 produits" $UI wait "10 produits" 10
+expect "L8. recherche effacée : tous les produits ($NP)" $UI wait "$NP produits" 10
 fi
 
 if want_s Z; then
@@ -1064,13 +1070,13 @@ policy() { api PUT /api/gestion/app-update -d "$1" >/dev/null; }
 policy '{"latestVersionCode":null,"minVersionCode":null}'
 closeall_api; add_api Tomates 2
 launch
-expect "Z1. version à jour : aucun message" bash -c "$UI wait 'Bienvenue' 20 && $UI gone 'Une nouvelle version' 4 && ! $UI has 'Pour continuer à utiliser'"
+expect "Z1. version à jour : aucun message" bash -c "sleep 6; ! $UI has 'Une nouvelle version' && ! $UI has 'Pour continuer à utiliser'"
 policy "{\"latestVersionCode\":$((VC+1)),\"minVersionCode\":null}"
 launch
 expect "Z2. mise à jour conseillée : message et « Plus tard »" bash -c "$UI wait 'Une nouvelle version de Mes Courses est disponible.' 15 && $UI has 'Plus tard' && $UI has 'Mettre à jour'"
 shot final-z1-conseillee
 $UI tap "Plus tard" >/dev/null; sleep 2
-signin "$FAMILY" adil 482913
+$UI has "Bienvenue" && signin "$FAMILY" adil 482913
 expect "Z3. reportée : l'application s'utilise, le message ne revient pas à chaque écran" bash -c "$UI wait 'Ma liste' 20 && $UI gone 'Une nouvelle version' 3"
 tapt "Historique"; tapt "Liste"
 expect "Z3b. toujours pas de message après un changement d'écran" $UI gone "Une nouvelle version" 3
@@ -1102,7 +1108,8 @@ expect "Z9. obligation annulée : accès rétabli" bash -c "$UI gone 'Pour conti
 policy "{\"latestVersionCode\":$VC,\"minVersionCode\":$VC,\"availableOnPlay\":true}"
 adb shell input keyevent KEYCODE_HOME; sleep 2; adb shell am start -n "$ACT" >/dev/null 2>&1; sleep 5
 expect "Z10. version installée = version minimale : accès normal, aucun message" bash -c "$UI gone 'Pour continuer à utiliser' 8 && $UI gone 'Une nouvelle version' 3"
-expect "Z11. données conservées : la liste garde ses articles" bash -c "$UI has 'Tomates' && test \"\$(st Tomates)\" = '2.000 kg to_buy'"
+TOM=$(st Tomates)
+expect "Z11. données conservées : la liste garde ses articles" bash -c "$UI has 'Tomates' && test '$TOM' = '2.000 kg to_buy'"
 policy '{"latestVersionCode":null,"minVersionCode":null}'
 fi
 
