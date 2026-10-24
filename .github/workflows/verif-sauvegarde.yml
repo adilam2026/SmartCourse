@@ -21,6 +21,10 @@ on:
         description: "Copier aussi la plus récente, si sa restauration réussit"
         type: boolean
         default: false
+      apercu_027:
+        description: "Aperçu de la migration 027 sur la copie restaurée (transaction annulée, totaux anonymes seulement)"
+        type: boolean
+        default: false
   push:
     branches: [claude/evolutions-avancees]
 permissions:
@@ -62,9 +66,10 @@ jobs:
           S3_FORCE_PATH_STYLE: ${{ secrets.S3_FORCE_PATH_STYLE }}
           KEEP: ${{ inputs.conserver }}
           KEEP_LATEST: ${{ inputs.conserver_verifiee && '1' || '' }}
+          MIGRATION_PREVIEW: ${{ inputs.apercu_027 && 'migrations/027_unit_corrections.sql' || '' }}
         run: |
           set -o pipefail # un échec de la restauration ne doit jamais être masqué par « tee »
-          docker run --rm --network verif-net -e BACKUP_KEY -e S3_BUCKET -e S3_ENDPOINT -e S3_REGION -e S3_ACCESS_KEY_ID -e S3_SECRET_ACCESS_KEY -e S3_FORCE_PATH_STYLE -e KEEP -e KEEP_LATEST \
+          docker run --rm --network verif-net -e BACKUP_KEY -e S3_BUCKET -e S3_ENDPOINT -e S3_REGION -e S3_ACCESS_KEY_ID -e S3_SECRET_ACCESS_KEY -e S3_FORCE_PATH_STYLE -e KEEP -e KEEP_LATEST -e MIGRATION_PREVIEW \
             -e RESTORE_TARGET_URL=postgres://verif:verif@restore-pg:5432/verif smartcourse:verif node dist/backup-isolated.js | tee bilan.txt
       - name: Nettoyage (serveur jetable détruit)
         if: always()

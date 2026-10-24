@@ -138,16 +138,20 @@ Journal : chaque changement est inscrit dans `unit_corrections` (valeurs avant/a
 | Application | L'APK 1188 fonctionne avec ce serveur (statistiques déjà connues, sans l'historique détaillé) | — |
 
 ```sql
--- Annulation de 027 (sur accord du propriétaire, après une sauvegarde vérifiée)
-UPDATE initial_catalog i SET unit = c.old_unit FROM unit_corrections c WHERE c.migration='027' AND c.subject='initial_catalog' AND c.ref=i.key;
-UPDATE extended_catalog e SET unit = c.old_unit FROM unit_corrections c WHERE c.migration='027' AND c.subject='extended_catalog' AND c.ref=e.key;
-UPDATE products p SET unit = c.old_unit FROM unit_corrections c WHERE c.migration='027' AND c.subject='product' AND c.ref=p.id::text AND p.unit=c.new_unit;
-UPDATE family_prices f SET ref_qty=(c.old_price->>'refQty')::numeric, ref_unit=c.old_price->>'refUnit', packaging=c.old_price->>'packaging', piece_weight_g=(c.old_price->>'pieceWeightG')::numeric
+-- Annulation de 027 (sur accord du propriétaire, après une sauvegarde vérifiée). N'annule que ce que 027 a fait et qui n'a pas été
+-- modifié depuis. Les nouvelles unités, la colonne « format » et les 8 nouvelles références restent (inutilisées, sans effet).
+UPDATE initial_catalog i SET unit = c.old_unit FROM unit_corrections c WHERE c.migration='027' AND c.subject='initial_catalog' AND c.outcome='unit_changed' AND c.ref=i.key AND i.unit=c.new_unit;
+UPDATE extended_catalog e SET unit = c.old_unit FROM unit_corrections c WHERE c.migration='027' AND c.subject='extended_catalog' AND c.outcome='unit_changed' AND c.ref=e.key AND e.unit=c.new_unit;
+UPDATE products p SET unit = c.old_unit FROM unit_corrections c WHERE c.migration='027' AND c.subject='product' AND c.outcome='unit_changed' AND c.ref=p.id::text AND p.unit=c.new_unit;
+UPDATE initial_catalog i SET name = c.old_value->>'name' FROM unit_corrections c WHERE c.migration='027' AND c.subject='initial_catalog' AND c.outcome='renamed' AND c.ref=i.key AND i.name=c.new_value->>'name';
+UPDATE extended_catalog e SET name = c.old_value->>'name' FROM unit_corrections c WHERE c.migration='027' AND c.subject='extended_catalog' AND c.outcome='renamed' AND c.ref=e.key AND e.name=c.new_value->>'name';
+UPDATE products p SET name = c.old_value->>'name' FROM unit_corrections c WHERE c.migration='027' AND c.subject='product' AND c.outcome='renamed' AND c.ref=p.id::text AND p.name=c.new_value->>'name';
+UPDATE family_prices f SET ref_qty=(c.old_value->>'refQty')::numeric, ref_unit=c.old_value->>'refUnit', packaging=c.old_value->>'packaging', piece_weight_g=(c.old_value->>'pieceWeightG')::numeric
   FROM unit_corrections c WHERE c.migration='027' AND c.subject='family_price' AND c.outcome='price_converted' AND c.family_id=f.family_id AND c.ref=f.product_id::text
-   AND f.amount=(c.new_price->>'amount')::numeric AND f.ref_qty=(c.new_price->>'refQty')::numeric AND f.ref_unit=c.new_price->>'refUnit';
-UPDATE base_prices b SET ref_qty=(c.old_price->>'refQty')::numeric, ref_unit=c.old_price->>'refUnit', packaging=c.old_price->>'packaging', piece_weight_g=(c.old_price->>'pieceWeightG')::numeric
+   AND f.amount=(c.new_value->>'amount')::numeric AND f.ref_qty=(c.new_value->>'refQty')::numeric AND f.ref_unit=c.new_value->>'refUnit';
+UPDATE base_prices b SET ref_qty=(c.old_value->>'refQty')::numeric, ref_unit=c.old_value->>'refUnit', packaging=c.old_value->>'packaging', piece_weight_g=(c.old_value->>'pieceWeightG')::numeric
   FROM unit_corrections c WHERE c.migration='027' AND c.subject='base_price' AND c.outcome='price_converted' AND c.ref=b.origin||':'||b.key
-   AND b.ref_qty=(c.new_price->>'refQty')::numeric AND b.ref_unit=c.new_price->>'refUnit';
+   AND b.ref_qty=(c.new_value->>'refQty')::numeric AND b.ref_unit=c.new_value->>'refUnit';
 UPDATE families SET catalog_rev = catalog_rev + 1;
 ```
 

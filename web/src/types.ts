@@ -16,7 +16,7 @@ export interface Me {
   prefs?: Prefs;
 }
 
-export type Unit = "piece" | "paquet" | "bouteille" | "brique" | "pot" | "boite" | "kg" | "litre";
+export type Unit = "piece" | "paquet" | "bouteille" | "brique" | "pot" | "boite" | "botte" | "rouleau" | "sachet" | "cube" | "kg" | "litre";
 
 /** Prix indicatif d'un produit (MAD) : montant pour une quantité de référence. Voir pricing.ts. */
 export interface Price {

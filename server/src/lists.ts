@@ -16,8 +16,8 @@ import { priceOfItem, snapshotPrice } from "./prices.js";
  * list -> item -> purchase, so there is no deadlock cycle.
  */
 
-export type Unit = "piece" | "paquet" | "bouteille" | "brique" | "pot" | "boite" | "kg" | "litre";
-export const UNITS: readonly Unit[] = ["piece", "paquet", "bouteille", "brique", "pot", "boite", "kg", "litre"];
+export type Unit = "piece" | "paquet" | "bouteille" | "brique" | "pot" | "boite" | "botte" | "rouleau" | "sachet" | "cube" | "kg" | "litre";
+export const UNITS: readonly Unit[] = ["piece", "paquet", "bouteille", "brique", "pot", "boite", "botte", "rouleau", "sachet", "cube", "kg", "litre"];
 /** Units sold by weight or volume: quantities may have decimals (all others are whole numbers). */
 export const isFractional = (u: Unit): boolean => u === "kg" || u === "litre";
 

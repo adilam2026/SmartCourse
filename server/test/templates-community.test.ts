@@ -58,7 +58,7 @@ describe("favoris", () => {
     const up = await app.inject({ method: "PUT", url: `/api/templates/${t.id}`, cookies: f.admin, payload: { name: "Semaine", items: [{ productId: f.products["Tomates"].id, quantity: 2 }] } });
     expect(up.json().template).toMatchObject({ name: "Semaine", items: [{ name: "Tomates", quantity: 2 }] });
     // quantités : décimales seulement pour kg et litre
-    expect((await app.inject({ method: "POST", url: "/api/templates", cookies: f.admin, payload: { name: "Mauvais", items: [{ productId: f.products["Lait"].id, quantity: 1.5 }] } })).statusCode).toBe(400);
+    expect((await app.inject({ method: "POST", url: "/api/templates", cookies: f.admin, payload: { name: "Mauvais", items: [{ productId: f.products["Œufs"].id, quantity: 1.5 }] } })).statusCode).toBe(400);
     expect((await app.inject({ method: "DELETE", url: `/api/templates/${t.id}`, cookies: f.admin })).statusCode).toBe(200);
     expect((await app.inject({ method: "GET", url: "/api/templates", cookies: parent })).json().templates).toHaveLength(0);
   });

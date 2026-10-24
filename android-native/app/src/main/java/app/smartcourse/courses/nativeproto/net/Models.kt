@@ -23,7 +23,7 @@ val storeJson = Json { ignoreUnknownKeys = true; encodeDefaults = false; explici
 
 /* ───────────── Unités ───────────── */
 
-val SERVER_UNITS = listOf("piece", "paquet", "bouteille", "brique", "pot", "boite", "kg", "litre")
+val SERVER_UNITS = listOf("piece", "paquet", "bouteille", "brique", "pot", "boite", "botte", "rouleau", "sachet", "cube", "kg", "litre")
 fun isFractionalUnit(u: String) = u == "kg" || u == "litre"
 fun unitLabel(u: String): String = when (u) { "piece" -> "pièce"; "boite" -> "boîte"; "litre" -> "L"; else -> u }
 
@@ -51,6 +51,8 @@ data class CatProduct(
     val own: Boolean = false,
     /** Mots de recherche de la référence commune (sans accents), ex. « chocolat a tartiner » pour Nutella. */
     val keywords: String = "",
+    /** Format du produit, facultatif (« pot de 350 g ») : information affichée, jamais une conversion. */
+    val format: String? = null,
 )
 
 /** [categories] : toutes les catégories (clé, libellé), même vides — pour le choix de catégorie d'un nouveau produit. */
@@ -72,6 +74,7 @@ fun parseCatalog(o: JsonObject): CatalogData? = try {
                 active = x["active"]?.jsonPrimitive?.booleanOrNull ?: true, unit = x["unit"]?.jsonPrimitive?.contentOrNull ?: "piece",
                 photoUrl = x["photoUrl"]?.jsonPrimitive?.contentOrNull, price = parsePrice(x["price"]),
                 own = x["own"]?.jsonPrimitive?.booleanOrNull ?: false, keywords = x["keywords"]?.jsonPrimitive?.contentOrNull ?: "",
+                format = x["format"]?.jsonPrimitive?.contentOrNull,
             )
         }
     }

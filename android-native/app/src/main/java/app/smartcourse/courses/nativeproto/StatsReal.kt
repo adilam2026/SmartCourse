@@ -81,7 +81,7 @@ private fun purchasesText(n: Int) = if (n == 1) "1 achat" else "$n achats"
 private fun recordedQty(unit: String, q: Double): String = when (unit) {
     "kg" -> if (q < 1) "${fmtNum(q * 1000)} g" else "${fmtNum(q)} kg"
     "litre" -> if (q < 1) "${fmtNum(q * 1000)} mL" else "${fmtNum(q)} L"
-    else -> { val l = countLabelOf(unit); "${fmtNum(q)} " + if (q > 1) "${l}s" else l }
+    else -> { val l = countLabelOf(unit); "${fmtNum(q)} " + if (q > 1) app.smartcourse.courses.nativeproto.net.pluralOf(l) else l }
 }
 
 /** Quantité cumulée par unité, jamais additionnée entre unités : « 2 pièces et 1 kg ». null si aucune quantité n'est connue. */

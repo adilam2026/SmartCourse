@@ -50,6 +50,7 @@ data class Product(
     val price: PriceRef? = null,      // données réelles : prix indicatif en vigueur
     val own: Boolean = false,         // données réelles : produit créé par la famille (proposable au catalogue commun)
     val keywords: String = "",        // données réelles : mots de recherche de la référence commune
+    val format: String? = null,       // données réelles : format du produit (« pot de 350 g »), affiché seulement
 )
 
 /** Texte comparable pour la recherche : minuscules, sans accents ni ligatures (« Pâte » = « pate », « Œufs » = « oeufs »). */
@@ -73,7 +74,7 @@ fun refLabel(p: Product): String = when (p.unit) { UnitKind.MASS -> "kg"; UnitKi
 fun qtyText(p: Product, q: Int): String = when (p.unit) {
     UnitKind.MASS -> if (q >= 1000) "${fmtNum(q / 1000.0)} kg" else "$q g"
     UnitKind.VOLUME -> if (q >= 1000) "${fmtNum(q / 1000.0)} L" else "$q mL"
-    UnitKind.COUNT -> if (q <= 1) "$q ${p.countLabel}" else "$q ${p.countLabel}s"
+    UnitKind.COUNT -> if (q <= 1) "$q ${p.countLabel}" else "$q ${app.smartcourse.courses.nativeproto.net.pluralOf(p.countLabel)}"
 }
 
 fun priceText(cents: Int, p: Product): String {

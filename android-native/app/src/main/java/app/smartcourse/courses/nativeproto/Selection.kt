@@ -385,7 +385,8 @@ fun QuantitySheet(
             Column(Modifier.weight(1f)) {
                 Text(p.name, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 if (showPrice) Text(if (priceLabel != null) "Prix indicatif : $priceLabel" else "Prix non renseigné", style = MaterialTheme.typography.bodySmall)
-                else Text(if (hasUnits) "Se choisit en $bigName ou en ${p.unit.small}" else "Se compte en ${p.countLabel}s", style = MaterialTheme.typography.bodySmall)
+                else Text(if (hasUnits) "Se choisit en $bigName ou en ${p.unit.small}" else "Se compte en ${app.smartcourse.courses.nativeproto.net.pluralOf(p.countLabel)}", style = MaterialTheme.typography.bodySmall)
+                p.format?.let { Text("Format : $it", style = MaterialTheme.typography.bodySmall, color = C.Muted) }
             }
         }
         Spacer(Modifier.height(16.dp))

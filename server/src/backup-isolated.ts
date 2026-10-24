@@ -1,3 +1,4 @@
+import { previewUnitMigration } from "./migration-preview.js";
 import { keepBackup, KEPT_PREFIX, listBackups, S3BackupStore, verifyBackup, type BackupStore } from "./backup.js";
 import { verifyPhotoBackup } from "./backup-photos.js";
 import { createPool } from "./db.js";
@@ -47,6 +48,8 @@ try {
       afterRestore: async (scratch, manifest) => {
         const r = await verifyPhotoBackup(scratch, store, manifest.photos);
         photos = { checked: r.checked, bytes: r.bytes };
+        // Sur demande : aperçu d'une migration sur cette copie isolée (transaction annulée, totaux seulement).
+        if (env.MIGRATION_PREVIEW) for (const line of await previewUnitMigration(scratch, env.MIGRATION_PREVIEW)) console.log(line);
         return r.problems.map((x) => `photos : ${x}`);
       },
     },

@@ -36,7 +36,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /** Unités proposées pour un nouveau produit (mêmes clés que le serveur). */
-private val UNIT_CHOICES = listOf("piece" to "Pièce", "paquet" to "Paquet", "bouteille" to "Bouteille", "brique" to "Brique", "pot" to "Pot", "boite" to "Boîte", "kg" to "kg", "litre" to "Litre")
+private val UNIT_CHOICES = listOf("piece" to "Pièce", "paquet" to "Paquet", "bouteille" to "Bouteille", "brique" to "Brique", "pot" to "Pot", "boite" to "Boîte", "botte" to "Botte", "rouleau" to "Rouleau", "sachet" to "Sachet", "cube" to "Cube", "kg" to "kg", "litre" to "Litre")
 
 /** Même règle que le serveur : l'unité proposée suit la catégorie ; « Autres » = à la pièce. */
 fun defaultUnitFor(category: String): String = when (category) {

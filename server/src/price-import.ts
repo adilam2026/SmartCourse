@@ -72,7 +72,7 @@ const NOT_GENERIC: Record<string, RegExp> = {
 const DISCOUNT = /cashback|remise|promo|reduction|coupon|offre|fidelite|-\s?\d+\s?%/;
 
 const yes = (v: string | undefined) => ["oui", "yes", "true", "1", "x"].includes(flat(v ?? ""));
-const COUNT_REFS = new Set(["paquet", "bouteille", "brique", "pot", "boite"]);
+const COUNT_REFS = new Set(["paquet", "bouteille", "brique", "pot", "boite", "botte", "rouleau", "sachet", "cube"]);
 
 export function classify(rows: Record<string, string>[], catalog: Map<string, "initial" | "extended">): Classified[] {
   return rows.map((raw, idx) => {

@@ -995,7 +995,7 @@
     {
       "target": "initial",
       "key": "lessive",
-      "name": "Lessive",
+      "name": "Lessive liquide",
       "category": "Maison",
       "file": "files/lessive.webp",
       "sha256": "bd88fcdadeffca511e230d761a0198fc7e70683196c40b34acf0a286776dd8ca",
@@ -2763,7 +2763,7 @@
     {
       "target": "extended",
       "key": "glaces",
-      "name": "Glaces",
+      "name": "Glace individuelle",
       "category": "Surgelés",
       "file": "files/glaces.webp",
       "sha256": "b149faa8fe1606fe086ebccefb4474af628e29548bfe4a4a0e78c20ca4f6689e",
@@ -3453,7 +3453,7 @@
     {
       "target": "extended",
       "key": "savon-noir-menager",
-      "name": "Savon noir ménager",
+      "name": "Savon noir liquide",
       "category": "Maison",
       "file": "files/savon-noir-menager.webp",
       "sha256": "c66820edc6afccad79d664b97d287fbf30277a451e65634e23ca7d2d4ce2942e",

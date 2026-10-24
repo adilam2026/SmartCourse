@@ -993,7 +993,7 @@ if want_s U; then
 echo "═══ U. Unités corrigées : décimales au kg, lignes existantes jamais réinterprétées, prix à ressaisir ═══" | tee -a "$OUT/resultats.txt"
 login_api adil 482913
 closeall_api; api PUT /api/family/features -d '{"multiLists":false}' >/dev/null
-expect "U0. catalogue de la famille : Riz et Cumin au kg, Persil et Poulet à la pièce" test "$(sql "SELECT string_agg(p.name||':'||p.unit, ',' ORDER BY p.name) FROM products p JOIN families f ON f.id=p.family_id WHERE f.code='$FAMILY' AND p.name IN ('Riz','Cumin','Persil','Poulet')")" = "Cumin:kg,Persil:piece,Poulet:piece,Riz:kg"
+expect "U0. unités arbitrées dans la famille : riz/cumin au poids, persil en botte, poulet entier à la pièce, lait et huile au litre, thon en boîte, papier toilette en rouleau" test "$(sql "SELECT string_agg(p.name||':'||p.unit, ',' ORDER BY p.name) FROM products p JOIN families f ON f.id=p.family_id WHERE f.code='$FAMILY' AND p.name IN ('Riz','Cumin','Persil','Poulet','Lait','Huile de table','Thon en conserve','Papier toilette')")" = "Cumin:kg,Huile de table:litre,Lait:litre,Papier toilette:rouleau,Persil:botte,Poulet:piece,Riz:kg,Thon en conserve:boite"
 add_api Cumin 0.25
 add_api Riz 2
 # Ligne de riz créée AVANT la correction (en paquets) : elle doit rester « 2 paquets »
@@ -1019,6 +1019,16 @@ expect "U5. formulaire : ancien prix rappelé à part, montant vide (aucune repr
 shot final-u2-prix-a-ressaisir
 adb shell input keyevent KEYCODE_BACK; sleep 1
 expect "U6. serveur : ancien prix conservé tel quel" test "$(sql "SELECT fp.amount||' '||fp.ref_unit FROM family_prices fp JOIN products p ON p.id=fp.product_id JOIN families f ON f.id=fp.family_id WHERE f.code='$FAMILY' AND p.name='Poulet'")" = "70.00 kg"
+# Prix commun converti exactement (9,90 DH pour 500 g, jamais arrondi à 20 DH/kg) ; format du produit facultatif
+back_to_app; $UI has "Gestion des prix" || { tapt "Réglages"; $UI tap "Gestion des prix" --scroll >/dev/null; sleep 3; }
+fill "Rechercher un produit" "Vermicelles"; hide_kb; sleep 3
+expect "U7. vermicelles : prix converti exactement « 9,90 DH / 500 g »" $UI wait "9,90 DH / 500 g" 10
+fill "Rechercher un produit" "Thon"; hide_kb; sleep 3
+$UI tap "11,17 DH" >/dev/null; sleep 3
+fill "Format du produit" "boîte de 80 g"; hide_kb; sleep 1
+$UI tap "Enregistrer" --last >/dev/null; sleep 4
+expect "U8. format « boîte de 80 g » enregistré ; unité inchangée ; aucun prix personnel créé (prix commun conservé)" test "$(sql "SELECT p.format||'|'||p.unit||'|'||(SELECT count(*) FROM family_prices fp WHERE fp.product_id=p.id) FROM products p JOIN families f ON f.id=p.family_id WHERE f.code='$FAMILY' AND p.name='Thon en conserve'")" = "boîte de 80 g|boite|0"
+shot final-u3-format
 fi
 
 if want_s L; then

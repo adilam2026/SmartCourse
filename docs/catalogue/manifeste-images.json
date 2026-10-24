@@ -942,7 +942,7 @@
   {
    "target": "extended",
    "key": "glaces",
-   "name": "Glaces",
+   "name": "Glace individuelle",
    "file": "files/glaces.webp",
    "category": "surgeles",
    "origin": "Complémentaire (étendu actuel)",
@@ -1356,7 +1356,7 @@
   {
    "target": "extended",
    "key": "savon-noir-menager",
-   "name": "Savon noir ménager",
+   "name": "Savon noir liquide",
    "file": "files/savon-noir-menager.webp",
    "category": "maison",
    "origin": "Ajout proposé",

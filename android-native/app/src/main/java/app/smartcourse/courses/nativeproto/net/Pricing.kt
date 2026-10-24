@@ -22,7 +22,7 @@ sealed interface LineAmount {
     data class No(val reason: String) : LineAmount
 }
 
-private val COUNT_UNITS = setOf("piece", "paquet", "bouteille", "brique", "pot", "boite")
+private val COUNT_UNITS = setOf("piece", "paquet", "bouteille", "brique", "pot", "boite", "botte", "rouleau", "sachet", "cube")
 private val CENTS_RE = Regex("^\\d+(\\.\\d{1,2})?$")
 private val MILLI_RE = Regex("^\\d+(\\.\\d{1,3})?$")
 
@@ -90,9 +90,12 @@ fun summarize(lines: List<Triple<PriceRef?, String, String>>): Summary {
     return Summary(cents, priced, unpriced)
 }
 
+/** Pluriel d'une unité comptée : « rouleaux », « pots ». */
+fun pluralOf(label: String): String = if (label.endsWith("eau")) label + "x" else label + "s"
+
 fun fmtMoney(cents: Long): String = "${cents / 100},${(cents % 100).toString().padStart(2, '0')} DH"
 
-private val UNIT_SINGULAR = mapOf("piece" to "pièce", "paquet" to "paquet", "bouteille" to "bouteille", "brique" to "brique", "pot" to "pot", "boite" to "boîte", "kg" to "kg", "litre" to "litre", "g" to "g", "ml" to "ml")
+private val UNIT_SINGULAR = mapOf("piece" to "pièce", "paquet" to "paquet", "bouteille" to "bouteille", "brique" to "brique", "pot" to "pot", "boite" to "boîte", "botte" to "botte", "rouleau" to "rouleau", "sachet" to "sachet", "cube" to "cube", "kg" to "kg", "litre" to "litre", "g" to "g", "ml" to "ml")
 private val CONTAINER = Regex("^(flacon|bidon|bombe|rouleau|barquette|sachet|petit pain|quantité)\\b", RegexOption.IGNORE_CASE)
 
 private fun numOf(v: String): BigDecimal = BigDecimal(v.trim().replace(",", "."))
@@ -106,7 +109,7 @@ fun fmtPrice(p: PriceRef): String {
     val u = UNIT_SINGULAR[p.refUnit] ?: p.refUnit
     val one = q.compareTo(BigDecimal.ONE) == 0
     val metric = p.refUnit == "kg" || p.refUnit == "g" || p.refUnit == "ml" || p.refUnit == "litre"
-    val per = if (one) u else "${trimNum(p.refQty)} ${if (metric) u else u + (if (q > BigDecimal.ONE) "s" else "")}"
+    val per = if (one) u else "${trimNum(p.refQty)} ${if (metric) u else if (q > BigDecimal.ONE) pluralOf(u) else u}"
     if (!p.packaging.isNullOrEmpty() && CONTAINER.containsMatchIn(p.packaging)) return "$head / ${p.packaging}"
     val pack = if (!p.packaging.isNullOrEmpty()) (if (p.refUnit in COUNT_UNITS) " de ${p.packaging}" else " (${p.packaging})") else ""
     return "$head / $per$pack"

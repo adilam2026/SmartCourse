@@ -48,6 +48,8 @@ const productView = (r: any, price: PriceView | null = null) => ({
   brand: r.brand,
   active: r.active,
   unit: r.unit as Unit,
+  // Format du produit, facultatif (« pot de 350 g ») : information affichée, jamais une conversion.
+  format: (r.format ?? null) as string | null,
   photoUrl: photoUrl(r.photo_asset_id),
   price,
   // Produit créé par la famille (aucune référence commune) : il peut être proposé au catalogue commun.
@@ -109,6 +111,7 @@ export function catalogRoutes(app: FastifyInstance, { db, store, guard, hub }: D
     brand?: string | null;
     active?: boolean;
     unit?: Unit;
+    format?: string | null;
     image?: Buffer;
     resetImage?: boolean;
   }
@@ -142,8 +145,8 @@ export function catalogRoutes(app: FastifyInstance, { db, store, guard, hub }: D
         if (photoId) photo = photoId;
         else if (input.resetImage) photo = cur.catalog_photo ?? null; // back to the catalogue picture (or none for an added article)
         const r = await c.query(
-          `UPDATE products SET name = $3, category = $4, position = $5, brand = $6, active = $7, photo_asset_id = $8, unit = $9 WHERE id = $1 AND family_id = $2 RETURNING *`,
-          [input.id, auth.familyId, input.name ?? cur.name, category, position, input.brand !== undefined ? input.brand : cur.brand, input.active ?? cur.active, photo, input.unit ?? cur.unit],
+          `UPDATE products SET name = $3, category = $4, position = $5, brand = $6, active = $7, photo_asset_id = $8, unit = $9, format = $10 WHERE id = $1 AND family_id = $2 RETURNING *`,
+          [input.id, auth.familyId, input.name ?? cur.name, category, position, input.brand !== undefined ? input.brand : cur.brand, input.active ?? cur.active, photo, input.unit ?? cur.unit, input.format !== undefined ? input.format : cur.format],
         );
         return r.rows[0];
       });
@@ -171,6 +174,8 @@ export function catalogRoutes(app: FastifyInstance, { db, store, guard, hub }: D
         brand: z.string().trim().min(1).max(40).nullable().optional(),
         active: z.boolean().optional(),
         unit: z.enum(UNITS as unknown as [Unit, ...Unit[]]).optional(),
+        // Vide = aucun format.
+        format: z.string().trim().max(60).transform((v) => v || null).nullable().optional(),
         image: imageField.optional(),
         resetImage: z.boolean().optional(),
       })

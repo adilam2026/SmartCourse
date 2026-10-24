@@ -56,7 +56,7 @@ fun clockTime(iso: String?): String? = try {
 private fun CatProduct.toProduct() = Product(
     id = id, name = if (brand.isNullOrBlank()) name else "$name $brand", photo = 0, category = categoryLabel,
     unit = unitKindOf(unit), countLabel = countLabelOf(unit), basePrice = null, inCatalog = active,
-    photoUrl = photoUrl, serverUnit = unit, price = price, own = own, keywords = keywords,
+    photoUrl = photoUrl, serverUnit = unit, price = price, own = own, keywords = keywords, format = format,
 )
 
 /** Référence du catalogue commun proposée pendant une recherche (absente de la famille, ou retirée par un administrateur). */

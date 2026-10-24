@@ -68,15 +68,15 @@ describe("unités et quantités", () => {
   it("chaque produit a une unité ; l'ajout sans quantité vaut 1 ; les kg acceptent les décimales, pas les autres unités", async () => {
     const f = await newFamily();
     expect(f.units["Tomates"]).toBe("kg");
-    expect(f.units["Persil"]).toBe("piece"); // à la pièce depuis 027 (une botte)
+    expect(f.units["Persil"]).toBe("botte"); // à la botte depuis 027
     expect(f.units["Riz"]).toBe("kg"); // au poids depuis 027
-    expect(f.units["Lait"]).toBe("piece");
-    expect((await one(f.marie, f.list, op.add(f.products["Lait"]!))).status).toBe("applied");
+    expect(f.units["Œufs"]).toBe("piece");
+    expect((await one(f.marie, f.list, op.add(f.products["Œufs"]!))).status).toBe("applied");
     expect((await one(f.marie, f.list, op.add(f.products["Tomates"]!, 1.5))).status).toBe("applied");
     expect((await one(f.marie, f.list, op.add(f.products["Persil"]!, 2.5))).reason).toBe("bad_quantity");
     expect((await one(f.marie, f.list, op.add(f.products["Riz"]!, 0.25))).status).toBe("applied"); // 0,25 kg
     const v = await view(f.adil);
-    expect(lines(v, f.products["Lait"]!)[0]).toMatchObject({ quantity: 1, unit: "piece" });
+    expect(lines(v, f.products["Œufs"]!)[0]).toMatchObject({ quantity: 1, unit: "piece" });
     expect(lines(v, f.products["Tomates"]!)[0]).toMatchObject({ quantity: 1.5, unit: "kg" });
     expect(lines(v, f.products["Persil"]!)).toHaveLength(0);
     expect(lines(v, f.products["Riz"]!)[0]).toMatchObject({ quantity: 0.25, unit: "kg" });
@@ -84,29 +84,29 @@ describe("unités et quantités", () => {
 
   it("une quantité nulle, négative ou énorme est refusée par le serveur", async () => {
     const f = await newFamily();
-    for (const q of [0, -2, 1000]) expect((await send(f.marie, f.list, [op.add(f.products["Lait"]!, q)])).statusCode).toBe(400);
+    for (const q of [0, -2, 1000]) expect((await send(f.marie, f.list, [op.add(f.products["Œufs"]!, q)])).statusCode).toBe(400);
     expect((await view(f.adil)).items).toHaveLength(0);
   });
 
   it("l'unité d'un produit est configurable par l'administrateur seulement ; elle ne change pas les lignes déjà demandées", async () => {
     const f = await newFamily();
-    await one(f.marie, f.list, op.add(f.products["Lait"]!, 2));
-    expect((await app.inject({ method: "PATCH", url: `/api/products/${f.products["Lait"]}`, cookies: f.lamiaa, payload: { unit: "bouteille" } })).statusCode).toBe(403);
-    expect((await app.inject({ method: "PATCH", url: `/api/products/${f.products["Lait"]}`, cookies: f.adil, payload: { unit: "bouteille" } })).json().product.unit).toBe("bouteille");
-    expect((await app.inject({ method: "PATCH", url: `/api/products/${f.products["Lait"]}`, cookies: f.adil, payload: { unit: "gramme" } })).statusCode).toBe(400);
-    expect(lines(await view(f.adil), f.products["Lait"]!)[0]).toMatchObject({ quantity: 2, unit: "piece" });
+    await one(f.marie, f.list, op.add(f.products["Œufs"]!, 2));
+    expect((await app.inject({ method: "PATCH", url: `/api/products/${f.products["Œufs"]}`, cookies: f.lamiaa, payload: { unit: "bouteille" } })).statusCode).toBe(403);
+    expect((await app.inject({ method: "PATCH", url: `/api/products/${f.products["Œufs"]}`, cookies: f.adil, payload: { unit: "bouteille" } })).json().product.unit).toBe("bouteille");
+    expect((await app.inject({ method: "PATCH", url: `/api/products/${f.products["Œufs"]}`, cookies: f.adil, payload: { unit: "gramme" } })).statusCode).toBe(400);
+    expect(lines(await view(f.adil), f.products["Œufs"]!)[0]).toMatchObject({ quantity: 2, unit: "piece" });
   });
 });
 
 describe("unités adaptées (brique, pot, boîte)", () => {
   it("les nouvelles unités sont admises ; l'ancienne « pièce » n'est jamais convertie ; quantités entières exigées", async () => {
     const f = await newFamily();
-    await one(f.marie, f.list, op.add(f.products["Lait"]!, 2)); // demandé en « pièce »
+    await one(f.marie, f.list, op.add(f.products["Œufs"]!, 2)); // demandé en « pièce »
     for (const unit of ["brique", "pot", "boite"]) {
-      expect((await app.inject({ method: "PATCH", url: `/api/products/${f.products["Lait"]}`, cookies: f.adil, payload: { unit } })).json().product.unit).toBe(unit);
+      expect((await app.inject({ method: "PATCH", url: `/api/products/${f.products["Œufs"]}`, cookies: f.adil, payload: { unit } })).json().product.unit).toBe(unit);
     }
     // la ligne déjà demandée garde son unité d'origine
-    expect(lines(await view(f.adil), f.products["Lait"]!)[0]).toMatchObject({ quantity: 2, unit: "piece" });
+    expect(lines(await view(f.adil), f.products["Œufs"]!)[0]).toMatchObject({ quantity: 2, unit: "piece" });
     // un autre produit demandé après le changement prend la nouvelle unité, en nombres entiers
     await app.inject({ method: "PATCH", url: `/api/products/${f.products["Riz"]}`, cookies: f.adil, payload: { unit: "brique" } });
     expect((await one(f.marie, f.list, op.add(f.products["Riz"]!, 1.5))).reason).toBe("bad_quantity");
@@ -118,48 +118,48 @@ describe("unités adaptées (brique, pot, boîte)", () => {
 describe("ajustement de quantité et modifications simultanées", () => {
   it("set_qty change la quantité, journalise l'ancienne et la nouvelle valeur avec l'auteur", async () => {
     const f = await newFamily();
-    await one(f.marie, f.list, op.add(f.products["Lait"]!, 2));
-    const item = lines(await view(f.adil), f.products["Lait"]!)[0];
-    const r = await one(f.lamiaa, f.list, op.setQty(f.products["Lait"]!, 5, item.rev));
+    await one(f.marie, f.list, op.add(f.products["Œufs"]!, 2));
+    const item = lines(await view(f.adil), f.products["Œufs"]!)[0];
+    const r = await one(f.lamiaa, f.list, op.setQty(f.products["Œufs"]!, 5, item.rev));
     expect(r.status).toBe("applied");
     const v = await view(f.adil);
-    expect(lines(v, f.products["Lait"]!)[0]).toMatchObject({ quantity: 5, lastChange: { kind: "qty", before: 2, after: 5, by: { displayName: "Lamiaa" } } });
+    expect(lines(v, f.products["Œufs"]!)[0]).toMatchObject({ quantity: 5, lastChange: { kind: "qty", before: 2, after: 5, by: { displayName: "Lamiaa" } } });
     expect(v.events.map((e: any) => [e.kind, e.before, e.after, e.by.displayName])).toEqual([["add", null, 2, "Marie"], ["qty", 2, 5, "Lamiaa"]]);
   });
 
   it("deux modifications simultanées sur la même révision : une seule s'applique, l'autre est refusée avec la valeur actuelle (rien n'est écrasé)", async () => {
     const f = await newFamily();
-    await one(f.marie, f.list, op.add(f.products["Lait"]!, 2));
-    const item = lines(await view(f.adil), f.products["Lait"]!)[0];
-    const rs = await Promise.all([one(f.lamiaa, f.list, op.setQty(f.products["Lait"]!, 3, item.rev)), one(f.marie, f.list, op.setQty(f.products["Lait"]!, 6, item.rev))]);
+    await one(f.marie, f.list, op.add(f.products["Œufs"]!, 2));
+    const item = lines(await view(f.adil), f.products["Œufs"]!)[0];
+    const rs = await Promise.all([one(f.lamiaa, f.list, op.setQty(f.products["Œufs"]!, 3, item.rev)), one(f.marie, f.list, op.setQty(f.products["Œufs"]!, 6, item.rev))]);
     expect(rs.map((r) => r.status).sort()).toEqual(["applied", "rejected"]);
     const lost = rs.find((r) => r.status === "rejected");
     expect(lost.reason).toBe("stale");
-    const final = lines(await view(f.adil), f.products["Lait"]!)[0].quantity;
+    const final = lines(await view(f.adil), f.products["Œufs"]!)[0].quantity;
     expect(lost.detail.quantity).toBe(final); // la personne refusée apprend la valeur en vigueur
     expect([3, 6]).toContain(final);
   });
 
   it("un membre du personnel apprend la quantité actuelle mais pas le nom de l'auteur du changement", async () => {
     const f = await newFamily();
-    await one(f.marie, f.list, op.add(f.products["Lait"]!, 2));
-    const item = lines(await view(f.adil), f.products["Lait"]!)[0];
-    await one(f.lamiaa, f.list, op.setQty(f.products["Lait"]!, 4, item.rev));
-    const stale = await one(f.marie, f.list, op.setQty(f.products["Lait"]!, 9, item.rev));
+    await one(f.marie, f.list, op.add(f.products["Œufs"]!, 2));
+    const item = lines(await view(f.adil), f.products["Œufs"]!)[0];
+    await one(f.lamiaa, f.list, op.setQty(f.products["Œufs"]!, 4, item.rev));
+    const stale = await one(f.marie, f.list, op.setQty(f.products["Œufs"]!, 9, item.rev));
     expect(stale).toMatchObject({ status: "rejected", reason: "stale", detail: { quantity: 4, unit: "piece" } });
     expect(stale.detail.lastBy).toBeUndefined();
-    const parent = await one(f.adil, f.list, op.setQty(f.products["Lait"]!, 9, item.rev));
+    const parent = await one(f.adil, f.list, op.setQty(f.products["Œufs"]!, 9, item.rev));
     expect(parent.detail.lastBy.displayName).toBe("Lamiaa");
   });
 
   it("la même valeur sur une révision dépassée n'est pas une erreur ; un retrait sur une révision dépassée est refusé", async () => {
     const f = await newFamily();
-    await one(f.marie, f.list, op.add(f.products["Lait"]!, 2));
-    const item = lines(await view(f.adil), f.products["Lait"]!)[0];
-    await one(f.lamiaa, f.list, op.setQty(f.products["Lait"]!, 4, item.rev));
-    expect((await one(f.marie, f.list, op.setQty(f.products["Lait"]!, 4, item.rev))).status).toBe("already");
-    expect((await one(f.marie, f.list, op.remove(f.products["Lait"]!, item.rev))).reason).toBe("stale");
-    expect(lines(await view(f.adil), f.products["Lait"]!)).toHaveLength(1);
+    await one(f.marie, f.list, op.add(f.products["Œufs"]!, 2));
+    const item = lines(await view(f.adil), f.products["Œufs"]!)[0];
+    await one(f.lamiaa, f.list, op.setQty(f.products["Œufs"]!, 4, item.rev));
+    expect((await one(f.marie, f.list, op.setQty(f.products["Œufs"]!, 4, item.rev))).status).toBe("already");
+    expect((await one(f.marie, f.list, op.remove(f.products["Œufs"]!, item.rev))).reason).toBe("stale");
+    expect(lines(await view(f.adil), f.products["Œufs"]!)).toHaveLength(1);
   });
 
   it("rejouer la même opération (resynchronisation) ne double ni la quantité ni le journal", async () => {
@@ -182,66 +182,66 @@ describe("ajustement de quantité et modifications simultanées", () => {
 describe("doublons et articles déjà achetés", () => {
   it("ajouter un produit déjà présent ne crée pas de doublon : la quantité actuelle est renvoyée et rien ne change", async () => {
     const f = await newFamily();
-    await one(f.marie, f.list, op.add(f.products["Lait"]!, 3));
-    const r = await one(f.lamiaa, f.list, op.add(f.products["Lait"]!, 1));
+    await one(f.marie, f.list, op.add(f.products["Œufs"]!, 3));
+    const r = await one(f.lamiaa, f.list, op.add(f.products["Œufs"]!, 1));
     expect(r).toMatchObject({ status: "already", detail: { quantity: 3, unit: "piece" } });
     const v = await view(f.adil);
-    expect(lines(v, f.products["Lait"]!)).toHaveLength(1);
-    expect(lines(v, f.products["Lait"]!)[0].quantity).toBe(3);
+    expect(lines(v, f.products["Œufs"]!)).toHaveLength(1);
+    expect(lines(v, f.products["Œufs"]!)[0].quantity).toBe(3);
   });
 
   it("un article acheté n'est jamais remis à acheter par un simple ajout ; la demande doit être explicite et crée une NOUVELLE ligne", async () => {
     const f = await newFamily();
-    await one(f.marie, f.list, op.add(f.products["Lait"]!, 2));
-    const first = lines(await view(f.adil), f.products["Lait"]!)[0];
+    await one(f.marie, f.list, op.add(f.products["Œufs"]!, 2));
+    const first = lines(await view(f.adil), f.products["Œufs"]!)[0];
     await one(f.adil, f.list, op.purchase(first.id));
-    const plain = await one(f.marie, f.list, op.add(f.products["Lait"]!, 1));
+    const plain = await one(f.marie, f.list, op.add(f.products["Œufs"]!, 1));
     expect(plain).toMatchObject({ status: "rejected", reason: "already_purchased", detail: { quantity: 2, unit: "piece" } });
     expect(plain.detail.purchasedBy).toBeUndefined(); // personnel : pas de nom
-    expect(lines(await view(f.adil), f.products["Lait"]!)).toHaveLength(1);
+    expect(lines(await view(f.adil), f.products["Œufs"]!)).toHaveLength(1);
 
-    const again = await one(f.marie, f.list, op.again(f.products["Lait"]!, 4));
+    const again = await one(f.marie, f.list, op.again(f.products["Œufs"]!, 4));
     expect(again.status).toBe("applied");
     const v = await view(f.adil);
-    const ls = lines(v, f.products["Lait"]!);
+    const ls = lines(v, f.products["Œufs"]!);
     expect(ls.map((l: any) => [l.status, l.quantity]).sort()).toEqual([["purchased", 2], ["to_buy", 4]]);
     expect(ls.find((l: any) => l.status === "purchased").purchase.by.displayName).toBe("Adil");
     expect(v.events.map((e: any) => e.kind)).toEqual(["add", "request_again"]);
     // une deuxième demande ne crée pas de troisième ligne
-    expect(await one(f.lamiaa, f.list, op.again(f.products["Lait"]!, 9))).toMatchObject({ status: "already", detail: { quantity: 4 } });
-    expect(lines(await view(f.adil), f.products["Lait"]!)).toHaveLength(2);
+    expect(await one(f.lamiaa, f.list, op.again(f.products["Œufs"]!, 9))).toMatchObject({ status: "already", detail: { quantity: 4 } });
+    expect(lines(await view(f.adil), f.products["Œufs"]!)).toHaveLength(2);
   });
 
   it("request_again sur un produit jamais acheté est refusé (il faut « add »)", async () => {
     const f = await newFamily();
-    expect((await one(f.marie, f.list, op.again(f.products["Lait"]!))).reason).toBe("item_unknown");
+    expect((await one(f.marie, f.list, op.again(f.products["Œufs"]!))).reason).toBe("item_unknown");
   });
 
   it("la ligne achetée reste verrouillée ; la nouvelle ligne se modifie et se retire normalement", async () => {
     const f = await newFamily();
-    await one(f.marie, f.list, op.add(f.products["Lait"]!, 2));
-    await one(f.adil, f.list, op.purchase(lines(await view(f.adil), f.products["Lait"]!)[0].id));
-    expect((await one(f.marie, f.list, op.setQty(f.products["Lait"]!, 5, 2))).reason).toBe("locked_purchased");
-    await one(f.marie, f.list, op.again(f.products["Lait"]!, 1));
-    const open = lines(await view(f.adil), f.products["Lait"]!).find((l: any) => l.status === "to_buy");
-    expect((await one(f.lamiaa, f.list, op.setQty(f.products["Lait"]!, 3, open.rev))).status).toBe("applied");
-    const open2 = lines(await view(f.adil), f.products["Lait"]!).find((l: any) => l.status === "to_buy");
-    expect((await one(f.lamiaa, f.list, op.remove(f.products["Lait"]!, open2.rev))).status).toBe("applied");
-    const left = lines(await view(f.adil), f.products["Lait"]!);
+    await one(f.marie, f.list, op.add(f.products["Œufs"]!, 2));
+    await one(f.adil, f.list, op.purchase(lines(await view(f.adil), f.products["Œufs"]!)[0].id));
+    expect((await one(f.marie, f.list, op.setQty(f.products["Œufs"]!, 5, 2))).reason).toBe("locked_purchased");
+    await one(f.marie, f.list, op.again(f.products["Œufs"]!, 1));
+    const open = lines(await view(f.adil), f.products["Œufs"]!).find((l: any) => l.status === "to_buy");
+    expect((await one(f.lamiaa, f.list, op.setQty(f.products["Œufs"]!, 3, open.rev))).status).toBe("applied");
+    const open2 = lines(await view(f.adil), f.products["Œufs"]!).find((l: any) => l.status === "to_buy");
+    expect((await one(f.lamiaa, f.list, op.remove(f.products["Œufs"]!, open2.rev))).status).toBe("applied");
+    const left = lines(await view(f.adil), f.products["Œufs"]!);
     expect(left).toHaveLength(1);
     expect(left[0]).toMatchObject({ status: "purchased", quantity: 2 });
   });
 
   it("corriger un achat quand une nouvelle demande existe : les quantités se regroupent sur la ligne ouverte (une seule ligne ouverte par produit)", async () => {
     const f = await newFamily();
-    await one(f.marie, f.list, op.add(f.products["Lait"]!, 2));
-    const bought = lines(await view(f.adil), f.products["Lait"]!)[0];
+    await one(f.marie, f.list, op.add(f.products["Œufs"]!, 2));
+    const bought = lines(await view(f.adil), f.products["Œufs"]!)[0];
     await one(f.adil, f.list, op.purchase(bought.id));
-    await one(f.marie, f.list, op.again(f.products["Lait"]!, 3));
+    await one(f.marie, f.list, op.again(f.products["Œufs"]!, 3));
     const pid = (await view(f.adil)).items.find((i: any) => i.id === bought.id).purchase.id;
     const r = await one(f.lamiaa, f.list, op.correct(pid));
     expect(r.status).toBe("applied");
-    const ls = lines(await view(f.adil), f.products["Lait"]!);
+    const ls = lines(await view(f.adil), f.products["Œufs"]!);
     expect(ls).toHaveLength(1);
     expect(ls[0]).toMatchObject({ status: "to_buy", quantity: 5 });
     const inv = await db.query(`SELECT count(*)::int AS n FROM list_items i WHERE (i.status = 'purchased') <> EXISTS (SELECT 1 FROM purchases p WHERE p.list_item_id = i.id AND p.voided_at IS NULL)`);
@@ -276,14 +276,14 @@ describe("validations successives (date, heure, auteur)", () => {
     expect(group(b1.id)).toEqual([...names1].sort());
     expect(group(b2.id)).toEqual([...names2].sort());
     // chaque ligne garde l'heure et l'auteur de SON ajout
-    expect(new Date(lines(v, f.products["Lait"]!)[0].addedAt).getTime()).toBe(morning.getTime());
+    expect(new Date(lines(v, f.products["Œufs"]!)[0].addedAt).getTime()).toBe(morning.getTime());
     expect(lines(v, f.products["Oignons"]!)[0]).toMatchObject({ addedBy: { displayName: "Lamiaa" } });
     expect(new Date(lines(v, f.products["Oignons"]!)[0].addedAt).getTime()).toBe(noon.getTime());
     // modifier une quantité l'après-midi n'écrase pas l'heure d'ajout du matin : c'est un événement de plus
-    const lait = lines(v, f.products["Lait"]!)[0];
-    await send(f.lamiaa, f.list, [op.setQty(f.products["Lait"]!, 4, lait.rev)], b2);
+    const lait = lines(v, f.products["Œufs"]!)[0];
+    await send(f.lamiaa, f.list, [op.setQty(f.products["Œufs"]!, 4, lait.rev)], b2);
     const v2 = await view(f.adil);
-    const l2 = lines(v2, f.products["Lait"]!)[0];
+    const l2 = lines(v2, f.products["Œufs"]!)[0];
     expect(new Date(l2.addedAt).getTime()).toBe(morning.getTime());
     expect(l2.lastChange).toMatchObject({ kind: "qty", before: 1, after: 4, by: { displayName: "Lamiaa" } });
     expect(new Date(l2.lastChange.at).getTime()).toBe(noon.getTime());
@@ -293,14 +293,14 @@ describe("validations successives (date, heure, auteur)", () => {
   it("une heure d'appareil absurde (futur, ou plus de 30 jours) est remplacée par l'heure du serveur ; une validation hors connexion récente est conservée", async () => {
     const f = await newFamily();
     const before = Date.now();
-    await send(f.marie, f.list, [op.add(f.products["Lait"]!)], { id: randomUUID(), at: new Date(before + 3_600_000).toISOString() });
+    await send(f.marie, f.list, [op.add(f.products["Œufs"]!)], { id: randomUUID(), at: new Date(before + 3_600_000).toISOString() });
     await send(f.marie, f.list, [op.add(f.products["Sucre"]!)], { id: randomUUID(), at: new Date(before - 40 * 86_400_000).toISOString() });
     const offline = new Date(before - 2 * 3_600_000);
     await send(f.marie, f.list, [op.add(f.products["Riz"]!)], { id: randomUUID(), at: offline.toISOString() });
     const v = await view(f.adil);
     const at = (name: string) => new Date(lines(v, f.products[name]!)[0].addedAt).getTime();
-    expect(at("Lait")).toBeGreaterThanOrEqual(before - 1000);
-    expect(at("Lait")).toBeLessThan(before + 60_000);
+    expect(at("Œufs")).toBeGreaterThanOrEqual(before - 1000);
+    expect(at("Œufs")).toBeLessThan(before + 60_000);
     expect(at("Sucre")).toBeGreaterThanOrEqual(before - 1000);
     expect(at("Riz")).toBe(offline.getTime());
   });
@@ -308,7 +308,7 @@ describe("validations successives (date, heure, auteur)", () => {
   it("un identifiant de validation déjà pris par une autre personne n'accroche pas les opérations à sa validation", async () => {
     const f = await newFamily();
     const shared = randomUUID();
-    await send(f.marie, f.list, [op.add(f.products["Lait"]!)], { id: shared });
+    await send(f.marie, f.list, [op.add(f.products["Œufs"]!)], { id: shared });
     await send(f.lamiaa, f.list, [op.add(f.products["Sucre"]!)], { id: shared });
     const v = await view(f.adil);
     expect(v.validations).toHaveLength(2);
@@ -318,7 +318,7 @@ describe("validations successives (date, heure, auteur)", () => {
 
   it("le journal est réservé aux parents : le personnel ne reçoit ni événements, ni validations, ni auteurs", async () => {
     const f = await newFamily();
-    await one(f.marie, f.list, op.add(f.products["Lait"]!, 2));
+    await one(f.marie, f.list, op.add(f.products["Œufs"]!, 2));
     const s = await view(f.marie);
     expect(s.events).toBeUndefined();
     expect(s.validations).toBeUndefined();
@@ -328,17 +328,17 @@ describe("validations successives (date, heure, auteur)", () => {
 
   it("une liste clôturée est immuable : opérations refusées, journal impossible à modifier ou à effacer", async () => {
     const f = await newFamily();
-    await one(f.marie, f.list, op.add(f.products["Lait"]!, 2));
-    const item = lines(await view(f.adil), f.products["Lait"]!)[0];
+    await one(f.marie, f.list, op.add(f.products["Œufs"]!, 2));
+    const item = lines(await view(f.adil), f.products["Œufs"]!)[0];
     expect((await app.inject({ method: "POST", url: `/api/lists/${f.list}/close`, cookies: f.lamiaa })).statusCode).toBe(200);
-    for (const o of [op.add(f.products["Sucre"]!), op.setQty(f.products["Lait"]!, 9, item.rev), op.again(f.products["Lait"]!), op.remove(f.products["Lait"]!, item.rev)]) {
+    for (const o of [op.add(f.products["Sucre"]!), op.setQty(f.products["Œufs"]!, 9, item.rev), op.again(f.products["Œufs"]!), op.remove(f.products["Œufs"]!, item.rev)]) {
       expect((await one(f.marie, f.list, o)).reason).toBe("list_closed");
     }
     await expect(db.query("INSERT INTO list_events (list_id, family_id, item_id, product_id, validation_id, kind, qty_after, unit, actor_id, at) SELECT list_id, family_id, id, product_id, (SELECT id FROM validations LIMIT 1), 'add', 1, 'piece', added_by, now() FROM list_items WHERE id = $1", [item.id])).rejects.toThrow(/archivée/);
     await expect(db.query("UPDATE list_events SET qty_after = 99 WHERE item_id = $1", [item.id])).rejects.toThrow(/ajout seulement/);
     await expect(db.query("DELETE FROM validations WHERE list_id = $1", [f.list])).rejects.toThrow(/ajout seulement/);
     const archived = (await app.inject({ method: "GET", url: `/api/lists/${f.list}`, cookies: f.adil })).json().list;
-    expect(lines(archived, f.products["Lait"]!)[0].quantity).toBe(2);
+    expect(lines(archived, f.products["Œufs"]!)[0].quantity).toBe(2);
     expect(archived.events).toHaveLength(1);
   });
 });
@@ -348,13 +348,13 @@ describe("heure du téléphone et heure de réception", () => {
     const f = await newFamily();
     const pressed = new Date(Date.now() - 3 * 3_600_000);
     const before = Date.now();
-    await send(f.marie, f.list, [op.add(f.products["Lait"]!, 2)], { id: randomUUID(), at: pressed.toISOString() });
+    await send(f.marie, f.list, [op.add(f.products["Œufs"]!, 2)], { id: randomUUID(), at: pressed.toISOString() });
     const v = await view(f.adil);
     const val = v.validations[0];
     expect(new Date(val.at).getTime()).toBe(pressed.getTime()); // heure d'affichage : celle de l'appui
     expect(new Date(val.clientAt).getTime()).toBe(pressed.getTime()); // ce que le téléphone a annoncé
     expect(new Date(val.receivedAt).getTime()).toBeGreaterThanOrEqual(before - 1000); // reçu maintenant
-    const line = lines(v, f.products["Lait"]!)[0];
+    const line = lines(v, f.products["Œufs"]!)[0];
     expect(new Date(line.addedAt).getTime()).toBe(pressed.getTime());
     expect(new Date(line.addedReceivedAt).getTime()).toBeGreaterThanOrEqual(before - 1000);
     const e = v.events[0];
@@ -366,7 +366,7 @@ describe("heure du téléphone et heure de réception", () => {
     const f = await newFamily();
     const future = new Date(Date.now() + 5 * 3_600_000);
     const before = Date.now();
-    await send(f.marie, f.list, [op.add(f.products["Lait"]!)], { id: randomUUID(), at: future.toISOString() });
+    await send(f.marie, f.list, [op.add(f.products["Œufs"]!)], { id: randomUUID(), at: future.toISOString() });
     const val = (await view(f.adil)).validations[0];
     expect(new Date(val.at).getTime()).toBeLessThan(before + 60_000); // heure du serveur affichée
     expect(new Date(val.clientAt).getTime()).toBe(future.getTime()); // heure brute du téléphone gardée
@@ -374,7 +374,7 @@ describe("heure du téléphone et heure de réception", () => {
 
   it("sans heure fournie (ancien client), seule l'heure du serveur existe et clientAt est vide", async () => {
     const f = await newFamily();
-    await send(f.marie, f.list, [op.add(f.products["Lait"]!)]);
+    await send(f.marie, f.list, [op.add(f.products["Œufs"]!)]);
     expect((await view(f.adil)).validations[0].clientAt).toBeNull();
   });
 });
@@ -489,8 +489,8 @@ describe("Statistiques d'achats", () => {
     // Fin septembre 23:30 UTC = 00:30 le 1er octobre à Casablanca (UTC+1) : compte pour octobre.
     await buy(f, "Tomates", 2, "2026-09-30T23:30:00Z");
     await buy(f, "Tomates", 1.5, "2026-10-12T10:00:00Z");
-    await buy(f, "Lait", 6, "2026-10-13T10:00:00Z");
-    await buy(f, "Lait", 2, "2026-09-15T10:00:00Z");
+    await buy(f, "Œufs", 6, "2026-10-13T10:00:00Z");
+    await buy(f, "Œufs", 2, "2026-09-15T10:00:00Z");
     await buy(f, "Tomates", 4, "2026-09-10T10:00:00Z");
     await buy(f, "Riz", 1, "2026-11-02T10:00:00Z"); // hors des deux mois
     // l'historique de la famille commence aujourd'hui (liste créée maintenant) : pas de comparaison honnête possible
@@ -502,8 +502,8 @@ describe("Statistiques d'achats", () => {
     expect(s.comparison).toMatchObject({ available: true, fromDay: "2026-09-01", toDay: "2026-09-30" });
     const row = (name: string) => s.rows.find((r: any) => r.name === name);
     expect(row("Tomates")).toMatchObject({ purchases: 2, units: [{ unit: "kg", purchases: 2, quantity: 3.5 }], compare: { purchases: 1, units: [{ unit: "kg", quantity: 4 }] } });
-    expect(row("Lait")).toMatchObject({ purchases: 1, units: [{ unit: "piece", quantity: 6 }], compare: { purchases: 1 } });
-    expect(row("Lait").lastPurchaseAt).toBe("2026-10-13T10:00:00.000Z");
+    expect(row("Œufs")).toMatchObject({ purchases: 1, units: [{ unit: "piece", quantity: 6 }], compare: { purchases: 1 } });
+    expect(row("Œufs").lastPurchaseAt).toBe("2026-10-13T10:00:00.000Z");
     expect(row("Riz")).toBeUndefined();
     expect(s.rows[0].name).toBe("Tomates"); // le plus souvent acheté d'abord (fréquence, pas quantité : Lait a 6 unités)
     expect(s.totals).toMatchObject({ purchases: 3, products: 2, comparePurchases: 2 });
@@ -514,23 +514,23 @@ describe("Statistiques d'achats", () => {
     statsClock.now = () => new Date("2026-10-11T12:00:00Z");
     const f = await newFamily();
     await db.query("UPDATE lists SET created_at = '2026-06-01T00:00:00Z' WHERE family_id = $1", [f.familyId]);
-    await buy(f, "Lait", 2, "2026-10-03T10:00:00Z");
-    await buy(f, "Lait", 1, "2026-10-09T10:00:00Z");
-    await buy(f, "Lait", 4, "2026-09-05T10:00:00Z"); // dans 1–11 septembre
-    await buy(f, "Lait", 9, "2026-09-25T10:00:00Z"); // après le 11 : n'entre pas dans la comparaison
+    await buy(f, "Œufs", 2, "2026-10-03T10:00:00Z");
+    await buy(f, "Œufs", 1, "2026-10-09T10:00:00Z");
+    await buy(f, "Œufs", 4, "2026-09-05T10:00:00Z"); // dans 1–11 septembre
+    await buy(f, "Œufs", 9, "2026-09-25T10:00:00Z"); // après le 11 : n'entre pas dans la comparaison
     await buy(f, "Tomates", 1, "2026-10-04T10:00:00Z"); // rien à la même période en septembre
     await buy(f, "Riz", 1, "2026-08-04T10:00:00Z");
     const s = await stats(f.adil, "2026-10");
     expect(s.window).toMatchObject({ fromDay: "2026-10-01", toDay: "2026-10-11", partial: true });
     expect(s.comparison).toMatchObject({ available: true, fromDay: "2026-09-01", toDay: "2026-09-11" });
     const row = (name: string) => s.rows.find((r: any) => r.name === name);
-    expect(row("Lait")).toMatchObject({ purchases: 2, compare: { purchases: 1, units: [{ unit: "piece", quantity: 4 }] } });
+    expect(row("Œufs")).toMatchObject({ purchases: 2, compare: { purchases: 1, units: [{ unit: "piece", quantity: 4 }] } });
     expect(row("Tomates").compare).toBeNull(); // aucune référence : ni « nouveau », ni pourcentage
     const t = await stats(f.adil, undefined, "&period=last3");
     expect(t).toMatchObject({ period: "last3", month: "2026-10" });
     expect(t.window).toMatchObject({ fromDay: "2026-08-01", toDay: "2026-10-11" });
     expect(t.comparison).toMatchObject({ fromDay: "2026-05-01", toDay: "2026-07-11" });
-    expect(t.rows.map((r: any) => r.name).sort()).toEqual(["Lait", "Riz", "Tomates"]);
+    expect(t.rows.map((r: any) => r.name).sort((a: string, b: string) => a.localeCompare(b, "fr"))).toEqual(["Œufs", "Riz", "Tomates"]);
     // histoire incomplète : la liste la plus ancienne date de juin, la comparaison de trois mois (mai–juillet) n'est pas couverte
     expect(t.comparison.available).toBe(false);
     expect(t.rows.every((r: any) => r.compare === null)).toBe(true);
@@ -539,14 +539,14 @@ describe("Statistiques d'achats", () => {
   it("filtres par catégorie et par nom, tri par fréquence, dernier achat ou nom ; photo et dernier achat par produit", async () => {
     statsClock.now = () => new Date("2026-10-20T12:00:00Z");
     const f = await newFamily();
-    await buy(f, "Lait", 1, "2026-10-03T10:00:00Z");
+    await buy(f, "Œufs", 1, "2026-10-03T10:00:00Z");
     await buy(f, "Tomates", 1, "2026-10-05T10:00:00Z");
     await buy(f, "Tomates", 1, "2026-10-06T10:00:00Z");
     await buy(f, "Riz", 1, "2026-10-09T10:00:00Z");
     const names = async (qs: string) => (await stats(f.adil, "2026-10", qs)).rows.map((r: any) => r.name);
-    expect(await names("")).toEqual(["Tomates", "Lait", "Riz"]); // fréquence, puis ordre alphabétique (stable)
-    expect(await names("&sort=last")).toEqual(["Riz", "Tomates", "Lait"]);
-    expect(await names("&sort=name")).toEqual(["Lait", "Riz", "Tomates"]);
+    expect(await names("")).toEqual(["Tomates", "Œufs", "Riz"]); // fréquence, puis ordre alphabétique (stable)
+    expect(await names("&sort=last")).toEqual(["Riz", "Tomates", "Œufs"]);
+    expect(await names("&sort=name")).toEqual(["Œufs", "Riz", "Tomates"]);
     expect(await names("&q=TOMATE")).toEqual(["Tomates"]);
     expect(await names("&q=zzz")).toEqual([]);
     const all = await stats(f.adil, "2026-10");
@@ -561,15 +561,15 @@ describe("Statistiques d'achats", () => {
     statsClock.now = () => new Date("2026-10-20T12:00:00Z");
     const f = await newFamily();
     await db.query("UPDATE lists SET created_at = '2026-08-15T00:00:00Z' WHERE family_id = $1", [f.familyId]);
-    await buy(f, "Lait", 3, "2026-09-05T10:00:00Z");
-    await buy(f, "Lait", 2, "2026-10-03T10:00:00Z");
-    const corrected = await buy(f, "Lait", 5, "2026-10-04T10:00:00Z");
-    await db.query("UPDATE purchases SET unit = 'brique' WHERE list_item_id IN (SELECT id FROM list_items WHERE product_id = $1) AND quantity = 2", [f.products["Lait"]]);
+    await buy(f, "Œufs", 3, "2026-09-05T10:00:00Z");
+    await buy(f, "Œufs", 2, "2026-10-03T10:00:00Z");
+    const corrected = await buy(f, "Œufs", 5, "2026-10-04T10:00:00Z");
+    await db.query("UPDATE purchases SET unit = 'brique' WHERE list_item_id IN (SELECT id FROM list_items WHERE product_id = $1) AND quantity = 2", [f.products["Œufs"]]);
     const pid = (await db.query("SELECT id FROM purchases WHERE list_item_id = $1", [corrected.itemId])).rows[0].id as string;
     const listId = (await db.query("SELECT id FROM lists WHERE family_id = $1 AND status = 'active'", [f.familyId])).rows[0].id as string;
     await one(f.lamiaa, listId, op.correct(pid));
-    const d = (await app.inject({ method: "GET", url: `/api/stats/products/${f.products["Lait"]}?month=2026-10`, cookies: f.adil })).json();
-    expect(d.product).toMatchObject({ name: "Lait" });
+    const d = (await app.inject({ method: "GET", url: `/api/stats/products/${f.products["Œufs"]}?month=2026-10`, cookies: f.adil })).json();
+    expect(d.product).toMatchObject({ name: "Œufs" });
     // seuls les achats valides sont listés : l'achat corrigé (5) n'apparaît ni en ligne barrée ni autrement
     expect(d.purchases.map((p: any) => [p.quantity, p.unit])).toEqual([[2, "brique"]]);
     expect(d.purchases[0].by.displayName).toBe("Adil");
@@ -588,18 +588,18 @@ describe("Statistiques d'achats", () => {
     expect(d.months.find((m: any) => m.month === "2026-08")).toMatchObject({ covered: true, units: [] }); // mois couvert sans achat
     // autre famille : introuvable ; rôle personnel : refusé
     const other = await newFamily();
-    expect((await app.inject({ method: "GET", url: `/api/stats/products/${f.products["Lait"]}`, cookies: other.adil })).statusCode).toBe(404);
-    expect((await app.inject({ method: "GET", url: `/api/stats/products/${f.products["Lait"]}`, cookies: f.marie })).statusCode).toBe(403);
+    expect((await app.inject({ method: "GET", url: `/api/stats/products/${f.products["Œufs"]}`, cookies: other.adil })).statusCode).toBe(404);
+    expect((await app.inject({ method: "GET", url: `/api/stats/products/${f.products["Œufs"]}`, cookies: f.marie })).statusCode).toBe(403);
   });
 
   it("achats confirmés seulement, sans double comptage : un achat corrigé ne compte pas, son rachat compte une fois", async () => {
     const f = await newFamily();
-    const { itemId } = await buy(f, "Lait", 3, "2026-10-05T10:00:00Z");
+    const { itemId } = await buy(f, "Œufs", 3, "2026-10-05T10:00:00Z");
     const purchaseId = (await db.query("SELECT id FROM purchases WHERE list_item_id = $1", [itemId])).rows[0].id as string;
     const listId = (await db.query("SELECT id FROM lists WHERE family_id = $1 AND status = 'active'", [f.familyId])).rows[0].id as string;
     await one(f.lamiaa, listId, op.correct(purchaseId));
     expect((await stats(f.adil, "2026-10")).rows).toHaveLength(0);
-    const open = lines(await view(f.adil), f.products["Lait"]!)[0];
+    const open = lines(await view(f.adil), f.products["Œufs"]!)[0];
     await one(f.adil, listId, op.purchase(open.id));
     await db.query("UPDATE purchases SET purchased_at = '2026-10-06T10:00:00Z' WHERE list_item_id = $1 AND voided_at IS NULL", [open.id]);
     const s = await stats(f.adil, "2026-10");
@@ -627,7 +627,7 @@ describe("Statistiques d'achats", () => {
 
   it("les achats antérieurs à cette fonction comptent dans la fréquence mais n'inventent pas de quantité", async () => {
     const f = await newFamily();
-    const { itemId } = await buy(f, "Lait", 1, "2026-10-05T10:00:00Z");
+    const { itemId } = await buy(f, "Œufs", 1, "2026-10-05T10:00:00Z");
     await db.query("UPDATE purchases SET quantity = NULL, unit = NULL WHERE list_item_id = $1", [itemId]);
     const r = (await stats(f.adil, "2026-10")).rows[0];
     expect(r).toMatchObject({ purchases: 1, units: [{ unit: null, purchases: 1, quantity: null, unknownQuantity: 1 }] });
@@ -636,7 +636,7 @@ describe("Statistiques d'achats", () => {
   it("une famille ne voit jamais les achats d'une autre", async () => {
     const a = await newFamily();
     const b = await newFamily();
-    await buy(a, "Lait", 1, "2026-10-05T10:00:00Z");
+    await buy(a, "Œufs", 1, "2026-10-05T10:00:00Z");
     expect((await stats(b.adil, "2026-10")).rows).toHaveLength(0);
   });
 });
@@ -675,7 +675,7 @@ describe("migration 009 sur des données existantes", () => {
       const after = (await old.query("SELECT id, name, unit FROM products WHERE family_id = $1", [fam])).rows;
       expect(after).toHaveLength(80 + hExt.rows.length);
       for (const r of hExt.rows) expect(after.find((a) => a.id === r.id)!.name).toBe(r.name);
-      expect(after.find((a) => a.id === huileId[0].id)).toMatchObject({ name: "Huile de table", unit: "paquet" });
+      expect(after.find((a) => a.id === huileId[0].id)).toMatchObject({ name: "Huile de table", unit: "litre" }); // 027 : unité venue du catalogue (paquet de 009) -> litre
       expect(after.find((a) => a.id === huileId[1].id)!.name).toBe("Sel alimentaire");
       expect((await old.query("SELECT merged_into FROM extended_catalog WHERE key = 'salade-verte'")).rows[0].merged_into).toBe("laitue");
       expect((await old.query("SELECT count(*)::int AS n FROM extended_catalog WHERE id IN (SELECT extended_id FROM products)")).rows[0].n).toBe(hExt.rows.length);
@@ -685,8 +685,8 @@ describe("migration 009 sur des données existantes", () => {
       const items = (await old.query("SELECT product_id, quantity, unit, status FROM list_items ORDER BY added_at NULLS LAST")).rows;
       expect(items.filter((i) => i.product_id === tom)[0]).toMatchObject({ unit: "kg", status: "purchased" });
       expect(Number(items[0].quantity)).toBe(1);
-      expect((await old.query("SELECT unit FROM products WHERE id = $1", [lait])).rows[0].unit).toBe("piece");
-      expect((await old.query("SELECT unit FROM products WHERE family_id = $1 AND name = 'Persil'", [fam])).rows[0].unit).toBe("piece"); // corrigé par 027
+      expect((await old.query("SELECT unit FROM products WHERE id = $1", [lait])).rows[0].unit).toBe("litre"); // 027 : lait au litre (unité venue du catalogue)
+      expect((await old.query("SELECT unit FROM products WHERE family_id = $1 AND name = 'Persil'", [fam])).rows[0].unit).toBe("botte"); // corrigé par 027
       const pu = (await old.query("SELECT product_id, quantity, unit FROM purchases")).rows[0];
       expect(pu).toMatchObject({ product_id: tom, quantity: null, unit: null });
       // un événement d'ajout par article existant (le retiré n'en a pas), à l'heure d'origine, groupés par minute

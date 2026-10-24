@@ -1,9 +1,9 @@
 import type { Unit } from "./types";
 
-export const UNITS: Unit[] = ["piece", "paquet", "bouteille", "brique", "pot", "boite", "kg", "litre"];
-const SINGULAR: Record<Unit, string> = { piece: "pièce", paquet: "paquet", bouteille: "bouteille", brique: "brique", pot: "pot", boite: "boîte", kg: "kg", litre: "litre" };
-const PLURAL: Record<Unit, string> = { piece: "pièces", paquet: "paquets", bouteille: "bouteilles", brique: "briques", pot: "pots", boite: "boîtes", kg: "kg", litre: "litres" };
-export const UNIT_CHOICE: Record<Unit, string> = { piece: "Pièce", paquet: "Paquet", bouteille: "Bouteille", brique: "Brique", pot: "Pot", boite: "Boîte", kg: "Kilogramme (kg)", litre: "Litre" };
+export const UNITS: Unit[] = ["piece", "paquet", "bouteille", "brique", "pot", "boite", "botte", "rouleau", "sachet", "cube", "kg", "litre"];
+const SINGULAR: Record<Unit, string> = { piece: "pièce", paquet: "paquet", bouteille: "bouteille", brique: "brique", pot: "pot", boite: "boîte", botte: "botte", rouleau: "rouleau", sachet: "sachet", cube: "cube", kg: "kg", litre: "litre" };
+const PLURAL: Record<Unit, string> = { piece: "pièces", paquet: "paquets", bouteille: "bouteilles", brique: "briques", pot: "pots", boite: "boîtes", botte: "bottes", rouleau: "rouleaux", sachet: "sachets", cube: "cubes", kg: "kg", litre: "litres" };
+export const UNIT_CHOICE: Record<Unit, string> = { piece: "Pièce", paquet: "Paquet", bouteille: "Bouteille", brique: "Brique", pot: "Pot", boite: "Boîte", botte: "Botte", rouleau: "Rouleau", sachet: "Sachet", cube: "Cube", kg: "Kilogramme (kg)", litre: "Litre" };
 
 /** Units sold by weight or volume: quantities may have decimals. */
 export const isFractional = (unit: Unit): boolean => unit === "kg" || unit === "litre";

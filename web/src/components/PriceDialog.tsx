@@ -7,8 +7,8 @@ import { CityPrompt } from "./CityPicker";
 import { priceNature } from "../priceNature";
 import { Dialog } from "./Dialog";
 
-const REF_LABEL: Record<RefUnit, string> = { kg: "kg", g: "g", litre: "litre", ml: "ml", piece: "pièce", paquet: "paquet", bouteille: "bouteille", brique: "brique", pot: "pot", boite: "boîte" };
-const COUNTED = new Set<RefUnit>(["piece", "paquet", "bouteille", "brique", "pot", "boite"]);
+const REF_LABEL: Record<RefUnit, string> = { kg: "kg", g: "g", litre: "litre", ml: "ml", piece: "pièce", paquet: "paquet", bouteille: "bouteille", brique: "brique", pot: "pot", boite: "boîte", botte: "botte", rouleau: "rouleau", sachet: "sachet", cube: "cube" };
+const COUNTED = new Set<RefUnit>(["piece", "paquet", "bouteille", "brique", "pot", "boite", "botte", "rouleau", "sachet", "cube"]);
 /** Un conditionnement compte : sans son contenu (500 g, 1 L…), « paquet » ne dit pas ce que coûte un kilo. */
 const NEEDS_PACKAGING = new Set<RefUnit>(["paquet", "bouteille", "brique", "pot", "boite"]);
 

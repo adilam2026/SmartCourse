@@ -159,13 +159,13 @@ describe("catalogue complet (Tous les produits)", () => {
     const fam = (await db.query("SELECT id FROM families ORDER BY created_at DESC LIMIT 1")).rows[0].id;
     expect((await db.query("SELECT count(*)::int AS n FROM products WHERE family_id = $1", [fam])).rows[0].n).toBe(80);
     const unitOf = async (name: string) => (await all(f.admin, `?q=${encodeURIComponent(name)}`)).items.find((i: any) => i.name === name).unit;
-    expect(await unitOf("Huile de table")).toBe("bouteille");
-    expect(await unitOf("Huile d’olive")).toBe("bouteille");
+    expect(await unitOf("Huile de table")).toBe("litre"); // 027 : huiles au litre
+    expect(await unitOf("Huile d’olive")).toBe("litre");
     expect(await unitOf("Thon en conserve")).toBe("boite");
     expect(await unitOf("Sardines en conserve")).toBe("boite");
-    expect(await unitOf("Smen")).toBe("pot");
+    expect(await unitOf("Smen")).toBe("kg"); // 027 : au poids
     const add = await app.inject({ method: "POST", url: "/api/products/from-catalog", cookies: f.admin, payload: { origin: "extended", key: "smen" } });
-    expect(add.json().product.unit).toBe("pot");
+    expect(add.json().product.unit).toBe("kg");
   });
 
   it("audit + remplacement : une photo personnelle erronée est remplacée par la photo du catalogue du même nom, les autres photos personnelles sont intactes", async () => {

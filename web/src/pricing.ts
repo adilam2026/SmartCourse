@@ -6,9 +6,9 @@
  * de référence quand il s'agit d'un conditionnement (« paquet de 250 g »). Un prix absent n'est jamais zéro.
  */
 
-export type Unit = "piece" | "paquet" | "bouteille" | "brique" | "pot" | "boite" | "kg" | "litre";
+export type Unit = "piece" | "paquet" | "bouteille" | "brique" | "pot" | "boite" | "botte" | "rouleau" | "sachet" | "cube" | "kg" | "litre";
 export type RefUnit = Unit | "g" | "ml";
-export const REF_UNITS: readonly RefUnit[] = ["kg", "g", "litre", "ml", "piece", "paquet", "bouteille", "brique", "pot", "boite"];
+export const REF_UNITS: readonly RefUnit[] = ["kg", "g", "litre", "ml", "piece", "paquet", "bouteille", "brique", "pot", "boite", "botte", "rouleau", "sachet", "cube"];
 
 export interface PriceRef {
   /** Montant en MAD, écrit comme « 9.90 » ou 9.9 (jamais calculé avec des nombres à virgule flottante). */
@@ -23,7 +23,7 @@ export interface PriceRef {
 
 export type LineAmount = { ok: true; cents: number } | { ok: false; reason: "no_price" | "incompatible" };
 
-const COUNT_UNITS = new Set<string>(["piece", "paquet", "bouteille", "brique", "pot", "boite"]);
+const COUNT_UNITS = new Set<string>(["piece", "paquet", "bouteille", "brique", "pot", "boite", "botte", "rouleau", "sachet", "cube"]);
 type Kind = "mass" | "volume" | `count:${string}`;
 
 /** « 9.90 » / « 9,9 » / 9.9 → 990 centimes (entier exact). null si illisible. */
@@ -98,8 +98,10 @@ export function summarize(lines: { price?: PriceRef | null; qty: number | string
 
 export const fmtMoney = (cents: number): string => `${(cents / 100).toFixed(2).replace(".", ",")} DH`;
 
-const UNIT_SINGULAR: Record<string, string> = { piece: "pièce", paquet: "paquet", bouteille: "bouteille", brique: "brique", pot: "pot", boite: "boîte", kg: "kg", litre: "litre", g: "g", ml: "ml" };
+const UNIT_SINGULAR: Record<string, string> = { piece: "pièce", paquet: "paquet", bouteille: "bouteille", brique: "brique", pot: "pot", boite: "boîte", botte: "botte", rouleau: "rouleau", sachet: "sachet", cube: "cube", kg: "kg", litre: "litre", g: "g", ml: "ml" };
 const CONTAINER = /^(flacon|bidon|bombe|rouleau|barquette|sachet|petit pain|quantité)\b/i;
+/** Pluriel d'une unité comptée : « rouleaux », « pots ». */
+const plural = (u: string, q: number): string => (q > 1 ? (u.endsWith("eau") ? u + "x" : u + "s") : u);
 const trimNum = (v: string | number): string => String(Number(String(v).replace(",", "."))).replace(".", ",");
 
 /** « 9,90 DH / kg », « 12,50 DH / 500 g », « 14,00 DH / paquet de 250 g ». Seulement le prix, son unité ou son conditionnement. */
@@ -108,7 +110,7 @@ export function fmtPrice(p: PriceRef): string {
   const head = cents === null ? String(p.amount) : fmtMoney(cents);
   const q = Number(String(p.refQty).replace(",", "."));
   const u = UNIT_SINGULAR[p.refUnit] ?? p.refUnit;
-  const per = q === 1 ? u : `${trimNum(p.refQty)} ${p.refUnit === "kg" || p.refUnit === "g" || p.refUnit === "ml" || p.refUnit === "litre" ? u : u + (q > 1 ? "s" : "")}`;
+  const per = q === 1 ? u : `${trimNum(p.refQty)} ${p.refUnit === "kg" || p.refUnit === "g" || p.refUnit === "ml" || p.refUnit === "litre" ? u : plural(u, q)}`;
   // Un conditionnement qui nomme son propre contenant (« flacon de 750 ml », « rouleau de 20 mètres ») remplace l'unité : « 10,95 DH / flacon de 750 ml ».
   if (p.packaging && CONTAINER.test(p.packaging)) return `${head} / ${p.packaging}`;
   const pack = p.packaging ? (COUNT_UNITS.has(p.refUnit) ? ` de ${p.packaging}` : ` (${p.packaging})`) : "";

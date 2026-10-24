@@ -1,18 +1,18 @@
 Rayon;Article;Unité actuelle (catalogue);Unité retenue;Statut;Changement;Format et prix proposés (non vérifiés);Prix commun existant;Nature / date;Conversion du prix existant;Remarque
 legumes;Ail;pièce;poids;retenu (§4);change;;71,60 DH / kg;observed 12/10/2026;compatible;
-legumes;Aneth;pièce;botte (nouvelle unité);à confirmer;change;;;;aucun prix connu;"1re demande : pièce ; botte proposée"
+legumes;Aneth;pièce;botte;confirmé;change;;;;aucun prix connu;
 legumes;Aubergines;kg;poids;retenu (§4);inchangée;;9,80 DH / kg;observed 12/10/2026;compatible;
-legumes;Basilic;pièce;botte (nouvelle unité);à confirmer;change;;;;aucun prix connu;"1re demande : pièce ; botte proposée"
+legumes;Basilic;pièce;botte;confirmé;change;;;;aucun prix connu;
 legumes;Betteraves;kg;poids;retenu (§4);inchangée;;9,80 DH / kg;observed 12/10/2026;compatible;
 legumes;Brocolis;pièce;poids;retenu (§4);change;;;;aucun prix connu;
 legumes;Carottes;kg;poids;retenu (§4);inchangée;;7,90 DH / kg;observed 12/10/2026;compatible;
-legumes;Céleri;pièce;botte (nouvelle unité);à confirmer;change;;;;aucun prix connu;"1re demande : pièce ; botte proposée"
+legumes;Céleri;pièce;botte;confirmé;change;;;;aucun prix connu;
 legumes;Champignons;kg;poids;retenu (§4);inchangée;;64,50 DH / kg;observed 12/10/2026;compatible;
 legumes;Chou;pièce;poids;retenu (§4);change;;;;aucun prix connu;
 legumes;Choux-fleurs;pièce;poids;retenu (§4);change;;;;aucun prix connu;
-legumes;Ciboulette;pièce;botte (nouvelle unité);à confirmer;change;;;;aucun prix connu;"1re demande : pièce ; botte proposée"
+legumes;Ciboulette;pièce;botte;confirmé;change;;;;aucun prix connu;
 legumes;Concombres;kg;poids;retenu (§4);inchangée;;10,90 DH / kg;observed 12/10/2026;compatible;
-legumes;Coriandre;paquet;botte (nouvelle unité);à confirmer;change;;;;aucun prix connu;"1re demande : pièce ; botte proposée"
+legumes;Coriandre;paquet;botte;confirmé;change;;;;aucun prix connu;
 legumes;Courgettes;kg;poids;retenu (§4);inchangée;;15,80 DH / kg;observed 12/10/2026;compatible;
 legumes;Épinards;kg;poids;retenu (§4);inchangée;;;;aucun prix connu;
 legumes;Fenouil;pièce;poids;retenu (§4);change;;;;aucun prix connu;
@@ -21,10 +21,10 @@ legumes;Gingembre;kg;poids;retenu (§4);inchangée;;64,50 DH / kg;observed 12/10
 legumes;Haricots verts;kg;poids;retenu (§4);inchangée;;27,00 DH / kg;observed 12/10/2026;compatible;
 legumes;Laitue;pièce;pièce;retenu (§4);inchangée;;7,50 DH / pièce;observed 12/10/2026;compatible;
 legumes;Maïs frais;pièce;pièce;retenu (§4);inchangée;;;;aucun prix connu;
-legumes;Menthe;paquet;botte (nouvelle unité);à confirmer;change;;;;aucun prix connu;"1re demande : pièce ; botte proposée"
+legumes;Menthe;paquet;botte;confirmé;change;;;;aucun prix connu;
 legumes;Navets;kg;poids;retenu (§4);inchangée;;17,80 DH / kg;observed 12/10/2026;compatible;
 legumes;Oignons;kg;poids;retenu (§4);inchangée;;8,40 DH / kg;average 12/10/2026;compatible;
-legumes;Persil;paquet;botte (nouvelle unité);à confirmer;change;;3,90 DH / paquet (sachet (poids non précisé));observed 12/10/2026;selon décision;"1re demande : pièce ; botte proposée"
+legumes;Persil;paquet;botte;confirmé;change;;3,90 DH / paquet (sachet (poids non précisé));observed 12/10/2026;à confirmer : 1 paquet = 1 botte ? (même contenant, aucune conversion automatique);
 legumes;Petits pois;kg;poids;retenu (§4);inchangée;;;;aucun prix connu;
 legumes;Piments frais;kg;poids;retenu (§4);inchangée;;;;aucun prix connu;
 legumes;Poireaux;kg;poids;retenu (§4);inchangée;;;;aucun prix connu;
@@ -33,13 +33,13 @@ legumes;Poivrons verts;kg;poids;retenu (§4);inchangée;;17,00 DH / kg;observed 
 legumes;Pommes de terre;kg;poids;retenu (§4);inchangée;;9,00 DH / kg;rounded 12/10/2026;compatible;
 legumes;Potiron;kg;poids;retenu (§4);inchangée;;;;aucun prix connu;
 legumes;Radis;kg;poids;retenu (§4);inchangée;;;;aucun prix connu;
-legumes;Romarin;pièce;botte (nouvelle unité);à confirmer;change;;;;aucun prix connu;"1re demande : pièce ; botte proposée"
+legumes;Romarin;pièce;botte;confirmé;change;;;;aucun prix connu;
 legumes;Roquette;pièce;poids;retenu (§4);change;;;;aucun prix connu;
-legumes;Sauge;pièce;botte (nouvelle unité);à confirmer;change;;7,95 DH / paquet (barquette de 25 g);observed 12/10/2026;selon décision;"1re demande : pièce ; botte proposée"
-legumes;Thym;pièce;botte (nouvelle unité);à confirmer;change;;7,95 DH / paquet (barquette de 25 g);observed 12/10/2026;selon décision;"1re demande : pièce ; botte proposée"
+legumes;Sauge;pièce;botte;confirmé;change;;7,95 DH / paquet (barquette de 25 g);observed 12/10/2026;à confirmer : 1 paquet = 1 botte ? (même contenant, aucune conversion automatique);
+legumes;Thym;pièce;botte;confirmé;change;;7,95 DH / paquet (barquette de 25 g);observed 12/10/2026;à confirmer : 1 paquet = 1 botte ? (même contenant, aucune conversion automatique);
 legumes;Tomates;kg;poids;retenu (§4);inchangée;;9,90 DH / kg;observed 12/10/2026;compatible;
 fruits;Abricots;kg;poids;retenu (§4);inchangée;;;;aucun prix connu;
-fruits;Ananas;pièce;pièce;confirmé (§3);inchangée;;26,90 DH / pièce;observed 12/10/2026;compatible;
+fruits;Ananas;pièce;pièce;confirmé;inchangée;;26,90 DH / pièce;observed 12/10/2026;compatible;
 fruits;Avocats;kg;poids;retenu (§4);inchangée;;25,80 DH / kg;observed 12/10/2026;compatible;
 fruits;Bananes;kg;poids;retenu (§4);inchangée;;19,90 DH / kg;observed 12/10/2026;compatible;
 fruits;Cerises;kg;poids;retenu (§4);inchangée;;;;aucun prix connu;
@@ -56,13 +56,13 @@ fruits;Fruits de saison;kg;poids;retenu (§4);inchangée;;;;aucun prix connu;
 fruits;Grenades;kg;poids;retenu (§4);inchangée;;11,90 DH / kg;observed 12/10/2026;compatible;
 fruits;Kiwis;kg;poids;retenu (§4);inchangée;;61,80 DH / kg;observed 12/10/2026;compatible;
 fruits;Mangues;kg;poids;retenu (§4);inchangée;;13,90 DH / pièce;observed 12/10/2026;à ressaisir (poids non connu);
-fruits;Melon;kg;pièce ou poids;à confirmer;change;;;;aucun prix connu;
+fruits;Melon;kg;poids;confirmé;inchangée;;;;aucun prix connu;
 fruits;Mûres;paquet;poids;retenu (§4);change;;;;aucun prix connu;
-fruits;Noix de coco;pièce;pièce ou poids;à confirmer;inchangée;;14,50 DH / pièce;observed 12/10/2026;compatible;
+fruits;Noix de coco;pièce;pièce;confirmé;inchangée;;14,50 DH / pièce;observed 12/10/2026;compatible;
 fruits;Oranges;kg;poids;retenu (§4);inchangée;;;;aucun prix connu;
 fruits;Pamplemousse;kg;poids;retenu (§4);inchangée;;7,00 DH / kg;observed 12/10/2026;compatible;
-fruits;Papaye;pièce;pièce ou poids;à confirmer;inchangée;;;;aucun prix connu;
-fruits;Pastèque;kg;pièce ou poids;à confirmer;change;;;;aucun prix connu;
+fruits;Papaye;pièce;pièce;confirmé;inchangée;;;;aucun prix connu;
+fruits;Pastèque;kg;poids;confirmé;inchangée;;;;aucun prix connu;
 fruits;Pêches;kg;poids;retenu (§4);inchangée;;;;aucun prix connu;
 fruits;Poires;kg;poids;retenu (§4);inchangée;;32,00 DH / kg;rounded 12/10/2026;compatible;
 fruits;Pommes;kg;poids;retenu (§4);inchangée;;25,00 DH / kg;rounded 12/10/2026;compatible;
@@ -70,13 +70,13 @@ fruits;Prunes;kg;poids;retenu (§4);inchangée;;;;aucun prix connu;
 fruits;Raisins;kg;poids;retenu (§4);inchangée;;;;aucun prix connu;
 fruits;Raisins secs;paquet;poids;retenu (§4);change;;;;aucun prix connu;
 laitages;Beurre;pièce;poids;retenu (§4);change;;;;aucun prix connu;
-laitages;Crème chantilly;pièce;pièce;confirmé (§3);inchangée;pièce 250 g · 25 DH;36,50 DH / pièce (bombe de 250 g);observed 12/10/2026;compatible;
-laitages;Crème de cuisson;brique;pièce;confirmé (§3);change;pièce 200 mL · 12 DH;19,95 DH / brique (500 ml);observed 12/10/2026;à confirmer : 1 brique = 1 pièce ? (même contenant, aucune conversion automatique);
-laitages;Crème dessert;pot;pièce;confirmé (§3);change;pièce 125 g · 3 DH;;;aucun prix connu;
-laitages;Crème fraîche;pot;pièce;confirmé (§3);change;pièce 200 g · 15 DH;12,95 DH / pot (200 ml);observed 12/10/2026;à confirmer : 1 pot = 1 pièce ? (même contenant, aucune conversion automatique);
+laitages;Crème chantilly;pièce;pièce;confirmé;inchangée;pièce 250 g · 25 DH;36,50 DH / pièce (bombe de 250 g);observed 12/10/2026;compatible;
+laitages;Crème de cuisson;brique;pièce;confirmé;change;pièce 200 mL · 12 DH;19,95 DH / brique (500 ml);observed 12/10/2026;à confirmer : 1 brique = 1 pièce ? (même contenant, aucune conversion automatique);
+laitages;Crème dessert;pot;pièce;confirmé;change;pièce 125 g · 3 DH;;;aucun prix connu;
+laitages;Crème fraîche;pot;pièce;confirmé;change;pièce 200 g · 15 DH;12,95 DH / pot (200 ml);observed 12/10/2026;à confirmer : 1 pot = 1 pièce ? (même contenant, aucune conversion automatique);
 laitages;Fromage à tartiner;pot;poids;retenu (§4);change;;19,95 DH / pot (200 g);observed 12/10/2026;conversion exacte : 200 g → 99,75 DH/kg;
 laitages;Fromage blanc;pot;poids;retenu (§4);change;;;;aucun prix connu;
-laitages;Fromage en portions;boîte;portion (nouvelle unité);à confirmer;change;;26,00 DH / boîte (16 portions);observed 12/10/2026;selon décision;
+laitages;Fromage en portions;boîte;boîte (+ format, ex. 16 portions);confirmé;inchangée;;26,00 DH / boîte (16 portions);observed 12/10/2026;compatible;
 laitages;Fromage en tranches;paquet;poids;retenu (§4);change;;13,75 DH / paquet (200 g);observed 12/10/2026;conversion exacte : 200 g → 68,75 DH/kg;
 laitages;Fromage frais;pot;poids;retenu (§4);change;;14,95 DH / pot (190 g);observed 12/10/2026;conversion exacte : 190 g → 78,68 DH/kg;
 laitages;Fromage râpé;paquet;poids;retenu (§4);change;;19,50 DH / paquet (100 g);observed 12/10/2026;conversion exacte : 100 g → 195,00 DH/kg;
@@ -88,13 +88,13 @@ laitages;Margarine;boîte;poids;retenu (§4);change;;;;aucun prix connu;
 laitages;Mozzarella;boîte;poids;retenu (§4);change;;;;aucun prix connu;
 laitages;Œufs;pièce;pièce;retenu (§4);inchangée;;1,86 DH / pièce;observed 12/10/2026;compatible;
 laitages;Smen;pot;poids;retenu (§4);change;;;;aucun prix connu;
-laitages;Yaourt à boire;bouteille;pièce;confirmé (§3);change;pièce 250 mL · 5 DH;;;aucun prix connu;
-laitages;Yaourt aromatisé;pot;pot;confirmé (§3);inchangée;pot 110 g · 3 DH;;;aucun prix connu;
-laitages;Yaourt nature;pot;pot;confirmé (§3);inchangée;pot 110 g · 2 DH;;;aucun prix connu;
+laitages;Yaourt à boire;bouteille;pièce;confirmé;change;pièce 250 mL · 5 DH;;;aucun prix connu;
+laitages;Yaourt aromatisé;pot;pot;confirmé;inchangée;pot 110 g · 3 DH;;;aucun prix connu;
+laitages;Yaourt nature;pot;pot;confirmé;inchangée;pot 110 g · 2 DH;;;aucun prix connu;
 epicerie;Amandes;paquet;poids;retenu (§4);change;;;;aucun prix connu;
 epicerie;Bicarbonate alimentaire;paquet;poids;retenu (§4);change;;24,50 DH / pot (250 g);observed 12/10/2026;conversion exacte : 250 g → 98,00 DH/kg;
 epicerie;Biscuits;paquet;poids;retenu (§4);change;;;;aucun prix connu;
-epicerie;Bouillon;boîte;cube ou poids (poudre);à préciser;change;;7,50 DH / boîte (8 cubes);rounded 12/10/2026;selon décision;
+epicerie;Bouillon;boîte;cube;confirmé;change;;7,50 DH / boîte (8 cubes);rounded 12/10/2026;conversion exacte : 8 cubes → 7,50 DH / 8 cubes;
 epicerie;Cacao en poudre;boîte;poids;retenu (§4);change;;;;aucun prix connu;
 epicerie;Cannelle;paquet;poids;retenu (§4);change;;;;aucun prix connu;
 epicerie;Céréales;boîte;poids;retenu (§4);change;;;;aucun prix connu;
@@ -104,20 +104,20 @@ epicerie;Concentré de tomates;boîte;poids;retenu (§4);change;;7,40 DH / boît
 epicerie;Cornichons;pot;poids;retenu (§4);change;;9,80 DH / pot (210 g);observed 12/10/2026;conversion exacte : 210 g → 46,67 DH/kg;
 epicerie;Cumin;paquet;poids;retenu (§4);change;;;;aucun prix connu;
 epicerie;Curcuma;paquet;poids;retenu (§4);change;;;;aucun prix connu;
-epicerie;Édulcorant;boîte;comprimé ou poids (poudre);à préciser;change;;;;aucun prix connu;
+epicerie;Édulcorant;boîte;boîte (+ contenu);confirmé;inchangée;;;;aucun prix connu;
 epicerie;Farine;paquet;poids;retenu (§4);change;;6,75 DH / kg;observed 12/10/2026;compatible;
 epicerie;Farine complète;kg;poids;retenu (§4);inchangée;;10,20 DH / kg;rounded 12/10/2026;compatible;
 epicerie;Farine fino;kg;poids;retenu (§4);inchangée;;;;aucun prix connu;
 epicerie;Farine force;kg;poids;retenu (§4);inchangée;;;;aucun prix connu;
 epicerie;Fécule de maïs;paquet;poids;retenu (§4);change;;;;aucun prix connu;
-epicerie;Feuilles de brick;paquet;feuille / pièce;à confirmer;change;;19,50 DH / paquet (10 feuilles, 200 g);observed 12/10/2026;selon décision;
+epicerie;Feuilles de brick;paquet;paquet (+ format, nombre de feuilles);confirmé;inchangée;;19,50 DH / paquet (10 feuilles, 200 g);observed 12/10/2026;compatible;
 epicerie;Fèves sèches;paquet;poids;retenu (§4);change;;;;aucun prix connu;
 epicerie;Graines de sésame;paquet;poids;retenu (§4);change;;;;aucun prix connu;
 epicerie;Haricots blancs;paquet;poids;retenu (§4);change;;;;aucun prix connu;
 epicerie;Harissa;pot;poids;retenu (§4);change;;;;aucun prix connu;
-epicerie;Huile d'argan alimentaire;bouteille;volume (prix au litre);confirmé (§3);change;;;;aucun prix connu;
-epicerie;Huile de table;bouteille;volume (prix au litre);confirmé (§3);change;1 L · 18 DH/L;17,64 DH / litre;observed 12/10/2026;compatible;
-epicerie;Huile d’olive;bouteille;volume (prix au litre);confirmé (§3);change;1 L · 80 DH/L;47,45 DH / litre;observed 12/10/2026;compatible;
+epicerie;Huile d'argan alimentaire;bouteille;volume (prix au litre);confirmé;change;;;;aucun prix connu;
+epicerie;Huile de table;bouteille;volume (prix au litre);confirmé;change;1 L · 18 DH/L;17,64 DH / litre;observed 12/10/2026;compatible;
+epicerie;Huile d’olive;bouteille;volume (prix au litre);confirmé;change;1 L · 80 DH/L;47,45 DH / litre;observed 12/10/2026;compatible;
 epicerie;Ketchup;bouteille;poids;retenu (§4);change;;14,50 DH / bouteille (flacon de 310 g);observed 12/10/2026;conversion exacte : 310 g → 46,77 DH/kg;
 epicerie;Lentilles;paquet;poids;retenu (§4);change;;;;aucun prix connu;
 epicerie;Levure chimique;paquet;poids;retenu (§4);change;;;;aucun prix connu;
@@ -131,23 +131,23 @@ epicerie;Noix de cajou;paquet;poids;retenu (§4);change;;;;aucun prix connu;
 epicerie;Olives;pot;poids;retenu (§4);change;;;;aucun prix connu;
 epicerie;Paprika;paquet;poids;retenu (§4);change;;;;aucun prix connu;
 epicerie;Pâte à tartiner;pot;poids;retenu (§4);change;;73,50 DH / pot (600 g);observed 12/10/2026;conversion exacte : 600 g → 122,50 DH/kg;
-epicerie;Pâte à tartiner Nutella;pot;pièce (+ format du pot);confirmé (§3);change;pièce 350 g · 40 DH;;;aucun prix connu;
-epicerie;Pâtes;paquet;poids;confirmé (§3);change;1 kg · 20 DH/kg;10,00 DH / paquet (500 g);rounded 12/10/2026;conversion exacte : 500 g → 20,00 DH/kg;
+epicerie;Pâte à tartiner Nutella;pot;pièce (+ format);confirmé;change;pièce 350 g · 40 DH;;;aucun prix connu;
+epicerie;Pâtes;paquet;poids;confirmé;change;1 kg · 20 DH/kg;10,00 DH / paquet (500 g);rounded 12/10/2026;conversion exacte : 500 g → 20,00 DH/kg;
 epicerie;Pesto;pot;poids;retenu (§4);change;;;;aucun prix connu;
 epicerie;Piment en poudre;pot;poids;retenu (§4);change;;10,00 DH / pot (quantité de 125 g);rounded 12/10/2026;conversion exacte : 125 g → 80,00 DH/kg;
 epicerie;Pois cassés;paquet;poids;retenu (§4);change;;;;aucun prix connu;
 epicerie;Pois chiches;paquet;poids;retenu (§4);change;;;;aucun prix connu;
 epicerie;Poivre;paquet;poids;retenu (§4);change;;;;aucun prix connu;
-epicerie;Riz;paquet;poids;confirmé (§3);change;1 kg · 20 DH/kg;;;aucun prix connu;
+epicerie;Riz;paquet;poids;confirmé;change;1 kg · 20 DH/kg;;;aucun prix connu;
 epicerie;Safran;pot;poids;retenu (§4);change;;;;aucun prix connu;
-epicerie;Sauce tomate;boîte;poids ou volume;à préciser;change;;32,00 DH / pot (400 g);observed 12/10/2026;conversion exacte : 400 g → 80,00 DH/kg;selon la référence réelle
+epicerie;Sauce tomate;boîte;poids;confirmé;change;;32,00 DH / pot (400 g);observed 12/10/2026;conversion exacte : 400 g → 80,00 DH/kg;
 epicerie;Sel alimentaire;paquet;poids;retenu (§4);change;;;;aucun prix connu;
 epicerie;Semoule couscous;kg;poids;retenu (§4);inchangée;;15,00 DH / kg;rounded 12/10/2026;compatible;
 epicerie;Semoule fine;kg;poids;retenu (§4);inchangée;;;;aucun prix connu;
 epicerie;Sucre;paquet;poids;retenu (§4);change;;5,20 DH / kg;observed 12/10/2026;compatible;
 epicerie;Sucre glace;paquet;poids;retenu (§4);change;;;;aucun prix connu;
 epicerie;Sucre vanillé;paquet;poids;retenu (§4);change;;;;aucun prix connu;
-epicerie;Vermicelles;paquet;poids;confirmé (§3);change;1 kg · 20 DH/kg;9,90 DH / paquet (500 g);observed 12/10/2026;conversion exacte : 500 g → 19,80 DH/kg;
+epicerie;Vermicelles;paquet;poids;confirmé;change;1 kg · 20 DH/kg;9,90 DH / paquet (500 g);observed 12/10/2026;conversion exacte : 500 g → 19,80 DH/kg;
 epicerie;Vinaigre;bouteille;volume;retenu (§4);change;;;;aucun prix connu;
 viandes;Agneau;kg;poids;retenu (§4);inchangée;;193,80 DH / kg;observed 12/10/2026;compatible;
 viandes;Crevettes;kg;poids;retenu (§4);inchangée;;;;aucun prix connu;
@@ -155,14 +155,14 @@ viandes;Dinde;kg;poids;retenu (§4);inchangée;;;;aucun prix connu;
 viandes;Jambon de dinde;paquet;poids;retenu (§4);change;;;;aucun prix connu;
 viandes;Merguez;kg;poids;retenu (§4);inchangée;;;;aucun prix connu;
 viandes;Poisson;kg;poids;retenu (§4);inchangée;;;;aucun prix connu;
-viandes;Poulet;kg;pièce (poulet entier);confirmé (§3);change;;;;aucun prix connu;morceaux de poulet : article séparé au poids à créer ?
-viandes;Sardines en conserve;boîte;boîte;confirmé (§3);inchangée;boîte 125 g · 7 DH/boîte;;;aucun prix connu;
+viandes;Poulet;kg;pièce (poulet entier);confirmé;change;;;;aucun prix connu;
+viandes;Sardines en conserve;boîte;boîte;confirmé;inchangée;boîte 125 g · 7 DH/boîte;;;aucun prix connu;
 viandes;Saucisses;paquet;poids;retenu (§4);change;;75,60 DH / kg;observed 12/10/2026;compatible;
-viandes;Thon en conserve;boîte;boîte;confirmé (§3);inchangée;boîte 80 g · 11 DH/boîte;11,17 DH / boîte (80 g);rounded 12/10/2026;compatible;
+viandes;Thon en conserve;boîte;boîte;confirmé;inchangée;boîte 80 g · 11 DH/boîte;11,17 DH / boîte (80 g);rounded 12/10/2026;compatible;
 viandes;Viande de bœuf;kg;poids;retenu (§4);inchangée;;149,90 DH / kg;observed 12/10/2026;compatible;
 viandes;Viande hachée;kg;poids;retenu (§4);inchangée;;;;aucun prix connu;
 surgeles;Frites surgelées;paquet;poids;retenu (§4);change;;;;aucun prix connu;
-surgeles;Glaces;pièce;volume (bac) ou pièce (individuelle);à confirmer;change;;;;aucun prix connu;deux formes à distinguer
+surgeles;Glaces;pièce;pièce — renommée « Glace individuelle »;confirmé;inchangée;;;;aucun prix connu;"même identifiant ; nouvelle : Glace en bac (volume)"
 surgeles;Légumes surgelés;paquet;poids;retenu (§4);change;;;;aucun prix connu;
 surgeles;Pâte feuilletée;pièce;poids;retenu (§4);change;;;;aucun prix connu;
 surgeles;Petits pois surgelés;paquet;poids;retenu (§4);change;;;;aucun prix connu;
@@ -183,65 +183,65 @@ pain;Miel;pot;poids;retenu (§4);change;;56,95 DH / pot (450 g);observed 12/10/2
 pain;Pain;pièce;pièce;retenu (§4);inchangée;;2,00 DH / pièce;observed 12/10/2026;compatible;
 pain;Pain complet;pièce;pièce;retenu (§4);inchangée;;1,32 DH / pièce (petit pain);rounded 12/10/2026;compatible;
 pain;Pain de mie;paquet;poids;retenu (§4);change;;;;aucun prix connu;
-pain;Thé;boîte;poids (vrac) ou sachet;à préciser;change;;;;aucun prix connu;deux formes à distinguer
+pain;Thé;boîte;inchangée (ancienne référence conservée);à confirmer;change;;;;aucun prix connu;"nouvelles : en vrac (poids) et en sachets (sachet) ; rattacher l'ancienne ?"
 boissons;Boisson gazeuse;bouteille;volume;retenu (§4);change;;8,00 DH / bouteille (1 litre);observed 12/10/2026;conversion exacte : 1000 mL → 8,00 DH/L;
 boissons;Boisson végétale;brique;volume;retenu (§4);change;;30,00 DH / litre;rounded 12/10/2026;compatible;
-boissons;Café en capsules;boîte;capsule (nouvelle unité);retenu (§4);change;;;;aucun prix connu;
+boissons;Café en capsules;boîte;pièce (+ format);à confirmer;change;;;;aucun prix connu;« capsule » de §4 comptée en pièces, sans nouvelle unité
 boissons;Eau gazeuse;bouteille;volume;retenu (§4);change;;;;aucun prix connu;
 boissons;Eau minérale;bouteille;volume;retenu (§4);change;;4,45 DH / bouteille (1,5 litre);observed 12/10/2026;conversion exacte : 1500 mL → 2,97 DH/L;
 boissons;Jus de fruits;bouteille;volume;retenu (§4);change;;17,20 DH / brique (1 litre);observed 12/10/2026;conversion exacte : 1000 mL → 17,20 DH/L;
 boissons;Sirop;bouteille;volume;retenu (§4);change;;;;aucun prix connu;
 boissons;Thé glacé;bouteille;volume;retenu (§4);change;;;;aucun prix connu;
-boissons;Tisane;boîte;poids (vrac) ou sachet;à préciser;change;;;;aucun prix connu;deux formes à distinguer
+boissons;Tisane;boîte;inchangée (ancienne référence conservée);à confirmer;change;;;;aucun prix connu;"nouvelles : en vrac (poids) et en sachets (sachet) ; rattacher l'ancienne ?"
 maison;Aide au repassage;bouteille;volume;retenu (§4);change;;36,50 DH / bouteille (flacon de 500 ml);observed 12/10/2026;conversion exacte : 500 mL → 73,00 DH/L;
 maison;Allume-feu;paquet;pièce;retenu (§4);change;;;;aucun prix connu;
 maison;Allumettes;boîte;boîte;retenu (§4);inchangée;;;;aucun prix connu;
 maison;Ampoules;pièce;pièce;retenu (§4);inchangée;;;;aucun prix connu;
 maison;Assouplissant;bouteille;volume;retenu (§4);change;;22,95 DH / bouteille (flacon de 1 litre);observed 12/10/2026;conversion exacte : 1000 mL → 22,95 DH/L;
-maison;Blocs WC;paquet;pièce;retenu (§4);change;;31,50 DH / paquet (3 blocs de 38 g);observed 12/10/2026;à confirmer : 1 paquet de 3 = 3 pièces ? (aucune conversion automatique);
+maison;Blocs WC;paquet;pièce;retenu (§4);change;;31,50 DH / paquet (3 blocs de 38 g);observed 12/10/2026;conversion exacte : 3 blocs de 38 g → 31,50 DH / 3 pièces;
 maison;Briquet;pièce;pièce;retenu (§4);inchangée;;;;aucun prix connu;
 maison;Déboucheur;bouteille;volume;retenu (§4);change;;36,10 DH / bouteille (flacon de 1 litre);observed 12/10/2026;conversion exacte : 1000 mL → 36,10 DH/L;
 maison;Dégraissant;bouteille;volume;retenu (§4);change;;;;aucun prix connu;
 maison;Désinfectant du linge;bouteille;volume;retenu (§4);change;;;;aucun prix connu;
 maison;Désinfectant ménager;bouteille;volume;retenu (§4);change;;;;aucun prix connu;
-maison;Désodorisant;pièce;selon la forme;à préciser;change;;;;aucun prix connu;
+maison;Désodorisant;pièce;pièce (+ format);confirmé;inchangée;;;;aucun prix connu;
 maison;Détachant du linge;bouteille;volume;retenu (§4);change;;;;aucun prix connu;
 maison;Détartrant;bouteille;volume;retenu (§4);change;;;;aucun prix connu;
 maison;Diffuseur antimoustiques;pièce;pièce;retenu (§4);inchangée;;;;aucun prix connu;
 maison;Eau de Javel;bouteille;volume;retenu (§4);change;;9,98 DH / bouteille (bidon de 2,5 litres);rounded 12/10/2026;conversion exacte : 2500 mL → 3,99 DH/L;
-maison;Éponges;paquet;pièce;retenu (§4);change;;14,00 DH / paquet (5);observed 12/10/2026;à confirmer : 1 paquet de 5 = 5 pièces ? (aucune conversion automatique);
-maison;Essuie-tout;paquet;rouleau (nouvelle unité);à confirmer;change;;28,50 DH / paquet (3 rouleaux);observed 12/10/2026;selon décision;contenu des paquets non inventé
-maison;Film alimentaire;pièce;rouleau (nouvelle unité);à confirmer;change;;;;aucun prix connu;contenu des paquets non inventé
-maison;Insecticide;bouteille;selon la forme;à préciser;change;;;;aucun prix connu;
-maison;Lessive;bouteille;volume (liquide) ou poids (poudre);à préciser;change;;;;aucun prix connu;deux formes à distinguer
+maison;Éponges;paquet;pièce;retenu (§4);change;;14,00 DH / paquet (5);observed 12/10/2026;conversion exacte : 5 → 14,00 DH / 5 pièces;
+maison;Essuie-tout;paquet;rouleau;confirmé;change;;28,50 DH / paquet (3 rouleaux);observed 12/10/2026;conversion exacte : 3 rouleaux → 28,50 DH / 3 rouleaux;
+maison;Film alimentaire;pièce;rouleau (+ longueur facultative);confirmé;change;;;;aucun prix connu;
+maison;Insecticide;bouteille;pièce (+ format);confirmé;change;;;;aucun prix connu;
+maison;Lessive;bouteille;volume — renommée « Lessive liquide »;confirmé;change;;;;aucun prix connu;"même identifiant et historique ; nouvelles : Lessive en poudre (poids), Capsules de lessive (pièce)"
 maison;Liquide de rinçage pour lave-vaisselle;bouteille;volume;retenu (§4);change;;;;aucun prix connu;
 maison;Liquide vaisselle;bouteille;volume;retenu (§4);change;;10,95 DH / bouteille (flacon de 750 ml);observed 12/10/2026;conversion exacte : 750 mL → 14,60 DH/L;
 maison;Nettoyant multiusage;bouteille;volume;retenu (§4);change;;;;aucun prix connu;
 maison;Nettoyant sol;bouteille;volume;retenu (§4);change;;;;aucun prix connu;
 maison;Nettoyant vitres;bouteille;volume;retenu (§4);change;;;;aucun prix connu;
-maison;Papier aluminium;pièce;rouleau (nouvelle unité);à confirmer;change;;;;aucun prix connu;contenu des paquets non inventé
-maison;Papier cuisson;pièce;rouleau (nouvelle unité);à confirmer;change;;42,95 DH / pièce (rouleau de 20 mètres);observed 12/10/2026;selon décision;contenu des paquets non inventé
-maison;Papier toilette;paquet;rouleau (nouvelle unité);à confirmer;change;;54,50 DH / paquet (12 rouleaux);observed 12/10/2026;selon décision;contenu des paquets non inventé
+maison;Papier aluminium;pièce;rouleau (+ longueur facultative);confirmé;change;;;;aucun prix connu;
+maison;Papier cuisson;pièce;rouleau (+ longueur facultative);confirmé;change;;42,95 DH / pièce (rouleau de 20 mètres);observed 12/10/2026;à confirmer : 1 pièce = 1 rouleau ? (même contenant, aucune conversion automatique);
+maison;Papier toilette;paquet;rouleau;confirmé;change;;54,50 DH / paquet (12 rouleaux);observed 12/10/2026;conversion exacte : 12 rouleaux → 54,50 DH / 12 rouleaux;
 maison;Pastilles lave-vaisselle;boîte;pièce;retenu (§4);change;;;;aucun prix connu;
 maison;Piles;paquet;pièce;retenu (§4);change;;;;aucun prix connu;
-maison;Sacs congélation;boîte;paquet + contenu;retenu (§4);change;;;;aucun prix connu;contenu à saisir, non inventé
-maison;Sacs-poubelle;paquet;paquet + contenu;retenu (§4);inchangée;;18,95 DH / pièce (rouleau de 10 sacs de 60 litres);observed 12/10/2026;selon décision;contenu à saisir, non inventé
-maison;Savon noir ménager;bouteille;volume (liquide) ou poids (pâte);à préciser;change;;;;aucun prix connu;deux formes à distinguer
+maison;Sacs congélation;boîte;paquet (+ format);retenu (§4);change;;;;aucun prix connu;contenu à saisir dans le format, non inventé
+maison;Sacs-poubelle;paquet;paquet (+ format);retenu (§4);inchangée;;18,95 DH / pièce (rouleau de 10 sacs de 60 litres);observed 12/10/2026;à confirmer : 1 pièce = 1 paquet ? (même contenant, aucune conversion automatique);contenu à saisir dans le format, non inventé
+maison;Savon noir ménager;bouteille;volume — renommé « Savon noir liquide »;confirmé;change;;;;aucun prix connu;"même identifiant ; nouveau : Savon noir en pâte (poids)"
 maison;Sel régénérant pour lave-vaisselle;paquet;poids;retenu (§4);change;;;;aucun prix connu;
 hygiene;Après-shampooing;bouteille;volume;retenu (§4);change;;;;aucun prix connu;
 hygiene;Bain de bouche;bouteille;volume;retenu (§4);change;;50,50 DH / bouteille (flacon de 500 ml);observed 12/10/2026;conversion exacte : 500 mL → 101,00 DH/L;
 hygiene;Brosse à dents;pièce;pièce;retenu (§4);inchangée;;6,95 DH / pièce;observed 12/10/2026;compatible;
-hygiene;Coton;paquet;paquet + contenu;retenu (§4);inchangée;;;;aucun prix connu;
-hygiene;Couches;paquet;paquet + contenu;retenu (§4);inchangée;;;;aucun prix connu;
-hygiene;Crème hydratante;pot;selon l'étiquette (poids ou volume);à préciser;change;;34,50 DH / pot (75 ml);observed 12/10/2026;selon décision;
-hygiene;Dentifrice;pièce;selon l'étiquette (poids ou volume);à préciser;change;;;;aucun prix connu;
-hygiene;Déodorant;pièce;volume ou poids selon la forme;à préciser;change;;;;aucun prix connu;
+hygiene;Coton;paquet;paquet (+ format);retenu (§4);inchangée;;;;aucun prix connu;
+hygiene;Couches;paquet;paquet (+ format);retenu (§4);inchangée;;;;aucun prix connu;
+hygiene;Crème hydratante;pot;pièce (+ format);confirmé;change;;34,50 DH / pot (75 ml);observed 12/10/2026;à confirmer : 1 pot = 1 pièce ? (même contenant, aucune conversion automatique);
+hygiene;Dentifrice;pièce;pièce (+ format);confirmé;inchangée;;;;aucun prix connu;
+hygiene;Déodorant;pièce;pièce (+ format);confirmé;inchangée;;;;aucun prix connu;
 hygiene;Gel douche;bouteille;volume;retenu (§4);change;;43,50 DH / bouteille (flacon de 250 ml);observed 12/10/2026;conversion exacte : 250 mL → 174,00 DH/L;
-hygiene;Lingettes;paquet;paquet + contenu;retenu (§4);inchangée;;;;aucun prix connu;
-hygiene;Mouchoirs en papier;paquet;paquet + contenu;retenu (§4);inchangée;;15,95 DH / boîte (100 mouchoirs);observed 12/10/2026;selon décision;
-hygiene;Protections hygiéniques;paquet;paquet + contenu;retenu (§4);inchangée;;;;aucun prix connu;
+hygiene;Lingettes;paquet;paquet (+ format);retenu (§4);inchangée;;;;aucun prix connu;
+hygiene;Mouchoirs en papier;paquet;paquet (+ format);retenu (§4);inchangée;;15,95 DH / boîte (100 mouchoirs);observed 12/10/2026;à confirmer : 1 boîte = 1 paquet ? (même contenant, aucune conversion automatique);
+hygiene;Protections hygiéniques;paquet;paquet (+ format);retenu (§4);inchangée;;;;aucun prix connu;
 hygiene;Rasoirs;paquet;pièce;retenu (§4);change;;14,99 DH / pièce;rounded 12/10/2026;compatible;
 hygiene;Savon liquide;bouteille;volume;retenu (§4);change;;;;aucun prix connu;
 hygiene;Savon solide;pièce;poids;retenu (§4);change;;;;aucun prix connu;
-hygiene;Sérum physiologique;boîte;dosette + volume (nouvelle unité);retenu (§4);change;;;;aucun prix connu;
+hygiene;Sérum physiologique;boîte;boîte (+ format);à confirmer;inchangée;;;;aucun prix connu;« dosette » de §4 : boîte de N dosettes précisée dans le format, sans nouvelle unité
 hygiene;Shampooing;bouteille;volume;retenu (§4);change;;;;aucun prix connu;

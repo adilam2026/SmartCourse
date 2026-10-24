@@ -122,6 +122,10 @@ private fun PriceSheet(p: CatProduct, onDismiss: () -> Unit, onChanged: () -> Un
     var qty by remember { mutableStateOf(cur?.refQty?.replace('.', ',') ?: "1") }
     var unit by remember { mutableStateOf(cur?.refUnit?.takeIf { it in units } ?: units.first()) }
     var packaging by remember { mutableStateOf(cur?.packaging ?: "") }
+    var format by remember { mutableStateOf(p.format ?: "") }
+    val formatChanged = format.trim() != (p.format ?: "")
+    // Prix modifié ? (enregistrer le seul format ne transforme jamais le prix commun en prix personnel)
+    val priceChanged = cur == null || amount != cur.amount.replace('.', ',') || qty != cur.refQty.replace('.', ',') || unit != cur.refUnit || packaging != (cur.packaging ?: "")
     var why by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     val cents = parseCents(amount)?.takeIf { it > 0 }
@@ -167,6 +171,9 @@ private fun PriceSheet(p: CatProduct, onDismiss: () -> Unit, onChanged: () -> Un
             Spacer(Modifier.height(8.dp))
             FormField(packaging, { packaging = it.take(60) }, "Contenu (facultatif, ex. 250 g)")
         }
+        Spacer(Modifier.height(8.dp))
+        // Format du produit (facultatif) : affiché au moment de choisir l'article ; aucune conversion n'en est tirée.
+        FormField(format, { format = it.take(60) }, "Format du produit (facultatif, ex. pot de 350 g)")
         if (cur != null) {
             Row(Modifier.padding(top = 6.dp).heightIn(min = 48.dp).then(Modifier), verticalAlignment = Alignment.CenterVertically) {
                 TextButton({ why = !why }) { Text("D'où vient ce prix ?", color = C.TealDark) }
@@ -183,19 +190,22 @@ private fun PriceSheet(p: CatProduct, onDismiss: () -> Unit, onChanged: () -> Un
         PrimaryButton("Enregistrer", {
             busy = true
             scope.launch {
-                val body = buildJsonObject {
+                val body = if (!valid || !priceChanged) null else buildJsonObject {
                     put("amount", (cents!! / 100).toString() + "." + (cents % 100).toString().padStart(2, '0'))
                     put("refQty", java.math.BigDecimal(milli!!).movePointLeft(3).stripTrailingZeros().toPlainString())
                     put("refUnit", unit)
                     if (kind == UnitKind.COUNT && packaging.isNotBlank()) put("packaging", packaging.trim())
                 }
-                when (val r = data.session.api.call("PUT", "/api/products/${p.id}/price", body)) {
-                    is Outcome.Ok -> { demo.say("Prix enregistré."); onChanged(); onDismiss() }
-                    is Outcome.Fail -> demo.say(explain(r))
+                val f = if (!formatChanged) null else data.session.api.call("PATCH", "/api/products/${p.id}", buildJsonObject { put("format", format.trim()) })
+                val r = body?.let { data.session.api.call("PUT", "/api/products/${p.id}/price", it) }
+                when {
+                    f is Outcome.Fail -> demo.say(explain(f))
+                    r is Outcome.Fail -> demo.say(explain(r))
+                    else -> { demo.say(if (r != null) "Prix enregistré." else "Format enregistré."); onChanged(); onDismiss() }
                 }
                 busy = false
             }
-        }, Modifier.fillMaxWidth(), enabled = valid && !busy)
+        }, Modifier.fillMaxWidth(), enabled = ((valid && priceChanged) || (formatChanged && (valid || amount.isBlank()))) && !busy)
         if (cur != null && cur.source == "family") {
             Spacer(Modifier.height(6.dp))
             SecondaryButton("Partager ce prix avec ma ville", {

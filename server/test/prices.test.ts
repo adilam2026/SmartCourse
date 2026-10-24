@@ -132,7 +132,8 @@ describe("prix : base initiale, prix de la famille, préférences", () => {
   it("litre : unité acceptée avec des quantités décimales ; les unités existantes ne changent pas", async () => {
     const f = await family();
     const lait = f.products["Lait"];
-    const before = lait.unit;
+    await db.query("UPDATE products SET unit = 'piece' WHERE id = $1", [lait.id]); // unité choisie avant 027 (le lait est au litre depuis)
+    const before = "piece";
     const p = await app.inject({ method: "PATCH", url: `/api/products/${lait.id}`, cookies: f.admin, payload: { unit: "litre" } });
     expect(p.statusCode).toBe(200);
     const list = (await app.inject({ method: "POST", url: "/api/lists", cookies: f.admin })).json().list;

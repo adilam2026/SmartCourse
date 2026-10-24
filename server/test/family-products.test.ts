@@ -45,7 +45,7 @@ describe("catalogue : six références et leurs photos", () => {
     )).rows;
     const by = Object.fromEntries(refs.map((r) => [r.name, r]));
     for (const k of ["Farine fino", "Farine force", "Semoule fine", "Semoule couscous", "Farine complète"]) expect(by[k]?.unit, k).toBe("kg");
-    expect(by["Pâte à tartiner Nutella"].unit).toBe("pot");
+    expect(by["Pâte à tartiner Nutella"].unit).toBe("piece"); // 027 : pièce, format du pot précisé à part
     expect(by["Farine"]).toBeTruthy(); // la farine actuelle reste
     expect(by["Pâte à tartiner"]).toBeTruthy(); // la générique reste
     for (const q of ["nutella", "chocolat a tartiner", "pate a tartiner"]) expect(by["Pâte à tartiner Nutella"].s).toContain(q);
