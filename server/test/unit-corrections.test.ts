@@ -1,4 +1,4 @@
-import { copyFileSync, mkdtempSync, readdirSync } from "node:fs";
+import { copyFileSync, mkdtempSync, readFileSync, readdirSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -124,6 +124,18 @@ describe("migration 027 : correction des unités sur des données existantes", (
       expect(j.find((r) => r.subject === "family_price" && r.ref === coco)).toMatchObject({ outcome: "price_to_reenter", new_price: null });
       expect(j.some((r) => r.ref === tomates || r.ref === maison)).toBe(false);
       expect(Number((await db.query("SELECT catalog_rev FROM families WHERE id = $1", [other])).rows[0].catalog_rev)).toBeGreaterThan(revBefore);
+
+      // Retour arrière documenté (docs/evolutions/unites-statistiques-mise-a-jour.md) : remet exactement les valeurs d'origine
+      const doc = readFileSync(path.resolve(MIGRATIONS_DIR, "../../docs/evolutions/unites-statistiques-mise-a-jour.md"), "utf8");
+      const rollback = doc.split("```sql")[1]!.split("```")[0]!;
+      await db.query(rollback);
+      expect((await db.query("SELECT unit FROM initial_catalog WHERE key = 'riz'")).rows[0].unit).toBe("paquet");
+      expect((await db.query("SELECT unit FROM extended_catalog WHERE key = 'mangues'")).rows[0].unit).toBe("kg"); // déjà « kg » avant 027
+      const back = Object.fromEntries((await db.query("SELECT id, unit FROM products WHERE family_id = $1", [fam])).rows.map((r) => [r.id, r.unit]));
+      expect(back).toMatchObject({ [riz]: "paquet", [pates]: "paquet", [poulet]: "kg", [persil]: "paquet", [mangues]: "piece", [coco]: "piece", [tomates]: "kg" });
+      expect((await db.query("SELECT amount, ref_qty, ref_unit, packaging FROM family_prices WHERE product_id = $1", [pates])).rows[0]).toEqual({ amount: "10.00", ref_qty: "1.000", ref_unit: "paquet", packaging: "500 g" });
+      expect((await db.query("SELECT ref_qty, ref_unit, packaging FROM base_prices WHERE key = 'pates'")).rows[0]).toEqual({ ref_qty: "1.000", ref_unit: "paquet", packaging: "500 g" });
+      expect((await db.query("SELECT quantity, unit FROM purchases WHERE list_item_id = $1", [item])).rows[0]).toEqual({ quantity: "2.000", unit: "paquet" });
     } finally {
       await db.end();
       await admin.query(`DROP DATABASE "${dbName}" WITH (FORCE)`);
