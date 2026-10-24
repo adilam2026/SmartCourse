@@ -10,10 +10,10 @@ set -uo pipefail
 APK=${1:?apk}; OUT=${2:-demo-pub}
 PKG=app.smartcourse.courses.natif; ACT="$PKG/app.smartcourse.courses.nativeproto.MainActivity"
 HERE="$(cd "$(dirname "$0")" && pwd)"; UI="python3 $HERE/native-ui.py"; BASE=http://127.0.0.1:3000
-mkdir -p "$OUT/videos" "$OUT/images"; : > "$OUT/resultats.txt"; FAILS=0
+mkdir -p "$OUT/videos" "$OUT/images" "$OUT/diag"; : > "$OUT/resultats.txt"; FAILS=0
 log() { echo "$*" | tee -a "$OUT/resultats.txt"; }
 ok() { log "PASS  $1"; }
-ko() { log "FAIL  $1"; FAILS=$((FAILS+1)); adb exec-out screencap -p > "$OUT/echec-$(echo "$1" | tr -c 'a-zA-Z0-9' '_' | cut -c1-30).png" || true; }
+ko() { log "FAIL  $1"; FAILS=$((FAILS+1)); adb exec-out screencap -p > "$OUT/diag/echec-$(echo "$1" | tr -c 'a-zA-Z0-9' '_' | cut -c1-30).png" || true; }
 expect() { local l=$1; shift; if "$@"; then ok "$l"; else ko "$l"; fi; }
 want() { [ -z "${SEQUENCES:-}" ] || [[ ",${SEQUENCES// /}," == *",$1,"* ]]; }
 sql() { docker exec -i sc-recette-pg psql -U smart -d smartcourse -v ON_ERROR_STOP=1 -tA "$@"; }
@@ -23,7 +23,7 @@ fill_field() { $UI field "$1" >/dev/null || return 1; sleep 1; clear_field; adb 
 # Geste lisible : pause avant (le spectateur voit l'écran), action, pause après (le résultat reste à l'écran).
 act() { sleep 1.5; $UI tap "$@" >/dev/null || { log "  introuvable : $1"; return 1; }; sleep 2.5; }
 back() { sleep 1.2; adb shell input keyevent KEYCODE_BACK; sleep 2; }
-scroll_to() { for _ in 1 2 3 4 5; do $UI has "$1" && return 0; adb shell input swipe 540 1500 540 800 600; sleep 1; done; $UI has "$1"; }
+scroll_to() { for _ in 1 2 3 4 5; do $UI has "$1" && return 0; adb shell input swipe 540 1400 540 900 1500; sleep 1.5; done; $UI has "$1"; }
 top() { for _ in 1 2 3; do adb shell input swipe 540 600 540 1600 300; done; sleep 1; }
 still() { adb exec-out screencap -p > "$OUT/images/$1.png"; log "image $1"; }
 REC=""
@@ -40,12 +40,12 @@ rec_stop() {
   if [ "$s" -gt 100000 ]; then log "vidéo $REC ($((s/1024)) Ko)"; else ko "vidéo $REC vide ou absente"; fi
 }
 demo_bar() { # barre d'état propre et figée (mode démonstration d'Android) ; $1 = notifications visibles (true/false)
-  adb shell am broadcast -a com.android.systemui.demo -e command enter >/dev/null
-  adb shell am broadcast -a com.android.systemui.demo -e command clock -e hhmm 0941 >/dev/null
-  adb shell am broadcast -a com.android.systemui.demo -e command battery -e level 100 -e plugged false >/dev/null
-  adb shell am broadcast -a com.android.systemui.demo -e command network -e wifi show -e level 4 -e fully true >/dev/null
-  adb shell am broadcast -a com.android.systemui.demo -e command network -e mobile show -e level 4 -e datatype none -e fully true >/dev/null
-  adb shell am broadcast -a com.android.systemui.demo -e command notifications -e visible "${1:-false}" >/dev/null
+  adb shell am broadcast -a com.android.systemui.demo -p com.android.systemui -e command enter >/dev/null
+  adb shell am broadcast -a com.android.systemui.demo -p com.android.systemui -e command clock -e hhmm 0941 >/dev/null
+  adb shell am broadcast -a com.android.systemui.demo -p com.android.systemui -e command battery -e level 100 -e plugged false >/dev/null
+  adb shell am broadcast -a com.android.systemui.demo -p com.android.systemui -e command network -e wifi show -e level 4 -e fully true >/dev/null
+  adb shell am broadcast -a com.android.systemui.demo -p com.android.systemui -e command network -e mobile show -e level 4 -e datatype none -e fully true >/dev/null
+  adb shell am broadcast -a com.android.systemui.demo -p com.android.systemui -e command notifications -e visible "${1:-false}" >/dev/null
 }
 
 # ── États de la base jetable : S0 = jeu de données du spot, liste « Courses de la semaine » vide. Chaque séquence part d'un état connu.
@@ -62,25 +62,35 @@ other() { python3 "$HERE/demo-act.py" "$BASE" "$FAMILY" "$@" | tee -a "$OUT/resu
 
 # Application propre puis connexion d'un profil (hors enregistrement). $1 identifiant, $2 code, $3 texte attendu à l'arrivée.
 login_as() {
+  adb shell cmd statusbar collapse >/dev/null 2>&1; adb shell input keyevent KEYCODE_HOME; sleep 1
+  local try; for try in 1 2; do login_once "$@" && return 0; log "  nouvelle tentative de connexion $1"; done
+  ko "connexion $1"; return 1
+}
+login_once() {
   adb shell pm clear $PKG >/dev/null; adb shell pm grant $PKG android.permission.POST_NOTIFICATIONS >/dev/null 2>&1 || true
   adb shell am start -W -n "$ACT" >/dev/null 2>&1; sleep 4
   $UI wait "Bienvenue" 25 >/dev/null
   fill_field 0 "$FAMILY"; hide_kb; fill_field 1 "$1"; hide_kb; fill_field 2 "$2"; hide_kb
   $UI tap "Se connecter" --last >/dev/null; sleep 5
-  $UI wait "$3" 30 >/dev/null || { ko "connexion $1"; return 1; }
+  $UI wait "$3" 30 >/dev/null || { adb exec-out screencap -p > "$OUT/diag/connexion-$1-$(date +%s).png"; return 1; }
   sleep 3   # synchronisation initiale terminée avant de filmer
 }
 SOPHIE=(sophie 482913); KARIM=(karim 573918); NADIA=(nadia 573918)
 enable_notifications() { # Réglages → Notifications et rappels → Nouvelles demandes (hors enregistrement)
   $UI tap "Réglages" >/dev/null; sleep 2; scroll_to "Notifications et rappels" >/dev/null
   $UI tap "Notifications et rappels" >/dev/null; sleep 2
-  $UI has "Notifications activées" || $UI tap "Nouvelles demandes" >/dev/null; sleep 2
-  $UI wait "Notifications activées" 10 >/dev/null || ko "notifications activées"
+  $UI wait "Nouvelles demandes" 10 >/dev/null; sleep 1
+  adb exec-out screencap -p > "$OUT/diag/notif-avant-$(date +%s).png"
+  $UI tap "Nouvelles demandes" >/dev/null; sleep 1.5
+  adb exec-out screencap -p > "$OUT/diag/notif-apres-$(date +%s).png"
+  adb shell dumpsys jobscheduler | grep -q "$PKG" && log "  tâche périodique programmée" || ko "notifications activées (aucune tâche programmée)"
   adb shell input keyevent KEYCODE_BACK; sleep 1; $UI tap "Liste" --exact >/dev/null; sleep 4   # liste vue : repère des demandes posé
 }
 poll_now() { # la vérification périodique d'Android (WorkManager) est lancée tout de suite, sans attendre 15 minutes
   local job; job=$(adb shell dumpsys jobscheduler | tr -d '\r' | grep -oE "#u0a[0-9]+/[0-9]+: [0-9a-f]+ $PKG" | head -1 | sed -E 's#.*/([0-9]+):.*#\1#')
-  [ -n "$job" ] && adb shell cmd jobscheduler run -f $PKG "$job" >/dev/null; sleep 8
+  log "  vérification forcée, tâche n°${job:-absente}"; adb logcat -c
+  [ -n "$job" ] && adb shell cmd jobscheduler run -f $PKG "$job" >/dev/null; sleep 10
+  adb logcat -d | grep -E "CoursesNotif|WM-WorkerWrapper" | tail -4 | tee -a "$OUT/resultats.txt"
 }
 
 FAMILY=$(sql -c "SELECT code FROM families WHERE name='Famille Martin'")
@@ -100,17 +110,19 @@ adb install -r "$APK" >/dev/null
 if want A; then
 login_as "${NADIA[@]}" "Choisir mes articles"
 rec_start A-selection-photos
-act "Légumes et herbes"; act "Tomates" --exact
-$UI wait "Ajouter à ma sélection" 10 >/dev/null
+act "Légumes et herbes"; act "Tomates" --exact          # la photo touchée : 1 kg choisi
+act "Modifier la quantité : Tomates"
+$UI wait "Mettre à jour" 10 >/dev/null
 act "Augmenter"; act "Augmenter"   # 1 kg → 1,5 kg : le changement de quantité du spot
 expect "A1. Tomates : 1,5 kg" $UI has "1,5"
 still A1-quantite-tomates
-act "Ajouter à ma sélection"
-act "Pommes de terre" --exact; act "Ajouter à ma sélection"
-back; act "Fruits"; act "Bananes" --exact; act "Ajouter à ma sélection"
-back; act "Laitages et œufs"; act "Œufs" --exact; for _ in 1 2 3 4 5; do sleep 0.3; $UI tap "Augmenter" >/dev/null; sleep 0.8; done; sleep 1.5; act "Ajouter à ma sélection"
-back; act "Pain et petit-déjeuner"; act "Pain" --exact; for _ in 1 2 3; do sleep 0.3; $UI tap "Augmenter" >/dev/null; sleep 0.8; done; sleep 1.5; act "Ajouter à ma sélection"
-back
+act "Mettre à jour"
+act "Pommes de terre" --exact
+act "Catégories"; act "Fruits"; act "Bananes" --exact
+more() { act "Modifier la quantité : $1"; $UI wait "Mettre à jour" 10 >/dev/null; for _ in $(seq 1 "$2"); do sleep 0.4; $UI tap "Augmenter" >/dev/null; sleep 0.9; done; act "Mettre à jour"; }
+act "Catégories"; act "Laitages et œufs"; act "Œufs" --exact; more "Œufs" 5
+act "Catégories"; act "Pain et petit-déjeuner"; act "Pain" --exact; more "Pain" 3
+act "Catégories"
 expect "A2. sélection de 5 articles" $UI has "Terminer ma sélection (5)"
 still A2-selection-5-articles
 act "Terminer ma sélection"
@@ -129,13 +141,15 @@ for name in karim sophie; do
   demo_bar true
   rec_start "B-notification-$name"
   other batch; sleep 2; poll_now
+  for _ in 1 2 3; do adb shell dumpsys notification --noredact | grep -q 'Nouvelle demande' && break; poll_now; done
   sleep 2; adb shell cmd statusbar expand-notifications; sleep 4
   expect "B. notification « Nouvelle demande » ($name)" bash -c "adb shell dumpsys notification --noredact | grep -q 'Nouvelle demande'"
   still "B1-notification-$name"
-  act "Nouvelle demande"
+  act "Nouvelle demande" || adb shell cmd statusbar collapse
   $UI wait "Tomates" 15 >/dev/null; sleep 2
   still "B2-liste-ouverte-$name"
   rec_stop
+  adb shell cmd statusbar collapse >/dev/null 2>&1
   demo_bar false
 done
 fi
@@ -174,7 +188,8 @@ fi
 if want E; then
 restore S1 && login_as "${SOPHIE[@]}" "Œufs"
 rec_start E1-sophie-coche-oeufs
-scroll_to "Acheté : Œufs" >/dev/null; act "Acheté : Œufs"
+scroll_to "Acheté : Œufs" >/dev/null; sleep 1; act "Acheté : Œufs"
+expect "E1. Œufs achetés par Sophie" bash -c "for _ in 1 2 3 4 5; do $UI has 'Achetée par Sophie' || $UI has 'Acheté par Sophie' && exit 0; adb shell input swipe 540 1400 540 900 1500; sleep 2; done; exit 1"
 still E1-sophie-oeufs-achetes
 rec_stop
 restore S1 && login_as "${KARIM[@]}" "Œufs"
@@ -253,7 +268,7 @@ if want K; then
 $UI tap "Budget" >/dev/null; sleep 3; top
 rec_start K-mon-compte
 scroll_to "Mon compte" >/dev/null; act "Mon compte"
-expect "K1. Mon compte : solde, dépenses, entrées" $UI wait "Salaire" 15
+expect "K1. Mon compte : solde, dépenses, entrées" $UI wait "Solde de mon compte" 15
 sleep 2; still K1-mon-compte
 adb shell input swipe 540 1400 540 900 1200; sleep 2; still K2-mon-compte-operations
 rec_stop
@@ -266,14 +281,14 @@ $UI tap "Réglages" >/dev/null; sleep 3; top
 rec_start L-prix-indicatifs-maroc
 scroll_to "Gestion des prix" >/dev/null; act "Gestion des prix"
 $UI wait "Tomates" 15 >/dev/null; sleep 2; still L1-gestion-des-prix
-act "Tomates" --exact
+act "DH / kg"   # premier prix de la liste : Tomates
 expect "L1. prix indicatif en dirhams" $UI wait "Prix indicatif" 10
 sleep 2; still L2-prix-tomates
 rec_stop
 back
 fi
 
-adb shell am broadcast -a com.android.systemui.demo -e command exit >/dev/null
+adb shell am broadcast -a com.android.systemui.demo -p com.android.systemui -e command exit >/dev/null
 adb shell settings put system show_touches 0
 adb shell wm size reset >/dev/null; adb shell wm density reset >/dev/null
 log "Vidéos : $(ls "$OUT"/videos/*.mp4 2>/dev/null | wc -l) ; images : $(ls "$OUT"/images/*.png 2>/dev/null | wc -l) ; échecs : $FAILS"
