@@ -75,7 +75,7 @@ jobs:
         env: { GH_TOKEN: "${{ github.token }}" }
         run: |
           [ -d demo-pub/videos ] || exit 0
-          (cd demo-pub && zip -qr ../spot-mes-courses-videos.zip videos resultats.txt && zip -qr ../spot-mes-courses-images.zip images)
+          (cd demo-pub && zip -qr ../spot-mes-courses-videos.zip videos resultats.txt diag && zip -qr ../spot-mes-courses-images.zip images)
           TAG="spot-mes-courses-${{ github.run_number }}"
           gh release create "$TAG" spot-mes-courses-videos.zip spot-mes-courses-images.zip demo-pub/resultats.txt --prerelease \
             --repo "${{ github.repository }}" --target "${{ github.sha }}" --title "Spot Mes Courses — séquences (run ${{ github.run_number }})" \
