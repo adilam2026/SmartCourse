@@ -10,6 +10,7 @@ import { authenticate, confirmPassword, login, revokeSession, setupFamily, type 
 import { backupStatus } from "./backup.js";
 import { catalogRoutes } from "./catalog-routes.js";
 import { familyProductRoutes } from "./family-products.js";
+import { appUpdateRoutes } from "./app-update.js";
 import { COOKIE, makeGuard } from "./guard.js";
 import { listRoutes } from "./list-routes.js";
 import { statsRoutes } from "./stats-routes.js";
@@ -436,6 +437,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
   catalogRoutes(app, { db, store: deps.store, guard, hub });
   familyProductRoutes(app, { db, store: deps.store, guard, hub, managers: deps.catalogManagers });
+  appUpdateRoutes(app, { db, guard, managers: deps.catalogManagers });
   locationRoutes(app, { db, guard, hub, resolveCity: (c) => resolveCity(c, true)! });
   featureRoutes(app, { db, guard, hub });
   familyIdRoutes(app, { db, guard, hub, checkLimit: deps.familyIdRateLimit ?? { max: 30, timeWindow: "1 minute" } });

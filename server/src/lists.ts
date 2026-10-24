@@ -239,13 +239,16 @@ async function execSetQty(e: EventCtx, op: Extract<OpIn, { type: "set_qty" }>): 
   return { result: { status: "applied" }, itemId: item.id };
 }
 
-async function execPurchase(c: pg.PoolClient, a: AuthContext, listId: string, op: Extract<OpIn, { type: "purchase" }>): Promise<Executed> {
+async function execPurchase(c: pg.PoolClient, a: AuthContext, listId: string, op: Extract<OpIn, { type: "purchase" }>, batch?: BatchIn): Promise<Executed> {
   const item = (await c.query("SELECT * FROM list_items WHERE id = $1 AND list_id = $2 AND family_id = $3 FOR UPDATE", [op.itemId, listId, a.familyId])).rows[0];
   if (!item) return rejected("item_unknown");
   if (item.status === "removed") return { ...rejected("item_removed"), itemId: item.id };
   if (item.status === "purchased") return { result: { status: "already", detail: await purchaseDetail(c, listId, item.product_id) }, itemId: item.id };
   // Product, quantity and unit are frozen on the purchase: statistics never depend on later renames or unit changes.
-  await c.query("INSERT INTO purchases (list_item_id, list_id, family_id, purchased_by, product_id, quantity, unit) VALUES ($1,$2,$3,$4,$5,$6,$7)", [item.id, listId, a.familyId, a.profileId, item.product_id, item.quantity, item.unit]);
+  // Date of purchase: when « Acheté » was ticked on the phone (a purchase made offline and sent later keeps its real date),
+  // within the same plausible window as validations; the server's time otherwise.
+  const at = sanitizeAt(batch?.at, new Date());
+  await c.query("INSERT INTO purchases (list_item_id, list_id, family_id, purchased_by, product_id, quantity, unit, purchased_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)", [item.id, listId, a.familyId, a.profileId, item.product_id, item.quantity, item.unit, at]);
   await c.query("UPDATE list_items SET status = 'purchased', rev = rev + 1, updated_at = now() WHERE id = $1", [item.id]);
   return { result: { status: "applied" }, itemId: item.id };
 }
@@ -303,7 +306,7 @@ async function runOp(db: Db, a: AuthContext, listId: string, op: OpIn, batch?: B
     let ex: Executed;
     let validationId: string | undefined;
     if (list.status === "archived") ex = rejected("list_closed");
-    else if (op.type === "purchase") ex = await execPurchase(c, a, listId, op);
+    else if (op.type === "purchase") ex = await execPurchase(c, a, listId, op, batch);
     else {
       // Every other operation writes events: they belong to the validation (one press on "Valider") that carried them.
       const v = await ensureValidation(c, a, listId, batch, op.opId, new Date());

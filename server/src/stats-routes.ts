@@ -93,12 +93,17 @@ interface Cell {
   unknownQuantity: number;
 }
 
-const norm = (t: string) => t.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().trim();
+/** Occurrences listed in the history of one product (a product bought every day for more than five years). */
+const MAX_OCCURRENCES = 2000;
+
+const norm = (t: string) => t.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/œ/g, "oe").replace(/æ/g, "ae").trim();
 
 const periodSchema = z.object({
   month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).optional(),
-  period: z.enum(["month", "last3"]).default("month"),
+  // « all » : tout l'historique enregistré de la famille (sans comparaison).
+  period: z.enum(["month", "last3", "all"]).default("month"),
 });
+type Period = z.infer<typeof periodSchema>["period"];
 
 /** Last included local day of a window (the window end is exclusive). */
 const lastDay = (w: Window): string => dayKey(new Date(w.to.getTime() - 1));
@@ -127,6 +132,19 @@ export function statsRoutes(app: FastifyInstance, { db, guard }: { db: Db; guard
 
   const windowInfo = (w: Window) => ({ from: w.from.toISOString(), to: w.to.toISOString(), fromDay: dayKey(w.from), toDay: lastDay(w) });
 
+  /** Periods of the statistics; « all » runs from the first list of the family to the end of today and has nothing to compare with. */
+  const windowsOf = async (period: Period, month: string, now: Date, fam: string): Promise<Windows> => {
+    if (period !== "all") return windowsFor(period, month, now);
+    const today = partsOf(now);
+    const first = (await db.query("SELECT min(purchased_at) AS t FROM purchases WHERE family_id = $1 AND voided_at IS NULL", [fam])).rows[0]?.t as Date | null;
+    const hist = await historyStart(fam);
+    const starts = [first, hist, dayStart(today.y, today.m, today.d)].filter((d): d is Date => d !== null);
+    const from = new Date(Math.min(...starts.map((d) => d.getTime()))); // nothing recorded before it
+
+    const none = { from: new Date(0), to: new Date(0) };
+    return { current: { from, to: dayStart(today.y, today.m, today.d + 1) }, compare: none, partial: false };
+  };
+
   app.get("/api/stats/purchases", { preHandler: guard("stats.read") }, async (req) => {
     const q = periodSchema
       .extend({
@@ -136,9 +154,9 @@ export function statsRoutes(app: FastifyInstance, { db, guard }: { db: Db; guard
       })
       .parse(req.query);
     const now = statsClock.now();
-    const month = q.period === "last3" ? monthOf(now) : (q.month ?? monthOf(now));
-    const win = windowsFor(q.period, month, now);
+    const month = q.period === "month" ? (q.month ?? monthOf(now)) : monthOf(now);
     const fam = req.auth!.familyId;
+    const win = await windowsOf(q.period, month, now, fam);
     const rows = (
       await db.query(
         `SELECT pu.product_id, pu.unit, (pu.purchased_at >= $3) AS is_current,
@@ -163,7 +181,7 @@ export function statsRoutes(app: FastifyInstance, { db, guard }: { db: Db; guard
       table.set(r.product_id as string, e);
     }
     const hist = await historyStart(fam);
-    const covered = hist !== null && hist <= win.compare.from;
+    const covered = q.period !== "all" && hist !== null && hist <= win.compare.from;
     const all = [...table.entries()]
       .filter(([, e]) => e.current.length > 0)
       .map(([id, e]) => {
@@ -194,7 +212,9 @@ export function statsRoutes(app: FastifyInstance, { db, guard }: { db: Db; guard
         const byName = a.name.localeCompare(b.name, "fr");
         if (q.sort === "name") return byName;
         const byLast = (b.lastPurchaseAt ?? "").localeCompare(a.lastPurchaseAt ?? "");
-        return q.sort === "last" ? byLast || byName : b.purchases - a.purchases || byLast || byName;
+        const stable = byName || a.productId.localeCompare(b.productId); // equal names: still one fixed order
+        // Ranking by number of purchases; ties in alphabetical order (same order in the preview, the full list and the search).
+        return q.sort === "last" ? byLast || stable : b.purchases - a.purchases || stable;
       });
     const compareTotal = rowsOut.reduce((n, r) => n + (r.compare?.purchases ?? 0), 0);
     return {
@@ -222,9 +242,9 @@ export function statsRoutes(app: FastifyInstance, { db, guard }: { db: Db; guard
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
     const q = periodSchema.parse(req.query);
     const now = statsClock.now();
-    const month = q.period === "last3" ? monthOf(now) : (q.month ?? monthOf(now));
-    const win = windowsFor(q.period, month, now);
+    const month = q.period === "month" ? (q.month ?? monthOf(now)) : monthOf(now);
     const fam = req.auth!.familyId;
+    const win = await windowsOf(q.period, month, now, fam);
     const p = (
       await db.query("SELECT p.id, p.name, p.brand, p.active, p.category, p.photo_asset_id, i.photo_asset_id AS catalog_photo, c.label AS category_label FROM products p JOIN categories c ON c.key = p.category LEFT JOIN initial_catalog i ON i.key = p.catalog_key WHERE p.id = $1 AND p.family_id = $2", [id, fam])
     ).rows[0];
@@ -233,34 +253,37 @@ export function statsRoutes(app: FastifyInstance, { db, guard }: { db: Db; guard
     const list = (
       await db.query(
         `SELECT pu.id, pu.purchased_at, pu.quantity, pu.unit, b.id AS buyer_id, b.display_name AS buyer,
-                l.id AS list_id, l.status AS list_status, l.created_at AS list_created, l.closed_at AS list_closed
+                l.id AS list_id, l.name AS list_name, l.status AS list_status, l.created_at AS list_created, l.closed_at AS list_closed
            FROM purchases pu
            JOIN profiles b ON b.id = pu.purchased_by
            JOIN lists l ON l.id = pu.list_id
           WHERE pu.family_id = $1 AND pu.product_id = $2 AND pu.voided_at IS NULL AND pu.purchased_at >= $3 AND pu.purchased_at < $4
           ORDER BY pu.purchased_at DESC, pu.id
-          LIMIT 300`,
+          LIMIT ${MAX_OCCURRENCES + 1}`,
         [fam, id, win.current.from, win.current.to],
       )
     ).rows;
+    const truncated = list.length > MAX_OCCURRENCES;
+    if (truncated) list.length = MAX_OCCURRENCES;
     const purchases = list.map((r) => ({
       id: r.id as string,
       at: (r.purchased_at as Date).toISOString(),
       quantity: r.quantity === null ? null : Number(r.quantity),
       unit: (r.unit ?? null) as string | null,
       by: { id: r.buyer_id as string, displayName: r.buyer as string },
-      list: { id: r.list_id as string, status: r.list_status as string, createdAt: (r.list_created as Date).toISOString(), closedAt: r.list_closed ? (r.list_closed as Date).toISOString() : null },
+      list: { id: r.list_id as string, name: (r.list_name ?? null) as string | null, status: r.list_status as string, createdAt: (r.list_created as Date).toISOString(), closedAt: r.list_closed ? (r.list_closed as Date).toISOString() : null },
     }));
-    // Totals per unit, confirmed purchases only.
-    const totals = new Map<string, Cell>();
-    for (const r of purchases) {
-      const k = r.unit ?? "";
-      const c = totals.get(k) ?? { unit: r.unit, purchases: 0, quantity: null, unknownQuantity: 0 };
-      c.purchases += 1;
-      if (r.quantity === null) c.unknownQuantity += 1;
-      else c.quantity = (c.quantity ?? 0) + r.quantity;
-      totals.set(k, c);
-    }
+    // Totals per unit over the whole period (confirmed purchases only): units are never added together.
+    const totals = new Map<string, Cell>(
+      (
+        await db.query(
+          `SELECT pu.unit, count(*)::int AS purchases, sum(pu.quantity) AS quantity, count(*) FILTER (WHERE pu.quantity IS NULL)::int AS unknown
+             FROM purchases pu WHERE pu.family_id = $1 AND pu.product_id = $2 AND pu.voided_at IS NULL AND pu.purchased_at >= $3 AND pu.purchased_at < $4
+            GROUP BY 1 ORDER BY 2 DESC, 1`,
+          [fam, id, win.current.from, win.current.to],
+        )
+      ).rows.map((r) => [(r.unit ?? "") as string, cellOf(r)]),
+    );
     const last = (await db.query("SELECT max(purchased_at) AS t FROM purchases WHERE family_id = $1 AND product_id = $2 AND voided_at IS NULL", [fam, id])).rows[0]?.t as Date | null;
     // Six months ending with the last month of the period.
     const lastMonth = monthOf(new Date(win.current.to.getTime() - 1));
@@ -295,6 +318,8 @@ export function statsRoutes(app: FastifyInstance, { db, guard }: { db: Db; guard
       window: { ...windowInfo(win.current), partial: win.partial },
       summary: { purchases: [...totals.values()].reduce((n, c) => n + c.purchases, 0), units: [...totals.values()], lastPurchaseAt: last ? last.toISOString() : null },
       purchases,
+      // Never cut silently: the totals above only describe the occurrences listed.
+      truncated,
       months,
     };
   });

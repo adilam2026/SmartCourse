@@ -68,15 +68,18 @@ describe("unités et quantités", () => {
   it("chaque produit a une unité ; l'ajout sans quantité vaut 1 ; les kg acceptent les décimales, pas les autres unités", async () => {
     const f = await newFamily();
     expect(f.units["Tomates"]).toBe("kg");
-    expect(f.units["Persil"]).toBe("paquet");
+    expect(f.units["Persil"]).toBe("piece"); // à la pièce depuis 027 (une botte)
+    expect(f.units["Riz"]).toBe("kg"); // au poids depuis 027
     expect(f.units["Lait"]).toBe("piece");
     expect((await one(f.marie, f.list, op.add(f.products["Lait"]!))).status).toBe("applied");
     expect((await one(f.marie, f.list, op.add(f.products["Tomates"]!, 1.5))).status).toBe("applied");
     expect((await one(f.marie, f.list, op.add(f.products["Persil"]!, 2.5))).reason).toBe("bad_quantity");
+    expect((await one(f.marie, f.list, op.add(f.products["Riz"]!, 0.25))).status).toBe("applied"); // 0,25 kg
     const v = await view(f.adil);
     expect(lines(v, f.products["Lait"]!)[0]).toMatchObject({ quantity: 1, unit: "piece" });
     expect(lines(v, f.products["Tomates"]!)[0]).toMatchObject({ quantity: 1.5, unit: "kg" });
     expect(lines(v, f.products["Persil"]!)).toHaveLength(0);
+    expect(lines(v, f.products["Riz"]!)[0]).toMatchObject({ quantity: 0.25, unit: "kg" });
   });
 
   it("une quantité nulle, négative ou énorme est refusée par le serveur", async () => {
@@ -541,7 +544,7 @@ describe("Statistiques d'achats", () => {
     await buy(f, "Tomates", 1, "2026-10-06T10:00:00Z");
     await buy(f, "Riz", 1, "2026-10-09T10:00:00Z");
     const names = async (qs: string) => (await stats(f.adil, "2026-10", qs)).rows.map((r: any) => r.name);
-    expect(await names("")).toEqual(["Tomates", "Riz", "Lait"]); // fréquence, puis dernier achat
+    expect(await names("")).toEqual(["Tomates", "Lait", "Riz"]); // fréquence, puis ordre alphabétique (stable)
     expect(await names("&sort=last")).toEqual(["Riz", "Tomates", "Lait"]);
     expect(await names("&sort=name")).toEqual(["Lait", "Riz", "Tomates"]);
     expect(await names("&q=TOMATE")).toEqual(["Tomates"]);
@@ -664,7 +667,7 @@ describe("migration 009 sur des données existantes", () => {
       const l2 = (await old.query("INSERT INTO lists (family_id, created_by) VALUES ($1,$2) RETURNING id", [fam, prof])).rows[0].id as string;
       await old.query("INSERT INTO list_items (list_id, family_id, product_id, added_by, status) VALUES ($1,$2,$3,$4,'removed')", [l2, fam, lait, prof]);
 
-      expect(await migrate(old)).toEqual(["009_quantities.sql", "010_validation_times.sql", "011_units_more.sql", "012_push_notifications.sql", "013_catalog_keys.sql", "014_catalog_complete.sql", "015_recovery.sql", "016_install_and_purge.sql", "017_profile_deletion.sql", "018_prices_favorites.sql", "019_base_prices_initial.sql", "020_city_list_delete.sql", "021_family_signup.sql", "022_family_products_proposals.sql", "023_family_location.sql", "024_advanced_options_lists.sql", "025_budget.sql", "026_family_identifier.sql"]);
+      expect(await migrate(old)).toEqual(["009_quantities.sql", "010_validation_times.sql", "011_units_more.sql", "012_push_notifications.sql", "013_catalog_keys.sql", "014_catalog_complete.sql", "015_recovery.sql", "016_install_and_purge.sql", "017_profile_deletion.sql", "018_prices_favorites.sql", "019_base_prices_initial.sql", "020_city_list_delete.sql", "021_family_signup.sql", "022_family_products_proposals.sql", "023_family_location.sql", "024_advanced_options_lists.sql", "025_budget.sql", "026_family_identifier.sql", "027_unit_corrections.sql", "028_app_update.sql"]);
       // 026 : le code famille existant devient un alias permanent de connexion, rien d'autre ne change pour la famille
       const aliases = (await old.query("SELECT a.kind, a.alias = f.code AS same FROM family_aliases a JOIN families f ON f.id = a.family_id WHERE a.family_id = $1", [fam])).rows;
       expect(aliases).toEqual([{ kind: "code", same: true }]);
@@ -683,7 +686,7 @@ describe("migration 009 sur des données existantes", () => {
       expect(items.filter((i) => i.product_id === tom)[0]).toMatchObject({ unit: "kg", status: "purchased" });
       expect(Number(items[0].quantity)).toBe(1);
       expect((await old.query("SELECT unit FROM products WHERE id = $1", [lait])).rows[0].unit).toBe("piece");
-      expect((await old.query("SELECT unit FROM products WHERE family_id = $1 AND name = 'Persil'", [fam])).rows[0].unit).toBe("paquet");
+      expect((await old.query("SELECT unit FROM products WHERE family_id = $1 AND name = 'Persil'", [fam])).rows[0].unit).toBe("piece"); // corrigé par 027
       const pu = (await old.query("SELECT product_id, quantity, unit FROM purchases")).rows[0];
       expect(pu).toMatchObject({ product_id: tom, quantity: null, unit: null });
       // un événement d'ajout par article existant (le retiré n'en a pas), à l'heure d'origine, groupés par minute
