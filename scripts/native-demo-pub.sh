@@ -107,7 +107,7 @@ adb root >/dev/null 2>&1; sleep 3; adb wait-for-device   # émulateur de recette
 # ═══ A. Nadia choisit les articles en photos, change une quantité, envoie sa sélection ═══
 if want A; then
 login_as "${NADIA[@]}" "Choisir mes articles"
-rec_start A-selection-photos
+rec_start A1-photo-et-quantite
 act "Légumes et herbes"; act "Tomates" --exact          # la photo touchée : 1 kg choisi
 act "Modifier la quantité : Tomates"
 $UI wait "Mettre à jour" 10 >/dev/null
@@ -116,11 +116,13 @@ expect "A1. Tomates : 1,5 kg" $UI has "1,5"
 still A1-quantite-tomates
 act "Mettre à jour"
 act "Pommes de terre" --exact
+rec_stop
+rec_start A2-selection-envoi
 act "Catégories"; act "Fruits"; act "Bananes" --exact
 more() { act "Modifier la quantité : $1"; $UI wait "Mettre à jour" 10 >/dev/null; for _ in $(seq 1 "$2"); do sleep 0.4; $UI tap "Augmenter" >/dev/null; sleep 0.9; done; act "Mettre à jour"; }
-reach() { for _ in 1 2 3 4 5; do $UI has "$1" --exact && return 0; adb shell input swipe 540 1450 540 850 1500; sleep 1.5; done; }   # défilement lent et lisible
-act "Catégories"; act "Laitages et œufs"; reach "Œufs"; act "Œufs" --exact; more "Œufs" 5
-act "Catégories"; act "Pain et petit"; reach "Pain"; act "Pain" --exact; more "Pain" 3
+reach() { for _ in 1 2 3 4 5; do $UI has "$@" && return 0; adb shell input swipe 540 1450 540 850 1500; sleep 1.5; done; }   # défilement lent et lisible
+act "Catégories"; act "Laitages et œufs"; reach "Œufs" --exact; act "Œufs" --exact; more "Œufs" 5
+act "Catégories"; reach "Pain et petit"; act "Pain et petit"; reach "Pain" --exact; act "Pain" --exact; more "Pain" 3
 act "Catégories"
 expect "A2. sélection de 5 articles" $UI has "Terminer ma sélection (5)"
 still A2-selection-5-articles
