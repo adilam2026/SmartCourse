@@ -160,3 +160,15 @@ UPDATE families SET catalog_rev = catalog_rev + 1;
    avant migration, puis migrations 026, 027 et 028.
 4. Contrôles ciblés sur une famille jetable ; `/health` doit afficher `028_app_update.sql`.
 5. Publication Google Play par le propriétaire ; puis, seulement après disponibilité confirmée, réglage de la mise à jour.
+
+## Livraison de recette (non publiée)
+
+- APK/AAB signés (clé habituelle) : versionCode **1192**, pré-version
+  [`courses-natif-play-1.0.2-92`](https://github.com/adilam2026/SmartCourse/releases/tag/courses-natif-play-1.0.2-92),
+  construits depuis `f548b98` après les parcours U, L et Z réussis sur le même code (32/32, runs 91 et 92, aucun plantage).
+- Avec le serveur actuel de production (`bb8f627`, 025), cet APK :
+  - garde les unités actuelles (la migration 027 n'est pas appliquée) ;
+  - n'affiche aucun message de mise à jour (route absente) ;
+  - montre « Tout l'historique » en erreur explicite, avec « Réessayer », et jamais comme une absence d'achats.
+
+  Le reste fonctionne normalement.
