@@ -19,7 +19,7 @@ jobs:
   sequences:
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[demo')
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    timeout-minutes: 120
     permissions: { contents: write }
     steps:
       - uses: actions/checkout@v4
