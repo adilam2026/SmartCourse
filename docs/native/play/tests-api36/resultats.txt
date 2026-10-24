@@ -1,38 +1,25 @@
 ═══ U. Unités corrigées : décimales au kg, lignes existantes jamais réinterprétées, prix à ressaisir ═══
 PASS  U0. catalogue de la famille : Riz et Cumin au kg, Persil et Poulet à la pièce
 PASS  U1. 0,25 kg de cumin accepté et affiché (250 g)
-FAIL  U2. ligne de riz enregistrée en paquets : toujours « 2 paquets » (jamais « 2 g » ni « 2 kg »)
-      écran : "Ma liste"|"Samedi 24 octobre"|"Plus d'actions"|"Compte"|"0 sur 2 achetés"|"0 %"|"Ajouter des articles"|"Favoris"|"Épicerie"|"Replier"|"Riz"|"2 paquets"|"Acheté : Riz"|"Cumin"|"250 g"|"Acheté : Cumin"|"Liste"|"Liste"|"Historique"|"Historique"|"Statistiques"|"Statistiques"|"Réglages"|"Réglages"|
-FAIL  U3. quantité de la ligne modifiée dans SON unité (paquets)
-      écran : "Ma liste"|"Samedi 24 octobre"|"Plus d'actions"|"Compte"|"1 sur 2 achetés"|"50 %"|"Ajouter des articles"|"Favoris"|"Épicerie"|"Replier"|"Cumin"|"250 g"|"Acheté : Cumin"|"Déjà achetés (1)"|"Replier"|"Riz"|"2 paquets"|"Acheté par Adil · 10:42"|"Acheté : Riz"|"Liste"|"Liste"|"Historique"|"Historique"|"Statistiques"|"Statistiques"|"Réglages"|"Réglages"|
-FAIL  U4. ancien prix au kg du poulet signalé « à ressaisir », jamais affiché comme prix actuel
-      écran : "Search"|"Google app"|"Search web and more"|"Voice search"|"Google Lens"|"Calendar"|"Calendar"|"Camera"|"Camera"|"Chrome"|"Chrome"|"Clock"|"Clock"|"Contacts"|"Contacts"|"Drive"|"Drive"|"Files"|"Files"|"Gmail"|"Gmail"|"Google"|"Google"|"Maps"|"Maps"|"Mes Courses"|"Mes Courses"|"Messages"|"Messages"|"Phone"|"Phone"|"Photos"|"Photos"|"Safety"|"Safety"|"Settings"|"Settings"|"TMoble"|"TMoble"|"YouTube"|
-FAIL  U5. formulaire : ancien prix rappelé à part, montant vide (aucune reprise avec la nouvelle unité)
-      écran : "Search"|"Google app"|"Search web and more"|"Voice search"|"Google Lens"|"Calendar"|"Calendar"|"Camera"|"Camera"|"Chrome"|"Chrome"|"Clock"|"Clock"|"Contacts"|"Contacts"|"Drive"|"Drive"|"Files"|"Files"|"Gmail"|"Gmail"|"Google"|"Google"|"Maps"|"Maps"|"Mes Courses"|"Mes Courses"|"Messages"|"Messages"|"Phone"|"Phone"|"Photos"|"Photos"|"Safety"|"Safety"|"Settings"|"Settings"|"TMoble"|"TMoble"|"YouTube"|
+PASS  U2. ligne de riz enregistrée en paquets : toujours « 2 paquets » (jamais « 2 g » ni « 2 kg »)
+PASS  U3. quantité de la ligne modifiée dans SON unité (paquets)
+PASS  U4. ancien prix au kg du poulet signalé « à ressaisir », jamais affiché comme prix actuel
+PASS  U5. formulaire : ancien prix rappelé à part, montant vide (aucune reprise avec la nouvelle unité)
 PASS  U6. serveur : ancien prix conservé tel quel
 ═══ L. Statistiques : tous les produits achetés, recherche, historique d'un produit, tout l'historique ═══
-FAIL  L0. jeu d'essai : 19 achats ce mois, 20 en tout
-      écran : "At a glance"|"Sat, Oct 24"|"Sat, Oct 24"|"Gmail"|"Gmail"|"Photos"|"Photos"|"YouTube"|"YouTube"|"Home"|"Phone"|"Phone"|"Messages"|"Messages"|"Chrome"|"Chrome"|"Mes Courses"|"Predicted app: Mes Courses"|"Google search"|"Google app"|"Voice search"|"Google Lens"|
-FAIL  L1. aperçu conservé (8 produits) et bouton « Voir tous les produits (10) »
-      écran : "Statistiques"|"Aide sur les statistiques"|"Compte"|"Produits les plus achetés"|"Bananes, 2 achats, 2 kg. Voir l'historique des achats"|"Bananes"|"2 kg"|"2 achats"|"Beurre, 2 achats, 2 pièces. Voir l'historique des achats"|"Beurre"|"2 pièces"|"2 achats"|"Carottes, 2 achats, 2 kg. Voir l'historique des achats"|"Carottes"|"2 kg"|"2 achats"|"Farine, 2 achats, 2 paquets. Voir l'historique des achats"|"Farine"|"2 paquets"|"2 achats"|"Lait, 2 achats, 2 pièces. Voir l'historique des achats"|"Lait"|"2 pièces"|"2 achats"|"Oignons, 2 achats, 2 kg. Voir l'historique des achats"|"Oignons"|"2 kg"|"2 achats"|"Pommes, 2 achats, 2 kg. Voir l'historique des achats"|"Pommes"|"2 kg"|"2 achats"|"Sucre, 2 achats, 2 paquets. Voir l'historique des achats"|"Sucre"|"2 paquets"|"2 achats"|"Voir tous les produits (11)"|"Le mois est en cours : la comparaison porte sur le même nombre de jours de la période précédente."|"Liste"|"Liste"|
-FAIL  L2. écran « Tous les produits achetés » avec la période affichée
-      écran : "Statistiques"|"Aide sur les statistiques"|"Compte"|"Produits les plus achetés"|"Bananes, 2 achats, 2 kg. Voir l'historique des achats"|"Bananes"|"2 kg"|"2 achats"|"Beurre, 2 achats, 2 pièces. Voir l'historique des achats"|"Beurre"|"2 pièces"|"2 achats"|"Carottes, 2 achats, 2 kg. Voir l'historique des achats"|"Carottes"|"2 kg"|"2 achats"|"Farine, 2 achats, 2 paquets. Voir l'historique des achats"|"Farine"|"2 paquets"|"2 achats"|"Lait, 2 achats, 2 pièces. Voir l'historique des achats"|"Lait"|"2 pièces"|"2 achats"|"Oignons, 2 achats, 2 kg. Voir l'historique des achats"|"Oignons"|"2 kg"|"2 achats"|"Pommes, 2 achats, 2 kg. Voir l'historique des achats"|"Pommes"|"2 kg"|"2 achats"|"Sucre, 2 achats, 2 paquets. Voir l'historique des achats"|"Sucre"|"2 paquets"|"2 achats"|"Voir tous les produits (11)"|"Le mois est en cours : la comparaison porte sur le même nombre de jours de la période précédente."|"Liste"|"Liste"|
-FAIL  L3. recherche (majuscules ignorées) : Cumin, 10e produit, trouvé avec « 1 achat » et sa quantité
-      écran : "Statistiques"|"Aide sur les statistiques"|"Compte"|"Produits les plus achetés"|"Bananes, 2 achats, 2 kg. Voir l'historique des achats"|"Bananes"|"2 kg"|"2 achats"|"Beurre, 2 achats, 2 pièces. Voir l'historique des achats"|"Beurre"|"2 pièces"|"2 achats"|"Carottes, 2 achats, 2 kg. Voir l'historique des achats"|"Carottes"|"2 kg"|"2 achats"|"Farine, 2 achats, 2 paquets. Voir l'historique des achats"|"Farine"|"2 paquets"|"2 achats"|"Lait, 2 achats, 2 pièces. Voir l'historique des achats"|"Lait"|"2 pièces"|"2 achats"|"Oignons, 2 achats, 2 kg. Voir l'historique des achats"|"Oignons"|"2 kg"|"2 achats"|"Pommes, 2 achats, 2 kg. Voir l'historique des achats"|"Pommes"|"2 kg"|"2 achats"|"Sucre, 2 achats, 2 paquets. Voir l'historique des achats"|"Sucre"|"2 paquets"|"2 achats"|"Voir tous les produits (11)"|"Le mois est en cours : la comparaison porte sur le même nombre de jours de la période précédente."|"Liste"|"Liste"|
-FAIL  L4. historique du produit : période choisie, 1 achat de 0,25 kg avec sa date
-      écran : "Statistiques"|"Aide sur les statistiques"|"Compte"|"Produits les plus achetés"|"Bananes, 2 achats, 2 kg. Voir l'historique des achats"|"Bananes"|"2 kg"|"2 achats"|"Beurre, 2 achats, 2 pièces. Voir l'historique des achats"|"Beurre"|"2 pièces"|"2 achats"|"Carottes, 2 achats, 2 kg. Voir l'historique des achats"|"Carottes"|"2 kg"|"2 achats"|"Farine, 2 achats, 2 paquets. Voir l'historique des achats"|"Farine"|"2 paquets"|"2 achats"|"Lait, 2 achats, 2 pièces. Voir l'historique des achats"|"Lait"|"2 pièces"|"2 achats"|"Oignons, 2 achats, 2 kg. Voir l'historique des achats"|"Oignons"|"2 kg"|"2 achats"|"Pommes, 2 achats, 2 kg. Voir l'historique des achats"|"Pommes"|"2 kg"|"2 achats"|"Sucre, 2 achats, 2 paquets. Voir l'historique des achats"|"Sucre"|"2 paquets"|"2 achats"|"Voir tous les produits (11)"|"Le mois est en cours : la comparaison porte sur le même nombre de jours de la période précédente."|"Liste"|"Liste"|
-FAIL  L5. « Tout l'historique » : l'achat plus ancien apparaît (2 achats, 0,75 kg cumulés)
-      écran : "Statistiques"|"Aide sur les statistiques"|"Compte"|"Produits les plus achetés"|"Bananes, 2 achats, 2 kg. Voir l'historique des achats"|"Bananes"|"2 kg"|"2 achats"|"Beurre, 2 achats, 2 pièces. Voir l'historique des achats"|"Beurre"|"2 pièces"|"2 achats"|"Carottes, 2 achats, 2 kg. Voir l'historique des achats"|"Carottes"|"2 kg"|"2 achats"|"Farine, 2 achats, 2 paquets. Voir l'historique des achats"|"Farine"|"2 paquets"|"2 achats"|"Lait, 2 achats, 2 pièces. Voir l'historique des achats"|"Lait"|"2 pièces"|"2 achats"|"Oignons, 2 achats, 2 kg. Voir l'historique des achats"|"Oignons"|"2 kg"|"2 achats"|"Pommes, 2 achats, 2 kg. Voir l'historique des achats"|"Pommes"|"2 kg"|"2 achats"|"Sucre, 2 achats, 2 paquets. Voir l'historique des achats"|"Sucre"|"2 paquets"|"2 achats"|"Voir tous les produits (11)"|"Le mois est en cours : la comparaison porte sur le même nombre de jours de la période précédente."|"Liste"|"Liste"|
-FAIL  L6. retour : liste complète, recherche « CUMI » conservée
-      écran : "Ma liste"|"Samedi 24 octobre"|"Plus d'actions"|"Compte"|"10 sur 10 achetés"|"100 %"|"Tout est acheté."|"Terminer les courses"|"Ajouter des articles"|"Favoris"|"Déjà achetés (10)"|"Replier"|"Tomates"|"1 kg"|"Acheté par Adil · 08:44"|"Acheté : Tomates"|"Oignons"|"1 kg"|"Acheté par Adil · 08:44"|"Acheté : Oignons"|"Carottes"|"1 kg"|"Acheté par Adil · 08:44"|"Acheté : Carottes"|"Bananes"|"1 kg"|"Acheté par Adil · 08:44"|"Acheté : Bananes"|"Pommes"|"1 kg"|"Acheté par Adil · 08:44"|"Acheté : Pommes"|"Lait"|"1 pièce"|"Acheté : Lait"|"Liste"|"Liste"|"Historique"|"Historique"|"Statistiques"|
-FAIL  L7. aucune correspondance : message explicite
-      écran : "Ma liste"|"Samedi 24 octobre"|"Plus d'actions"|"Compte"|"10 sur 10 achetés"|"100 %"|"Tout est acheté."|"Terminer les courses"|"Ajouter des articles"|"Favoris"|"Déjà achetés (10)"|"Replier"|"Tomates"|"1 kg"|"Acheté par Adil · 08:44"|"Acheté : Tomates"|"Oignons"|"1 kg"|"Acheté par Adil · 08:44"|"Acheté : Oignons"|"Carottes"|"1 kg"|"Acheté par Adil · 08:44"|"Acheté : Carottes"|"Bananes"|"1 kg"|"Acheté par Adil · 08:44"|"Acheté : Bananes"|"Pommes"|"1 kg"|"Acheté par Adil · 08:44"|"Acheté : Pommes"|"Lait"|"1 pièce"|"Acheté : Lait"|"Liste"|"Liste"|"Historique"|"Historique"|"Statistiques"|
-FAIL  L8. recherche effacée : les 10 produits
-      écran : "Ma liste"|"Samedi 24 octobre"|"Plus d'actions"|"Compte"|"10 sur 10 achetés"|"100 %"|"Tout est acheté."|"Terminer les courses"|"Ajouter des articles"|"Favoris"|"Déjà achetés (10)"|"Replier"|"Tomates"|"1 kg"|"Acheté par Adil · 08:44"|"Acheté : Tomates"|"Oignons"|"1 kg"|"Acheté par Adil · 08:44"|"Acheté : Oignons"|"Carottes"|"1 kg"|"Acheté par Adil · 08:44"|"Acheté : Carottes"|"Bananes"|"1 kg"|"Acheté par Adil · 08:44"|"Acheté : Bananes"|"Pommes"|"1 kg"|"Acheté par Adil · 08:44"|"Acheté : Pommes"|"Lait"|"1 pièce"|"Acheté : Lait"|"Liste"|"Liste"|"Historique"|"Historique"|"Statistiques"|
+      produits achetés ce mois : 10 ; achats de cumin : 1 ce mois, 2 en tout
+PASS  L0. jeu d'essai : au moins 10 produits ce mois, cumin acheté 1 fois ce mois et 2 fois en tout
+PASS  L1. aperçu conservé (8 produits, Cumin absent) et bouton « Voir tous les produits (10) »
+PASS  L2. écran « Tous les produits achetés » avec la période affichée
+PASS  L3. recherche (majuscules ignorées) : Cumin, hors du top 8, trouvé avec « 1 achat » et sa quantité
+PASS  L4. historique du produit : période choisie, 1 achat de 0,25 kg avec sa date
+PASS  L5. « Tout l'historique » : l'achat plus ancien apparaît (2 achats, 0,75 kg cumulés)
+PASS  L6. retour : liste complète, recherche « CUMI » conservée
+PASS  L7. aucune correspondance : message explicite
+PASS  L8. recherche effacée : tous les produits (10)
 ═══ Z. Mise à jour de l'application : aucune, conseillée, obligatoire, annulée ; panne réseau sans blocage ═══
       versionCode installé : 1
-FAIL  Z1. version à jour : aucun message
-      écran : "Ma liste"|"Samedi 24 octobre"|"Plus d'actions"|"Compte"|"0 sur 1 achetés"|"0 %"|"Ajouter des articles"|"Favoris"|"Légumes et herbes"|"Replier"|"Tomates"|"2 kg"|"Acheté : Tomates"|"Liste"|"Liste"|"Historique"|"Historique"|"Statistiques"|"Statistiques"|"Réglages"|"Réglages"|
+PASS  Z1. version à jour : aucun message
 PASS  Z2. mise à jour conseillée : message et « Plus tard »
 PASS  Z3. reportée : l'application s'utilise, le message ne revient pas à chaque écran
 PASS  Z3b. toujours pas de message après un changement d'écran
@@ -40,14 +27,13 @@ PASS  Z4. obligation refusée sans confirmation de disponibilité sur Google Pla
 PASS  Z5. mise à jour obligatoire (au retour dans l'application) : accès bloqué, message attendu
 PASS  Z6. « Mettre à jour » ouvre la fiche Mes Courses (Google Play, sinon navigateur)
 --------- beginning of main
-10-24 10:51:43.225  8608  8608 I CoursesUpdate: navigateur, fiche ouverte : https://play.google.com/store/apps/details?id=app.smartcourse.courses.natif
+10-24 11:05:30.314  8027  8027 I CoursesUpdate: navigateur, fiche ouverte : https://play.google.com/store/apps/details?id=app.smartcourse.courses.natif
 PASS  Z7. retour sans mise à jour : blocage maintenu
 PASS  Z7b. le bouton Retour ne contourne pas le blocage
 PASS  Z8. panne réseau : aucun faux blocage
 PASS  Z9. obligation annulée : accès rétabli
 PASS  Z10. version installée = version minimale : accès normal, aucun message
-FAIL  Z11. données conservées : la liste garde ses articles
-      écran : "Ma liste"|"Samedi 24 octobre"|"Plus d'actions"|"Compte"|"0 sur 1 achetés"|"0 %"|"Ajouter des articles"|"Favoris"|"Légumes et herbes"|"Replier"|"Tomates"|"2 kg"|"Acheté : Tomates"|"Liste"|"Liste"|"Historique"|"Historique"|"Statistiques"|"Statistiques"|"Réglages"|"Réglages"|
-ECHECS=15
+PASS  Z11. données conservées : la liste garde ses articles
+ECHECS=0
 CRASH_APPLICATION=0
-TOTAL_ECHECS=15
+TOTAL_ECHECS=0
