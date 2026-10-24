@@ -87,9 +87,10 @@ enable_notifications() { # Réglages → Notifications et rappels → Nouvelles 
   adb shell input keyevent KEYCODE_BACK; sleep 1; $UI tap "Liste" --exact >/dev/null; sleep 4   # liste vue : repère des demandes posé
 }
 poll_now() { # la vérification périodique d'Android (WorkManager) est lancée tout de suite, sans attendre 15 minutes
-  local job; job=$(adb shell dumpsys jobscheduler | tr -d '\r' | grep -oE "#u0a[0-9]+/[0-9]+: [0-9a-f]+ $PKG" | head -1 | sed -E 's#.*/([0-9]+):.*#\1#')
+  adb shell dumpsys jobscheduler | tr -d '\r' | grep -E "JOB #.*$PKG" > "$OUT/diag/jobs-$(date +%s).txt"
+  local job; job=$(adb shell dumpsys jobscheduler | tr -d '\r' | grep -E "JOB #.*$PKG.*SystemJobService" | head -1 | sed -E 's#.*JOB \#[^/]+/([0-9]+):.*#\1#')
   log "  vérification forcée, tâche n°${job:-absente}"; adb logcat -c
-  [ -n "$job" ] && adb shell cmd jobscheduler run -f $PKG "$job" >/dev/null; sleep 10
+  [ -n "$job" ] && adb shell cmd jobscheduler run -f $PKG "$job" 2>&1 | head -2 | tee -a "$OUT/resultats.txt"; sleep 10
   adb logcat -d | grep -E "CoursesNotif|WM-WorkerWrapper" | tail -4 | tee -a "$OUT/resultats.txt"
 }
 
@@ -119,9 +120,9 @@ still A1-quantite-tomates
 act "Mettre à jour"
 act "Pommes de terre" --exact
 act "Catégories"; act "Fruits"; act "Bananes" --exact
-more() { act "Modifier la quantité : $1"; $UI wait "Mettre à jour" 10 >/dev/null; for _ in $(seq 1 "$2"); do sleep 0.4; $UI tap "Augmenter" >/dev/null; sleep 0.9; done; act "Mettre à jour"; }
-act "Catégories"; act "Laitages et œufs"; act "Œufs" --exact; more "Œufs" 5
-act "Catégories"; act "Pain et petit-déjeuner"; act "Pain" --exact; more "Pain" 3
+more() { act "Modifier la quantité : $1" --scroll; $UI wait "Mettre à jour" 10 >/dev/null; for _ in $(seq 1 "$2"); do sleep 0.4; $UI tap "Augmenter" >/dev/null; sleep 0.9; done; act "Mettre à jour"; }
+act "Catégories"; act "Laitages et œufs"; act "Œufs" --exact --scroll; more "Œufs" 5
+act "Catégories"; act "Pain et petit-déjeuner"; act "Pain" --exact --scroll; more "Pain" 3
 act "Catégories"
 expect "A2. sélection de 5 articles" $UI has "Terminer ma sélection (5)"
 still A2-selection-5-articles
@@ -142,6 +143,13 @@ for name in karim sophie; do
   rec_start "B-notification-$name"
   other batch; sleep 2; poll_now
   for _ in 1 2 3; do adb shell dumpsys notification --noredact | grep -q 'Nouvelle demande' && break; poll_now; done
+  if ! adb shell dumpsys notification --noredact | grep -q 'Nouvelle demande'; then
+    # Repli : la vérification périodique d'Android (au plus 15 min + marge) ; l'enregistrement reprend quand la notification est là.
+    rec_stop; mv "$OUT/videos/B-notification-$name.mp4" "$OUT/diag/B-attente-$name.mp4" 2>/dev/null
+    log "  attente de la vérification périodique d'Android (jusqu'à 17 min)"
+    for _ in $(seq 1 102); do adb shell dumpsys notification --noredact | grep -q 'Nouvelle demande' && break; sleep 10; done
+    rec_start "B-notification-$name"; sleep 1
+  fi
   sleep 2; adb shell cmd statusbar expand-notifications; sleep 4
   expect "B. notification « Nouvelle demande » ($name)" bash -c "adb shell dumpsys notification --noredact | grep -q 'Nouvelle demande'"
   still "B1-notification-$name"
@@ -160,7 +168,7 @@ restore S0 && login_as "${SOPHIE[@]}" "Ma liste"
 still C0-liste-vide
 rec_start C-liste-partagee
 sleep 2; other batch
-expect "C1. les 5 articles apparaissent sans action" bash -c "$UI wait 'Tomates' 30 && $UI wait 'Pain' 10"
+expect "C1. les articles apparaissent sans action" bash -c "$UI wait 'Tomates' 30 && $UI wait 'Bananes' 10"
 sleep 4; still C1-articles-recus
 rec_stop
 fi
@@ -184,17 +192,17 @@ sleep 3; still D2-sophie-voit-achat-karim
 rec_stop
 fi
 
-# ═══ E. Sophie coche « Œufs » ; Karim voit le changement ═══
+# ═══ E. Sophie coche « Bananes » ; Karim voit le changement ═══
 if want E; then
-restore S1 && login_as "${SOPHIE[@]}" "Œufs"
-rec_start E1-sophie-coche-oeufs
-scroll_to "Acheté : Œufs" >/dev/null; sleep 1; act "Acheté : Œufs"
-expect "E1. Œufs achetés par Sophie" bash -c "for _ in 1 2 3 4 5; do $UI has 'Achetée par Sophie' || $UI has 'Acheté par Sophie' && exit 0; adb shell input swipe 540 1400 540 900 1500; sleep 2; done; exit 1"
-still E1-sophie-oeufs-achetes
+restore S1 && login_as "${SOPHIE[@]}" "Bananes"
+rec_start E1-sophie-coche-bananes
+act "Acheté : Bananes"
+expect "E1. Bananes achetées par Sophie" bash -c "for _ in 1 2 3 4 5; do $UI has 'Achetée par Sophie' || $UI has 'Acheté par Sophie' && exit 0; adb shell input swipe 540 1400 540 900 1500; sleep 2; done; exit 1"
+still E1-sophie-bananes-achetees
 rec_stop
-restore S1 && login_as "${KARIM[@]}" "Œufs"
-rec_start E2-karim-voit-oeufs
-sleep 2; other buy sophie "Œufs"
+restore S1 && login_as "${KARIM[@]}" "Bananes"
+rec_start E2-karim-voit-bananes
+sleep 2; other buy sophie "Bananes"
 expect "E2. chez Karim : « Acheté par Sophie »" bash -c "for _ in 1 2 3 4 5 6; do $UI has 'Acheté par Sophie' && exit 0; adb shell input swipe 540 1500 540 900 600; sleep 3; done; exit 1"
 sleep 3; still E2-karim-voit-achat-sophie
 rec_stop
