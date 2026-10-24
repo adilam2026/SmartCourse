@@ -197,7 +197,7 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
         demo.inCatalog.clear()
         map.values.forEach { demo.inCatalog[it.id] = it.inCatalog }
         val lines = eff.map { l ->
-            Line(l.productId, qtyEdits[l.productId] ?: toBase(l.unit, l.quantity), l.bought, l.itemId, l.rev, l.purchaseId, l.buyer, clockTime(l.boughtAt), l.pending, l.price)
+            Line(l.productId, qtyEdits[l.productId] ?: toBase(l.unit, l.quantity), l.bought, l.itemId, l.rev, l.purchaseId, l.buyer, clockTime(l.boughtAt), l.pending, l.price, l.unit)
         }
         if (lines != demo.lines.toList()) { demo.lines.clear(); demo.lines.addAll(lines) }
         demo.pendingOps = engine.pendingOps
@@ -212,7 +212,7 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
     fun estimate(): Pair<Long, Int> {
         var cents = 0L; var missing = 0
         for (l in demo.lines) {
-            val p = demo.byId[l.productId] ?: continue
+            val p = demo.lineProduct(l) ?: continue
             when (val a = lineAmount(l.price ?: p.price, serverQtyText(p.serverUnit, l.qty), p.serverUnit)) {
                 is LineAmount.Ok -> cents += a.cents
                 is LineAmount.No -> missing++
@@ -224,7 +224,16 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
     /* ───── Brouillon de sélection ───── */
 
     private fun loadSelection(listId: String?) {
-        engine.loadDraft(listId).forEach { (pid, q) -> demo.byId[pid]?.let { p -> if (p.inCatalog) demo.selection[pid] = toBase(p.serverUnit, q) } }
+        val units = engine.loadDraftUnits(listId)
+        val changed = ArrayList<String>()
+        engine.loadDraft(listId).forEach { (pid, q) ->
+            demo.byId[pid]?.let { p ->
+                // Quantité saisie dans une unité qui n'est plus celle du produit : jamais convertie, à choisir de nouveau.
+                if (units[pid] != null && units[pid] != p.serverUnit) changed += p.name
+                else if (p.inCatalog) demo.selection[pid] = toBase(p.serverUnit, q)
+            }
+        }
+        if (changed.isNotEmpty()) demo.say("Unité modifiée depuis votre sélection, quantité à choisir de nouveau : ${changed.joinToString(", ")}.")
     }
 
     private fun syncDraft() {
@@ -251,16 +260,23 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
     }
 
     private fun persistDraft() {
-        val m = demo.selection.toMap().mapNotNull { (pid, q) -> demo.byId[pid]?.let { pid to toServer(it.serverUnit, q) } }.toMap()
-        engine.saveDraft(draftListId.takeIf { it != "\u0000" }, m)
+        val sel = demo.selection.toMap().filterKeys { demo.byId[it] != null }
+        val m = sel.mapValues { (pid, q) -> toServer(demo.byId[pid]!!.serverUnit, q) }
+        engine.saveDraft(draftListId.takeIf { it != "\u0000" }, m, sel.keys.associateWith { demo.byId[it]!!.serverUnit })
     }
 
     fun resumeOrphans() {
         val orphans = engine.takeOrphans()
         var n = 0
-        orphans.forEach { o -> val p = demo.byId[o.productId]; if (p != null && p.inCatalog) { demo.selection[o.productId] = toBase(p.serverUnit, o.quantity); n++ } }
+        val changed = ArrayList<String>()
+        orphans.forEach { o ->
+            val p = demo.byId[o.productId]
+            if (p != null && p.inCatalog && o.unit != null && o.unit != p.serverUnit) changed += p.name // jamais converti d'une unité à l'autre
+            else if (p != null && p.inCatalog) { demo.selection[o.productId] = toBase(p.serverUnit, o.quantity); n++ }
+        }
         demo.orphanCount = 0
-        demo.say(if (n > 0) "$n article${if (n > 1) "s" else ""} repris dans votre sélection." else "Ces articles ne sont plus au catalogue.")
+        val note = if (changed.isEmpty()) "" else " Unité modifiée, quantité à choisir de nouveau : ${changed.joinToString(", ")}."
+        demo.say((if (n > 0) "$n article${if (n > 1) "s" else ""} repris dans votre sélection." else if (changed.isEmpty()) "Ces articles ne sont plus au catalogue." else "") + note)
     }
 
     fun dismissOrphans() { engine.takeOrphans(); demo.orphanCount = 0 }
@@ -439,9 +455,9 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
         val line = engine.effective().firstOrNull { it.productId == pid }
         val p = demo.byId[pid]
         if (line == null || p == null || line.bought) { qtyEdits.remove(pid); render(); return }
-        val sq = toServer(p.serverUnit, q)
+        val sq = toServer(line.unit, q) // la quantité d'une ligne se modifie toujours dans l'unité de la ligne
         if (sq != line.quantity) {
-            engine.enqueue(listOf(engine.op("set_qty", productId = pid, quantity = sq, baseRev = if (line.itemId != null) line.rev else 1, name = p.name, unit = p.serverUnit)))
+            engine.enqueue(listOf(engine.op("set_qty", productId = pid, quantity = sq, baseRev = if (line.itemId != null) line.rev else 1, name = p.name, unit = line.unit)))
         }
         qtyEdits.remove(pid); render()
         if (sq != line.quantity) flushAndRefresh()
@@ -466,17 +482,23 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
     fun submitStaffSelection(after: (() -> Unit)? = null) {
         val entries = demo.selection.toMap()
         val lines = engine.effective()
-        val ops = entries.mapNotNull { (pid, q) ->
-            val p = demo.byId[pid] ?: return@mapNotNull null
+        val ops = entries.flatMap { (pid, q) ->
+            val p = demo.byId[pid] ?: return@flatMap emptyList()
             val cur = lines.firstOrNull { it.productId == pid }
             val sq = toServer(p.serverUnit, q.coerceAtLeast(0)).coerceIn(0.0, 999.0)
             when {
-                q <= 0 -> if (cur != null && !cur.bought) engine.op("remove", productId = pid, baseRev = if (cur.itemId != null) cur.rev else 1, name = p.name) else null
-                !p.inCatalog -> null
-                cur == null -> engine.op("add", productId = pid, quantity = sq, name = p.name, unit = p.serverUnit, category = p.category, photoUrl = p.photoUrl)
-                cur.bought -> engine.op("request_again", productId = pid, quantity = sq, name = p.name, unit = p.serverUnit, category = p.category, photoUrl = p.photoUrl)
-                cur.quantity == sq -> null
-                else -> engine.op("set_qty", productId = pid, quantity = sq, baseRev = if (cur.itemId != null) cur.rev else 1, name = p.name, unit = p.serverUnit)
+                q <= 0 -> listOfNotNull(if (cur != null && !cur.bought) engine.op("remove", productId = pid, baseRev = if (cur.itemId != null) cur.rev else 1, name = p.name) else null)
+                !p.inCatalog -> emptyList()
+                cur == null -> listOf(engine.op("add", productId = pid, quantity = sq, name = p.name, unit = p.serverUnit, category = p.category, photoUrl = p.photoUrl))
+                cur.bought -> listOf(engine.op("request_again", productId = pid, quantity = sq, name = p.name, unit = p.serverUnit, category = p.category, photoUrl = p.photoUrl))
+                // Ligne enregistrée dans une autre unité (unité du produit changée depuis) : la quantité choisie, dans la nouvelle unité,
+                // remplace la ligne explicitement (retrait puis ajout) ; elle n'est jamais additionnée ni réinterprétée.
+                cur.unit != p.serverUnit -> listOf(
+                    engine.op("remove", productId = pid, baseRev = if (cur.itemId != null) cur.rev else 1, name = p.name),
+                    engine.op("add", productId = pid, quantity = sq, name = p.name, unit = p.serverUnit, category = p.category, photoUrl = p.photoUrl),
+                )
+                cur.quantity == sq -> emptyList()
+                else -> listOf(engine.op("set_qty", productId = pid, quantity = sq, baseRev = if (cur.itemId != null) cur.rev else 1, name = p.name, unit = p.serverUnit))
             }
         }
         if (ops.isEmpty()) { demo.selection.clear(); render(); after?.invoke(); return }
@@ -502,8 +524,9 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
     }
 
     /** Ajoute des produits à la liste (sélection, favori ou « Recommander ») : [entries] = produit → quantité (unités de l'application). */
-    fun submit(entries: Map<String, Int>, clearSelection: Boolean, after: () -> Unit = {}) {
+    fun submit(entries: Map<String, Int>, clearSelection: Boolean, after: () -> Unit = {}, note: String = "") {
         val lines = engine.effective()
+        val otherUnit = ArrayList<String>()
         val ops = entries.mapNotNull { (pid, q) ->
             val p = demo.byId[pid] ?: return@mapNotNull null
             if (!p.inCatalog) return@mapNotNull null
@@ -512,10 +535,12 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
             when {
                 cur == null -> engine.op("add", productId = pid, quantity = sq, name = p.name, unit = p.serverUnit, category = p.category, photoUrl = p.photoUrl)
                 cur.bought -> engine.op("request_again", productId = pid, quantity = sq, name = p.name, unit = p.serverUnit, category = p.category, photoUrl = p.photoUrl)
+                cur.unit != p.serverUnit -> { otherUnit += p.name; null } // jamais d'addition entre deux unités
                 else -> engine.op("set_qty", productId = pid, quantity = (cur.quantity + sq).coerceAtMost(999.0), baseRev = if (cur.itemId != null) cur.rev else 1, name = p.name, unit = p.serverUnit)
             }
         }
-        if (ops.isEmpty()) { demo.say("Aucun article à ajouter."); return }
+        val otherNote = (if (otherUnit.isEmpty()) "" else " Déjà dans la liste dans une autre unité, non modifié : ${otherUnit.joinToString(", ")} (modifiez la ligne existante).") + note
+        if (ops.isEmpty()) { demo.say(if (otherUnit.isEmpty()) "Aucun article à ajouter." else otherNote.trim()); return }
         engine.enqueue(ops)
         if (clearSelection) demo.selection.clear()
         render(); after()
@@ -524,7 +549,7 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
             val rep = engine.flush()
             if (rep.networkDown) demo.say("Envoi en attente : $before modification${if (before > 1) "s" else ""} partiront au retour du réseau.")
             else if (rep.messages.isNotEmpty()) demo.say(rep.messages.joinToString(" "))
-            else demo.say(if (me.role == "staff") "Demande envoyée." else "Articles ajoutés à la liste.")
+            else demo.say((if (me.role == "staff") "Demande envoyée." else "Articles ajoutés à la liste.") + otherNote)
             if (!rep.networkDown) engine.refresh()
             render(); syncDraft()
         }
@@ -547,8 +572,8 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
             when {
                 cur == null -> ops += engine.op("add", productId = pid, quantity = sq, name = p.name, unit = p.serverUnit, category = p.category, photoUrl = p.photoUrl)
                 cur.bought -> ops += engine.op("request_again", productId = pid, quantity = sq, name = p.name, unit = p.serverUnit, category = p.category, photoUrl = p.photoUrl)
-                replace -> if (cur.quantity != sq) ops += engine.op("set_qty", productId = pid, quantity = sq, baseRev = if (cur.itemId != null) cur.rev else 1, name = p.name, unit = p.serverUnit)
                 cur.unit != p.serverUnit -> otherUnit++
+                replace -> if (cur.quantity != sq) ops += engine.op("set_qty", productId = pid, quantity = sq, baseRev = if (cur.itemId != null) cur.rev else 1, name = p.name, unit = p.serverUnit)
                 else -> ops += engine.op("set_qty", productId = pid, quantity = (cur.quantity + sq).coerceAtMost(999.0), baseRev = if (cur.itemId != null) cur.rev else 1, name = p.name, unit = p.serverUnit)
             }
         }

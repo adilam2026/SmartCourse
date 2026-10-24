@@ -53,8 +53,12 @@ private fun parsePast(o: JsonObject) = Past(
 /** Recommander : remet dans la liste en cours les articles achetés, sans rien supprimer ni modifier d'ancien. */
 private fun reorder(demo: Demo, lines: List<PastLine>, nav: (String) -> Unit) {
     val data = demo.data ?: return
-    val usable = lines.filter { demo.byId[it.productId]?.inCatalog == true }
-    if (usable.isEmpty()) { demo.say("Aucun de ces articles n'est dans votre catalogue actuel."); return }
+    val inCatalog = lines.filter { demo.byId[it.productId]?.inCatalog == true }
+    // Achat enregistré dans une unité qui n'est plus celle du produit : sa quantité n'est jamais convertie ni recommandée telle quelle.
+    val otherUnit = inCatalog.filter { it.unit != demo.byId[it.productId]?.serverUnit }
+    val usable = inCatalog - otherUnit.toSet()
+    if (usable.isEmpty()) { demo.say(if (otherUnit.isEmpty()) "Aucun de ces articles n'est dans votre catalogue actuel." else "Unité modifiée depuis cet achat, à ajouter vous-même : ${otherUnit.joinToString(", ") { it.name }}."); return }
+    if (otherUnit.isNotEmpty()) demo.say("Unité modifiée depuis cet achat, non recommandé : ${otherUnit.joinToString(", ") { it.name }}.")
     val entries = usable.associate { it.productId to toBase(it.unit, it.qty) }
     // Plusieurs listes actives : la destination est choisie (nouvelle liste ou liste en cours).
     if (demo.multiLists) { demo.reorderDestination = entries; return }

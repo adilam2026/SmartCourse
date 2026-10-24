@@ -60,19 +60,24 @@ class ListEngine(
     fun wipeLocal() {
         val listId = list?.id
         for (k in listOf("list", "outbox", "orphans")) kv.remove(key(k))
-        kv.remove(draftKey(listId)); kv.remove(draftKey(null))
+        kv.remove(draftKey(listId)); kv.remove(draftKey(null)); kv.remove(unitsKey(listId)); kv.remove(unitsKey(null))
         list = null; outbox = emptyList(); orphans = emptyList()
     }
 
     /* ───── Brouillon de sélection (par famille + profil + liste ; « none » quand aucune liste n'existe) ───── */
 
     private fun draftKey(listId: String?) = "draft|$scope|${listId ?: "none"}"
+    /** Unité de chaque quantité du brouillon (clé séparée : les brouillons enregistrés avant elle restent lisibles). */
+    private fun unitsKey(listId: String?) = "draftunits|$scope|${listId ?: "none"}"
+    fun loadDraftUnits(listId: String?): Map<String, String> =
+        kv.get(unitsKey(listId))?.let { s -> try { storeJson.decodeFromString(MapSerializer(String.serializer(), String.serializer()), s) } catch (_: Exception) { null } } ?: emptyMap()
 
     fun loadDraft(listId: String?): Map<String, Double> =
         kv.get(draftKey(listId))?.let { s -> try { storeJson.decodeFromString(MapSerializer(String.serializer(), Double.serializer()), s) } catch (_: Exception) { null } } ?: emptyMap()
 
-    fun saveDraft(listId: String?, draft: Map<String, Double>) {
+    fun saveDraft(listId: String?, draft: Map<String, Double>, units: Map<String, String> = emptyMap()) {
         if (draft.isEmpty()) kv.remove(draftKey(listId)) else kv.put(draftKey(listId), storeJson.encodeToString(MapSerializer(String.serializer(), Double.serializer()), draft))
+        if (draft.isEmpty() || units.isEmpty()) kv.remove(unitsKey(listId)) else kv.put(unitsKey(listId), storeJson.encodeToString(MapSerializer(String.serializer(), String.serializer()), units))
     }
 
     /** Un brouillon rangé sous une liste qui n'est plus la liste en cours est mis de côté (« Reprendre »), jamais ajouté à l'autre liste. */
@@ -80,7 +85,8 @@ class ListEngine(
         if (oldListId == newListId) return
         val d = loadDraft(oldListId)
         if (d.isEmpty()) return
-        val add = d.map { (pid, q) -> val (n, u) = describe(pid); Orphan(pid, n, q, u) }
+        val units = loadDraftUnits(oldListId)
+        val add = d.map { (pid, q) -> val (n, u) = describe(pid); Orphan(pid, n, q, units[pid] ?: u) }
         orphans = (orphans.filter { o -> add.none { it.productId == o.productId } } + add)
         saveOrphans(); saveDraft(oldListId, emptyMap())
     }

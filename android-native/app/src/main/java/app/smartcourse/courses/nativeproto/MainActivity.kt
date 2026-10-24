@@ -80,6 +80,7 @@ import app.smartcourse.courses.nativeproto.net.Session
 class MainActivity : ComponentActivity() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var session: Session? = null
+    private var demoMode = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Paramètres de lancement : réservés au build de recette (captures automatiques d'écrans simulés).
@@ -115,10 +116,20 @@ class MainActivity : ComponentActivity() {
         // Version finale : serveur permanent fixé à la compilation, jamais demandé à l'utilisateur.
         if (BuildConfig.FINAL) s.setServer(BuildConfig.SERVER_URL)
         val demoMode = Launch.str("screen") != null || Launch.str("path") != null || Launch.flag("hub")
+        this.demoMode = demoMode
         if (!demoMode) s.start()
         splash.setKeepOnScreenCondition { !demoMode && s.state == AuthState.Booting }
         val loader = ImageLoader.Builder(applicationContext).okHttpClient(s.api.imageClient()).crossfade(true).build()
-        setContent { CoursesTheme { CompositionLocalProvider(LocalImageLoader provides loader) { Root(s, demoMode) } } }
+        setContent {
+            CoursesTheme {
+                CompositionLocalProvider(LocalImageLoader provides loader) {
+                    Box(Modifier.fillMaxSize()) {
+                        Root(s, demoMode)
+                        if (!demoMode) UpdateGate()
+                    }
+                }
+            }
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -131,7 +142,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onStart() { super.onStart(); session?.verify(); LiveHolder.current?.onForeground() }
+    override fun onStart() {
+        super.onStart(); session?.verify(); LiveHolder.current?.onForeground()
+        // Mise à jour : vérifiée à chaque ouverture et à chaque retour (ex. au retour de Google Play), connecté ou non.
+        val s = session
+        if (s != null && !demoMode) scope.launch { AppUpdate.check(s.api, BuildConfig.VERSION_CODE) }
+    }
     override fun onStop() { super.onStop(); LiveHolder.current?.onBackground() }
     override fun onDestroy() { super.onDestroy(); scope.cancel() }
 }

@@ -10,7 +10,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import app.smartcourse.courses.nativeproto.net.PriceRef
+import app.smartcourse.courses.nativeproto.net.LineAmount
 import app.smartcourse.courses.nativeproto.net.fmtPrice
+import app.smartcourse.courses.nativeproto.net.lineAmount
 import java.util.Locale
 
 /** Paramètres de lancement (adb) : servent uniquement à ouvrir un écran dans un état précis pour les captures. */
@@ -81,7 +83,7 @@ fun priceText(cents: Int, p: Product): String {
 
 /** Pas du bouton +/− dans l'unité affichée. */
 fun stepOf(p: Product, big: Boolean): Int = when (p.unit) {
-    UnitKind.MASS -> if (big) 500 else 100
+    UnitKind.MASS -> if (big) 250 else 100 // en kg : 0,25 · 0,5 · 0,75 · 1 kg…
     UnitKind.VOLUME -> if (big) 500 else 100
     UnitKind.COUNT -> 1
 }
@@ -110,6 +112,8 @@ data class Line(
     val productId: String, val qty: Int, val bought: Boolean,
     val itemId: String? = null, val rev: Int = 0, val purchaseId: String? = null,
     val buyer: String? = null, val boughtAt: String? = null, val pending: Boolean = false, val price: PriceRef? = null,
+    /** Unité ENREGISTRÉE sur la ligne (serveur) : elle reste celle de la ligne même si l'unité du produit change ensuite. */
+    val unit: String? = null,
 )
 data class Profile(val name: String, val role: ProfRole, val primary: Boolean = false, val active: Boolean = true, val color: Color)
 data class Order(val id: String, val date: String, val lines: List<Pair<String, Int>>)
@@ -189,7 +193,14 @@ class Demo(initialRole: Role? = null, val live: Boolean = false) {
      */
     /** Quantité déjà dans la liste en cours (article non acheté), pour TOUS les rôles : l'écran d'ajout reflète toute la liste
      *  (recommandation, favoris ou ajout manuel) et la sélection ne garde que les modifications. Données de démonstration : personnel seulement. */
-    fun savedQty(pid: String): Int? = if (role == Role.STAFF || data != null) lines.firstOrNull { it.productId == pid && !it.bought }?.qty else null
+    /** Quantité de la ligne non achetée, dans l'unité ACTUELLE du produit ; null si la ligne a été enregistrée dans une autre unité. */
+    fun savedQty(pid: String): Int? = if (role == Role.STAFF || data != null) openLine(pid)?.takeIf { sameUnit(it) }?.qty else null
+    fun openLine(pid: String): Line? = lines.firstOrNull { it.productId == pid && !it.bought }
+    private fun sameUnit(l: Line) = l.unit == null || l.unit == byId[l.productId]?.serverUnit
+    /** Produit d'une ligne, dans l'unité de la LIGNE : une ligne n'est jamais réinterprétée après un changement d'unité du produit. */
+    fun lineProduct(l: Line): Product? = byId[l.productId]?.let { p ->
+        if (sameUnit(l)) p else p.copy(unit = unitKindOf(l.unit!!), countLabel = countLabelOf(l.unit), serverUnit = l.unit, price = null)
+    }
     /** « Recommander » sur une liste en cours non vide : choix explicite (ajouter ou remplacer), jamais de fusion silencieuse. */
     var reorderAsk by mutableStateOf<Map<String, Int>?>(null)
     fun selQty(pid: String): Int? { val s = selection[pid] ?: return savedQty(pid); return if (s <= 0) null else s }
@@ -253,7 +264,8 @@ class Demo(initialRole: Role? = null, val live: Boolean = false) {
 
     /** Texte du prix indicatif d'un produit (ou null s'il n'y en a pas). */
     fun priceLabel(p: Product, line: Line? = null): String? =
-        if (live) (line?.price ?: p.price)?.let { fmtPrice(it) } else prices[p.id]?.let { priceText(it, p) }
+        if (live) (line?.price ?: p.price?.takeIf { lineAmount(it, "1", p.serverUnit) is LineAmount.Ok })?.let { fmtPrice(it) } // jamais un ancien prix d'une autre unité
+        else prices[p.id]?.let { priceText(it, p) }
 }
 
 val LocalDemo = compositionLocalOf<Demo> { error("Demo manquant") }

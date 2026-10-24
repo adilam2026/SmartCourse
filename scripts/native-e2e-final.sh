@@ -977,6 +977,135 @@ adb shell cmd statusbar expand-notifications; sleep 2; shot final-q2-notificatio
 adb shell settings put global auto_time 1
 fi
 
+# Achat enregistré par l'API (article ajouté puis coché) ; $3 = date d'achat (SQL), facultative
+buy_api() {
+  add_api "$1" "$2"
+  local item; item=$(sql "SELECT i.id FROM list_items i JOIN lists l ON l.id=i.list_id JOIN families f ON f.id=l.family_id JOIN products p ON p.id=i.product_id WHERE f.code='$FAMILY' AND l.status='active' AND p.name='$1' AND i.status='to_buy'")
+  [ -z "$item" ] && { api POST /api/lists/active/ops -d "{\"ops\":[{\"opId\":\"$(uuid)\",\"type\":\"request_again\",\"productId\":\"$(pid_of "$1")\",\"quantity\":$2}]}" >/dev/null
+    item=$(sql "SELECT i.id FROM list_items i JOIN lists l ON l.id=i.list_id JOIN families f ON f.id=l.family_id JOIN products p ON p.id=i.product_id WHERE f.code='$FAMILY' AND l.status='active' AND p.name='$1' AND i.status='to_buy'"); }
+  api POST /api/lists/active/ops -d "{\"ops\":[{\"opId\":\"$(uuid)\",\"type\":\"purchase\",\"itemId\":\"$item\"}]}" >/dev/null
+  [ -n "${3:-}" ] && sql "UPDATE purchases SET purchased_at = $3 WHERE list_item_id='$item' AND voided_at IS NULL" >/dev/null
+  return 0
+}
+uuid() { cat /proc/sys/kernel/random/uuid; }
+
+if want_s U; then
+echo "═══ U. Unités corrigées : décimales au kg, lignes existantes jamais réinterprétées, prix à ressaisir ═══" | tee -a "$OUT/resultats.txt"
+login_api adil 482913
+closeall_api; api PUT /api/family/features -d '{"multiLists":false}' >/dev/null
+expect "U0. catalogue de la famille : Riz et Cumin au kg, Persil et Poulet à la pièce" test "$(sql "SELECT string_agg(p.name||':'||p.unit, ',' ORDER BY p.name) FROM products p JOIN families f ON f.id=p.family_id WHERE f.code='$FAMILY' AND p.name IN ('Riz','Cumin','Persil','Poulet')")" = "Cumin:kg,Persil:piece,Poulet:piece,Riz:kg"
+add_api Cumin 0.25
+add_api Riz 2
+# Ligne de riz créée AVANT la correction (en paquets) : elle doit rester « 2 paquets »
+sql "UPDATE list_items SET unit='paquet' WHERE id=(SELECT i.id FROM list_items i JOIN lists l ON l.id=i.list_id JOIN families f ON f.id=l.family_id JOIN products p ON p.id=i.product_id WHERE f.code='$FAMILY' AND l.status='active' AND p.name='Riz')" >/dev/null
+# Ancien prix de famille du poulet au kg (le poulet est maintenant à la pièce) : conservé, jamais converti
+sql "INSERT INTO family_prices (family_id, product_id, amount, ref_qty, ref_unit) SELECT f.id, p.id, 70, 1, 'kg' FROM products p JOIN families f ON f.id=p.family_id WHERE f.code='$FAMILY' AND p.name='Poulet' ON CONFLICT (family_id, product_id) DO UPDATE SET amount=70, ref_qty=1, ref_unit='kg', packaging=NULL, piece_weight_g=NULL" >/dev/null
+launch; $UI wait "Bienvenue" 25 >/dev/null
+signin "$FAMILY" adil 482913; $UI wait "Ma liste" 25 >/dev/null; sleep 2
+expect "U1. 0,25 kg de cumin accepté et affiché (250 g)" $UI wait "250 g" 15
+expect "U2. ligne de riz enregistrée en paquets : toujours « 2 paquets » (jamais « 2 g » ni « 2 kg »)" bash -c "$UI has '2 paquets' && ! $UI has '2 g' && test \"\$(st Riz)\" = '2.000 paquet to_buy'"
+shot final-u1-liste-unites
+# Modifier la quantité de cette ligne garde son unité
+$UI tap "Riz" >/dev/null; sleep 2
+expect "U3. quantité de la ligne modifiée dans SON unité (paquets)" $UI wait "Se compte en paquets" 8
+adb shell input keyevent KEYCODE_BACK; sleep 2
+tapt "Réglages"; $UI tap "Gestion des prix" --scroll >/dev/null; sleep 3
+search Poulet
+expect "U4. ancien prix au kg du poulet signalé « à ressaisir », jamais affiché comme prix actuel" bash -c "$UI wait 'prix à ressaisir' 10 && ! $UI has '70,00 DH / kg'"
+$UI tap "Ajouter un prix" >/dev/null || $UI tap "Poulet" --last >/dev/null; sleep 3
+expect "U5. formulaire : ancien prix rappelé à part, montant vide (aucune reprise avec la nouvelle unité)" bash -c "$UI wait 'Ancien prix : 70,00 DH / kg' 10 && $UI has 'ne peut pas être converti'"
+shot final-u2-prix-a-ressaisir
+adb shell input keyevent KEYCODE_BACK; sleep 1
+expect "U6. serveur : ancien prix conservé tel quel" test "$(sql "SELECT fp.amount||' '||fp.ref_unit FROM family_prices fp JOIN products p ON p.id=fp.product_id JOIN families f ON f.id=fp.family_id WHERE f.code='$FAMILY' AND p.name='Poulet'")" = "70.00 kg"
+fi
+
+if want_s L; then
+echo "═══ L. Statistiques : tous les produits achetés, recherche, historique d'un produit, tout l'historique ═══" | tee -a "$OUT/resultats.txt"
+login_api adil 482913
+closeall_api; api PUT /api/family/features -d '{"multiLists":false}' >/dev/null
+FID=$(sql "SELECT id FROM families WHERE code='$FAMILY'")
+sql "DELETE FROM purchases WHERE family_id='$FID'" >/dev/null 2>&1 || true
+# Neuf produits achetés deux fois ce mois ; Cumin une fois ce mois (10e, hors de l'aperçu) et une fois il y a deux mois
+for n in Tomates Lait Oignons Carottes Pommes Bananes Sucre Farine Beurre; do buy_api "$n" 1 "now() - interval '1 hour'"; buy_api "$n" 1 "now() - interval '2 hours'"; done
+buy_api Cumin 0.25 "now() - interval '3 hours'"
+buy_api Cumin 0.5 "date_trunc('month', now()) - interval '40 days'"
+expect "L0. jeu d'essai : 19 achats ce mois, 20 en tout" test "$(sql "SELECT count(*) FILTER (WHERE purchased_at >= date_trunc('month', now()))||'/'||count(*) FROM purchases WHERE family_id='$FID' AND voided_at IS NULL")" = "19/20"
+launch; $UI wait "Bienvenue" 25 >/dev/null
+signin "$FAMILY" adil 482913; $UI wait "Ma liste" 25 >/dev/null
+tapt "Statistiques"; $UI wait "Produits les plus achetés" 20 >/dev/null
+expect "L1. aperçu conservé (8 produits) et bouton « Voir tous les produits (10) »" bash -c "$UI tap 'Voir tous les produits (10)' --scroll >/dev/null"
+expect "L2. écran « Tous les produits achetés » avec la période affichée" bash -c "$UI wait 'Tous les produits achetés' 10 && $UI has 'Ce mois' && $UI has '10 produits'"
+shot final-l1-tous-les-produits
+fill "Rechercher un produit" "CUMI"; hide_kb; sleep 2
+expect "L3. recherche (majuscules ignorées) : Cumin, 10e produit, trouvé avec « 1 achat » et sa quantité" bash -c "$UI has 'Cumin' && $UI has '1 achat' && $UI has '0,25 kg' && $UI has '1 sur 10'"
+shot final-l2-recherche
+$UI tap "Cumin" >/dev/null; sleep 3
+expect "L4. historique du produit : période choisie, 1 achat de 0,25 kg avec sa date" bash -c "$UI wait 'Historique des achats' 10 && $UI has '0,25 kg' && $UI has '1 achat'"
+shot final-l3-historique
+$UI tap "Tout l'historique" >/dev/null; sleep 3
+expect "L5. « Tout l'historique » : l'achat plus ancien apparaît (2 achats, 0,75 kg cumulés)" bash -c "$UI wait '2 achats' 10 && $UI has '0,5 kg' && $UI has '0,75 kg'"
+shot final-l4-tout-historique
+adb shell input keyevent KEYCODE_BACK; sleep 2
+expect "L6. retour : liste complète, recherche « CUMI » conservée" bash -c "$UI wait 'Tous les produits achetés' 10 && $UI has 'CUMI' && $UI has '1 sur 10'"
+fill "Rechercher un produit" "zzz"; hide_kb; sleep 2
+expect "L7. aucune correspondance : message explicite" $UI wait "Aucun produit acheté ne correspond à votre recherche" 10
+$UI tap "Effacer la recherche" >/dev/null; sleep 2
+expect "L8. recherche effacée : les 10 produits" $UI wait "10 produits" 10
+fi
+
+if want_s Z; then
+echo "═══ Z. Mise à jour de l'application : aucune, conseillée, obligatoire, annulée ; panne réseau sans blocage ═══" | tee -a "$OUT/resultats.txt"
+FID=$(sql "SELECT id FROM families WHERE code='$FAMILY'")
+sql "INSERT INTO catalog_managers (profile_id) SELECT id FROM profiles WHERE family_id='$FID' AND login='adil' ON CONFLICT DO NOTHING" >/dev/null
+login_api adil 482913
+VC=$(adb shell dumpsys package $PKG | grep -m1 -oE "versionCode=[0-9]+" | cut -d= -f2)
+echo "      versionCode installé : $VC" | tee -a "$OUT/resultats.txt"
+policy() { api PUT /api/gestion/app-update -d "$1" >/dev/null; }
+policy '{"latestVersionCode":null,"minVersionCode":null}'
+closeall_api; add_api Tomates 2
+launch
+expect "Z1. version à jour : aucun message" bash -c "$UI wait 'Bienvenue' 20 && $UI gone 'Une nouvelle version' 4 && ! $UI has 'Pour continuer à utiliser'"
+policy "{\"latestVersionCode\":$((VC+1)),\"minVersionCode\":null}"
+launch
+expect "Z2. mise à jour conseillée : message et « Plus tard »" bash -c "$UI wait 'Une nouvelle version de Mes Courses est disponible.' 15 && $UI has 'Plus tard' && $UI has 'Mettre à jour'"
+shot final-z1-conseillee
+$UI tap "Plus tard" >/dev/null; sleep 2
+signin "$FAMILY" adil 482913
+expect "Z3. reportée : l'application s'utilise, le message ne revient pas à chaque écran" bash -c "$UI wait 'Ma liste' 20 && $UI gone 'Une nouvelle version' 3"
+tapt "Historique"; tapt "Liste"
+expect "Z3b. toujours pas de message après un changement d'écran" $UI gone "Une nouvelle version" 3
+expect "Z4. obligation refusée sans confirmation de disponibilité sur Google Play" test "$(api PUT /api/gestion/app-update -d "{\"latestVersionCode\":$((VC+1)),\"minVersionCode\":$((VC+1))}")" = 400
+policy "{\"latestVersionCode\":$((VC+1)),\"minVersionCode\":$((VC+1)),\"availableOnPlay\":true}"
+adb shell input keyevent KEYCODE_HOME; sleep 2; adb shell am start -n "$ACT" >/dev/null 2>&1; sleep 4
+expect "Z5. mise à jour obligatoire (au retour dans l'application) : accès bloqué, message attendu" bash -c "$UI wait 'Pour continuer à utiliser Mes Courses, veuillez mettre à jour' 15 && $UI has 'Vos données seront conservées'"
+shot final-z2-obligatoire
+adb logcat -c
+$UI tap "Mettre à jour" >/dev/null; sleep 5
+expect "Z6. « Mettre à jour » ouvre la fiche Mes Courses (Google Play, sinon navigateur)" bash -c "adb logcat -d -s CoursesUpdate:I | grep -qE 'ouverte : (market://details\?id=|https://play.google.com/store/apps/details\?id=)app.smartcourse.courses.natif'"
+adb logcat -d -s CoursesUpdate:I | tail -3 | tee -a "$OUT/resultats.txt"
+back_to_app; sleep 3
+expect "Z7. retour sans mise à jour : blocage maintenu" $UI wait "Pour continuer à utiliser Mes Courses" 15
+adb shell input keyevent KEYCODE_BACK; sleep 2; adb shell am start -n "$ACT" >/dev/null 2>&1; sleep 4
+expect "Z7b. le bouton Retour ne contourne pas le blocage" $UI wait "Pour continuer à utiliser Mes Courses" 15
+# Panne réseau : l'application relancée n'est jamais bloquée faute de pouvoir vérifier
+adb shell am force-stop $PKG
+adb shell cmd connectivity airplane-mode enable >/dev/null 2>&1; adb shell svc wifi disable >/dev/null 2>&1; adb shell svc data disable >/dev/null 2>&1; sleep 4
+adb shell am start -W -n "$ACT" >/dev/null 2>&1; sleep 6
+expect "Z8. panne réseau : aucun faux blocage" bash -c "sleep 8; ! $UI has 'Pour continuer à utiliser'"
+shot final-z3-hors-connexion
+adb shell cmd connectivity airplane-mode disable >/dev/null 2>&1; adb shell svc wifi enable >/dev/null 2>&1; adb shell svc data enable >/dev/null 2>&1; sleep 8
+# Annulation de l'obligation côté serveur : effet immédiat au retour dans l'application
+policy "{\"latestVersionCode\":$((VC+1)),\"minVersionCode\":null}"
+adb shell input keyevent KEYCODE_HOME; sleep 2; adb shell am start -n "$ACT" >/dev/null 2>&1; sleep 5
+expect "Z9. obligation annulée : accès rétabli" bash -c "$UI gone 'Pour continuer à utiliser' 8 && $UI wait 'Ma liste' 10"
+# « Après mise à jour » : la version installée atteint la version exigée
+policy "{\"latestVersionCode\":$VC,\"minVersionCode\":$VC,\"availableOnPlay\":true}"
+adb shell input keyevent KEYCODE_HOME; sleep 2; adb shell am start -n "$ACT" >/dev/null 2>&1; sleep 5
+expect "Z10. version installée = version minimale : accès normal, aucun message" bash -c "$UI gone 'Pour continuer à utiliser' 8 && $UI gone 'Une nouvelle version' 3"
+expect "Z11. données conservées : la liste garde ses articles" bash -c "$UI has 'Tomates' && test \"\$(st Tomates)\" = '2.000 kg to_buy'"
+policy '{"latestVersionCode":null,"minVersionCode":null}'
+fi
+
 echo "ECHECS=$FAILS" | tee -a "$OUT/resultats.txt"
 adb logcat -d -b crash > "$OUT/logcat-crash.txt" 2>&1 || true
 echo "CRASH_APPLICATION=$(grep -c app.smartcourse "$OUT/logcat-crash.txt")" | tee -a "$OUT/resultats.txt"

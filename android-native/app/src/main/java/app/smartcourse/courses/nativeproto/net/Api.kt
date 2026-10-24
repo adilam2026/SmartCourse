@@ -191,6 +191,12 @@ class ApiClient(private val store: SessionStorage, client: OkHttpClient? = null)
     }
 
     /** Requête sans session (récupération par e-mail, création de famille) : le cookie n'est jamais envoyé ni conservé. */
+    /** Lecture publique (sans session), ex. la vérification de mise à jour, possible avant comme après la connexion. */
+    suspend fun getPublic(path: String): Outcome<JsonObject> {
+        val base = store.server ?: return Outcome.Fail(Failure.BAD_ADDRESS)
+        return exec(builder(base, path, false).get().build()) { r, text -> classify(r, text) }
+    }
+
     suspend fun callPublic(method: String, path: String, body: JsonObject): Outcome<JsonObject> {
         val base = store.server ?: return Outcome.Fail(Failure.BAD_ADDRESS)
         val req = builder(base, path, false).method(method, body.toString().toRequestBody(media)).build()

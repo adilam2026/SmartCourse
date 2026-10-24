@@ -21,7 +21,9 @@ import androidx.compose.ui.unit.dp
 import app.smartcourse.courses.nativeproto.net.CatProduct
 import app.smartcourse.courses.nativeproto.net.Outcome
 import app.smartcourse.courses.nativeproto.net.PriceRef
+import app.smartcourse.courses.nativeproto.net.LineAmount
 import app.smartcourse.courses.nativeproto.net.fmtPrice
+import app.smartcourse.courses.nativeproto.net.lineAmount
 import app.smartcourse.courses.nativeproto.net.parseCents
 import app.smartcourse.courses.nativeproto.net.parseMilli
 import app.smartcourse.courses.nativeproto.net.parsePrice
@@ -40,6 +42,9 @@ fun PricesScreen(onBack: () -> Unit) {
     if (LocalDemo.current.data == null) PricesScreenSim(onBack) else PricesReal(onBack)
 }
 
+/** Le prix est-il exprimé dans un format utilisable pour l'unité ACTUELLE du produit ? (sinon : ancien prix, à ressaisir) */
+internal fun priceFits(p: CatProduct): Boolean = p.price != null && lineAmount(p.price, "1", p.unit) is LineAmount.Ok
+
 private fun sourceLabel(p: PriceRef) = when (p.source) { "family" -> "Votre prix"; "community" -> "Prix de la ville"; else -> "Prix de référence" }
 
 @Composable
@@ -53,9 +58,9 @@ private fun PricesReal(onBack: () -> Unit) {
     var editId by remember { mutableStateOf<String?>(null) }
     var sync by remember { mutableStateOf(false) }
     val mine = data.catalogProducts.filter { it.active }
-    val missing = mine.count { it.price == null }
+    val missing = mine.count { !priceFits(it) }
     val cats = mine.map { it.categoryLabel }.distinct()
-    val shown = mine.filter { (cat == null || it.categoryLabel == cat) && (!missingOnly || it.price == null) && (query.isBlank() || it.name.contains(query.trim(), ignoreCase = true)) }
+    val shown = mine.filter { (cat == null || it.categoryLabel == cat) && (!missingOnly || !priceFits(it)) && (query.isBlank() || it.name.contains(query.trim(), ignoreCase = true)) }
 
     Column(Modifier.fillMaxSize()) {
         TopBar("Gestion des prix", onBack = onBack, actions = {
@@ -79,9 +84,12 @@ private fun PricesReal(onBack: () -> Unit) {
                             RemotePhoto(p.photoUrl, 44.dp, 10.dp)
                             Column(Modifier.weight(1f)) {
                                 Text(p.name, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                Text(p.price?.let { sourceLabel(it) } ?: "Réf. ${unitLabel2(p.unit)}", style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                                val stale = p.price != null && !priceFits(p)
+                                if (stale) Text("Unité changée : prix à ressaisir ${perUnit(p.unit)}", style = MaterialTheme.typography.bodySmall, color = C.Amber, maxLines = 2)
+                                else Text(p.price?.let { sourceLabel(it) } ?: "Réf. ${unitLabel2(p.unit)}", style = MaterialTheme.typography.bodySmall, maxLines = 1)
                             }
-                            PricePill(p.price?.let { fmtPrice(it) }) { editId = p.id }
+                            // Un ancien prix dans une autre unité n'est jamais présenté comme le prix actuel.
+                            PricePill(p.price?.takeIf { priceFits(p) }?.let { fmtPrice(it) }) { editId = p.id }
                         }
                     }
                 }
@@ -96,6 +104,8 @@ private fun PricesReal(onBack: () -> Unit) {
     if (sync) CommunitySheet({ sync = false }) { scope.launch { data.refreshCatalog() } }
 }
 
+private fun perUnit(u: String) = when (u) { "kg" -> "au kg"; "litre" -> "au litre"; else -> "à l'unité (${countLabelOf(u)})" }
+
 private fun unitLabel2(u: String) = when (u) { "kg" -> "kg"; "litre" -> "litre"; else -> countLabelOf(u) }
 
 @Composable
@@ -105,7 +115,9 @@ private fun PriceSheet(p: CatProduct, onDismiss: () -> Unit, onChanged: () -> Un
     val scope = rememberCoroutineScope()
     val kind = unitKindOf(p.unit)
     val units = when (kind) { UnitKind.MASS -> listOf("kg", "g"); UnitKind.VOLUME -> listOf("litre", "ml"); UnitKind.COUNT -> listOf(p.unit) }
-    val cur = p.price
+    // Ancien prix dans une autre unité (unité du produit changée) : affiché à part, jamais repris dans le formulaire avec la nouvelle unité.
+    val stale = p.price?.takeIf { !priceFits(p) }
+    val cur = p.price?.takeIf { stale == null }
     var amount by remember { mutableStateOf(cur?.amount?.replace('.', ',') ?: "") }
     var qty by remember { mutableStateOf(cur?.refQty?.replace('.', ',') ?: "1") }
     var unit by remember { mutableStateOf(cur?.refUnit?.takeIf { it in units } ?: units.first()) }
@@ -125,6 +137,13 @@ private fun PriceSheet(p: CatProduct, onDismiss: () -> Unit, onChanged: () -> Un
                 Text(p.name, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text("Prix indicatif (en dirhams)", style = MaterialTheme.typography.bodySmall)
             }
+        }
+        stale?.let {
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "Ancien prix : ${fmtPrice(it)}. L'unité de ce produit est maintenant « ${unitLabel2(p.unit)} » : ce prix ne peut pas être converti sans information complémentaire. Saisissez le prix ${perUnit(p.unit)}.",
+                style = MaterialTheme.typography.bodySmall, color = C.Amber,
+            )
         }
         Spacer(Modifier.height(14.dp))
         OutlinedTextField(

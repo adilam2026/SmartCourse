@@ -180,12 +180,14 @@ fun SelectionScreen(nav: (String) -> Unit, onBack: () -> Unit) {
 /** Personnel : repère d'un article déjà enregistré dans la liste du jour (ou de la modification en attente). */
 @Composable private fun SavedTag(p: Product) {
     val demo = LocalDemo.current
-    val saved = demo.savedQty(p.id) ?: return
+    val line = demo.openLine(p.id) ?: return
+    val lp = demo.lineProduct(line) ?: p // la quantité enregistrée garde l'unité de sa ligne
+    val saved = line.qty
     val s = demo.selection[p.id]
     val (t, c) = when {
-        s == null -> "Dans la liste · ${qtyText(p, saved)}" to C.TealDark
+        s == null -> "Dans la liste · ${qtyText(lp, saved)}" to C.TealDark
         s <= 0 -> "Sera retiré à l'enregistrement" to C.Amber
-        else -> "Modifié (dans la liste : ${qtyText(p, saved)})" to C.Amber
+        else -> "Modifié (dans la liste : ${qtyText(lp, saved)})" to C.Amber
     }
     Text(t, style = MaterialTheme.typography.labelSmall, color = c, maxLines = 1, overflow = TextOverflow.Ellipsis)
 }

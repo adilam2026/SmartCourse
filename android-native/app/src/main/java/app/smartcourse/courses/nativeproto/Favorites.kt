@@ -82,11 +82,16 @@ fun FavoritesSheet(onDismiss: () -> Unit) {
                     Text("${f.items.size} article${if (f.items.size > 1) "s" else ""}", style = MaterialTheme.typography.bodySmall)
                 }
                 RowAction("Utiliser", {
-                    val usable = f.items.filter { it.active && demo.byId[it.productId]?.inCatalog == true }
-                    if (usable.isEmpty()) demo.say("Aucun article de ce favori n'est disponible dans votre catalogue.")
+                    val available = f.items.filter { it.active && demo.byId[it.productId]?.inCatalog == true }
+                    // Quantité du favori enregistrée dans une unité qui n'est plus celle du produit : jamais convertie, jamais ajoutée.
+                    val otherUnit = available.filter { it.unit != demo.byId[it.productId]?.serverUnit }
+                    val usable = available - otherUnit.toSet()
+                    val note = if (otherUnit.isEmpty()) "" else " Unité modifiée, à ajouter vous-même : ${otherUnit.joinToString(", ") { it.name }}."
+                    if (usable.isEmpty()) demo.say(if (otherUnit.isEmpty()) "Aucun article de ce favori n'est disponible dans votre catalogue." else note.trim())
                     else {
-                        data.submit(usable.associate { it.productId to toBase(it.unit, it.quantity) }, clearSelection = false)
-                        if (usable.size < f.items.size) demo.say("${f.items.size - usable.size} article(s) retiré(s) du catalogue ont été ignorés.")
+                        val ignored = f.items.size - usable.size - otherUnit.size
+                        data.submit(usable.associate { it.productId to toBase(it.unit, it.quantity) }, clearSelection = false,
+                            note = (if (ignored > 0) " $ignored article(s) retiré(s) du catalogue ont été ignorés." else "") + note)
                         onDismiss()
                     }
                 }, true)

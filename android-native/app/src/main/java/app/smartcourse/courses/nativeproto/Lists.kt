@@ -187,8 +187,8 @@ fun AdminListScreen(nav: (String) -> Unit) {
         )
     }
     editId?.let { id ->
-        val p = demo.byId[id]
         val line = demo.lines.firstOrNull { it.productId == id }
+        val p = line?.let { demo.lineProduct(it) }
         if (p == null || line == null) {
             editId = null
         } else {
@@ -223,7 +223,7 @@ private const val BOUGHT = "\u0000achetes"
 private fun AdminLines(lines: List<Line>, demo: Demo, onEdit: (String) -> Unit) {
     SCard {
         lines.forEachIndexed { i, l ->
-            val p = demo.byId[l.productId] ?: return@forEachIndexed
+            val p = demo.lineProduct(l) ?: return@forEachIndexed
             if (i > 0) HorizontalDivider(color = C.Line.copy(alpha = 0.6f), modifier = Modifier.padding(start = 66.dp))
             Row(
                 Modifier.fillMaxWidth().then(if (!l.bought) Modifier.clickable { onEdit(p.id) } else Modifier).padding(horizontal = 12.dp, vertical = 8.dp).heightIn(min = 48.dp),
@@ -316,7 +316,7 @@ fun StaffListScreen(nav: (String) -> Unit) {
 
 @Composable
 private fun StaffCard(l: Line, demo: Demo) {
-    val p = demo.byId[l.productId] ?: return
+    val p = demo.lineProduct(l) ?: return
     SCard(padding = PaddingValues(12.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             ProductPhoto(p, 72.dp, radius = 16.dp, modifier = Modifier.alpha(if (l.bought) 0.6f else 1f))
@@ -350,7 +350,7 @@ private fun StaffCard(l: Line, demo: Demo) {
 fun shareList(ctx: android.content.Context, demo: Demo) {
     val text = buildString {
         append("Liste de courses — ${demo.listDate}\n")
-        demo.lines.filter { !it.bought }.forEach { l -> demo.byId[l.productId]?.let { p -> append("• ${p.name} : ${qtyText(p, l.qty)}\n") } }
+        demo.lines.filter { !it.bought }.forEach { l -> demo.lineProduct(l)?.let { p -> append("• ${p.name} : ${qtyText(p, l.qty)}\n") } }
     }
     val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(android.content.Intent.EXTRA_TEXT, text) }
     try { ctx.startActivity(android.content.Intent.createChooser(send, "Partager la liste").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) { demo.say("Aucune application de partage disponible.") }
