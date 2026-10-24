@@ -2,7 +2,7 @@
 # Spot publicitaire de 60 s : séquences vidéo SÉPARÉES (A à L) et images fixes de l'application RÉELLE, version candidate
 # (même code que l'APK final, -Pfinal=1), sur un serveur de recette LOCAL et jetable rempli de données FICTIVES (Famille Martin :
 # Karim le mari, Sophie la femme, Nadia l'employée de maison ; Casablanca). Aucune donnée réelle, aucun accès à la production.
-# Format vertical 1080 × 1920, sans son ; gestes lents, pause avant et après chaque action ; barre d'état figée (09:41).
+# Format vertical 1080 × 1920, sans son ; gestes lents, pause avant et après chaque action ; heure réelle dans la barre d'état.
 # « L'autre téléphone » (notification, coche visible chez l'autre parent) : l'action de l'autre profil est envoyée par l'API de la
 # recette, comme le ferait son application ; un seul émulateur filme le téléphone qui reçoit.
 # Usage : native-demo-pub.sh APK SORTIE   (recette lancée avec SEED_PLAY=1 ; SEQUENCES=A,B,… pour n'en jouer qu'une partie)
@@ -39,15 +39,11 @@ rec_stop() {
   local s; s=$(stat -c %s "$OUT/videos/$REC.mp4" 2>/dev/null || echo 0)
   if [ "$s" -gt 100000 ]; then log "vidéo $REC ($((s/1024)) Ko)"; else ko "vidéo $REC vide ou absente"; fi
 }
-demo_bar() { # barre d'état propre et figée (mode démonstration d'Android) ; $1 = notifications visibles (true/false)
-  adb shell am broadcast -a com.android.systemui.demo -p com.android.systemui -e command enter >/dev/null
-  adb shell am broadcast -a com.android.systemui.demo -p com.android.systemui -e command clock -e hhmm 0941 >/dev/null
-  adb shell am broadcast -a com.android.systemui.demo -p com.android.systemui -e command battery -e level 100 -e plugged false >/dev/null
-  adb shell am broadcast -a com.android.systemui.demo -p com.android.systemui -e command network -e wifi show -e level 4 -e fully true >/dev/null
-  adb shell am broadcast -a com.android.systemui.demo -p com.android.systemui -e command network -e mobile show -e level 4 -e datatype none -e fully true >/dev/null
-  adb shell am broadcast -a com.android.systemui.demo -p com.android.systemui -e command notifications -e visible "${1:-false}" >/dev/null
-}
 
+hide_system_notifications() { # notifications propres à l'émulateur (« Serial console enabled », clavier…) : reportées 1 h
+  adb shell dumpsys notification --noredact | tr -d '\r' | grep -oE 'key=[0-9]+\|android\|[^ :]+' | sed 's/^key=//' | sort -u | \
+    while read -r k; do adb shell cmd notification snooze --for 3600000 "'$k'" >/dev/null 2>&1; done
+}
 # ── États de la base jetable : S0 = jeu de données du spot, liste « Courses de la semaine » vide. Chaque séquence part d'un état connu.
 snapshot() { docker exec sc-recette-pg pg_dump -U smart -Fc smartcourse > "/tmp/demo-$1.dump"; }
 restore() {
@@ -102,9 +98,9 @@ expect "S0. données fictives : 4 courses passées, liste « Courses de la semai
 snapshot S0
 
 adb shell wm size 1080x1920 >/dev/null; adb shell wm density 420 >/dev/null
-adb shell settings put global sysui_demo_allowed 1
+adb shell settings put global sysui_demo_allowed 0   # heure réelle : aucune barre d'état figée
 adb shell settings put system show_touches 1   # point de contact visible : le geste se lit à l'écran
-demo_bar false
+adb shell am broadcast -a com.android.systemui.demo -p com.android.systemui -e command exit >/dev/null
 adb install -r "$APK" >/dev/null
 adb root >/dev/null 2>&1; sleep 3; adb wait-for-device   # émulateur de recette : réglage de l'horloge (séquence B)
 
@@ -134,41 +130,39 @@ rec_stop
 expect "A3. sélection reçue par le serveur (5 articles)" test "$(sql -c "SELECT count(*) FROM list_items i JOIN lists l ON l.id=i.list_id WHERE l.name='Courses de la semaine' AND l.status='active' AND i.status<>'removed'")" = 5
 fi
 
-# ═══ B. Notification sur les deux téléphones des parents (Karim, puis Sophie) ═══
+# ═══ B. Notification sur les téléphones des deux parents (Karim, puis Sophie) ═══
+# La notification n'est PAS instantanée : application fermée, c'est la vérification PÉRIODIQUE d'Android (WorkManager, environ toutes
+# les 15 min, moment choisi par Android) qui interroge le serveur et affiche « Nouvelle demande ». WorkManager refuse d'exécuter cette
+# tâche avant son échéance, même forcée : sur l'émulateur jetable, l'horloge est avancée de 16 min (le délai qu'Android aurait laissé
+# passer), la vérification réelle de l'application est lancée, puis l'horloge est remise à l'heure. Deux plans par parent :
+#   B1-…-envoi     : téléphone en veille (écran d'accueil), Nadia envoie sa sélection, rien ne s'affiche tout de suite ;
+#   B2-…-reception : environ 16 min plus tard (l'heure de la barre d'état l'indique), la notification arrive, ouverture de la liste.
+notif_ok() { adb shell dumpsys notification --noredact | grep -qiE 'android.title=.*demandes?'; }
 if want B; then
 for name in karim sophie; do
   restore S0 || continue
   if [ $name = karim ]; then login_as "${KARIM[@]}" "Ma liste"; else login_as "${SOPHIE[@]}" "Ma liste"; fi
-  enable_notifications; poll_now
-  adb shell input keyevent KEYCODE_HOME; sleep 3
-  demo_bar true
-  rec_start "B-notification-$name"
-  other batch; sleep 2; poll_now
-  for _ in 1 2 3; do adb shell dumpsys notification --noredact | grep -qiE 'android.title=.*demandes?' && break; poll_now; done
-  if ! adb shell dumpsys notification --noredact | grep -qiE 'android.title=.*demandes?'; then
-    # WorkManager n'exécute pas une tâche périodique avant son échéance (15 min) : l'horloge de l'émulateur jetable est avancée de
-    # 16 min, la vérification réelle de l'application est lancée, puis l'horloge est remise à l'heure.
-    log "  horloge de l'émulateur avancée de 16 min"
-    adb shell settings put global auto_time 0; adb shell "date -u $(date -u -d '+16 minutes' +%m%d%H%M%Y.%S)" >/dev/null
-    for _ in 1 2 3; do poll_now; adb shell dumpsys notification --noredact | grep -qiE 'android.title=.*demandes?' && break; done
-    adb shell "date -u $(date -u +%m%d%H%M%Y.%S)" >/dev/null
-  fi
-  if ! adb shell dumpsys notification --noredact | grep -qiE 'android.title=.*demandes?'; then
-    # Repli : la vérification périodique d'Android (au plus 15 min + marge) ; l'enregistrement reprend quand la notification est là.
-    rec_stop; mv "$OUT/videos/B-notification-$name.mp4" "$OUT/diag/B-attente-$name.mp4" 2>/dev/null
-    log "  attente de la vérification périodique d'Android (jusqu'à 17 min)"
-    for _ in $(seq 1 102); do adb shell dumpsys notification --noredact | grep -qiE 'android.title=.*demandes?' && break; sleep 10; done
-    rec_start "B-notification-$name"; sleep 1
-  fi
-  sleep 2; adb shell cmd statusbar expand-notifications; sleep 4
-  expect "B. notification « Nouvelle demande » ($name)" bash -c "adb shell dumpsys notification --noredact | grep -qiE 'android.title=.*demandes?'"
-  still "B1-notification-$name"
-  act "demande" || adb shell cmd statusbar collapse
-  $UI wait "Tomates" 15 >/dev/null; sleep 2
-  still "B2-liste-ouverte-$name"
+  enable_notifications; poll_now          # première vérification : repère des demandes déjà vues (aucune)
+  adb shell input keyevent KEYCODE_HOME; sleep 3; hide_system_notifications
+  rec_start "B1-$name-envoi"
+  sleep 2; other batch; sleep 6           # aucune notification : la liste n'est pas synchronisée en direct quand l'application est fermée
+  expect "B1. aucune notification immédiate ($name)" bash -c "! adb shell dumpsys notification --noredact | grep -qiE 'android.title=.*demandes?'"
+  rec_stop
+  log "  horloge de l'émulateur avancée de 16 min (échéance de la vérification périodique d'Android)"
+  adb shell settings put global auto_time 0; adb shell "date -u $(date -u -d '+16 minutes' +%m%d%H%M%Y.%S)" >/dev/null; sleep 2
+  hide_system_notifications
+  rec_start "B2-$name-reception"
+  for _ in 1 2 3; do poll_now; notif_ok && break; done
+  expect "B2. notification « Nouvelle demande » reçue ($name)" notif_ok
+  sleep 3; still "B1-notification-$name"
+  adb shell cmd statusbar expand-notifications; sleep 4
+  still "B2-volet-notification-$name"
+  act "Nouvelle demande" || act "demande" || adb shell cmd statusbar collapse
+  expect "B3. la notification ouvre la liste ($name)" $UI wait "Tomates" 15
+  sleep 2; still "B3-liste-ouverte-$name"
   rec_stop
   adb shell cmd statusbar collapse >/dev/null 2>&1
-  demo_bar false
+  adb shell "date -u $(date -u +%m%d%H%M%Y.%S)" >/dev/null; adb shell settings put global auto_time 1
 done
 fi
 
