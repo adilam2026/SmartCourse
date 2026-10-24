@@ -54,10 +54,10 @@ describe("ville du profil", () => {
     const me = (await app.inject({ method: "GET", url: "/api/me", cookies: cookieOf(ok) })).json().me;
     expect(me.city).toBe("Fès");
     const f = await family();
-    // Ville exigée tant que le pays de la famille n'est pas confirmé ; confirmé (migration 023), le nouveau membre hérite de la ville de la famille.
-    await db.query("UPDATE families SET location_confirmed_at = NULL WHERE id = (SELECT family_id FROM profiles WHERE login = 'adil' ORDER BY created_at DESC LIMIT 1)");
+    // Cette règle historique ne concerne que les familles sans localisation confirmée.
+    await db.query("UPDATE families SET location_confirmed_at = NULL WHERE code = $1", [f.code]);
     expect((await app.inject({ method: "POST", url: "/api/profiles", cookies: f.admin, payload: { displayName: "X", login: "xx", role: "staff", secret: "573918", secretConfirm: "573918" } })).json().error).toBe("city_required");
-    await db.query("UPDATE families SET location_confirmed_at = now() WHERE id = (SELECT family_id FROM profiles WHERE login = 'adil' ORDER BY created_at DESC LIMIT 1)");
+    await db.query("UPDATE families SET location_confirmed_at = now() WHERE code = $1", [f.code]);
     expect((await app.inject({ method: "POST", url: "/api/profiles", cookies: f.admin, payload: { displayName: "X", login: "xx", role: "staff", secret: "573918", secretConfirm: "573918", city: "Gotham" } })).json().error).toBe("invalid_city");
   });
   it("modifiable dans le profil ; visible dans la liste des profils ; un profil existant sans ville fonctionne normalement", async () => {
