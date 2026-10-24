@@ -27,7 +27,7 @@ PASS  Z4. obligation refusée sans confirmation de disponibilité sur Google Pla
 PASS  Z5. mise à jour obligatoire (au retour dans l'application) : accès bloqué, message attendu
 PASS  Z6. « Mettre à jour » ouvre la fiche Mes Courses (Google Play, sinon navigateur)
 --------- beginning of main
-10-24 11:05:30.314  8027  8027 I CoursesUpdate: navigateur, fiche ouverte : https://play.google.com/store/apps/details?id=app.smartcourse.courses.natif
+10-24 11:17:58.528  7928  7928 I CoursesUpdate: navigateur, fiche ouverte : https://play.google.com/store/apps/details?id=app.smartcourse.courses.natif
 PASS  Z7. retour sans mise à jour : blocage maintenu
 PASS  Z7b. le bouton Retour ne contourne pas le blocage
 PASS  Z8. panne réseau : aucun faux blocage
