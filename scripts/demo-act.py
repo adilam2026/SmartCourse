@@ -45,7 +45,8 @@ def the_list(cookie):
 
 
 def ops(cookie, list_id, items):
-    call("POST", f"/api/lists/{list_id}/ops", {"ops": [dict(opId=str(uuid.uuid4()), **o) for o in items]}, cookie)
+    # Un seul lot, comme « Terminer ma sélection » dans l'application : une seule demande pour toute la sélection.
+    call("POST", f"/api/lists/{list_id}/ops", {"batch": {"id": str(uuid.uuid4())}, "ops": [dict(opId=str(uuid.uuid4()), **o) for o in items]}, cookie)
 
 
 if ACTION == "batch":

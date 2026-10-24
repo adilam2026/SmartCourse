@@ -89,6 +89,11 @@ for days, spec in PAST:
             f"UPDATE purchases SET purchased_at = {at} + interval '20 minutes' WHERE list_id = '{lid}';"]
 sql.append("SET session_replication_role = DEFAULT;")
 
+# Karim, le mari, administrateur comme Sophie : les réglages (dont « Nouvelles demandes ») ne sont proposés qu'aux administrateurs.
+kid = next(p["id"] for p in call("GET", "/api/profiles", cookie=sophie)[1]["profiles"] if p["login"] == "karim")
+call("PATCH", f"/api/profiles/{kid}", {"role": "admin"}, sophie)
+karim = login("karim", "573918")
+
 # Maroc (prix indicatifs affichés), une liste nommée, Budget en MAD
 call("PUT", "/api/family/location", {"country": "MA", "city": "Casablanca"}, sophie)
 call("PUT", "/api/family/features", {"multiLists": True}, sophie)
