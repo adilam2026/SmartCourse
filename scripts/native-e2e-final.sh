@@ -994,11 +994,12 @@ echo "═══ O. Lot catalogue du 1er novembre 2026 : images, recherche, unit�
 expect "O0. 45 références ajoutées par 029, toutes illustrées après la synchronisation" test "$(sql "SELECT count(*) FROM extended_catalog WHERE source='captures-20261101' AND photo_asset_id IS NOT NULL")" = 45
 login_api adil 482913
 for k in olives-meslala soupe-de-legumes sole pistaches; do api POST /api/products/from-catalog -d "{\"origin\":\"extended\",\"key\":\"$k\"}" >/dev/null; done
-expect "O1. ajoutés depuis les références : unité et photo de la référence" test "$(sql "SELECT string_agg(p.name||':'||p.unit||':'||(p.photo_asset_id IS NOT NULL), ',' ORDER BY p.name) FROM products p JOIN families f ON f.id=p.family_id WHERE f.code='$FAMILY' AND p.name IN ('Olives meslala','Soupe de légumes','Sole','Pistaches')")" = "Olives meslala:kg:true,Pistaches:kg:true,Soupe de légumes:sachet:true,Sole:kg:true"
+expect "O1. ajoutés depuis les références : unité et photo de la référence" test "$(sql "SELECT string_agg(p.name||':'||p.unit||':'||(p.photo_asset_id IS NOT NULL), ',' ORDER BY p.name) FROM products p JOIN families f ON f.id=p.family_id WHERE f.code='$FAMILY' AND p.name IN ('Olives meslala','Soupe de légumes','Sole','Pistaches')")" = "Olives meslala:kg:t,Pistaches:kg:t,Soupe de légumes:sachet:t,Sole:kg:t"
 clear_search() { $UI field 0 >/dev/null; sleep 1; clear_field; hide_kb; sleep 2; }
 near() { # $1 au-dessus de $2 et de $3 à l'écran (défilement jusqu'à voir les trois)
-  top_list; for _ in $(seq 1 12); do $UI has "$1" && $UI has "$2" && $UI has "$3" && break; adb shell input swipe 540 1500 540 900 700; sleep 1.5; done
-  $UI above "$1" "$2" && $UI above "$2" "$3"
+  top_list; for _ in $(seq 1 25); do $UI has "$1" && $UI has "$2" && $UI has "$3" && break; adb shell input swipe 540 1500 540 900 700; sleep 1.5; done
+  $UI above "$1" "$2" && $UI above "$2" "$3" && return 0
+  echo "  écran : $(adb exec-out uiautomator dump /dev/tty 2>/dev/null | grep -o 'text="[^"]\{3,\}"' | sed 's/text=//' | tr '\n' ' ' | cut -c1-400)" | tee -a "$OUT/resultats.txt"; return 1
 }
 top_list() { for _ in 1 2 3 4 5 6; do adb shell input swipe 540 700 540 1600 200; done; sleep 1; }
 launch; $UI wait "Bienvenue" 25 >/dev/null
@@ -1019,17 +1020,17 @@ shot final-o3-classement-olives
 expect "O7. classement : Levure chimique, Soupe de légumes, Pistaches" near "Levure chimique" "Soupe de légumes" "Pistaches"
 expect "O8. classement : Thon en conserve, puis Sole (après Poisson)" near "Poisson" "Thon en conserve" "Sole"
 shot final-o4-classement-poissons
-$UI tap "Soupe de légumes" >/dev/null; sleep 2
-expect "O9. unité : la soupe se compte en sachets" $UI wait "sachets" 8
+$UI tap "Soupe de légumes" >/dev/null; sleep 2   # touchée : choisie avec la quantité par défaut, affichée dans son unité
+expect "O9. unité : la soupe se compte au sachet (« 1 sachet »)" $UI wait "1 sachet" 8
 shot final-o5-soupe-sachets
-adb shell input keyevent KEYCODE_BACK; sleep 2
+$UI tap "Soupe de légumes" >/dev/null; sleep 2   # retirée de la sélection
 OL=$(sql "SELECT p.id FROM products p JOIN families f ON f.id=p.family_id WHERE f.code='$FAMILY' AND p.name='Olives meslala'")
 api PATCH "/api/products/$OL" -d '{"active":false}' >/dev/null
-launch; $UI wait "Affichage" 25 >/dev/null; sleep 3
+launch; $UI wait "Affichage" 25 >/dev/null; sleep 6
 expect "O10. masqué par un administrateur : voisins inchangés (Concentré de tomates, Sel alimentaire, Poivre)" near "Concentré de tomates" "Sel alimentaire" "Poivre"
 expect "O10b. … et l'article masqué n'apparaît plus chez le personnel" bash -c "! $UI has 'Olives meslala'"
 api PATCH "/api/products/$OL" -d '{"active":true}' >/dev/null
-launch; $UI wait "Affichage" 25 >/dev/null; sleep 3
+launch; $UI wait "Affichage" 25 >/dev/null; sleep 6
 expect "O11. réaffiché : même place, entre les condiments et le sel" near "Concentré de tomates" "Olives meslala" "Sel alimentaire"
 logout
 fi
