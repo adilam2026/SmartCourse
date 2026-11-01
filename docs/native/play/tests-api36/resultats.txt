@@ -1,6 +1,6 @@
 ═══ O. Lot catalogue du 1er novembre 2026 : images, recherche, unités, classement après synchronisation ═══
 PASS  O0. 45 références ajoutées par 029, toutes illustrées après la synchronisation
-FAIL  O1. ajoutés depuis les références : unité et photo de la référence
+FAIL  O1. ajoutés depuis les références : unité et photo de la référence (Olives meslala:kg:photo,Pistaches:kg:photo,Sole:kg:photo,Soupe de légumes:sachet:photo)
       écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Identifiant famille"|"Ex. LesTaha04. L'ancien code famille à 8 caractères reste accepté."|"Identifiant personnel"|"Code d'accès personnel"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Votre code à vous. Il n'existe pas de mot de passe commun à la famille."|"Se connecter"|"Besoin d'aide ?"|"Après une connexion réussie, l'identifiant famille et votre identifiant personnel sont retenus sur ce téléphone."|
 PASS  O2. personnel connecté
 PASS  O3. recherche « olive » : Olives meslala
@@ -9,11 +9,10 @@ PASS  O5. recherche « poisson » : Poisson et Sole
 PASS  O6. classement : Concentré de tomates, Olives meslala, Sel alimentaire (olives près des condiments, pas en fin d'Épicerie)
 PASS  O7. classement : Levure chimique, Soupe de légumes, Pistaches
 PASS  O8. classement : Thon en conserve, puis Sole (après Poisson)
-FAIL  O9. unité : la soupe se compte au sachet (« 1 sachet »)
-      écran : "Choisir mes articles"|"Affichage : Liste, tous les articles"|"Compte"|"Rechercher un produit…"|"Pistaches"|"au kilo"|"Ajouter"|"Viandes et poisson"|"6 articles"|"Poulet"|"à l'unité"|"Ajouter"|"Viande hachée"|"au kilo"|"Ajouter"|"Viande de bœuf"|"au kilo"|"Ajouter"|"Poisson"|"au kilo"|"Ajouter"|"Thon en conserve"|"à l'unité"|"Ajouter"|"Sole"|"au kilo"|"Ajouter"|"Terminer ma sélection"|
+PASS  O9. unité : la soupe se compte au sachet (« 1 sachet »)
 PASS  O10. masqué par un administrateur : voisins inchangés (Concentré de tomates, Sel alimentaire, Poivre)
 PASS  O10b. … et l'article masqué n'apparaît plus chez le personnel
 PASS  O11. réaffiché : même place, entre les condiments et le sel
-ECHECS=2
+ECHECS=1
 CRASH_APPLICATION=0
-TOTAL_ECHECS=2
+TOTAL_ECHECS=1
