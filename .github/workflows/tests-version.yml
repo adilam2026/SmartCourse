@@ -1,0 +1,59 @@
+name: Tests d'une version (serveur et web)
+# Rejoue les tests du serveur (avec PostgreSQL jetable) et de l'application web sur un commit PRÉCIS, pour rattacher des
+# résultats publics à une version. Aucune donnée réelle, aucun secret, aucun déploiement.
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Commit à tester (SHA complet)"
+        required: true
+permissions:
+  contents: read
+jobs:
+  serveur:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: smart
+          POSTGRES_PASSWORD: smart
+          POSTGRES_DB: smartcourse_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U smart -d smartcourse_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: "${{ inputs.sha }}" }
+      - run: git log -1 --format='Version testée : %H — %s'
+        working-directory: .
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci
+      - run: npx tsc -p tsconfig.json --noEmit
+      - run: npx vitest run
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: "${{ inputs.sha }}" }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit -p .
+      - run: npx vitest run
