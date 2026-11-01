@@ -219,7 +219,11 @@ Relevés à vérifier ou à distinguer (24 sur 89 ; unités finales) :
 **Rapport par foyer :** `rapport-foyer.sql` liste les articles d'un foyer qui garderaient une unité personnalisée, avec l'état de leur prix.
 - **Ce n'est pas une requête en lecture seule.** Il **exécute** les migrations 026 à 030 (schéma et données, avec verrous), lit leur journal, puis annule la transaction.
 - À utiliser **uniquement sur une copie restaurée** d'une sauvegarde, **dans un environnement privé** : jamais sur la production, jamais dans l'intégration continue, et ses résultats jamais dans les journaux du dépôt public.
-- Je ne l'ai pas exécuté sur les données réelles : je n'ai pas accès à la production ni à une copie restaurée privée.
+- **Exécution sur la copie privée :** `scripts/rapport-foyer-prive.sh CODEFAMILLE`, sur le poste de l'administrateur.
+  - Il restaure la dernière sauvegarde dans un PostgreSQL 18 local et jetable (programme `dist/copie-privee.js`).
+  - Il exécute le rapport, puis supprime la copie.
+  - Les secrets sont lus dans le terminal ; ils ne sont jamais écrits dans le dépôt.
+  - Contrôlé de bout en bout sur une sauvegarde de test : restauration, copie conservée, rapport, copie inchangée après le rapport, refus si une adresse de production ou un serveur distant est donné.
 
 **Restant à trancher :**
 1. **Merlan colin et Merlan ration :** non fusionnés, en attendant une identification confirmée.
