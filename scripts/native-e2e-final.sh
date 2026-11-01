@@ -1054,7 +1054,7 @@ ysearch "sucre"; $UI tap "Sucre" --exact >/dev/null; sleep 2
 expect "Y1. Sucre choisi : « 1 pièce »" $UI wait "1 pièce" 8
 $UI tap "Modifier la quantité : Sucre" >/dev/null; sleep 2
 expect "Y2. Sucre : format « paquet de 2 kg » affiché" $UI wait "Format : paquet de 2 kg" 8
-expect "Y3. Sucre : aucun prix affiché comme prix actuel (5,20 DH/kg jamais présenté comme prix du paquet)" bash -c "$UI has 'Prix non renseigné' && ! $UI has '10,40' && ! $UI has '5,20'"
+expect "Y3. Sucre : aucun prix affiché comme prix actuel (ni 5,20 DH/kg, ni prix du paquet déduit)" bash -c "$UI has 'Format : paquet de 2 kg' && ! $UI has 'DH' && ! $UI has '10,40' && ! $UI has '5,20'"
 shot final-y1-sucre-format
 $UI tap "Retirer de la sélection" >/dev/null; sleep 2
 ysearch "pate a tartiner"; $UI tap "Pâte à tartiner" --exact >/dev/null; sleep 2

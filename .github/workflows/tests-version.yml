@@ -45,7 +45,10 @@ jobs:
           cache: npm
           cache-dependency-path: server/package-lock.json
       - name: Client pg_dump 16 (même version majeure que le serveur PostgreSQL de test)
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client-16 >/dev/null && ls /usr/lib/postgresql
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-common >/dev/null
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y >/dev/null
+          sudo apt-get install -y -qq postgresql-client-16 >/dev/null && ls /usr/lib/postgresql
       - run: npm ci
       - run: npx tsc -p tsconfig.json --noEmit
       # 127.0.0.1 comme lors de la validation : les 2 tests TLS (réservés à « localhost » avec un serveur TLS) sont ignorés
