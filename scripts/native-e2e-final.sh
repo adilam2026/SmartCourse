@@ -1048,7 +1048,7 @@ Y0B=$(sql "SELECT string_agg(key||':'||amount||'/'||ref_qty::float||' '||ref_uni
 expect "Y0b. prix communs conservés, aucun prix du paquet déduit de 5,20 DH/kg ($Y0B)" test "$Y0B" = "fromage-en-portions:26.00/1 boite:-,sucre:5.20/1 kg:-"
 launch; $UI wait "Bienvenue" 25 >/dev/null
 signin "$FAMILY" adil 482913; $UI wait "Ma liste" 25 >/dev/null; sleep 2
-tapt "Ajouter des articles"; $UI wait "Rechercher un produit" 15 >/dev/null
+tapt "Créer une liste"; $UI wait "Rechercher un produit" 15 >/dev/null   # aucune liste en cours : « Créer une liste » ouvre la sélection
 ysearch() { $UI field 0 >/dev/null; sleep 1; clear_field; adb shell input text "$1"; sleep 1; hide_kb; sleep 2; }
 ysearch "sucre"; $UI tap "Sucre" --exact >/dev/null; sleep 2
 expect "Y1. Sucre choisi : « 1 pièce »" $UI wait "1 pièce" 8
