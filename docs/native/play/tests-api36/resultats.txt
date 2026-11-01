@@ -8,6 +8,43 @@ PASS  Y4. Pâte à tartiner choisie : « 1 pièce »
 PASS  Y5. Fromage en portions choisi au poids : « 1 kg »
 PASS  Y6. Gestion des prix : Sucre « prix à ressaisir par pièce » (à compléter)
 PASS  Y7. Gestion des prix : Fromage en portions « prix à ressaisir au kg » (à compléter)
+═══ L. Statistiques : tous les produits achetés, recherche, historique d'un produit, tout l'historique ═══
+      produits achetés ce mois : 10 ; achats de cumin : 1 ce mois, 2 en tout
+PASS  L0. jeu d'essai : au moins 10 produits ce mois, cumin acheté 1 fois ce mois et 2 fois en tout
+PASS  L1. aperçu conservé (8 produits, Cumin absent) et bouton « Voir tous les produits (10) »
+PASS  L2. écran « Tous les produits achetés » avec la période affichée
+PASS  L3. recherche (majuscules ignorées) : Cumin, hors du top 8, trouvé avec « 1 achat » et sa quantité
+PASS  L4. historique du produit : période choisie, 1 achat de 250 g avec sa date
+PASS  L5. « Tout l'historique » : l'achat plus ancien apparaît (2 achats, 750 g cumulés)
+PASS  L6. retour : liste complète, recherche « CUMI » conservée
+PASS  L7. aucune correspondance : message explicite
+PASS  L8. recherche effacée : tous les produits (10)
+ECHECS=0
+CRASH_APPLICATION=0
+═══ O. Lot catalogue du 1er novembre 2026 : images, recherche, unités, classement après synchronisation ═══
+PASS  O0. 45 références ajoutées par 029, toutes illustrées après la synchronisation
+PASS  O1. ajoutés depuis les références : unité et photo de la référence (Olives meslala:kg:photo,Pistaches:kg:photo,Sole:kg:photo,Soupe de légumes:piece:photo)
+PASS  O2. personnel connecté
+PASS  O3. recherche « olive » : Olives meslala
+PASS  O4. recherche « cheveux » (nom relevé sur l'emballage) : Vermicelles
+PASS  O5. recherche « poisson » : Poisson et Sole
+PASS  O6. classement : Concentré de tomates, Olives meslala, Sel alimentaire (olives près des condiments, pas en fin d'Épicerie)
+PASS  O7. classement : Levure chimique, Soupe de légumes, Pistaches
+PASS  O8. classement : Thon en conserve, puis Sole (après Poisson)
+PASS  O9. unité : un sachet de soupe est un article complet (« 1 pièce »)
+PASS  O10. masqué par un administrateur : voisins inchangés (Concentré de tomates, Sel alimentaire, Poivre)
+PASS  O10b. … et l'article masqué n'apparaît plus chez le personnel
+PASS  O11. réaffiché : même place, entre les condiments et le sel
+═══ U. Unités corrigées : décimales au kg, lignes existantes jamais réinterprétées, prix à ressaisir ═══
+PASS  U0. unités arbitrées dans la famille : riz/cumin au poids, persil en botte, poulet entier à la pièce, lait et huile au litre, thon en boîte, papier toilette en rouleau
+PASS  U1. 0,25 kg de cumin accepté et affiché (250 g)
+PASS  U2. ligne de riz enregistrée en paquets : toujours « 2 paquets » (jamais « 2 g » ni « 2 kg »)
+PASS  U3. quantité de la ligne modifiée dans SON unité (paquets)
+PASS  U4. ancien prix au kg du poulet signalé « à ressaisir », jamais affiché comme prix actuel
+PASS  U5. formulaire : ancien prix rappelé à part, montant vide (aucune reprise avec la nouvelle unité)
+PASS  U6. serveur : ancien prix conservé tel quel
+PASS  U7. vermicelles : prix converti exactement « 9,90 DH / 500 g »
+PASS  U8. format « pack de 3 x 80 g » enregistré ; unité inchangée ; aucun prix personnel créé (prix commun conservé)
 ECHECS=0
 CRASH_APPLICATION=0
 TOTAL_ECHECS=0
