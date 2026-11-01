@@ -7,6 +7,13 @@ on:
       sha:
         description: "Commit à tester (SHA complet)"
         required: true
+  # Ce fichier n'est pas sur la branche par défaut (lancement manuel impossible par l'API) : il s'exécute aussi quand il est
+  # modifié sur la branche de travail, sur la version écrite dans VERSION_TESTEE.
+  push:
+    branches: [claude/unites-statistiques]
+    paths: ['.github/workflows/tests-version.yml']
+env:
+  VERSION_TESTEE: b0bf0cac0cbbb70115d4098557d55b6154072bd2
 permissions:
   contents: read
 jobs:
@@ -29,7 +36,7 @@ jobs:
         working-directory: server
     steps:
       - uses: actions/checkout@v4
-        with: { ref: "${{ inputs.sha }}" }
+        with: { ref: "${{ inputs.sha || env.VERSION_TESTEE }}" }
       - run: git log -1 --format='Version testée : %H — %s'
         working-directory: .
       - uses: actions/setup-node@v4
@@ -48,7 +55,7 @@ jobs:
         working-directory: web
     steps:
       - uses: actions/checkout@v4
-        with: { ref: "${{ inputs.sha }}" }
+        with: { ref: "${{ inputs.sha || env.VERSION_TESTEE }}" }
       - uses: actions/setup-node@v4
         with:
           node-version: 22
