@@ -30,7 +30,8 @@ const p = env.BACKUP_S3_BUCKET ? "BACKUP_S3_" : "S3_";
 // COPY_LOCAL_DIR : sauvegardes d'un dossier local (contrôle du programme lui-même, sans stockage distant).
 const store: BackupStore = env.COPY_LOCAL_DIR ? new LocalBackupStore(env.COPY_LOCAL_DIR) : new S3BackupStore(
   s3ClientFromParts({
-    endpoint: env[`${p}ENDPOINT`], region: env[`${p}REGION`], accessKeyId: env[`${p}ACCESS_KEY_ID`], secretAccessKey: env[`${p}SECRET_ACCESS_KEY`],
+    // une valeur vide (saisie laissée vide) vaut « non défini »
+    endpoint: env[`${p}ENDPOINT`] || undefined, region: env[`${p}REGION`] || undefined, accessKeyId: env[`${p}ACCESS_KEY_ID`], secretAccessKey: env[`${p}SECRET_ACCESS_KEY`],
     forcePathStyle: env.S3_FORCE_PATH_STYLE === "false" ? false : undefined,
   }),
   env[`${p}BUCKET`] ?? fail("aucun stockage de sauvegardes (S3_BUCKET ou BACKUP_S3_BUCKET)."),

@@ -1,0 +1,31 @@
+name: Rapport foyer — contrôle complet du script sur une sauvegarde fictive
+# Exécute scripts/rapport-foyer-prive.sh de bout en bout (saisie, image de production, PostgreSQL jetable, copie, rapport,
+# nettoyage) sur une base et une sauvegarde FICTIVES, dans un stockage S3 local (MinIO). Aucune donnée réelle, aucun vrai secret :
+# la vraie sauvegarde ne doit jamais être utilisée ici (journaux publics).
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/unites-statistiques]
+    paths:
+      - '.github/workflows/rapport-foyer-test.yml'
+      - 'scripts/rapport-foyer-prive.sh'
+      - 'scripts/test-rapport-foyer-prive.sh'
+      - 'server/src/copie-privee.ts'
+      - 'server/scripts/seed-sauvegarde-test.ts'
+      - 'docs/catalogue/import-2026-11-01/rapport-foyer.sql'
+permissions:
+  contents: read
+jobs:
+  script:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.4
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci
+        working-directory: server
+      - run: scripts/test-rapport-foyer-prive.sh
