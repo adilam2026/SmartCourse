@@ -1,4 +1,5 @@
 import { previewUnitMigration } from "./migration-preview.js";
+import { controleDeploiement } from "./controle-migration.js";
 import { keepBackup, KEPT_PREFIX, listBackups, S3BackupStore, verifyBackup, type BackupStore } from "./backup.js";
 import { verifyPhotoBackup } from "./backup-photos.js";
 import { createPool } from "./db.js";
@@ -35,6 +36,7 @@ const store: BackupStore = new S3BackupStore(
 
 const db = createPool(target);
 let photos: { checked: number; bytes: number } | null = null;
+let controlFailed = false;
 try {
   const all = await listBackups(store);
   const latest = all[0] ?? fail("aucune sauvegarde trouvée.");
@@ -50,6 +52,17 @@ try {
         photos = { checked: r.checked, bytes: r.bytes };
         // Sur demande : aperçu d'une migration sur cette copie isolée (transaction annulée, totaux seulement).
         if (env.MIGRATION_PREVIEW) for (const line of await previewUnitMigration(scratch, env.MIGRATION_PREVIEW)) console.log(line);
+        // Sur demande : contrôle du déploiement (migrations + images rejouées sur cette copie isolée, totaux seulement).
+        if (env.CONTROLE_DEPLOIEMENT === "1") {
+          const u = new URL(target);
+          u.pathname = `/${scratch.database}`;
+          const c = await controleDeploiement(scratch, u.toString(), env.PHOTO_MANIFEST ?? "./catalog-photos/manifest.json").catch((e: Error) => ({
+            lines: [`CONTRÔLE DU DÉPLOIEMENT impossible : ${e.message}`], problems: ["contrôle interrompu"],
+          }));
+          for (const line of c.lines) console.log(line);
+          console.log(c.problems.length ? `CONTRÔLE DU DÉPLOIEMENT : ${c.problems.length} écart(s).` : "CONTRÔLE DU DÉPLOIEMENT : tous les contrôles sont conformes.");
+          if (c.problems.length) controlFailed = true;
+        }
         return r.problems.map((x) => `photos : ${x}`);
       },
     },
@@ -81,3 +94,4 @@ try {
 } finally {
   await db.end();
 }
+if (controlFailed) process.exitCode = 4;
