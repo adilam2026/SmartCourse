@@ -7,13 +7,11 @@ on:
       sha:
         description: "Commit à tester (SHA complet)"
         required: true
-  # Ce fichier n'est pas sur la branche par défaut (lancement manuel impossible par l'API) : il s'exécute aussi quand il est
-  # modifié sur la branche de travail, sur la version écrite dans VERSION_TESTEE.
+  # Ce fichier n'est pas sur la branche par défaut (lancement manuel impossible par l'API) : il s'exécute aussi à chaque envoi
+  # sur la branche de travail qui touche le serveur, le web, le Dockerfile ou ce fichier, sur le commit envoyé.
   push:
     branches: [claude/unites-statistiques]
-    paths: ['.github/workflows/tests-version.yml']
-env:
-  VERSION_TESTEE: b0bf0cac0cbbb70115d4098557d55b6154072bd2
+    paths: ['.github/workflows/tests-version.yml', 'Dockerfile', 'server/**', 'web/**']
 permissions:
   contents: read
 jobs:
@@ -36,12 +34,12 @@ jobs:
         working-directory: server
     steps:
       - uses: actions/checkout@v4
-        with: { ref: "${{ inputs.sha || env.VERSION_TESTEE }}" }
+        with: { ref: "${{ inputs.sha || github.sha }}" }
       - run: "git log -1 --format='Version testée %H — %s'"
         working-directory: .
       - uses: actions/setup-node@v4
         with:
-          node-version: 22.22.0   # même version que les tests de validation (données de fuseaux ICU 2025b)
+          node-version: 22.23.4   # même Node que l'image de production (tzdata 2026e : Maroc UTC+0 depuis le 20/09/2026)
           cache: npm
           cache-dependency-path: server/package-lock.json
       - name: Client pg_dump 16 (même version majeure que le serveur PostgreSQL de test)
@@ -63,12 +61,28 @@ jobs:
         working-directory: web
     steps:
       - uses: actions/checkout@v4
-        with: { ref: "${{ inputs.sha || env.VERSION_TESTEE }}" }
+        with: { ref: "${{ inputs.sha || github.sha }}" }
       - uses: actions/setup-node@v4
         with:
-          node-version: 22.22.0   # même version que les tests de validation (données de fuseaux ICU 2025b)
+          node-version: 22.23.4   # même Node que l'image de production (tzdata 2026e : Maroc UTC+0 depuis le 20/09/2026)
           cache: npm
           cache-dependency-path: web/package-lock.json
       - run: npm ci
       - run: npx tsc --noEmit -p .
       - run: npx vitest run
+  image:
+    # L'image Docker réellement construite pour la production (même Dockerfile que Railway) : construction (avec le contrôle
+    # Africa/Casablanca intégré), version de Node et décalages du fuseau du foyer aux dates concernées.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: "${{ inputs.sha || github.sha }}" }
+      - name: Construction de l'image de production
+        run: . scripts/lib-docker.sh && docker_build smartcourse:version
+      - name: Fuseau du foyer dans l'image
+        run: |
+          docker run --rm smartcourse:version node -e '
+            const f = (i) => new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Casablanca", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZoneName: "shortOffset" }).format(new Date(i));
+            console.log("Node", process.version, "tzdata", process.versions.tz);
+            for (const i of ["2026-01-15T07:00:00Z", "2026-03-01T07:00:00Z", "2026-09-19T07:00:00Z", "2026-09-21T07:00:00Z", "2026-10-20T07:00:00Z", "2027-06-15T07:00:00Z"]) console.log(i, "->", f(i));'

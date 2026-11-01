@@ -52,11 +52,11 @@ describe("historique des validations", () => {
       { ...ev("q1", "a", "v2", "qty", "2026-10-12T13:00:00Z", "Lamiaa"), before: 1, after: 3 },
     ],
   };
-  it("retrouve le groupe de 08:00 (5 articles) et celui de 14:00 (3 ajouts + 1 modification), le plus récent d'abord", () => {
+  it("retrouve le groupe de 07:00 (5 articles) et celui de 13:00 (3 ajouts + 1 modification), le plus récent d'abord", () => {
     const g = validationGroups(list);
     expect(g.map((x) => [x.validation.by.displayName, x.events.length])).toEqual([["Lamiaa", 4], ["Marie", 5]]);
-    expect(fmtTime(g[1]!.validation.at)).toBe("08:00"); // 07:00 UTC = 08:00 à Casablanca
-    expect(fmtTime(g[0]!.validation.at)).toBe("14:00");
+    expect(fmtTime(g[1]!.validation.at)).toBe("07:00"); // 07:00 UTC = 07:00 à Casablanca (UTC+0 depuis le 20/09/2026)
+    expect(fmtTime(g[0]!.validation.at)).toBe("13:00");
   });
   it("détail d'une ligne : ajout du matin puis modification de l'après-midi, avec l'ancienne et la nouvelle valeur", () => {
     expect(eventsOfItem(list, "a").map((e) => [e.kind, e.before, e.after, e.by.displayName])).toEqual([["add", null, 1, "Marie"], ["qty", 1, 3, "Lamiaa"]]);
@@ -104,15 +104,19 @@ describe("quantités et unités", () => {
 
 describe("dates en Africa/Casablanca", () => {
   it("l'heure affichée suit le fuseau du foyer, pas celui du téléphone", () => {
-    expect(fmtTime("2026-10-12T07:00:00Z")).toBe("08:00");
-    expect(fmtTime("2026-10-12T13:00:00Z")).toBe("14:00");
+    expect(fmtTime("2026-06-12T07:00:00Z")).toBe("08:00"); // UTC+1 (avant le 20/09/2026)
+    expect(fmtTime("2026-10-12T07:00:00Z")).toBe("07:00"); // UTC+0 permanent depuis le 20/09/2026 (IANA 2026c)
+    expect(fmtTime("2026-10-12T13:00:00Z")).toBe("13:00");
     // Ramadan 2026 : le Maroc repasse à UTC+0 (février-mars)
     expect(fmtTime("2026-03-01T07:00:00Z")).toBe("07:00");
   });
   it("le jour change à minuit de Casablanca", () => {
-    const now = new Date("2026-10-12T12:00:00Z");
-    expect(fmtWhen("2026-10-12T07:00:00Z", now)).toBe("08:00");
-    expect(fmtWhen("2026-10-11T23:30:00Z", now)).toBe("00:30"); // 00:30 le 12 à Casablanca : le même jour que maintenant
+    const june = new Date("2026-06-12T12:00:00Z"); // UTC+1
+    expect(fmtWhen("2026-06-12T07:00:00Z", june)).toBe("08:00");
+    expect(fmtWhen("2026-06-11T23:30:00Z", june)).toBe("00:30"); // 00:30 le 12 à Casablanca : le même jour que maintenant
+    const now = new Date("2026-10-12T12:00:00Z"); // UTC+0
+    expect(fmtWhen("2026-10-12T07:00:00Z", now)).toBe("07:00");
+    expect(fmtWhen("2026-10-11T23:30:00Z", now)).not.toBe("23:30"); // 23:30 le 11 : la veille, affichée avec sa date
     expect(fmtWhen("2026-10-10T07:00:00Z", now)).toMatch(/10/);
     expect(fmtMonth("2026-10")).toBe("Octobre 2026");
   });
@@ -164,7 +168,7 @@ describe("heure du téléphone et heure de réception", () => {
   it("une validation reçue longtemps après l'appui est signalée « envoyé plus tard », avec les deux heures", () => {
     const now = new Date("2026-10-12T13:30:00Z");
     expect(isLate("2026-10-12T07:00:00Z", "2026-10-12T13:12:00Z")).toBe(true);
-    expect(lateNote("2026-10-12T07:00:00Z", "2026-10-12T13:12:00Z", now)).toBe("envoyé plus tard (reçu 14:12)");
+    expect(lateNote("2026-10-12T07:00:00Z", "2026-10-12T13:12:00Z", now)).toBe("envoyé plus tard (reçu 13:12)");
   });
   it("un envoi normal (quelques secondes, ou une courte coupure) n'est pas signalé", () => {
     expect(isLate("2026-10-12T07:00:00Z", "2026-10-12T07:00:03Z")).toBe(false);

@@ -486,8 +486,11 @@ describe("Statistiques d'achats", () => {
   it("fréquence et quantité distinctes, mois en Africa/Casablanca, comparaison de périodes équivalentes, pas de dépenses", async () => {
     statsClock.now = () => new Date("2026-11-20T12:00:00Z"); // octobre est un mois complet
     const f = await newFamily();
-    // Fin septembre 23:30 UTC = 00:30 le 1er octobre à Casablanca (UTC+1) : compte pour octobre.
-    await buy(f, "Tomates", 2, "2026-09-30T23:30:00Z");
+    // Mois au calendrier de Casablanca. Règle officielle (IANA 2026c) : UTC+0 permanent depuis le 20/09/2026 à 02:00.
+    // Fin octobre 23:30 UTC = 23:30 le 31 octobre (UTC+0) : compte pour octobre (avec l'ancienne règle UTC+1, ce serait novembre).
+    await buy(f, "Tomates", 2, "2026-10-31T23:30:00Z");
+    // Fin juin 23:30 UTC = 00:30 le 1er juillet (UTC+1, avant le changement) : compte pour juillet, pas pour juin.
+    await buy(f, "Lait", 1, "2026-06-30T23:30:00Z");
     await buy(f, "Tomates", 1.5, "2026-10-12T10:00:00Z");
     await buy(f, "Œufs", 6, "2026-10-13T10:00:00Z");
     await buy(f, "Œufs", 2, "2026-09-15T10:00:00Z");
@@ -508,6 +511,8 @@ describe("Statistiques d'achats", () => {
     expect(s.rows[0].name).toBe("Tomates"); // le plus souvent acheté d'abord (fréquence, pas quantité : Lait a 6 unités)
     expect(s.totals).toMatchObject({ purchases: 3, products: 2, comparePurchases: 2 });
     expect(s.months).toContain("2026-11");
+    expect((await stats(f.lamiaa, "2026-07")).rows.map((r: any) => r.name)).toContain("Lait");
+    expect((await stats(f.lamiaa, "2026-06")).rows.map((r: any) => r.name)).not.toContain("Lait");
   });
 
   it("mois en cours : comparé aux mêmes jours du mois précédent ; trois derniers mois ; jamais de comparaison sans historique ni référence", async () => {

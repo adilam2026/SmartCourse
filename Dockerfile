@@ -5,7 +5,10 @@
 # dumps that an older server cannot restore). The image therefore carries the clients for PostgreSQL
 # 16, 17 and 18 and the app picks the one matching the server at backup time (see server/src/backup.ts).
 # Add a version: add a stage below, a COPY line in the final stage, and its number to PG_MAJORS_DOC.
-ARG NODE_IMAGE=node:22-slim
+# Node FIXÉ (version et empreinte de l'index multi-architecture) : ses données de fuseaux (tzdata 2026e) connaissent le passage
+# du Maroc à UTC+0 permanent le 20/09/2026 (base IANA 2026c). Une image « node:22-slim » non fixée pouvait embarquer une
+# version plus ancienne (règle UTC+1 périmée) ou changer sans contrôle. Mise à jour : nouvelle version + empreinte vérifiées.
+ARG NODE_IMAGE=node:22.23.4-slim@sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da
 ARG PG_IMAGE_16=postgres:16-bookworm
 ARG PG_IMAGE_17=postgres:17-bookworm
 ARG PG_IMAGE_18=postgres:18-bookworm
@@ -59,6 +62,8 @@ COPY server/assetlinks.json ./assetlinks.json
 COPY --from=web /app/web/dist /app/web/dist
 # Run as the unprivileged "node" user; ./data is only used in development (production uses the bucket).
 RUN mkdir -p /app/server/data && chown -R node:node /app/server/data
+# Contrôle de construction : l'heure du foyer (Africa/Casablanca) suit la règle officielle en vigueur ; sinon l'image est refusée.
+RUN node -e 'const o=(i)=>{const p=new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Casablanca",timeZoneName:"shortOffset"}).formatToParts(new Date(i)).find(x=>x.type==="timeZoneName").value;return p};const a=o("2026-06-15T12:00:00Z"),b=o("2026-10-20T12:00:00Z");console.log("Africa/Casablanca : juin 2026 "+a+", octobre 2026 "+b+" (tzdata "+process.versions.tz+")");if(a!=="GMT+1"||!/^GMT(\+0)?$/.test(b))process.exit(1)'
 USER node
 EXPOSE 3000
 CMD ["node", "dist/index.js"]

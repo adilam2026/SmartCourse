@@ -170,3 +170,22 @@ UPDATE families SET catalog_rev = catalog_rev + 1;
 - **Avec le serveur actuel de production** (`bb8f627`, 025), cet APK garde les anciennes unités. Il n'affiche aucun message de mise
   à jour, l'historique complet est signalé en erreur avec « Réessayer », et le format ne s'enregistre pas. Le reste fonctionne.
   Pour une recette complète, il faut le serveur de la branche.
+
+## Fuseau horaire du foyer (Maroc) : UTC+0 permanent depuis le 20/09/2026
+
+**Source officielle :** la base des fuseaux IANA, version 2026c du 08/07/2026, indique « Morocco moves to permanent +00 on 2026-09-20 » à 02:00. Le Sahara occidental est aussi concerné. Les versions 2026d, 2026e et 2026f ne changent pas cette règle.
+
+**Décalages aux dates concernées (Africa/Casablanca) :**
+- UTC+1 hors Ramadan jusqu'au 20/09/2026 (par exemple le 15/01, le 15/06 et le 19/09/2026) ;
+- UTC+0 pendant le Ramadan 2026 ;
+- UTC+0 à partir du 20/09/2026, toute l'année, par exemple 07:00 UTC = 07:00 le 20/10/2026.
+
+**Écart observé entre versions de Node :** l'heure affichée vient des données de fuseaux de Node (ICU).
+- Node 22.22.0 (tzdata 2025b) applique encore l'ancienne règle et montre 08:00 en octobre 2026 : c'est périmé.
+- Node 22.23.4 (tzdata 2026e) suit la règle officielle et montre 07:00.
+
+**Mesures :**
+- **Image de production :** Node fixé à `22.23.4-slim`, avec l'empreinte de l'index multi-architecture, dans le `Dockerfile`. Un contrôle intégré refuse de construire l'image si Africa/Casablanca n'est pas à UTC+1 en juin 2026 et à UTC+0 en octobre 2026.
+- **Tests web et serveur :** les attentes sont alignées sur la règle officielle aux mêmes dates, avec des cas avant et après le 20/09/2026. Elles exigent des données de fuseaux 2026c ou plus récentes ; l'intégration continue utilise la même Node que l'image.
+- **Tâches programmées du serveur :** elles fonctionnent par intervalles (sauvegarde dès que la dernière a plus de 24 h, contrôle toutes les 10 min ; purges toutes les 6 h), pas à heure fixe. Elles ne dépendent donc pas du décalage, et aucune tâche planifiée n'existe sur GitHub.
+- **Application Android :** elle affiche les heures dans le fuseau du téléphone, avec les données de fuseaux d'Android (mises à jour par le système). Elle ne contient aucun décalage écrit en dur. Les rappels d'achat suivent l'heure locale du téléphone.
