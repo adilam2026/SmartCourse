@@ -1,18 +1,14 @@
 ═══ Y. Complément unités : Pâte à tartiner à la pièce, Sucre à la pièce (paquet de 2 kg, prix à compléter), Fromage en portions au poids (prix à compléter) ═══
 PASS  Y0. serveur : unités et format dans la famille (Fromage en portions:kg:-,Pâte à tartiner:piece:-,Sucre:piece:paquet de 2 kg)
 PASS  Y0b. prix communs conservés, aucun prix du paquet déduit de 5,20 DH/kg (fromage-en-portions:26.00/1 boite:-,sucre:5.20/1 kg:-)
-FAIL  Y1. Sucre choisi : « 1 pièce »
-      écran : "Ma liste"|"Compte"|"Aucune liste en cours"|"Choisissez les articles de vos prochaines courses."|"Créer une liste"|"Liste"|"Liste"|"Historique"|"Historique"|"Statistiques"|"Statistiques"|"Réglages"|"Réglages"|
-FAIL  Y2. Sucre : format « paquet de 2 kg » affiché
-      écran : "Ma liste"|"Compte"|"Aucune liste en cours"|"Choisissez les articles de vos prochaines courses."|"Créer une liste"|"Liste"|"Liste"|"Historique"|"Historique"|"Statistiques"|"Statistiques"|"Réglages"|"Réglages"|
+PASS  Y1. Sucre choisi : « 1 pièce »
+PASS  Y2. Sucre : format « paquet de 2 kg » affiché
 FAIL  Y3. Sucre : aucun prix affiché comme prix actuel (5,20 DH/kg jamais présenté comme prix du paquet)
-      écran : "Ma liste"|"Compte"|"Aucune liste en cours"|"Choisissez les articles de vos prochaines courses."|"Créer une liste"|"Liste"|"Liste"|"Historique"|"Historique"|"Statistiques"|"Statistiques"|"Réglages"|"Réglages"|
-FAIL  Y4. Pâte à tartiner choisie : « 1 pièce »
-      écran : "Ma liste"|"Compte"|"Aucune liste en cours"|"Choisissez les articles de vos prochaines courses."|"Créer une liste"|"Liste"|"Liste"|"Historique"|"Historique"|"Statistiques"|"Statistiques"|"Réglages"|"Réglages"|
-FAIL  Y5. Fromage en portions choisi au poids : « 1 kg »
-      écran : "Ma liste"|"Compte"|"Aucune liste en cours"|"Choisissez les articles de vos prochaines courses."|"Créer une liste"|"Liste"|"Liste"|"Historique"|"Historique"|"Statistiques"|"Statistiques"|"Réglages"|"Réglages"|
+      écran : "Close sheet"|"Sucre"|"Se compte en pièces"|"Format : paquet de 2 kg"|"Diminuer"|"1"|"pièce"|"Augmenter"|" "|"Mettre à jour"|"Retirer de la sélection"|
+PASS  Y4. Pâte à tartiner choisie : « 1 pièce »
+PASS  Y5. Fromage en portions choisi au poids : « 1 kg »
 PASS  Y6. Gestion des prix : Sucre « prix à ressaisir par pièce » (à compléter)
 PASS  Y7. Gestion des prix : Fromage en portions « prix à ressaisir au kg » (à compléter)
-ECHECS=5
+ECHECS=1
 CRASH_APPLICATION=0
-TOTAL_ECHECS=5
+TOTAL_ECHECS=1
