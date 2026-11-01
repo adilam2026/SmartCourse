@@ -1,8 +1,13 @@
 -- Rapport d'un foyer : articles qui GARDERAIENT une unité différente des décisions validées (unité considérée comme choisie
--- par la famille), avec l'état de leur prix. LECTURE SEULE : les migrations 026 à 030 sont jouées dans une transaction ANNULÉE.
--- À exécuter sur une COPIE de la base (restauration d'une sauvegarde), jamais pendant l'utilisation de la production :
---   psql "$URL_DE_LA_COPIE" -v famille=CODEFAMILLE -f docs/catalogue/import-2026-11-01/rapport-foyer.sql
--- (lancé depuis la racine du dépôt ; CODEFAMILLE = le code famille actuel, 8 caractères.)
+-- par la famille), avec l'état de leur prix.
+--
+-- CE N'EST PAS UNE SIMPLE REQUÊTE EN LECTURE SEULE : le script EXÉCUTE les migrations 026 à 030 (modifications de schéma et de
+-- données, verrous sur les tables), lit leur journal, puis ANNULE la transaction (ROLLBACK). Conditions d'utilisation :
+--   * uniquement sur une COPIE RESTAURÉE d'une sauvegarde, jamais sur la base de production ;
+--   * dans un environnement PRIVÉ (poste ou serveur de l'administrateur) : le résultat contient des données du foyer et ne doit
+--     jamais apparaître dans les journaux du dépôt public (aucune exécution par l'intégration continue GitHub) ;
+--   * psql "$URL_DE_LA_COPIE_RESTAUREE" -v famille=CODEFAMILLE -f docs/catalogue/import-2026-11-01/rapport-foyer.sql
+--     (depuis la racine du dépôt ; CODEFAMILLE = code famille actuel, 8 caractères).
 \set ON_ERROR_STOP on
 BEGIN;
 \i server/migrations/026_family_identifier.sql

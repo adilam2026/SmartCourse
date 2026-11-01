@@ -1037,6 +1037,45 @@ expect "O11. réaffiché : même place, entre les condiments et le sel" near "Co
 logout
 fi
 
+if want_s Y; then
+echo "═══ Y. Complément unités : Pâte à tartiner à la pièce, Sucre à la pièce (paquet de 2 kg, prix à compléter), Fromage en portions au poids (prix à compléter) ═══" | tee -a "$OUT/resultats.txt"
+login_api adil 482913
+closeall_api; api PUT /api/family/features -d '{"multiLists":false}' >/dev/null
+api POST /api/products/from-catalog -d '{"origin":"extended","key":"pate-a-tartiner"}' >/dev/null
+Y0=$(sql "SELECT string_agg(p.name||':'||p.unit||':'||coalesce(p.format,'-'), ',' ORDER BY p.name) FROM products p JOIN families f ON f.id=p.family_id WHERE f.code='$FAMILY' AND p.name IN ('Pâte à tartiner','Sucre','Fromage en portions')")
+expect "Y0. serveur : unités et format dans la famille ($Y0)" test "$Y0" = "Fromage en portions:kg:-,Pâte à tartiner:piece:-,Sucre:piece:paquet de 2 kg"
+Y0B=$(sql "SELECT string_agg(key||':'||amount||'/'||ref_qty::float||' '||ref_unit||':'||coalesce(piece_weight_g::text,'-'), ',' ORDER BY key) FROM base_prices WHERE key IN ('sucre','fromage-en-portions')")
+expect "Y0b. prix communs conservés, aucun prix du paquet déduit de 5,20 DH/kg ($Y0B)" test "$Y0B" = "fromage-en-portions:26.00/1 boite:-,sucre:5.20/1 kg:-"
+launch; $UI wait "Bienvenue" 25 >/dev/null
+signin "$FAMILY" adil 482913; $UI wait "Ma liste" 25 >/dev/null; sleep 2
+tapt "Ajouter des articles"; $UI wait "Rechercher un produit" 15 >/dev/null
+ysearch() { $UI field 0 >/dev/null; sleep 1; clear_field; adb shell input text "$1"; sleep 1; hide_kb; sleep 2; }
+ysearch "sucre"; $UI tap "Sucre" --exact >/dev/null; sleep 2
+expect "Y1. Sucre choisi : « 1 pièce »" $UI wait "1 pièce" 8
+$UI tap "Modifier la quantité : Sucre" >/dev/null; sleep 2
+expect "Y2. Sucre : format « paquet de 2 kg » affiché" $UI wait "Format : paquet de 2 kg" 8
+expect "Y3. Sucre : aucun prix affiché comme prix actuel (5,20 DH/kg jamais présenté comme prix du paquet)" bash -c "$UI has 'Prix non renseigné' && ! $UI has '10,40' && ! $UI has '5,20'"
+shot final-y1-sucre-format
+$UI tap "Retirer de la sélection" >/dev/null; sleep 2
+ysearch "pate a tartiner"; $UI tap "Pâte à tartiner" --exact >/dev/null; sleep 2
+expect "Y4. Pâte à tartiner choisie : « 1 pièce »" $UI wait "1 pièce" 8
+shot final-y2-pate-a-tartiner
+$UI tap "Pâte à tartiner" --exact >/dev/null; sleep 2
+ysearch "portions"; $UI tap "Fromage en portions" --exact >/dev/null; sleep 2
+expect "Y5. Fromage en portions choisi au poids : « 1 kg »" $UI wait "1 kg" 8
+shot final-y3-fromage-portions-kg
+$UI tap "Fromage en portions" --exact >/dev/null; sleep 2
+back_to_app; for _ in 1 2 3; do $UI has "Réglages" && break; adb shell input keyevent KEYCODE_BACK; sleep 2; done
+tapt "Réglages"; $UI tap "Gestion des prix" --scroll >/dev/null; sleep 3
+fill "Rechercher un produit" "Sucre"; hide_kb; sleep 3
+expect "Y6. Gestion des prix : Sucre « prix à ressaisir par pièce » (à compléter)" bash -c "$UI has 'Sucre' && $UI has 'prix à ressaisir'"
+shot final-y4-prix-sucre-a-completer
+$UI field 0 >/dev/null; sleep 1; clear_field; adb shell input text "portions"; sleep 1; hide_kb; sleep 3
+expect "Y7. Gestion des prix : Fromage en portions « prix à ressaisir au kg » (à compléter)" bash -c "$UI has 'Fromage en portions' && $UI has 'prix à ressaisir'"
+shot final-y5-prix-fromage-a-completer
+logout
+fi
+
 if want_s U; then
 echo "═══ U. Unités corrigées : décimales au kg, lignes existantes jamais réinterprétées, prix à ressaisir ═══" | tee -a "$OUT/resultats.txt"
 login_api adil 482913

@@ -217,9 +217,9 @@ Relevés à vérifier ou à distinguer (24 sur 89 ; unités finales) :
 - prix du Fromage en portions à compléter, faute de poids confirmé.
 
 **Rapport par foyer :** `rapport-foyer.sql` liste les articles d'un foyer qui garderaient une unité personnalisée, avec l'état de leur prix.
-- Il joue les migrations 026 à 030 dans une transaction annulée.
-- Il est à exécuter sur une copie de la base (restauration d'une sauvegarde).
-- Je ne l'ai pas exécuté sur les données réelles : je n'ai pas accès à la production, et les journaux de l'intégration continue sont publics.
+- **Ce n'est pas une requête en lecture seule.** Il **exécute** les migrations 026 à 030 (schéma et données, avec verrous), lit leur journal, puis annule la transaction.
+- À utiliser **uniquement sur une copie restaurée** d'une sauvegarde, **dans un environnement privé** : jamais sur la production, jamais dans l'intégration continue, et ses résultats jamais dans les journaux du dépôt public.
+- Je ne l'ai pas exécuté sur les données réelles : je n'ai pas accès à la production ni à une copie restaurée privée.
 
 **Restant à trancher :**
 1. **Merlan colin et Merlan ration :** non fusionnés, en attendant une identification confirmée.
