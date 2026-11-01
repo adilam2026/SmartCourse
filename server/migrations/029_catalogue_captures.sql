@@ -8,7 +8,9 @@
 --    Épicerie, avec les fruits secs) et Céréales (Épicerie → Pain et petit-déjeuner, avec granola et flocons d'avoine). Les
 --    articles des familles ne suivent que s'ils sont encore dans la catégorie d'origine (une catégorie choisie par la famille
 --    n'est jamais modifiée).
---  * Unités : potages déshydratés en sachets ; sauces et boissons relevées en cL/mL au litre ; aucune conversion g ↔ mL.
+--  * Unités (décisions du 1er novembre 2026) : un contenant ou un article complet = 1 pièce (soupes en sachet, sauces, sucres,
+--    vermicelles de Chine, granola, café soluble, confiture, chips) ; le poids ou le volume reste une information de format.
+--    Poissons, fruits secs et olives au poids, boissons au litre. Aucune conversion g ↔ mL.
 --  * Prix relevés NON importés (date de prise de vue inconnue) : voir docs/catalogue/import-2026-11-01/references.csv.
 INSERT INTO extended_catalog (category,name,search_text,source,key,unit) VALUES
 ('epicerie','Pistaches','pistaches','captures-20261101','pistaches','kg'),
@@ -16,21 +18,21 @@ INSERT INTO extended_catalog (category,name,search_text,source,key,unit) VALUES
 ('epicerie','Pruneaux','pruneaux','captures-20261101','pruneaux','kg'),
 ('epicerie','Abricots secs','abricots secs','captures-20261101','abricots-secs','kg'),
 ('epicerie','Raisins secs blonds','raisins secs blonds','captures-20261101','raisins-secs-blonds','kg'),
-('epicerie','Soupe aux lentilles','soupe aux lentilles','captures-20261101','soupe-aux-lentilles','sachet'),
-('epicerie','Soupe poulet et vermicelles','soupe poulet et vermicelles','captures-20261101','soupe-poulet-et-vermicelles','sachet'),
-('epicerie','Soupe de légumes','soupe de legumes','captures-20261101','soupe-de-legumes','sachet'),
-('epicerie','Crème de poulet','creme de poulet','captures-20261101','creme-de-poulet','sachet'),
+('epicerie','Soupe aux lentilles','soupe aux lentilles','captures-20261101','soupe-aux-lentilles','piece'),
+('epicerie','Soupe poulet et vermicelles','soupe poulet et vermicelles','captures-20261101','soupe-poulet-et-vermicelles','piece'),
+('epicerie','Soupe de légumes','soupe de legumes','captures-20261101','soupe-de-legumes','piece'),
+('epicerie','Crème de poulet','creme de poulet','captures-20261101','creme-de-poulet','piece'),
 ('epicerie','Olives meslala','olives meslala','captures-20261101','olives-meslala','kg'),
 ('epicerie','Olives vertes en tranches','olives vertes en tranches','captures-20261101','olives-vertes-en-tranches','kg'),
 ('epicerie','Olives rouges','olives rouges','captures-20261101','olives-rouges','kg'),
 ('epicerie','Olives vertes au citron','olives vertes au citron','captures-20261101','olives-vertes-au-citron','kg'),
 ('epicerie','Olives noires façon grecque','olives noires facon grecque','captures-20261101','olives-noires-facon-grecque','kg'),
-('epicerie','Assaisonnement au citron','assaisonnement au citron','captures-20261101','assaisonnement-au-citron','litre'),
-('epicerie','Sucre en lingots','sucre en lingots','captures-20261101','sucre-en-lingots','kg'),
-('epicerie','Sucre en morceaux','sucre en morceaux','captures-20261101','sucre-en-morceaux','kg'),
-('epicerie','Sauce algérienne','sauce algerienne','captures-20261101','sauce-algerienne','litre'),
-('epicerie','Sauce barbecue','sauce barbecue','captures-20261101','sauce-barbecue','litre'),
-('epicerie','Vermicelles de Chine','vermicelles de chine','captures-20261101','vermicelles-de-chine','kg'),
+('epicerie','Assaisonnement au citron','assaisonnement au citron','captures-20261101','assaisonnement-au-citron','piece'),
+('epicerie','Sucre en lingots','sucre en lingots','captures-20261101','sucre-en-lingots','piece'),
+('epicerie','Sucre en morceaux','sucre en morceaux','captures-20261101','sucre-en-morceaux','piece'),
+('epicerie','Sauce algérienne','sauce algerienne','captures-20261101','sauce-algerienne','piece'),
+('epicerie','Sauce barbecue','sauce barbecue','captures-20261101','sauce-barbecue','piece'),
+('epicerie','Vermicelles de Chine','vermicelles de chine','captures-20261101','vermicelles-de-chine','piece'),
 ('boissons','Boisson énergisante','boisson energisante','captures-20261101','boisson-energisante','litre'),
 ('boissons','Soda à l''orange','soda a l''orange','captures-20261101','soda-a-l-orange','litre'),
 ('boissons','Tonic','tonic','captures-20261101','tonic','litre'),
@@ -39,10 +41,10 @@ INSERT INTO extended_catalog (category,name,search_text,source,key,unit) VALUES
 ('boissons','Soda à l''orange sans sucre','soda a l''orange sans sucre','captures-20261101','soda-a-l-orange-sans-sucre','litre'),
 ('boissons','Soda à la pomme','soda a la pomme','captures-20261101','soda-a-la-pomme','litre'),
 ('boissons','Soda à l''ananas','soda a l''ananas','captures-20261101','soda-a-l-ananas','litre'),
-('epicerie','Chips au fromage et aux oignons','chips au fromage et aux oignons','captures-20261101','chips-au-fromage-et-aux-oignons','kg'),
-('pain','Granola aux trois chocolats','granola aux trois chocolats','captures-20261101','granola-aux-trois-chocolats','kg'),
-('pain','Café soluble','cafe soluble','captures-20261101','cafe-soluble','kg'),
-('pain','Confiture de figue','confiture de figue','captures-20261101','confiture-de-figue','kg'),
+('epicerie','Chips','chips chips au fromage et aux oignons','captures-20261101','chips-au-fromage-et-aux-oignons','piece'),
+('pain','Granola aux trois chocolats','granola aux trois chocolats','captures-20261101','granola-aux-trois-chocolats','piece'),
+('pain','Café soluble','cafe soluble','captures-20261101','cafe-soluble','piece'),
+('pain','Confiture de figue','confiture de figue','captures-20261101','confiture-de-figue','piece'),
 ('viandes','Saint-Pierre métallisé','saint-pierre metallise','captures-20261101','saint-pierre-metallise','kg'),
 ('viandes','Espadon','espadon','captures-20261101','espadon','kg'),
 ('viandes','Sole','sole','captures-20261101','sole','kg'),

@@ -46,12 +46,109 @@
 - Masquer un article ne déplace pas les autres ; réafficher le remet à la même place.
 - Les 45 nouvelles références ont toutes des voisins.
 
+## Unités finales (décisions du 1er novembre 2026)
+
+**Principe :** une unité représente un contenant ou un article complet. Poids, volume et nombre de sachets restent des informations de format. Le détail des règles et le retour arrière sont dans `UNITES-030.md`.
+
+### Références existantes corrigées (migration 030)
+
+41 changements : 9 références de départ, 32 du catalogue complémentaire.
+
+| Rayon | Référence | Avant | Après |
+|---|---|---|---|
+| Légumes et herbes | Choux-fleurs (`choux-fleurs`) | kg | **pièce** |
+| Légumes et herbes | Épinards (`epinards`) | kg | **botte** |
+| Fruits | Melon (`melon`) | kg | **pièce** |
+| Fruits | Pastèque (`pasteque`) | kg | **pièce** |
+| Laitages et œufs | Fromage en portions (`fromage-en-portions`) | boîte | **kg** |
+| Laitages et œufs | Lait concentré (`lait-concentre`) | kg | **pièce** |
+| Laitages et œufs | Lait en poudre (`lait-en-poudre`) | kg | **pièce** |
+| Épicerie | Bicarbonate alimentaire (`bicarbonate-alimentaire`) | kg | **pièce** |
+| Épicerie | Biscuits (`biscuits`) | kg | **pièce** |
+| Épicerie | Cacao en poudre (`cacao-en-poudre`) | kg | **pièce** |
+| Épicerie | Chapelure (`chapelure`) | kg | **pièce** |
+| Épicerie | Concentré de tomates (`concentre-de-tomates`) | kg | **pièce** |
+| Épicerie | Fécule de maïs (`fecule-de-mais`) | kg | **pièce** |
+| Épicerie | Ketchup (`ketchup`) | kg | **pièce** |
+| Épicerie | Levure chimique (`levure-chimique`) | kg | **pièce** |
+| Épicerie | Levure de boulanger (`levure-de-boulanger`) | kg | **pièce** |
+| Épicerie | Maïs en conserve (`mais-en-conserve`) | kg | **pièce** |
+| Épicerie | Mayonnaise (`mayonnaise`) | kg | **pièce** |
+| Épicerie | Moutarde (`moutarde`) | kg | **pièce** |
+| Épicerie | Pesto (`pesto`) | kg | **pièce** |
+| Épicerie | Sauce tomate (`sauce-tomate`) | kg | **pièce** |
+| Épicerie | Sel alimentaire (`sel`) | kg | **pièce** |
+| Épicerie | Sucre (`sucre`) | kg | **pièce** |
+| Épicerie | Sucre glace (`sucre-glace`) | kg | **pièce** |
+| Épicerie | Sucre vanillé (`sucre-vanille`) | kg | **pièce** |
+| Pain et petit-déjeuner | Beurre de cacahuètes (`beurre-de-cacahuetes`) | kg | **pièce** |
+| Pain et petit-déjeuner | Biscottes (`biscottes`) | kg | **pièce** |
+| Pain et petit-déjeuner | Café (`cafe`) | kg | **pièce** |
+| Pain et petit-déjeuner | Caramel à tartiner (`caramel-a-tartiner`) | kg | **pièce** |
+| Pain et petit-déjeuner | Céréales au chocolat (`cereales`) | kg | **pièce** |
+| Pain et petit-déjeuner | Compote de fruits (`compote-de-fruits`) | kg | **pièce** |
+| Pain et petit-déjeuner | Confiture (`confiture`) | kg | **pièce** |
+| Pain et petit-déjeuner | Flocons d'avoine (`flocons-d-avoine`) | kg | **pièce** |
+| Pain et petit-déjeuner | Gâteaux secs marocains (`gateaux-secs-marocains`) | kg | **pièce** |
+| Pain et petit-déjeuner | Miel (`miel`) | kg | **pièce** |
+| Pain et petit-déjeuner | Pain de mie (`pain-de-mie`) | kg | **pièce** |
+| Pain et petit-déjeuner | Thé en vrac (`the-en-vrac`) | kg | **pièce** |
+| Boissons | Tisane en vrac (`tisane-en-vrac`) | kg | **pièce** |
+| Maison | Lessive en poudre (`lessive-en-poudre`) | kg | **pièce** |
+| Maison | Savon noir en pâte (`savon-noir-en-pate`) | kg | **pièce** |
+| Maison | Sel régénérant pour lave-vaisselle (`sel-regenerant-pour-lave-vaisselle`) | kg | **pièce** |
+
+Les autres références existantes gardent leur unité, par exemple :
+- harissa, amlou, beurre, margarine, fromages : au poids ;
+- farines, semoule, couscous, riz, pâtes, cheveux d'ange, légumineuses : au poids ;
+- fruits secs, olives, cornichons, citrons confits, épices : au poids ;
+- viandes, poissons et surgelés : au poids, sauf le poulet entier, à la pièce ;
+- boissons, huiles et autres liquides validés : au litre, **dont Lben**.
+
+### Références nouvelles du lot (migration 029, unités finales)
+
+| Rayon | Unité | Références |
+|---|---|---|
+| Épicerie | kg | Abricots secs, Cacahuètes salées, Olives meslala, Olives noires façon grecque, Olives rouges, Olives vertes au citron, Olives vertes en tranches, Pistaches, Pruneaux, Raisins secs blonds |
+| Épicerie | pièce | Assaisonnement au citron, Chips, Crème de poulet, Sauce algérienne, Sauce barbecue, Soupe aux lentilles, Soupe de légumes, Soupe poulet et vermicelles, Sucre en lingots, Sucre en morceaux, Vermicelles de Chine |
+| Viandes et poisson | kg | Anneaux de calamar, Bar, Crevettes grises, Crevettes roses, Dorade royale, Espadon, Lamelles de calamar, Merlan colin, Merlan ration, Pageot chama, Pageot royal, Saint-Pierre métallisé, Sole |
+| Pain et petit-déjeuner | pièce | Café soluble, Confiture de figue, Granola aux trois chocolats |
+| Boissons | litre | Boisson énergisante, Cola, Soda à l'ananas, Soda à la pomme, Soda à l'orange, Soda à l'orange sans sucre, Soda au citron, Tonic |
+
+### Familles et historiques
+
+- **Produits des familles :** l'unité change seulement si elle venait du catalogue. Une unité choisie par la famille est conservée et journalisée. Identifiants inchangés.
+- **Nom :** « Céréales » devient « Céréales au chocolat » chez les familles qui n'avaient pas changé ce nom. « Mes céréales » resterait « Mes céréales ».
+- **Historique :** achats, lignes de listes, événements et favoris sont figés. Un achat passé de 0,5 kg de miel reste 0,5 kg. Les statistiques gardent kg et pièces séparés.
+- **Quantités :** à la pièce, elles sont entières (1,5 pot refusé).
+
+### Prix communs (base 019), sur une base de recette
+
+| Référence | Prix observé (019) | Après 027 | Après 030 |
+|---|---|---|---|
+| Miel | 56,95 DH le pot de 450 g | 56,95 DH / 450 g | **56,95 DH la pièce**, format 450 g |
+| Confiture | 18,95 DH le pot de 430 g | 18,95 DH / 430 g | **18,95 DH la pièce**, format 430 g |
+| Concentré de tomates | 7,40 DH la boîte de 140 g | 7,40 DH / 140 g | **7,40 DH la pièce**, format 140 g |
+| Sauce tomate | 32,00 DH le pot de 400 g | 32,00 DH / 400 g | **32,00 DH la pièce**, format 400 g |
+| Ketchup | 14,50 DH le flacon de 310 g | 14,50 DH / 310 g | **14,50 DH la pièce**, format flacon de 310 g |
+| Mayonnaise | 14,95 DH le pot de 280 g | 14,95 DH / 280 g | **14,95 DH la pièce**, format 280 g |
+| Moutarde | 16,50 DH le pot de 300 g | 16,50 DH / 300 g | **16,50 DH la pièce**, format 300 g |
+| Maïs en conserve | 6,65 DH la boîte de 150 g | 6,65 DH / 150 g | **6,65 DH la pièce**, format 150 g |
+| Bicarbonate alimentaire | 24,50 DH le pot de 250 g | 24,50 DH / 250 g | **24,50 DH la pièce**, format 250 g |
+| Flocons d'avoine | 20,95 DH le paquet de 500 g | 20,95 DH / 500 g | **20,95 DH la pièce**, format 500 g |
+| Caramel à tartiner | 64,00 DH le pot de 380 g | 64,00 DH / 380 g | **64,00 DH la pièce**, format 380 g |
+| Compote de fruits | 19,50 DH le pot de 390 g | 19,50 DH / 390 g | **19,50 DH la pièce**, format 390 g |
+| Sucre | 5,20 DH / kg | 5,20 DH / kg | **conservé, à compléter** : aucun format connu, jamais utilisé comme prix à la pièce |
+| Fromage en portions | 26,00 DH la boîte de 16 portions | idem | **conservé, à compléter** : aucun poids écrit, pas de prix au kg déduit |
+
+**Prix des familles :** mêmes règles.
+- Contenant → 1 pièce.
+- Prix au kg avec un format au poids unique (« pot de 250 g ») → même prix au kg, avec un poids de pièce de 250 g. Le montant d'une ligne est exact.
+- Sinon : conservé et signalé à compléter. C'est le cas d'un prix au kg sans format, d'un prix « par sachet » pour le sucre vanillé ou la levure chimique, et du melon au kg.
+
 ## Adaptations par rapport au correctif du lot
 
-1. **Unités alignées sur les conventions de 027.**
-   - Les quatre potages déshydratés se comptent **au sachet** (40 à 100 g), et non au kg.
-   - Sauce algérienne, sauce barbecue et assaisonnement au citron sont relevés en mL ou cL : ils restent au litre, sans conversion g ↔ mL.
-   - Les autres unités sont celles du lot : poissons au kg, boissons au litre, fruits secs et olives au kg comme leurs voisins existants.
+1. **Unités :** remplacées par les décisions du 1er novembre 2026 (section précédente). Noms « Chips » et « Céréales au chocolat ».
 2. **Classement.**
    - Le correctif du lot triait chaque catégorie par groupes puis par nom. Cela aurait déplacé l'ordre de départ de toutes les familles, par exemple les huiles, aujourd'hui en tête d'Épicerie.
    - Le classement retenu conserve l'ordre de départ et ne place que les ajouts.
@@ -68,65 +165,57 @@
 - Prix promotionnels et prix barrés sont distincts.
 - Les marques et formats concurrents restent des relevés séparés d'un même article : pas de moyenne, pas de prix le plus bas automatique.
 
-Relevés à vérifier ou à distinguer (29 sur 89) :
+Relevés à vérifier ou à distinguer (24 sur 89 ; unités finales) :
 
-| Capture | Article relevé | Référence (unité) | Format | Prix relevé | Point à vérifier |
+| Capture | Article relevé | Référence (unité finale) | Format | Prix relevé | Point à vérifier |
 |---|---|---|---|---|---|
 | 03-631400.jpg | Noix de cajou grillées | `noix-de-cajou` (kg) | 200 g | 43.80 DH | prix promotionnel : 43.80 DH, prix barré 47.80 DH (distincts) |
 | 04-631398.jpg | Raisins secs noirs | `raisins-secs` (kg) | 200 g | 13.80 DH | prix promotionnel : 13.80 DH, prix barré 15.80 DH (distincts) |
 | 05-631396.jpg | Pruneaux | `pruneaux` (kg) | 200 g | 12.38 DH | prix promotionnel : 12.38 DH, prix barré 16.38 DH (distincts) |
 | 07-631392.jpg | Amandes | `amandes` (kg) | 200 g | 25.00 DH | prix promotionnel : 25.00 DH, prix barré 29.18 DH (distincts) |
-| 10-631386.jpg | Chapelure | `chapelure` (kg) | 250 g | 4.90 DH | Bonus 25 g visible : contenu à confirmer |
-| 01-631384.jpg | Soupe aux lentilles | `soupe-aux-lentilles` (sachet) | 100 g | 8.10 DH | sachet : poids du sachet seulement indicatif ; Titre 100 g / emballage 70 g à confirmer |
-| 02-631382.jpg | Soupe poulet et vermicelles | `soupe-poulet-et-vermicelles` (sachet) | 60 g | 8.50 DH | sachet : poids du sachet seulement indicatif ; Titre 60 g / emballage 80 g à confirmer |
-| 03-631380.jpg | Soupe de légumes | `soupe-de-legumes` (sachet) | 40 g | 8.25 DH | sachet : poids du sachet seulement indicatif ; Titre 40 g / emballage 60 g à confirmer |
-| 04-631378.jpg | Crème de poulet | `creme-de-poulet` (sachet) | 60 g | 8.50 DH | sachet : poids du sachet seulement indicatif |
-| 01-631364.jpg | Assaisonnement au citron | `assaisonnement-au-citron` (litre) | 24 cL | 5.95 DH | Assaisonnement citron : ne pas assimiler automatiquement au vinaigre |
-| 06-631354.jpg | Sauce tomate pour pizza | `sauce-tomate` (kg) | 37 cL | 13.40 DH | format en volume, unité au kg (aucune conversion mL → g) |
-| 07-631352.jpg | Concentré de tomates | `concentre-de-tomates` (kg) | 10.6 cL | 6.70 DH | format en volume, unité au kg (aucune conversion mL → g) ; Fiche 10.6 cL / étiquette 105 g |
+| 10-631386.jpg | Chapelure | `chapelure` (piece) | 250 g | 4.90 DH | Bonus 25 g visible : contenu à confirmer |
+| 01-631384.jpg | Soupe aux lentilles | `soupe-aux-lentilles` (piece) | 100 g | 8.10 DH | Titre 100 g / emballage 70 g à confirmer |
+| 02-631382.jpg | Soupe poulet et vermicelles | `soupe-poulet-et-vermicelles` (piece) | 60 g | 8.50 DH | Titre 60 g / emballage 80 g à confirmer |
+| 03-631380.jpg | Soupe de légumes | `soupe-de-legumes` (piece) | 40 g | 8.25 DH | Titre 40 g / emballage 60 g à confirmer |
+| 01-631364.jpg | Assaisonnement au citron | `assaisonnement-au-citron` (piece) | 24 cL | 5.95 DH | Assaisonnement citron : ne pas assimiler automatiquement au vinaigre |
+| 07-631352.jpg | Concentré de tomates | `concentre-de-tomates` (piece) | 10.6 cL | 6.70 DH | Fiche 10.6 cL / étiquette 105 g |
 | 08-631350.jpg | Harissa | `harissa` (kg) | 160 g | 8.40 DH | Sauce liquide / pâte de harissa à distinguer |
-| 09-631348.jpg | Sauce algérienne | `sauce-algerienne` (litre) | 305 mL | 18.95 DH | prix promotionnel : 18.95 DH, prix barré 22.50 DH (distincts) |
-| 03-631340.jpg | Ketchup | `ketchup` (kg) | 460 g | 22.95 DH | prix promotionnel : 22.95 DH, prix barré 29.95 DH (distincts) |
-| 07-631332.jpg | Levure chimique | `levure-chimique` (kg) | 5 unités | 6.00 DH | prix d'un lot de sachets, unité de la référence au poids : prix non importé |
-| 08-631330.jpg | Sucre vanillé | `sucre-vanille` (kg) | 10 × 7.5 g | 5.50 DH | prix d'un lot de sachets, unité de la référence au poids : prix non importé |
-| 09-631328.jpg | Levure chimique | `levure-chimique` (kg) | 10 × 8 g | 5.50 DH | prix d'un lot de sachets, unité de la référence au poids : prix non importé |
+| 09-631348.jpg | Sauce algérienne | `sauce-algerienne` (piece) | 305 mL | 18.95 DH | prix promotionnel : 18.95 DH, prix barré 22.50 DH (distincts) |
+| 03-631340.jpg | Ketchup | `ketchup` (piece) | 460 g | 22.95 DH | prix promotionnel : 22.95 DH, prix barré 29.95 DH (distincts) |
 | 01-631304.jpg | Semoule fine | `semoule-fine` (kg) | 5 kg | 55.25 DH | 5 kg + 1 kg gratuit : contenu réel à confirmer |
 | 10-631286.jpg | Soda à l'orange sans sucre | `soda-a-l-orange-sans-sucre` (litre) | 50 cL | 6.50 DH | prix promotionnel : 6.50 DH, prix barré 6.60 DH (distincts) |
-| 10-630704.jpg | Miel multifleurs | `miel` (kg) | 250 g | 31.50 DH | prix promotionnel : 31.50 DH, prix barré 32.50 DH (distincts) |
-| 01-630702.jpg | Confiture d'abricot | `confiture` (kg) | 21 cL | 10.50 DH | format en volume, unité au kg (aucune conversion mL → g) ; Poids net à vérifier, fiche en cL |
-| 02-630700.jpg | Confiture de figue | `confiture-de-figue` (kg) | 37 cL | 19.20 DH | format en volume, unité au kg (aucune conversion mL → g) ; Poids net à vérifier, fiche en cL |
+| 10-630704.jpg | Miel multifleurs | `miel` (piece) | 250 g | 31.50 DH | prix promotionnel : 31.50 DH, prix barré 32.50 DH (distincts) |
+| 01-630702.jpg | Confiture d'abricot | `confiture` (piece) | 21 cL | 10.50 DH | Poids net à vérifier, fiche en cL |
+| 02-630700.jpg | Confiture de figue | `confiture-de-figue` (piece) | 37 cL | 19.20 DH | Poids net à vérifier, fiche en cL |
 | 08-630688.jpg | Merlan colin | `merlan-colin` (kg) | 500 g | 41.98 DH | Identification commerciale à confirmer |
 | 09-630686.jpg | Bar | `bar` (kg) | 400–600 g | 163.95 DH | fourchette de poids ; Base du prix non explicite : ne pas convertir |
 | 10-630684.jpg | Merlan ration | `merlan-ration` (kg) | 500 g | 51.98 DH | Identification commerciale à confirmer |
-| 07-630670.jpg | Lben | `lben` (litre) | 440 g | 4.90 DH | format en poids, unité au litre (aucune conversion g → mL) |
-| 08-630668.jpg | Lben | `lben` (litre) | 450 g | 4.65 DH | format en poids, unité au litre (aucune conversion g → mL) |
-| 09-630666.jpg | Lait entier UHT | `lait` (litre) | 6 × 1 L | 65.95 DH | prix d'un lot de 6 × 1 L (6 L) : prix non importé |
+| 07-630670.jpg | Lben | `lben` (litre) | 440 g | 4.90 DH | format en poids, unité au litre (aucune conversion g → mL, aucun prix au litre déduit) |
+| 08-630668.jpg | Lben | `lben` (litre) | 450 g | 4.65 DH | format en poids, unité au litre (aucune conversion g → mL, aucun prix au litre déduit) |
+| 09-630666.jpg | Lait entier UHT | `lait` (litre) | 6 × 1 L | 65.95 DH | prix d'un lot (6 × 1 L) : non importé |
 
-## Points restant à trancher
+## Décisions appliquées et points restants
 
-1. **Visuels de l'éditeur** (Semoule fine, Semoule couscous, Farine complète, Farine fino) : garder les visuels fournis en 022, ou appliquer les illustrations du lot ?
-2. **Références voisines d'une référence générique** :
-   - Olives (5 variétés) ;
-   - Sucre (lingots, morceaux) ;
-   - Crevettes (grises, roses) ;
-   - Café soluble ;
-   - Confiture de figue ;
-   - Raisins secs blonds ;
-   - 7 sodas, à côté de « Boisson gazeuse ».
-   
-   Elles sont intégrées comme articles distincts, conformément au lot. À confirmer, ou à rattacher à la référence générique comme simple mot de recherche.
-3. **Noms à confirmer** :
-   - « Merlan colin » et « Merlan ration » : identification commerciale à confirmer selon le lot ;
-   - « Chips au fromage et aux oignons » : il n'existe pas de référence générique « Chips » ;
-   - « Céréales » : sa nouvelle image montre des céréales au chocolat d'une marque.
-4. **Marques sur les emballages** : les illustrations reprennent des emballages reconnaissables, comme demandé. Les noms d'articles restent génériques. À garder en tête pour les captures de la fiche Google Play.
-5. **Unités à arbitrer** :
-   - Sauce tomate, ketchup, mayonnaise, moutarde et harissa sont au kg, alors que les deux nouvelles sauces relevées en mL sont au litre ;
-   - Lben est au litre, alors que les pots relevés sont en grammes ;
-   - Levure chimique et sucre vanillé sont au kg, alors qu'ils sont vendus en lots de sachets.
-6. **Prix** : ils sont importables seulement avec une date d'observation confirmée et une base de prix sans ambiguïté (voir le tableau).
+**Appliqués :**
+- visuels de l'éditeur conservés pour les farines et semoules ;
+- variantes gardées comme articles distincts, dans les catégories existantes ;
+- noms « Chips » et « Céréales au chocolat » ;
+- unités finales ;
+- Lben au litre, sans conversion des grammes ni prix au litre déduit.
+
+**Restant à trancher :**
+1. **Merlan colin et Merlan ration :** non fusionnés, en attendant une identification confirmée.
+2. **Articles absents ou ambigus dans les décisions sur les unités :**
+   - « Confiture de figue » : placée à la pièce, comme « Confiture » ;
+   - « Pâte à tartiner » : non citée, reste au kg (la variante Nutella est déjà à la pièce) ;
+   - « Biscuits secs » : n'existe pas au catalogue (« Biscuits » et « Gâteaux secs marocains » sont passés à la pièce) ;
+   - « Café moulu ou en grains » : rattaché à la référence « Café ».
+3. **Prix à compléter :** Sucre (5,20 DH / kg) et Fromage en portions (boîte de 16 portions, sans poids). Les prix relevés du lot restent non importés (date de prise de vue inconnue).
+4. **Marques sur les emballages :** les illustrations reprennent des emballages reconnaissables (Heinz, Coca-Cola, Red Bull…). À garder en tête pour les captures de la fiche Google Play.
 
 ## Retour arrière (si nécessaire, après accord et sauvegarde vérifiée)
+
+Commencer par le retour arrière de 030 (`UNITES-030.md`), puis celui de 029 ci-dessous.
 
 1. **Serveur.**
    - Redéployer le commit précédent. Le manifeste d'images précédent est resynchronisé au démarrage ; les photos personnelles des familles ne sont jamais touchées.

@@ -2149,7 +2149,7 @@
     {
       "target": "extended",
       "key": "cereales",
-      "name": "Céréales",
+      "name": "Céréales au chocolat",
       "category": "Pain et petit-déjeuner",
       "file": "files/cereales.webp",
       "sha256": "060282e8e6bb80ef204ab572d607e8bed22901423ef1a2b3aa69d12416d5e57a",
@@ -4110,7 +4110,7 @@
     {
       "target": "extended",
       "key": "chips-au-fromage-et-aux-oignons",
-      "name": "Chips au fromage et aux oignons",
+      "name": "Chips",
       "category": "Épicerie",
       "file": "files/chips-au-fromage-et-aux-oignons.webp",
       "sha256": "7eb05a091a20ff4433c1a368fa737e6a35290e8ee407919a7de45cd1a9bbc672",

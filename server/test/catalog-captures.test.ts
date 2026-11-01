@@ -95,8 +95,9 @@ describe("migration 029", () => {
     const added = (await db.query("SELECT key, category, unit FROM extended_catalog WHERE source = 'captures-20261101'")).rows;
     expect(added).toHaveLength(45);
     const u = Object.fromEntries(added.map((r) => [r.key, r.unit]));
-    expect([u["soupe-aux-lentilles"], u["creme-de-poulet"]]).toEqual(["sachet", "sachet"]); // potages en sachets (40 à 100 g)
-    expect([u["sauce-algerienne"], u["sauce-barbecue"], u["assaisonnement-au-citron"]]).toEqual(["litre", "litre", "litre"]); // relevés en mL / cL
+    // un contenant ou un article complet = 1 pièce (décisions du 1er novembre 2026) ; poids et volume restent le format
+    expect([u["soupe-aux-lentilles"], u["creme-de-poulet"], u["sauce-algerienne"], u["sauce-barbecue"], u["assaisonnement-au-citron"], u["chips-au-fromage-et-aux-oignons"]])
+      .toEqual(Array(6).fill("piece"));
     expect([u["cola"], u["boisson-energisante"], u["sole"], u["bar"], u["pistaches"]]).toEqual(["litre", "litre", "kg", "kg", "kg"]);
     // aucune référence du lot ne double une clé ou un nom existant
     const dup = (await db.query(

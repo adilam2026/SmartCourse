@@ -995,7 +995,7 @@ expect "O0. 45 références ajoutées par 029, toutes illustrées après la sync
 login_api adil 482913
 for k in olives-meslala soupe-de-legumes sole pistaches; do api POST /api/products/from-catalog -d "{\"origin\":\"extended\",\"key\":\"$k\"}" >/dev/null; done
 O1V=$(sql "SELECT string_agg(p.name||':'||p.unit||':'||CASE WHEN p.photo_asset_id IS NULL THEN 'sans-photo' ELSE 'photo' END, ',' ORDER BY p.name) FROM products p JOIN families f ON f.id=p.family_id WHERE f.code='$FAMILY' AND p.name IN ('Olives meslala','Soupe de légumes','Sole','Pistaches')")
-expect "O1. ajoutés depuis les références : unité et photo de la référence ($O1V)" test "$O1V" = "Olives meslala:kg:photo,Pistaches:kg:photo,Sole:kg:photo,Soupe de légumes:sachet:photo"
+expect "O1. ajoutés depuis les références : unité et photo de la référence ($O1V)" test "$O1V" = "Olives meslala:kg:photo,Pistaches:kg:photo,Sole:kg:photo,Soupe de légumes:piece:photo"
 clear_search() { $UI field 0 >/dev/null; sleep 1; clear_field; hide_kb; sleep 2; }
 near() { # $1 au-dessus de $2 et de $3 à l'écran (défilement jusqu'à voir les trois)
   top_list; for _ in $(seq 1 25); do $UI has "$1" && $UI has "$2" && $UI has "$3" && break; adb shell input swipe 540 1500 540 900 700; sleep 1.5; done
@@ -1023,8 +1023,8 @@ expect "O8. classement : Thon en conserve, puis Sole (après Poisson)" near "Poi
 shot final-o4-classement-poissons
 near "Levure chimique" "Soupe de légumes" "Pistaches" >/dev/null
 $UI tap "Soupe de légumes" >/dev/null; sleep 2   # touchée : choisie avec la quantité par défaut, affichée dans son unité
-expect "O9. unité : la soupe se compte au sachet (« 1 sachet »)" $UI wait "1 sachet" 8
-shot final-o5-soupe-sachets
+expect "O9. unité : un sachet de soupe est un article complet (« 1 pièce »)" $UI wait "1 pièce" 8
+shot final-o5-soupe-piece
 $UI tap "Soupe de légumes" >/dev/null; sleep 2   # retirée de la sélection
 OL=$(sql "SELECT p.id FROM products p JOIN families f ON f.id=p.family_id WHERE f.code='$FAMILY' AND p.name='Olives meslala'")
 api PATCH "/api/products/$OL" -d '{"active":false}' >/dev/null

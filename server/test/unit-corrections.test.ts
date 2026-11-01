@@ -79,8 +79,10 @@ describe("migration 027 : unités du tableau validé sur une base en production 
       await db.query("INSERT INTO list_template_items (template_id, product_id, quantity, unit) VALUES ($1,$2,2,'paquet')", [tpl, riz]);
       const before = { purchases: (await db.query("SELECT * FROM purchases ORDER BY id")).rows, items: (await db.query("SELECT * FROM list_items ORDER BY id")).rows };
 
-      // 026, 027, 028 et 029 dans l'ordre, depuis 025
-      expect(await migrate(db)).toEqual(["026_family_identifier.sql", "027_unit_corrections.sql", "028_app_update.sql", "029_catalogue_captures.sql"]);
+      // 026, 027 et 028 dans l'ordre, depuis 025 (027 seule ; les décisions de 030 sont contrôlées dans unit-decisions.test.ts)
+      const upTo028 = mkdtempSync(path.join(os.tmpdir(), "mig-"));
+      for (const f of readdirSync(MIGRATIONS_DIR).filter((x) => x < "029")) copyFileSync(path.join(MIGRATIONS_DIR, f), path.join(upTo028, f));
+      expect(await migrate(db, upTo028)).toEqual(["026_family_identifier.sql", "027_unit_corrections.sql", "028_app_update.sql"]);
 
       const unitOf = async (table: string, key: string) => (await db.query(`SELECT unit FROM ${table} WHERE key = $1`, [key])).rows[0]?.unit;
       // Catalogue : décisions confirmées et arbitrages
