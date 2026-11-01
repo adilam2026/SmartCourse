@@ -346,9 +346,9 @@ export function catalogRoutes(app: FastifyInstance, { db, store, guard, hub }: D
       }
       const pos = (await c.query("SELECT coalesce(max(position), -1) + 1 AS p FROM products WHERE family_id = $1 AND category = $2", [familyId, e.category])).rows[0].p;
       const ins = await c.query(
-        `INSERT INTO products (family_id, category, name, brand, photo_asset_id, ${origin === "initial" ? "catalog_key" : "extended_id"}, position, unit)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-        [familyId, e.category, e.name, brand, e.photo_asset_id, origin === "initial" ? e.key : e.id, pos, e.unit ?? defaultUnit(e.category)],
+        `INSERT INTO products (family_id, category, name, brand, photo_asset_id, ${origin === "initial" ? "catalog_key" : "extended_id"}, position, unit, format)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+        [familyId, e.category, e.name, brand, e.photo_asset_id, origin === "initial" ? e.key : e.id, pos, e.unit ?? defaultUnit(e.category), e.format ?? null],
       );
       return { product: ins.rows[0], created: true, reactivated: false };
     });
@@ -391,10 +391,10 @@ export function catalogRoutes(app: FastifyInstance, { db, store, guard, hub }: D
       if (!e) throw new HttpError(404, "not_found", "Produit introuvable dans le catalogue étendu");
       const pos = (await c.query("SELECT coalesce(max(position), -1) + 1 AS p FROM products WHERE family_id = $1 AND category = $2", [familyId, e.category])).rows[0].p;
       const ins = await c.query(
-        `INSERT INTO products (family_id, category, name, brand, photo_asset_id, extended_id, position, unit)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+        `INSERT INTO products (family_id, category, name, brand, photo_asset_id, extended_id, position, unit, format)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
          ON CONFLICT DO NOTHING RETURNING *`,
-        [familyId, e.category, e.name, e.brand, e.photo_asset_id, e.id, pos, e.unit ?? defaultUnit(e.category)],
+        [familyId, e.category, e.name, e.brand, e.photo_asset_id, e.id, pos, e.unit ?? defaultUnit(e.category), e.format ?? null],
       );
       if (!ins.rows[0]) throw new HttpError(409, "product_exists", "Ce produit existe déjà dans le catalogue familial");
       return ins.rows[0];

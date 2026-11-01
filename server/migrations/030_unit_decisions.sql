@@ -27,6 +27,7 @@ INSERT INTO t030 VALUES
   -- Pâtes à tartiner et compotes
   ('initial', 'confiture', 'piece'), ('initial', 'miel', 'piece'), ('extended', 'beurre-de-cacahuetes', 'piece'),
   ('extended', 'caramel-a-tartiner', 'piece'), ('extended', 'compote-de-fruits', 'piece'),
+  ('extended', 'pate-a-tartiner', 'piece'),  -- comme « Pâte à tartiner Nutella » (référence distincte, aucun doublon)
   -- Sucres, levures, aides à la pâtisserie
   ('initial', 'sucre', 'piece'), ('extended', 'sucre-glace', 'piece'), ('extended', 'sucre-vanille', 'piece'),
   ('initial', 'levure-chimique', 'piece'), ('extended', 'levure-de-boulanger', 'piece'),
@@ -55,6 +56,14 @@ INSERT INTO t030 VALUES
 -- levure chimique (1 paquet de 10 sachets = 1 pièce) : ces prix-là ne sont pas convertibles.
 CREATE TEMP TABLE sachet030 (key text) ON COMMIT DROP;
 INSERT INTO sachet030 VALUES ('soupe-aux-lentilles'), ('soupe-poulet-et-vermicelles'), ('soupe-de-legumes'), ('creme-de-poulet');
+
+-- ---- Format de référence d'une référence commune (information affichée, jamais une conversion ni un prix) -----------------
+-- Copié dans le format du produit d'une famille quand elle l'ajoute ; une famille garde toujours le format qu'elle a saisi.
+ALTER TABLE initial_catalog  ADD COLUMN IF NOT EXISTS format text CHECK (format IS NULL OR length(format) <= 60);
+ALTER TABLE extended_catalog ADD COLUMN IF NOT EXISTS format text CHECK (format IS NULL OR length(format) <= 60);
+ALTER TABLE unit_corrections DROP CONSTRAINT IF EXISTS unit_corrections_outcome_check;
+ALTER TABLE unit_corrections ADD CONSTRAINT unit_corrections_outcome_check
+  CHECK (outcome IN ('unit_changed', 'unit_kept_custom', 'price_converted', 'price_to_confirm', 'renamed', 'created', 'format_set'));
 
 -- ---- Nom : « Céréales » -> « Céréales au chocolat » (même identifiant ; l'ancien nom reste reconnu) -------------------------
 INSERT INTO unit_corrections (migration, subject, ref, old_value, new_value, outcome)
@@ -196,6 +205,16 @@ SELECT '030', 'base_price', origin || ':' || key, ref_unit, new_unit,
   FROM bpr030;
 UPDATE base_prices b SET ref_qty = x.n_qty, ref_unit = x.n_unit, packaging = x.n_pack, piece_weight_g = NULL
   FROM bpr030 x WHERE x.origin = b.origin AND x.key = b.key AND x.n_unit IS NOT NULL;
+
+-- ---- Format de référence du Sucre (APRÈS les prix : seul un format saisi par la famille peut servir à une conversion ;
+-- le format de référence n'en déclenche jamais, et 5,20 DH/kg n'est jamais transformé en prix du paquet).
+-- Sucre (« sucre granulé ») : paquet de 2 kg. Le prix relevé sur la capture (9,95 DH le paquet) reste un relevé, non importé
+-- (date de prise de vue inconnue) ; le prix commun de 5,20 DH/kg n'est jamais réutilisé comme prix à la pièce.
+UPDATE initial_catalog SET format = 'paquet de 2 kg' WHERE key = 'sucre' AND format IS NULL;
+INSERT INTO unit_corrections (migration, family_id, subject, ref, old_value, new_value, outcome)
+SELECT '030', p.family_id, 'product', p.id::text, jsonb_build_object('format', p.format), jsonb_build_object('format', 'paquet de 2 kg'), 'format_set'
+  FROM products p WHERE p.catalog_key = 'sucre' AND p.format IS NULL;
+UPDATE products SET format = 'paquet de 2 kg' WHERE catalog_key = 'sucre' AND format IS NULL;
 
 -- Tous les téléphones relisent le catalogue (unités, noms, prix).
 UPDATE families SET catalog_rev = catalog_rev + 1;

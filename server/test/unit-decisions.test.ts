@@ -58,6 +58,9 @@ describe("migration 030 sur des familles en production (025 → 030)", () => {
       await price(sucre, 5.2, 1, "kg", null); // prix au kg, aucun format : à compléter
       const vanille = await add(fam, { extended: "sucre-vanille" }, "kg");
       await price(vanille, 0.6, 1, "sachet", null); // petit sachet d'un paquet de 10 : à compléter
+      const sucre2 = await add(other, { initial: "sucre" }, "kg");
+      await db.query("UPDATE products SET format = 'sac de 5 kg' WHERE id = $1", [sucre2]); // format saisi par la famille
+      const pate = await add(fam, { extended: "pate-a-tartiner" }, "kg");
       const ketchup = await add(fam, { extended: "ketchup" }, "bouteille"); // unité choisie par la famille
       const melon = await add(fam, { extended: "melon" }, "kg");
       await price(melon, 4, 1, "kg", null);
@@ -86,7 +89,7 @@ describe("migration 030 sur des familles en production (025 → 030)", () => {
         ids: (await db.query("SELECT id FROM products ORDER BY id")).rows,
         snapshot028: {
           units: (await db.query("SELECT key, unit FROM initial_catalog UNION ALL SELECT key, unit FROM extended_catalog ORDER BY 1")).rows,
-          products: (await db.query("SELECT id, unit, name FROM products ORDER BY id")).rows,
+          products: (await db.query("SELECT id, unit, name, format FROM products ORDER BY id")).rows,
           fprices: (await db.query("SELECT product_id, amount, ref_qty, ref_unit, packaging, piece_weight_g FROM family_prices ORDER BY product_id")).rows,
           bprices: (await db.query("SELECT key, amount, ref_qty, ref_unit, packaging, piece_weight_g FROM base_prices ORDER BY origin, key")).rows,
         },
@@ -97,12 +100,16 @@ describe("migration 030 sur des familles en production (025 → 030)", () => {
 
       // ---- Catalogue commun
       const unitOf = async (key: string) => (await db.query("SELECT unit FROM initial_catalog WHERE key = $1 UNION ALL SELECT unit FROM extended_catalog WHERE key = $1", [key])).rows[0]?.unit;
-      for (const k of ["miel", "confiture", "sucre", "sucre-vanille", "levure-chimique", "ketchup", "sauce-barbecue", "soupe-aux-lentilles", "chips-au-fromage-et-aux-oignons", "cereales", "melon", "sel", "pain-de-mie", "lessive-en-poudre", "lait-en-poudre"])
+      for (const k of ["miel", "confiture", "sucre", "sucre-vanille", "levure-chimique", "ketchup", "sauce-barbecue", "soupe-aux-lentilles", "chips-au-fromage-et-aux-oignons", "cereales", "melon", "sel", "pain-de-mie", "lessive-en-poudre", "lait-en-poudre", "pate-a-tartiner", "pate-a-tartiner-nutella"])
         expect([k, await unitOf(k)]).toEqual([k, "piece"]);
       expect([await unitOf("fromage-en-portions"), await unitOf("epinards")]).toEqual(["kg", "botte"]);
       // Unités conservées (décisions « inchangées »)
-      for (const [k, u] of [["harissa", "kg"], ["amlou", "kg"], ["beurre", "kg"], ["farine", "kg"], ["olives", "kg"], ["sole", "kg"], ["poulet", "piece"], ["lben", "litre"], ["huile-de-table", "litre"], ["pate-a-tartiner", "kg"], ["the", "boite"]])
-        expect([k, await unitOf(k)]).toEqual([k, u]);
+      const kept: [string, string][] = [["harissa", "kg"], ["amlou", "kg"], ["beurre", "kg"], ["farine", "kg"], ["olives", "kg"], ["sole", "kg"], ["poulet", "piece"], ["lben", "litre"], ["huile-de-table", "litre"], ["the", "boite"]];
+      for (const [k, u] of kept) expect([k, await unitOf(k)]).toEqual([k, u]);
+      // Pâte à tartiner : à la pièce comme Nutella, deux références distinctes (aucun doublon créé)
+      expect((await db.query("SELECT count(*)::int AS n FROM extended_catalog WHERE lower(name) = 'pâte à tartiner'")).rows[0].n).toBe(1);
+      // Sucre : format de référence « paquet de 2 kg » ; le prix commun au kg n'est jamais un prix à la pièce
+      expect((await db.query("SELECT format FROM initial_catalog WHERE key = 'sucre'")).rows[0].format).toBe("paquet de 2 kg");
       expect((await db.query("SELECT name, former_names FROM extended_catalog WHERE key = 'cereales'")).rows[0]).toEqual({ name: "Céréales au chocolat", former_names: ["céréales"] });
       expect((await db.query("SELECT name FROM extended_catalog WHERE key = 'chips-au-fromage-et-aux-oignons'")).rows[0].name).toBe("Chips");
 
@@ -111,6 +118,9 @@ describe("migration 030 sur des familles en production (025 → 030)", () => {
       expect([miel, confiture, sucre, vanille, melon, cereales, lessive].map((id) => p[id].unit)).toEqual(Array(7).fill("piece"));
       expect([p[portions].unit, p[portions2].unit, p[epinards].unit, p[tomates].unit]).toEqual(["kg", "kg", "botte", "kg"]);
       expect(p[ketchup].unit).toBe("bouteille");
+      expect(p[pate].unit).toBe("piece");
+      const fmt = Object.fromEntries((await db.query("SELECT id, format FROM products WHERE id = ANY($1)", [[sucre, sucre2]])).rows.map((r) => [r.id, r.format]));
+      expect([fmt[sucre], fmt[sucre2], p[sucre2].unit]).toEqual(["paquet de 2 kg", "sac de 5 kg", "piece"]);
       expect([p[cereales].name, p[mesCereales].name]).toEqual(["Céréales au chocolat", "Mes céréales"]);
       expect((await db.query("SELECT id FROM products ORDER BY id")).rows).toEqual(before.ids);
       const journal = (await db.query("SELECT subject, ref, outcome, old_unit, new_unit, new_value FROM unit_corrections WHERE migration = '030'")).rows;
@@ -135,11 +145,13 @@ describe("migration 030 sur des familles en production (025 → 030)", () => {
       expect(toConfirm).toEqual([sucre, vanille, melon, portions2].sort());
 
       // ---- Base commune : contenants observés = 1 pièce, montants inchangés ; prix au kg sans format conservé
-      const bp = Object.fromEntries((await db.query("SELECT key, amount, ref_qty, ref_unit, packaging FROM base_prices")).rows.map((r) => [r.key, r]));
+      const bp = Object.fromEntries((await db.query("SELECT key, amount, ref_qty, ref_unit, packaging, piece_weight_g FROM base_prices")).rows.map((r) => [r.key, r]));
       expect(bp.miel).toMatchObject({ amount: "56.95", ref_qty: "1.000", ref_unit: "piece", packaging: "450 g" });
       expect(fmtPrice(ref({ ...bp.ketchup, piece_weight_g: null }))).toContain("14,50 DH");
       expect(bp.ketchup).toMatchObject({ ref_unit: "piece", packaging: "flacon de 310 g" });
-      expect(bp.sucre).toMatchObject({ amount: "5.20", ref_unit: "kg" });
+      expect(bp.sucre).toMatchObject({ amount: "5.20", ref_unit: "kg", piece_weight_g: null });
+      expect(lineAmount(ref(bp.sucre), 1, "piece")).toEqual({ ok: false, reason: "incompatible" }); // jamais 10,40 DH le paquet
+      expect(bp.sucre.amount).not.toBe("9.95"); // le relevé de la capture n'est pas importé
       expect(bp["fromage-en-portions"]).toMatchObject({ amount: "26.00", ref_unit: "boite", packaging: "16 portions" });
       expect(bp.vermicelles).toMatchObject({ amount: "9.90", ref_unit: "g" }); // hors décisions : inchangé
 
@@ -154,7 +166,8 @@ describe("migration 030 sur des familles en production (025 → 030)", () => {
       await db.query(doc.split("```sql")[1]!.split("```")[0]!);
       const units = (await db.query("SELECT key, unit FROM initial_catalog UNION ALL SELECT key, unit FROM extended_catalog WHERE source <> 'captures-20261101' ORDER BY 1")).rows;
       expect(units).toEqual(before.snapshot028.units);
-      expect((await db.query("SELECT id, unit, name FROM products ORDER BY id")).rows).toEqual(before.snapshot028.products);
+      expect((await db.query("SELECT id, unit, name, format FROM products ORDER BY id")).rows).toEqual(before.snapshot028.products);
+      expect((await db.query("SELECT format FROM initial_catalog WHERE key = 'sucre'")).rows[0].format).toBeNull();
       expect((await db.query("SELECT product_id, amount, ref_qty, ref_unit, packaging, piece_weight_g FROM family_prices ORDER BY product_id")).rows).toEqual(before.snapshot028.fprices);
       expect((await db.query("SELECT key, amount, ref_qty, ref_unit, packaging, piece_weight_g FROM base_prices ORDER BY origin, key")).rows).toEqual(before.snapshot028.bprices);
       expect((await db.query("SELECT name FROM extended_catalog WHERE key = 'cereales'")).rows[0].name).toBe("Céréales");
@@ -189,6 +202,7 @@ describe("unités finales dans l'application : quantités, synchronisation, stat
     const fam = (await db.query("SELECT id FROM families WHERE name = 'Unités'")).rows[0].id as string;
     const cat = (await app.inject({ method: "GET", url: "/api/catalog", cookies: A })).json();
     const prod = (name: string) => cat.categories.flatMap((c: any) => c.products).find((p: any) => p.name === name);
+    expect([prod("Sucre").format, prod("Miel").format]).toEqual(["paquet de 2 kg", null]); // format de référence copié à la création
     expect([prod("Miel").unit, prod("Sucre").unit, prod("Confiture").unit, prod("Sel alimentaire").unit, prod("Fromage en portions").unit, prod("Riz").unit])
       .toEqual(["piece", "piece", "piece", "piece", "kg", "kg"]);
     const added = (await app.inject({ method: "POST", url: "/api/products/from-catalog", cookies: A, payload: { origin: "extended", key: "soupe-de-legumes" } })).json().product;

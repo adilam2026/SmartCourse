@@ -11,6 +11,12 @@
 
 Le tableau des changements préparés, avec le résultat sur une base de recette, est dans `INTEGRATION.md`.
 
+## Format de référence
+
+- **Sucre :** « paquet de 2 kg ». C'est une information affichée, jamais une conversion ni un prix.
+- **Familles :** le format est copié chez les familles qui n'en avaient pas, et à chaque ajout ; une famille garde le sien.
+- **Prix au kg :** le format est appliqué après les prix, donc aucun prix au kg (commun ou d'une famille) n'est transformé en prix du paquet grâce à lui.
+
 ## Familles, historiques et prix
 
 ### Produits des familles
@@ -50,6 +56,9 @@ UPDATE base_prices b SET ref_qty = (u.old_value->>'refQty')::numeric, ref_unit =
  WHERE u.migration = '030' AND u.subject = 'base_price' AND u.outcome = 'price_converted' AND b.origin || ':' || b.key = u.ref;
 UPDATE products p SET unit = u.old_unit FROM unit_corrections u
  WHERE u.migration = '030' AND u.subject = 'product' AND u.outcome = 'unit_changed' AND p.id::text = u.ref;
+UPDATE products p SET format = u.old_value->>'format' FROM unit_corrections u
+ WHERE u.migration = '030' AND u.subject = 'product' AND u.outcome = 'format_set' AND p.id::text = u.ref;
+UPDATE initial_catalog SET format = NULL WHERE key = 'sucre' AND format = 'paquet de 2 kg';
 UPDATE products p SET name = u.old_value->>'name' FROM unit_corrections u
  WHERE u.migration = '030' AND u.subject = 'product' AND u.outcome = 'renamed' AND p.id::text = u.ref;
 UPDATE initial_catalog i SET unit = u.old_unit FROM unit_corrections u

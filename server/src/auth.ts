@@ -238,8 +238,8 @@ export async function createFamilyRecords(
   const loginId = input.loginId ? (await assignFamilyId(c, familyId, input.loginId, profileId)).loginId : null;
   // Catalogue familial de départ : copie des 80 références génériques.
   await c.query(
-    `INSERT INTO products (family_id, category, name, catalog_key, photo_asset_id, position, unit)
-     SELECT $1, category, name, key, photo_asset_id, position, unit FROM initial_catalog`,
+    `INSERT INTO products (family_id, category, name, catalog_key, photo_asset_id, position, unit, format)
+     SELECT $1, category, name, key, photo_asset_id, position, unit, format FROM initial_catalog`,
     [familyId],
   );
   await c.query("INSERT INTO audit_log (family_id, actor_profile_id, action, target_profile_id) VALUES ($1, $2, 'family.created', $2)", [familyId, profileId]);

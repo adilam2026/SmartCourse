@@ -31,8 +31,8 @@ export const familyDefaultUnit = (category: string): Unit =>
   category === "legumes" || category === "fruits" || category === "viandes" ? "kg" : category === "boissons" ? "bouteille" : category === "epicerie" || category === "surgeles" ? "paquet" : "piece";
 
 /** Colonnes communes d'une référence (départ ou étendue). */
-const REF_I = "SELECT 'initial'::text AS origin, i.key, NULL::uuid AS id, i.name, i.category, i.unit, i.photo_asset_id, i.former_names FROM initial_catalog i";
-const REF_E = "SELECT 'extended'::text AS origin, e.key, e.id, e.name, e.category, e.unit, e.photo_asset_id, e.former_names FROM extended_catalog e WHERE e.merged_into IS NULL";
+const REF_I = "SELECT 'initial'::text AS origin, i.key, NULL::uuid AS id, i.name, i.category, i.unit, i.photo_asset_id, i.former_names, i.format FROM initial_catalog i";
+const REF_E = "SELECT 'extended'::text AS origin, e.key, e.id, e.name, e.category, e.unit, e.photo_asset_id, e.former_names, e.format FROM extended_catalog e WHERE e.merged_into IS NULL";
 const refByKey = (origin: "initial" | "extended") => (origin === "initial" ? `${REF_I} WHERE i.key = $1` : `${REF_E} AND e.key = $1`);
 
 const view = (r: any) => ({
@@ -149,9 +149,9 @@ export function familyProductRoutes(app: FastifyInstance, { db, store, guard, hu
       const unit: Unit = ref ? ((ref.unit as Unit | null) ?? familyDefaultUnit(category)) : (body.unit ?? familyDefaultUnit(category));
       const pos = (await c.query("SELECT coalesce(max(position), -1) + 1 AS p FROM products WHERE family_id = $1 AND category = $2", [a.familyId, category])).rows[0].p;
       const ins = await c.query(
-        `INSERT INTO products (family_id, category, name, photo_asset_id, catalog_key, extended_id, position, unit)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-        [a.familyId, category, name, ref?.photo_asset_id ?? null, ref?.origin === "initial" ? ref.key : null, ref?.origin === "extended" ? ref.id : null, pos, unit],
+        `INSERT INTO products (family_id, category, name, photo_asset_id, catalog_key, extended_id, position, unit, format)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+        [a.familyId, category, name, ref?.photo_asset_id ?? null, ref?.origin === "initial" ? ref.key : null, ref?.origin === "extended" ? ref.id : null, pos, unit, ref?.format ?? null],
       );
       return { product: ins.rows[0], created: true };
     });

@@ -52,10 +52,11 @@
 
 ### Références existantes corrigées (migration 030)
 
-41 changements : 9 références de départ, 32 du catalogue complémentaire.
+42 changements : 9 références de départ, 33 du catalogue complémentaire (dont Pâte à tartiner, complément validé).
 
 | Rayon | Référence | Avant | Après |
 |---|---|---|---|
+| Épicerie | Pâte à tartiner (`pate-a-tartiner`) | kg | **pièce** |
 | Légumes et herbes | Choux-fleurs (`choux-fleurs`) | kg | **pièce** |
 | Légumes et herbes | Épinards (`epinards`) | kg | **botte** |
 | Fruits | Melon (`melon`) | kg | **pièce** |
@@ -115,6 +116,13 @@ Les autres références existantes gardent leur unité, par exemple :
 | Pain et petit-déjeuner | pièce | Café soluble, Confiture de figue, Granola aux trois chocolats |
 | Boissons | litre | Boisson énergisante, Cola, Soda à l'ananas, Soda à la pomme, Soda à l'orange, Soda à l'orange sans sucre, Soda au citron, Tonic |
 
+### Format de référence
+
+**Sucre (« sucre granulé ») : à la pièce, format de référence « paquet de 2 kg ».**
+- Le format est copié chez les familles qui n'en avaient pas, et lors de chaque nouvel ajout. Une famille garde toujours le format qu'elle a saisi. C'est journalisé et réversible.
+- Le prix relevé sur la capture, 9,95 DH le paquet, reste un relevé : il n'est pas importé, car ce n'est pas un tarif actuel garanti.
+- Le prix commun de 5,20 DH/kg n'est jamais transformé en prix du paquet. Le prix au kg d'une famille ne l'est pas non plus : seul un format saisi par la famille elle-même peut servir à une conversion.
+
 ### Familles et historiques
 
 - **Produits des familles :** l'unité change seulement si elle venait du catalogue. Une unité choisie par la famille est conservée et journalisée. Identifiants inchangés.
@@ -138,7 +146,7 @@ Les autres références existantes gardent leur unité, par exemple :
 | Flocons d'avoine | 20,95 DH le paquet de 500 g | 20,95 DH / 500 g | **20,95 DH la pièce**, format 500 g |
 | Caramel à tartiner | 64,00 DH le pot de 380 g | 64,00 DH / 380 g | **64,00 DH la pièce**, format 380 g |
 | Compote de fruits | 19,50 DH le pot de 390 g | 19,50 DH / 390 g | **19,50 DH la pièce**, format 390 g |
-| Sucre | 5,20 DH / kg | 5,20 DH / kg | **conservé, à compléter** : aucun format connu, jamais utilisé comme prix à la pièce |
+| Sucre | 5,20 DH / kg | 5,20 DH / kg | **conservé, à compléter** : jamais utilisé comme prix du paquet (le format de référence ne sert à aucune conversion) |
 | Fromage en portions | 26,00 DH la boîte de 16 portions | idem | **conservé, à compléter** : aucun poids écrit, pas de prix au kg déduit |
 
 **Prix des familles :** mêmes règles.
@@ -203,14 +211,23 @@ Relevés à vérifier ou à distinguer (24 sur 89 ; unités finales) :
 - unités finales ;
 - Lben au litre, sans conversion des grammes ni prix au litre déduit.
 
+**Complément validé, appliqué :**
+- Pâte à tartiner à la pièce, comme Nutella (deux références distinctes, aucun doublon) ;
+- Sucre au format « paquet de 2 kg » ;
+- prix du Fromage en portions à compléter, faute de poids confirmé.
+
+**Rapport par foyer :** `rapport-foyer.sql` liste les articles d'un foyer qui garderaient une unité personnalisée, avec l'état de leur prix.
+- Il joue les migrations 026 à 030 dans une transaction annulée.
+- Il est à exécuter sur une copie de la base (restauration d'une sauvegarde).
+- Je ne l'ai pas exécuté sur les données réelles : je n'ai pas accès à la production, et les journaux de l'intégration continue sont publics.
+
 **Restant à trancher :**
 1. **Merlan colin et Merlan ration :** non fusionnés, en attendant une identification confirmée.
 2. **Articles absents ou ambigus dans les décisions sur les unités :**
    - « Confiture de figue » : placée à la pièce, comme « Confiture » ;
-   - « Pâte à tartiner » : non citée, reste au kg (la variante Nutella est déjà à la pièce) ;
    - « Biscuits secs » : n'existe pas au catalogue (« Biscuits » et « Gâteaux secs marocains » sont passés à la pièce) ;
    - « Café moulu ou en grains » : rattaché à la référence « Café ».
-3. **Prix à compléter :** Sucre (5,20 DH / kg) et Fromage en portions (boîte de 16 portions, sans poids). Les prix relevés du lot restent non importés (date de prise de vue inconnue).
+3. **Prix à compléter :** Sucre (5,20 DH / kg ; relevé de 9,95 DH le paquet de 2 kg non importé) et Fromage en portions (boîte de 16 portions, sans poids confirmé). Les autres prix relevés du lot restent non importés (date de prise de vue inconnue).
 4. **Marques sur les emballages :** les illustrations reprennent des emballages reconnaissables (Heinz, Coca-Cola, Red Bull…). À garder en tête pour les captures de la fiche Google Play.
 
 ## Retour arrière (si nécessaire, après accord et sauvegarde vérifiée)
