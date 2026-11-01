@@ -1,18 +1,7 @@
-═══ A. Catalogue (contrôle rapide) : Tous les articles / Par catégories × Liste / Cartes ═══
-PASS  A0. démarrage, personnel connecté
-PASS  A1. icône Affichage dans l'en-tête, plus de rangée de boutons
-PASS  A2. Par catégories : grille des catégories (sans articles)
-PASS  A3. catégorie ouverte : ses articles et le retour
-PASS  A4. article choisi
-PASS  A5. retour à la grille, badge « choisi(s) » sur la catégorie
-PASS  A6. retour Android : grille, application toujours ouverte
-PASS  A7. Tous les articles en Liste : titres de catégorie, sélection conservée
-PASS  A8. préférence gardée après fermeture de l'application
-PASS  A9. préférence gardée après déconnexion / reconnexion
 ═══ O. Lot catalogue du 1er novembre 2026 : images, recherche, unités, classement après synchronisation ═══
 PASS  O0. 45 références ajoutées par 029, toutes illustrées après la synchronisation
 FAIL  O1. ajoutés depuis les références : unité et photo de la référence
-      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"ZQMC6KBV"|"Ex. LesTaha04. L'ancien code famille à 8 caractères reste accepté."|"marie"|"Code d'accès personnel"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Votre code à vous. Il n'existe pas de mot de passe commun à la famille."|"Se connecter"|"Besoin d'aide ?"|"Après une connexion réussie, l'identifiant famille et votre identifiant personnel sont retenus sur ce téléphone."|
+      écran : "Mes Courses"|"Les courses en famille"|"Bienvenue"|"Accédez à votre liste de courses familiale"|"Se connecter"|"Première connexion"|"Identifiant famille"|"Ex. LesTaha04. L'ancien code famille à 8 caractères reste accepté."|"Identifiant personnel"|"Code d'accès personnel"|"Afficher le code"|"Mon code contient des lettres ou des symboles"|"Votre code à vous. Il n'existe pas de mot de passe commun à la famille."|"Se connecter"|"Besoin d'aide ?"|"Après une connexion réussie, l'identifiant famille et votre identifiant personnel sont retenus sur ce téléphone."|
 PASS  O2. personnel connecté
 PASS  O3. recherche « olive » : Olives meslala
 PASS  O4. recherche « cheveux » (nom relevé sur l'emballage) : Vermicelles
@@ -20,43 +9,11 @@ PASS  O5. recherche « poisson » : Poisson et Sole
 PASS  O6. classement : Concentré de tomates, Olives meslala, Sel alimentaire (olives près des condiments, pas en fin d'Épicerie)
 PASS  O7. classement : Levure chimique, Soupe de légumes, Pistaches
 PASS  O8. classement : Thon en conserve, puis Sole (après Poisson)
-FAIL  O9. unité : la soupe se compte en sachets
-      écran : "Choisir mes articles"|"Affichage : Liste, tous les articles"|"Compte"|"Rechercher un produit…"|"Pistaches"|"au kilo"|"Ajouter"|"Viandes et poisson"|"6 articles"|"Poulet"|"à l'unité"|"Ajouter"|"Viande hachée"|"au kilo"|"Ajouter"|"Viande de bœuf"|"au kilo"|"Ajouter"|"Poisson"|"au kilo"|"Ajouter"|"Thon en conserve"|"à l'unité"|"Ajouter"|"Sole"|"Ajouter"|"Terminer ma sélection (1)"|
-FAIL  O10. masqué par un administrateur : voisins inchangés (Concentré de tomates, Sel alimentaire, Poivre)
-      écran : "Choisir mes articles"|"Affichage : Liste, tous les articles"|"Compte"|"Rechercher un produit…"|"Fromage en portions"|"à l'unité"|"Ajouter"|"Fromage à tartiner"|"au kilo"|"Ajouter"|"Fromage râpé"|"au kilo"|"Ajouter"|"Yaourt nature"|"à l'unité"|"Ajouter"|"Yaourt aromatisé"|"à l'unité"|"Ajouter"|"Yaourt à boire"|"à l'unité"|"Ajouter"|"Crème fraîche"|"à l'unité"|"Ajouter"|"Terminer ma sélection (1)"|
+FAIL  O9. unité : la soupe se compte au sachet (« 1 sachet »)
+      écran : "Choisir mes articles"|"Affichage : Liste, tous les articles"|"Compte"|"Rechercher un produit…"|"Pistaches"|"au kilo"|"Ajouter"|"Viandes et poisson"|"6 articles"|"Poulet"|"à l'unité"|"Ajouter"|"Viande hachée"|"au kilo"|"Ajouter"|"Viande de bœuf"|"au kilo"|"Ajouter"|"Poisson"|"au kilo"|"Ajouter"|"Thon en conserve"|"à l'unité"|"Ajouter"|"Sole"|"au kilo"|"Ajouter"|"Terminer ma sélection"|
+PASS  O10. masqué par un administrateur : voisins inchangés (Concentré de tomates, Sel alimentaire, Poivre)
 PASS  O10b. … et l'article masqué n'apparaît plus chez le personnel
-FAIL  O11. réaffiché : même place, entre les condiments et le sel
-      écran : "Choisir mes articles"|"Affichage : Liste, tous les articles"|"Compte"|"Rechercher un produit…"|"Fromage en portions"|"à l'unité"|"Ajouter"|"Fromage à tartiner"|"au kilo"|"Ajouter"|"Fromage râpé"|"au kilo"|"Ajouter"|"Yaourt nature"|"à l'unité"|"Ajouter"|"Yaourt aromatisé"|"à l'unité"|"Ajouter"|"Yaourt à boire"|"à l'unité"|"Ajouter"|"Crème fraîche"|"à l'unité"|"Ajouter"|"Terminer ma sélection (1)"|
-ECHECS=4
+PASS  O11. réaffiché : même place, entre les condiments et le sel
+ECHECS=2
 CRASH_APPLICATION=0
-═══ N. Produit introuvable : actif, masqué, disponible, réellement absent, catalogue inaccessible — contrôle rapide ═══
-PASS  N1. six références avec leur visuel fourni (6/6)
-PASS  N2. personnel connecté
-PASS  N3. personnel : produit masqué introuvable, renvoi vers un administrateur, aucune création
-PASS  N4. administrateur : plus de bouton de création directe, « Rechercher dans le catalogue complet »
-PASS  N5. catalogue ouvert avec la recherche transmise ; masqué → « Réactiver »
-PASS  N6. autre onglet : vérifié dans tout le catalogue, « Masqué » + « Réactiver », aucune création
-PASS  N7. réactivé puis choisi, retour à la sélection
-PASS  N8. disponible mais absent : « Ajouter » depuis la référence existante
-PASS  N9. ajouté depuis la référence (avec sa photo) et choisi
-PASS  N10. actif : trouvé directement dans la sélection
-PASS  N11. actif vu depuis l'onglet « À ajouter » : « Déjà dans mon catalogue », aucune création
-PASS  N12. réellement absent : « Créer un nouveau produit »
-PASS  N13. formulaire prérempli
-PASS  N14. créé pour cette famille seulement, proposition possible
-PASS  N15. hors connexion : explication + Réessayer, aucune création
-PASS  N16. après reconnexion : vérification aboutie
-PASS  N17. /gestion : page servie, données protégées
-═══ U. Unités corrigées : décimales au kg, lignes existantes jamais réinterprétées, prix à ressaisir ═══
-PASS  U0. unités arbitrées dans la famille : riz/cumin au poids, persil en botte, poulet entier à la pièce, lait et huile au litre, thon en boîte, papier toilette en rouleau
-PASS  U1. 0,25 kg de cumin accepté et affiché (250 g)
-PASS  U2. ligne de riz enregistrée en paquets : toujours « 2 paquets » (jamais « 2 g » ni « 2 kg »)
-PASS  U3. quantité de la ligne modifiée dans SON unité (paquets)
-PASS  U4. ancien prix au kg du poulet signalé « à ressaisir », jamais affiché comme prix actuel
-PASS  U5. formulaire : ancien prix rappelé à part, montant vide (aucune reprise avec la nouvelle unité)
-PASS  U6. serveur : ancien prix conservé tel quel
-PASS  U7. vermicelles : prix converti exactement « 9,90 DH / 500 g »
-PASS  U8. format « pack de 3 x 80 g » enregistré ; unité inchangée ; aucun prix personnel créé (prix commun conservé)
-ECHECS=0
-CRASH_APPLICATION=0
-TOTAL_ECHECS=4
+TOTAL_ECHECS=2
