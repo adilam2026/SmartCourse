@@ -1,6 +1,6 @@
 name: Rapport foyer — contrôle complet du script sur une sauvegarde fictive
 # Exécute scripts/rapport-foyer-prive.sh de bout en bout (saisie, image de production, PostgreSQL jetable, copie, rapport,
-# nettoyage) sur une base et une sauvegarde FICTIVES, dans un stockage S3 local (MinIO). Aucune donnée réelle, aucun vrai secret :
+# nettoyage) sur une base et une sauvegarde FICTIVES, dans un stockage S3 local (adobe/s3mock). Aucune donnée réelle, aucun vrai secret :
 # la vraie sauvegarde ne doit jamais être utilisée ici (journaux publics).
 on:
   workflow_dispatch:

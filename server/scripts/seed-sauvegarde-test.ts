@@ -1,6 +1,6 @@
 /**
  * Contrôle de scripts/rapport-foyer-prive.sh (intégration continue) : base FICTIVE au schéma de la production (025) avec un foyer
- * de test, puis une sauvegarde chiffrée déposée dans un stockage S3 LOCAL (MinIO). Aucune donnée réelle, aucun vrai secret.
+ * de test, puis une sauvegarde chiffrée déposée dans un stockage S3 LOCAL (adobe/s3mock). Aucune donnée réelle, aucun vrai secret.
  * Usage (depuis server/) : SRC_URL=… S3_ENDPOINT=… S3_BUCKET=… S3_ACCESS_KEY_ID=… S3_SECRET_ACCESS_KEY=… BACKUP_KEY=… npx tsx scripts/seed-sauvegarde-test.ts
  */
 import { copyFileSync, mkdtempSync, readdirSync } from "node:fs";

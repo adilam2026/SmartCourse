@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Contrôle COMPLET de scripts/rapport-foyer-prive.sh, enchaînement réel compris, sur une sauvegarde FICTIVE (aucune donnée
-# réelle, aucun vrai secret) : stockage S3 local (MinIO), image construite avec le Dockerfile de production, PostgreSQL jetable.
+# réelle, aucun vrai secret) : stockage S3 local (adobe/s3mock, compatible S3 ; il accepte toute paire de clés : la vérification
+# des clés réelles est celle de la restauration de contrôle), image construite avec le Dockerfile de production, PostgreSQL jetable.
 # Scénarios : réussite ; mauvaise clé (erreur) ; Ctrl-C pendant la restauration ; réseau créé par le script.
 # Après chacun : aucun conteneur ni volume restant, réseau du script supprimé, aucun secret dans la sortie ni dans Docker.
 set -Eeuo pipefail
 cd "$(dirname "$0")/.."
 . scripts/lib-docker.sh
-NET=copie-test-net; KEY="cle-de-test-fictive-$RANDOM$RANDOM"; ID=minio-test; SECRET="secret-fictif-$RANDOM$RANDOM"
+NET=copie-test-net; KEY="cle-de-test-fictive-$RANDOM$RANDOM"; ID=s3-test; SECRET="secret-fictif-$RANDOM$RANDOM"
 FAILS=0
 ok() { echo "PASS  $*"; }
 ko() { echo "FAIL  $*"; FAILS=$((FAILS+1)); }
@@ -20,14 +21,14 @@ cleanup() { docker rm -f -v "$ID" src-pg copie-pg copie-app >/dev/null 2>&1 || t
 trap cleanup EXIT
 
 docker network create "$NET" >/dev/null
-docker run -d --name "$ID" --network "$NET" -p 127.0.0.1:9000:9000 -e MINIO_ROOT_USER="$ID" -e MINIO_ROOT_PASSWORD="$SECRET" minio/minio server /data >/dev/null
+docker run -d --name "$ID" --network "$NET" -p 127.0.0.1:9090:9090 -e initialBuckets=sauvegardes adobe/s3mock >/dev/null
 docker run -d --name src-pg -p 127.0.0.1:5455:5432 -e POSTGRES_USER=src -e POSTGRES_PASSWORD=src -e POSTGRES_DB=src "$(docker_image postgres:18)" >/dev/null
-for _ in $(seq 1 60); do docker exec src-pg pg_isready -U src -d src >/dev/null 2>&1 && curl -fsS -m 2 http://127.0.0.1:9000/minio/health/live >/dev/null 2>&1 && break; sleep 1; done
-(cd server && SRC_URL=postgres://src:src@127.0.0.1:5455/src S3_ENDPOINT=http://127.0.0.1:9000 S3_BUCKET=sauvegardes S3_ACCESS_KEY_ID="$ID" \
+for _ in $(seq 1 60); do docker exec src-pg pg_isready -U src -d src >/dev/null 2>&1 && curl -sS -m 2 -o /dev/null http://127.0.0.1:9090/ 2>/dev/null && break; sleep 1; done
+(cd server && SRC_URL=postgres://src:src@127.0.0.1:5455/src S3_ENDPOINT=http://127.0.0.1:9090 S3_BUCKET=sauvegardes S3_ACCESS_KEY_ID="$ID" \
   S3_SECRET_ACCESS_KEY="$SECRET" BACKUP_KEY="$KEY" npx tsx scripts/seed-sauvegarde-test.ts)
 docker_build smartcourse:copie-test >/dev/null
 VOLS0=$(vols)
-answers() { printf '%s\n' TESTFOY1 "$1" sauvegardes "http://$ID:9000" "" "$ID" "$SECRET" ""; }
+answers() { printf '%s\n' TESTFOY1 "$1" sauvegardes "http://$ID:9090" "" "$ID" "$SECRET" ""; }
 
 echo "── 1. Réussite"
 answers "$KEY" | COPY_IMAGE=smartcourse:copie-test COPY_NETWORK="$NET" scripts/rapport-foyer-prive.sh > /tmp/r1.txt 2>&1 && rc=0 || rc=$?

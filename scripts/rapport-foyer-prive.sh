@@ -39,7 +39,7 @@ command -v docker >/dev/null || { echo "Docker est nécessaire." >&2; exit 1; }
 # ---- Saisie (rien n'est affiché pour les secrets ; rien n'est écrit sur le disque)
 ask()  { local v; printf '%s : ' "$1" >&2; IFS= read -r v; printf '%s' "$v"; }
 askS() { local v; printf '%s (saisie masquée) : ' "$1" >&2; IFS= read -rs v; printf '\n' >&2; printf '%s' "$v"; }
-famille=$(ask "Code famille (8 caractères, Réglages → Famille dans l'application)")
+famille=$(ask "Code famille (8 caractères : icône du profil en haut à droite de l'application, « Famille : nom (CODE) »)")
 k_backup=$(askS "BACKUP_KEY")
 s_bucket=$(ask "S3_BUCKET")
 s_endpoint=$(ask "S3_ENDPOINT")
