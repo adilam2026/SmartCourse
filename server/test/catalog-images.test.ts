@@ -74,7 +74,7 @@ async function seedOldCatalogue(keys: string[]) {
 describe("le pack de 80 visuels", () => {
   it("le manifeste du dépôt : 80 clés uniques, noms exacts, aucune marque, provenance « générée »", async () => {
     const all = JSON.parse(await readFile(MANIFEST, "utf8"));
-    expect(all.items.filter((i: any) => i.target === "extended")).toHaveLength(166); // pack du catalogue complémentaire (+ 3 références de 022)
+    expect(all.items.filter((i: any) => i.target === "extended")).toHaveLength(211); // pack complémentaire (+ 3 de 022, + 45 du lot du 1er novembre 2026)
     const m = { ...all, items: all.items.filter((i: any) => i.target === "initial") };
     expect(m.items).toHaveLength(80);
     expect(new Set(m.items.map((i: any) => i.key)).size).toBe(80);
@@ -82,7 +82,7 @@ describe("le pack de 80 visuels", () => {
     expect(ref).toHaveLength(80);
     for (const it of m.items) {
       expect(ref.find((r) => r.key === it.key)?.name).toBe(it.name); // association exacte clé ↔ nom
-      // Semoule fine : visuel fourni par l'éditeur (022) ; toutes les autres images de départ sont générées.
+      // Semoule fine : visuel fourni par l'éditeur (022), conservé par le lot du 1er novembre 2026 ; toutes les autres sont générées.
       if (it.key === "semoule-fine") expect([it.license, it.sourceName]).toEqual(["OWN", "Visuel fourni par l'éditeur de Mes Courses"]);
       else {
         expect(it.license).toBe("GENERATED");
@@ -129,7 +129,7 @@ describe("remplacement des anciennes images", () => {
   let freedExpected = 0;
   it("la synchronisation remplace les 80 références sans doublon ni changement d'identifiant", async () => {
     const r = await syncCatalogPhotos(db, store, MANIFEST);
-    expect(r.imported).toHaveLength(246); // 80 de départ + 163 du catalogue complémentaire
+    expect(r.imported).toHaveLength(291); // 80 de départ + 211 du catalogue complémentaire
     const ic = (await db.query("SELECT i.key, a.generated, a.source_sha256, a.license, a.source_name, a.author FROM initial_catalog i JOIN photo_assets a ON a.id = i.photo_asset_id")).rows;
     expect(ic).toHaveLength(80);
     const m = JSON.parse(await readFile(MANIFEST, "utf8"));
@@ -190,7 +190,7 @@ describe("remplacement des anciennes images", () => {
     for (let i = 0; i < 3; i++) {
       const r = await syncCatalogPhotos(db, store, MANIFEST);
       expect(r.imported).toEqual([]);
-      expect(r.skipped).toHaveLength(246);
+      expect(r.skipped).toHaveLength(291);
       const p = await purgeOrphanAssets(db, store, { minAgeMinutes: 0 });
       expect(p.assets).toBe(0);
     }
@@ -316,10 +316,10 @@ describe("ajouter et modifier un article (administrateur)", () => {
     expect(near(px(503, 256), [0, 0, 255])).toBe(true); // bord droit conservé (bleu)
     expect(img.rawPayload.length).toBeLessThan(30_000); // optimisé : bien moins que l'original
     expect(img.rawPayload.length).toBeLessThan(wide.length / 2);
-    // visible chez le personnel et chez les parents, dans la bonne catégorie, à la fin
+    // visible chez le personnel et chez les parents, dans la bonne catégorie, à côté des pains (et non en fin de catégorie)
     for (const who of [F.staff, F.parent]) {
-      const cat = (await catalog(who)).find((c) => c.key === "pain")!;
-      expect(cat.products.at(-1).name).toBe("Baguette de Meknès");
+      const names = (await catalog(who)).find((c) => c.key === "pain")!.products.map((p: any) => p.name);
+      expect(names.indexOf("Baguette de Meknès")).toBe(names.indexOf("Pain") + 1);
     }
     // le personnel peut le sélectionner (droit de sélection conservé)
     const lid = await newList(F.parent);

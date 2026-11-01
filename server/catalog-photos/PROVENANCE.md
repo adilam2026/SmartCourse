@@ -14,3 +14,12 @@ Les 163 images `extended` du manifeste (même provenance : **images générées 
 
 Farine fino, Farine force, Semoule fine, Semoule couscous, Farine complète et Pâte à tartiner Nutella : visuels fournis par
 l'éditeur de Mes Courses (licence `OWN`), réduits à 512 × 512 px sur fond blanc, sans rognage ni retouche du texte.
+
+## Lot du 1er novembre 2026 (77 images)
+
+Illustrations préparées à partir de 89 captures d'écran fournies par l'utilisateur (`docs/catalogue/import-2026-11-01/`) :
+WebP 512 × 512, fond blanc, emballages reconnaissables conservés **à la demande de l'utilisateur** (noms d'articles génériques).
+Ce ne sont pas des photographies fabricant certifiées : de petits détails d'étiquette peuvent différer des originaux.
+45 références nouvelles, 32 images de références existantes remplacées. Les 4 visuels fournis par l'éditeur (Semoule fine,
+Semoule couscous, Farine complète, Farine fino) sont conservés ; les illustrations du lot correspondantes ne sont pas appliquées.
+Aucune licence externe n'est revendiquée. Association par `target` + `key` uniquement, empreintes SHA-256 vérifiées.

@@ -7,7 +7,7 @@ import { insertPhotoAsset, preparePhoto } from "../src/photos.js";
 import { syncCatalogPhotos } from "../src/photos-import.js";
 import { closeTestDb, resetData, testDb, testStore } from "./helpers.js";
 
-/** Le vrai manifeste livré avec l'application : 80 images de départ + 163 du catalogue complémentaire. */
+/** Le vrai manifeste livré avec l'application : 80 images de départ + 211 du catalogue complémentaire. */
 const MANIFEST = path.resolve(import.meta.dirname, "../catalog-photos/manifest.json");
 let db: Db;
 const store = testStore();
@@ -34,13 +34,13 @@ describe("pack d'images du catalogue complémentaire", () => {
     await db.query("INSERT INTO products (family_id, category, name, photo_asset_id, position) VALUES ($1,'fruits','Pêches',$2,92)", [fam, pId]);
     await db.query("UPDATE extended_catalog SET photo_asset_id = NULL"); // état d'avant le pack
     const r = await syncCatalogPhotos(db, store, MANIFEST);
-    expect(r.imported).toHaveLength(166); // + Farine fino, Farine force, Pâte à tartiner Nutella (022)
+    expect(r.imported).toHaveLength(211); // + Farine fino, Farine force, Pâte à tartiner Nutella (022), + 45 du lot du 1er novembre 2026
     expect(r.imported.every((x) => x.startsWith("extended:"))).toBe(true);
     // chaque entrée visible du catalogue complémentaire a sa photo ; « Salade verte » (absorbée) n'en a pas besoin
     // Les 8 références distinctes créées par 027 (lessive en poudre, thé en vrac…) n'ont pas encore de photo.
     const missing = (await db.query("SELECT key FROM extended_catalog WHERE photo_asset_id IS NULL AND merged_into IS NULL AND source <> 'seed-v4'")).rows;
     expect(missing).toEqual([]);
-    expect((await db.query("SELECT count(DISTINCT photo_asset_id)::int AS n FROM extended_catalog WHERE photo_asset_id IS NOT NULL")).rows[0].n).toBe(166);
+    expect((await db.query("SELECT count(DISTINCT photo_asset_id)::int AS n FROM extended_catalog WHERE photo_asset_id IS NOT NULL")).rows[0].n).toBe(211);
     // les 80 de départ n'ont pas bougé
     expect((await db.query("SELECT key, photo_asset_id FROM initial_catalog ORDER BY key")).rows).toEqual(initialBefore);
     // Papier cuisson : l'éponge commune est remplacée par la bonne photo ; les photos personnelles sont intactes
@@ -55,6 +55,6 @@ describe("pack d'images du catalogue complémentaire", () => {
     // idempotent
     const again = await syncCatalogPhotos(db, store, MANIFEST);
     expect(again.imported).toEqual([]);
-    expect(again.skipped).toHaveLength(246);
+    expect(again.skipped).toHaveLength(291);
   });
 });

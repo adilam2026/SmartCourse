@@ -5,6 +5,7 @@ import { HttpError } from "./errors.js";
 import type { Guard } from "./guard.js";
 import { can } from "./permissions.js";
 import type { SseHub } from "./hub.js";
+import { catalogOrderer } from "./catalog-order.js";
 import { UNITS, type Unit } from "./lists.js";
 import { loadPrices, type PriceView } from "./prices.js";
 import { pricesAvailable } from "./countries.js";
@@ -63,6 +64,11 @@ export function catalogRoutes(app: FastifyInstance, { db, store, guard, hub }: D
     done(null, body),
   );
 
+  // Classement des articles (catalog-order.ts), construit sur le catalogue de départ (80 références, modifié seulement par une migration).
+  let orderer: ReturnType<typeof catalogOrderer> | undefined;
+  const startingOrder = async () =>
+    (orderer ??= catalogOrderer((await db.query("SELECT category, name, position FROM initial_catalog")).rows));
+
   // Catalogue familial, regroupé par catégorie. Le personnel et les parents ne voient que les produits actifs.
   app.get("/api/catalog", { preHandler: guard() }, async (req) => {
     const a = req.auth!;
@@ -74,21 +80,25 @@ export function catalogRoutes(app: FastifyInstance, { db, store, guard, hub }: D
     // Hors du Maroc : aucun prix indicatif dans le catalogue (les prix familiaux restent enregistrés, simplement non affichés).
     const country = (await db.query("SELECT country FROM families WHERE id = $1", [a.familyId])).rows[0]?.country as string | null;
     const prices = pricesAvailable(country) ? await loadPrices(db, a.familyId) : new Map();
-    const [cats, prods] = await Promise.all([
+    const [cats, prods, order] = await Promise.all([
       db.query("SELECT key, label FROM categories ORDER BY position"),
       db.query(
-        `SELECT p.*, coalesce(i.name || ' ' || i.aliases, e.search_text, '') AS keywords
+        `SELECT p.*, coalesce(i.name || ' ' || i.aliases, e.search_text, '') AS keywords,
+                CASE WHEN i.category = p.category THEN i.position END AS start_pos
            FROM products p LEFT JOIN initial_catalog i ON i.key = p.catalog_key LEFT JOIN extended_catalog e ON e.id = p.extended_id
-          WHERE p.family_id = $1 ${withInactive ? "" : "AND p.active"} ORDER BY p.position, lower(p.name)`,
+          WHERE p.family_id = $1 ${withInactive ? "" : "AND p.active"}`,
         [a.familyId],
       ),
+      startingOrder(),
     ]);
+    // Articles de départ dans leur ordre ; un article ajouté ou réaffiché, à côté des articles semblables (voir catalog-order.ts).
+    const ordered = order(prods.rows.map((p) => ({ ...p, startPos: p.start_pos, seq: p.position })));
     return {
       rev,
       categories: cats.rows.map((c) => ({
         key: c.key,
         label: c.label,
-        products: prods.rows.filter((p) => p.category === c.key).map((p) => productView(p, prices.get(p.id) ?? null)),
+        products: ordered.filter((p) => p.category === c.key).map((p) => productView(p, prices.get(p.id) ?? null)),
       })),
     };
   });
@@ -272,14 +282,22 @@ export function catalogRoutes(app: FastifyInstance, { db, store, guard, hub }: D
     const params = [familyId, qs.category ?? null, needle];
     const stateOf = `(CASE WHEN t.product_id IS NULL THEN 'absent' WHEN t.product_active THEN 'active' ELSE 'inactive' END)`;
     const stateWhere = !qs.status ? "TRUE" : qs.status === "todo" ? `${stateOf} <> 'active'` : `${stateOf} = '${qs.status}'`; // valeurs d'une énumération : aucune injection possible
-    const presentFirst = qs.presentFirst === "1" ? `(t.product_id IS NOT NULL AND t.product_active) DESC NULLS LAST, ` : "";
-    const total = Number((await db.query(`SELECT count(*) AS n FROM (${base}) t WHERE ${stateWhere}`, params)).rows[0].n);
-    const r = await db.query(
-      `SELECT t.* FROM (${base}) t JOIN categories c ON c.key = t.category
-        WHERE ${stateWhere}
-        ORDER BY ${presentFirst}c.position, (t.origin = 'initial') DESC, t.pos, lower(t.name) LIMIT $4 OFFSET $5`,
-      [...params, qs.limit, qs.offset],
+    const presentFirst = qs.presentFirst === "1"; // « présents d'abord » : articles actifs de la famille en tête, même classement ensuite
+    // Même classement que chez les familles (catalog-order.ts) : références de départ dans leur ordre, chaque autre référence
+    // à côté des articles semblables, sans sous-catégorie. Au plus quelques centaines de lignes : classées ici, puis découpées.
+    const all = await db.query(
+      `SELECT t.*, c.position AS cpos FROM (${base}) t JOIN categories c ON c.key = t.category WHERE ${stateWhere}`,
+      params,
     );
+    const order = await startingOrder();
+    const total = all.rows.length;
+    const byCat = new Map<number, any[]>();
+    for (const x of all.rows) (byCat.get(x.cpos) ?? byCat.set(x.cpos, []).get(x.cpos)!).push(x);
+    let sorted = [...byCat.keys()].sort((a, b) => a - b).flatMap((k) =>
+      order(byCat.get(k)!.map((x) => ({ ...x, startPos: x.origin === "initial" ? x.pos : null, seq: 0 }))),
+    );
+    if (presentFirst) sorted = [...sorted.filter((x) => x.product_id && x.product_active), ...sorted.filter((x) => !(x.product_id && x.product_active))];
+    const r = { rows: sorted.slice(qs.offset, qs.offset + qs.limit) };
     let counts: { active: number; inactive: number; absent: number } | undefined;
     if (qs.counts === "1") {
       const cr = await db.query(`SELECT ${stateOf} AS st, count(*)::int AS n FROM (${base}) t GROUP BY 1`, params);

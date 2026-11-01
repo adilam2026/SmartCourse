@@ -1,0 +1,1516 @@
+[
+  {
+    "key": "pistaches",
+    "name": "Pistaches",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": false,
+    "image": "webp/pistaches.webp",
+    "references": [
+      {
+        "source": "01-631404.jpg",
+        "priceMAD": "28.90",
+        "regularPriceMAD": null,
+        "format": "100 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "cacahuetes-salees",
+    "name": "Cacahuètes salées",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": false,
+    "image": "webp/cacahuetes-salees.webp",
+    "references": [
+      {
+        "source": "02-631402.jpg",
+        "priceMAD": "11.80",
+        "regularPriceMAD": null,
+        "format": "200 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "noix-de-cajou",
+    "name": "Noix de cajou",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": true,
+    "image": "webp/noix-de-cajou.webp",
+    "references": [
+      {
+        "source": "03-631400.jpg",
+        "priceMAD": "43.80",
+        "regularPriceMAD": "47.80",
+        "format": "200 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "raisins-secs",
+    "name": "Raisins secs",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": true,
+    "image": "webp/raisins-secs.webp",
+    "references": [
+      {
+        "source": "04-631398.jpg",
+        "priceMAD": "13.80",
+        "regularPriceMAD": "15.80",
+        "format": "200 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "pruneaux",
+    "name": "Pruneaux",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": false,
+    "image": "webp/pruneaux.webp",
+    "references": [
+      {
+        "source": "05-631396.jpg",
+        "priceMAD": "12.38",
+        "regularPriceMAD": "16.38",
+        "format": "200 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "noix",
+    "name": "Noix",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": true,
+    "image": "webp/noix.webp",
+    "references": [
+      {
+        "source": "06-631394.jpg",
+        "priceMAD": "16.50",
+        "regularPriceMAD": null,
+        "format": "100 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "amandes",
+    "name": "Amandes",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": true,
+    "image": "webp/amandes.webp",
+    "references": [
+      {
+        "source": "07-631392.jpg",
+        "priceMAD": "25.00",
+        "regularPriceMAD": "29.18",
+        "format": "200 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "abricots-secs",
+    "name": "Abricots secs",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": false,
+    "image": "webp/abricots-secs.webp",
+    "references": [
+      {
+        "source": "08-631390.jpg",
+        "priceMAD": "55.80",
+        "regularPriceMAD": null,
+        "format": "200 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "raisins-secs-blonds",
+    "name": "Raisins secs blonds",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": false,
+    "image": "webp/raisins-secs-blonds.webp",
+    "references": [
+      {
+        "source": "09-631388.jpg",
+        "priceMAD": "8.90",
+        "regularPriceMAD": null,
+        "format": "100 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "chapelure",
+    "name": "Chapelure",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": true,
+    "image": "webp/chapelure.webp",
+    "references": [
+      {
+        "source": "10-631386.jpg",
+        "priceMAD": "4.90",
+        "regularPriceMAD": null,
+        "format": "250 g",
+        "warning": "Bonus 25 g visible : contenu à confirmer"
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "soupe-aux-lentilles",
+    "name": "Soupe aux lentilles",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": false,
+    "image": "webp/soupe-aux-lentilles.webp",
+    "references": [
+      {
+        "source": "01-631384.jpg",
+        "priceMAD": "8.10",
+        "regularPriceMAD": null,
+        "format": "100 g",
+        "warning": "Titre 100 g / emballage 70 g à confirmer"
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "soupe-poulet-et-vermicelles",
+    "name": "Soupe poulet et vermicelles",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": false,
+    "image": "webp/soupe-poulet-et-vermicelles.webp",
+    "references": [
+      {
+        "source": "02-631382.jpg",
+        "priceMAD": "8.50",
+        "regularPriceMAD": null,
+        "format": "60 g",
+        "warning": "Titre 60 g / emballage 80 g à confirmer"
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "soupe-de-legumes",
+    "name": "Soupe de légumes",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": false,
+    "image": "webp/soupe-de-legumes.webp",
+    "references": [
+      {
+        "source": "03-631380.jpg",
+        "priceMAD": "8.25",
+        "regularPriceMAD": null,
+        "format": "40 g",
+        "warning": "Titre 40 g / emballage 60 g à confirmer"
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "creme-de-poulet",
+    "name": "Crème de poulet",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": false,
+    "image": "webp/creme-de-poulet.webp",
+    "references": [
+      {
+        "source": "04-631378.jpg",
+        "priceMAD": "8.50",
+        "regularPriceMAD": null,
+        "format": "60 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "olives",
+    "name": "Olives",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": true,
+    "image": "webp/olives.webp",
+    "references": [
+      {
+        "source": "05-631376.jpg",
+        "priceMAD": "7.10",
+        "regularPriceMAD": null,
+        "format": "200 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "olives-meslala",
+    "name": "Olives meslala",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": false,
+    "image": "webp/olives-meslala.webp",
+    "references": [
+      {
+        "source": "06-631374.jpg",
+        "priceMAD": "7.10",
+        "regularPriceMAD": null,
+        "format": "200 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "olives-vertes-en-tranches",
+    "name": "Olives vertes en tranches",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": false,
+    "image": "webp/olives-vertes-en-tranches.webp",
+    "references": [
+      {
+        "source": "07-631372.jpg",
+        "priceMAD": "8.50",
+        "regularPriceMAD": null,
+        "format": "200 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "olives-rouges",
+    "name": "Olives rouges",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": false,
+    "image": "webp/olives-rouges.webp",
+    "references": [
+      {
+        "source": "08-631370.jpg",
+        "priceMAD": "7.18",
+        "regularPriceMAD": null,
+        "format": "200 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "olives-vertes-au-citron",
+    "name": "Olives vertes au citron",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": false,
+    "image": "webp/olives-vertes-au-citron.webp",
+    "references": [
+      {
+        "source": "09-631368.jpg",
+        "priceMAD": "7.50",
+        "regularPriceMAD": null,
+        "format": "200 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "olives-noires-facon-grecque",
+    "name": "Olives noires façon grecque",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": false,
+    "image": "webp/olives-noires-facon-grecque.webp",
+    "references": [
+      {
+        "source": "10-631366.jpg",
+        "priceMAD": "9.30",
+        "regularPriceMAD": null,
+        "format": "200 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "assaisonnement-au-citron",
+    "name": "Assaisonnement au citron",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": false,
+    "image": "webp/assaisonnement-au-citron.webp",
+    "references": [
+      {
+        "source": "01-631364.jpg",
+        "priceMAD": "5.95",
+        "regularPriceMAD": null,
+        "format": "24 cL",
+        "warning": "Assaisonnement citron : ne pas assimiler automatiquement au vinaigre"
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "vinaigre",
+    "name": "Vinaigre",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": true,
+    "image": "webp/vinaigre.webp",
+    "references": [
+      {
+        "source": "02-631362.jpg",
+        "priceMAD": "7.95",
+        "regularPriceMAD": null,
+        "format": "50 cL",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "sucre",
+    "name": "Sucre",
+    "target": "initial",
+    "category": "epicerie",
+    "existing": true,
+    "image": "webp/sucre.webp",
+    "references": [
+      {
+        "source": "03-631360.jpg",
+        "priceMAD": "9.95",
+        "regularPriceMAD": null,
+        "format": "2 kg",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "sucre-en-lingots",
+    "name": "Sucre en lingots",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": false,
+    "image": "webp/sucre-en-lingots.webp",
+    "references": [
+      {
+        "source": "04-631358.jpg",
+        "priceMAD": "5.95",
+        "regularPriceMAD": null,
+        "format": "1 kg",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "sucre-en-morceaux",
+    "name": "Sucre en morceaux",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": false,
+    "image": "webp/sucre-en-morceaux.webp",
+    "references": [
+      {
+        "source": "05-631356.jpg",
+        "priceMAD": "5.95",
+        "regularPriceMAD": null,
+        "format": "1 kg",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "sauce-tomate",
+    "name": "Sauce tomate",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": true,
+    "image": "webp/sauce-tomate.webp",
+    "references": [
+      {
+        "source": "06-631354.jpg",
+        "priceMAD": "13.40",
+        "regularPriceMAD": null,
+        "format": "37 cL",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "concentre-de-tomates",
+    "name": "Concentré de tomates",
+    "target": "initial",
+    "category": "epicerie",
+    "existing": true,
+    "image": "webp/concentre-de-tomates.webp",
+    "references": [
+      {
+        "source": "07-631352.jpg",
+        "priceMAD": "6.70",
+        "regularPriceMAD": null,
+        "format": "10.6 cL",
+        "warning": "Fiche 10.6 cL / étiquette 105 g"
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "harissa",
+    "name": "Harissa",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": true,
+    "image": "webp/harissa.webp",
+    "references": [
+      {
+        "source": "08-631350.jpg",
+        "priceMAD": "8.40",
+        "regularPriceMAD": null,
+        "format": "160 g",
+        "warning": "Sauce liquide / pâte de harissa à distinguer"
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "sauce-algerienne",
+    "name": "Sauce algérienne",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": false,
+    "image": "webp/sauce-algerienne.webp",
+    "references": [
+      {
+        "source": "09-631348.jpg",
+        "priceMAD": "18.95",
+        "regularPriceMAD": "22.50",
+        "format": "305 mL",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "sauce-barbecue",
+    "name": "Sauce barbecue",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": false,
+    "image": "webp/sauce-barbecue.webp",
+    "references": [
+      {
+        "source": "10-631346.jpg",
+        "priceMAD": "16.95",
+        "regularPriceMAD": null,
+        "format": "305 mL",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "moutarde",
+    "name": "Moutarde",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": true,
+    "image": "webp/moutarde.webp",
+    "references": [
+      {
+        "source": "01-631344.jpg",
+        "priceMAD": "19.10",
+        "regularPriceMAD": null,
+        "format": "340 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "mayonnaise",
+    "name": "Mayonnaise",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": true,
+    "image": "webp/mayonnaise.webp",
+    "references": [
+      {
+        "source": "02-631342.jpg",
+        "priceMAD": "25.30",
+        "regularPriceMAD": null,
+        "format": "220 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "ketchup",
+    "name": "Ketchup",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": true,
+    "image": "webp/ketchup.webp",
+    "references": [
+      {
+        "source": "03-631340.jpg",
+        "priceMAD": "22.95",
+        "regularPriceMAD": "29.95",
+        "format": "460 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "huile-d-olive",
+    "name": "Huile d’olive",
+    "target": "initial",
+    "category": "epicerie",
+    "existing": true,
+    "image": "webp/huile-d-olive.webp",
+    "references": [
+      {
+        "source": "04-631338.jpg",
+        "priceMAD": "44.95",
+        "regularPriceMAD": null,
+        "format": "1 L",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "huile-de-table",
+    "name": "Huile de table",
+    "target": "initial",
+    "category": "epicerie",
+    "existing": true,
+    "image": "webp/huile-de-table.webp",
+    "references": [
+      {
+        "source": "05-631336.jpg",
+        "priceMAD": "19.95",
+        "regularPriceMAD": null,
+        "format": "1 L",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "levure-de-boulanger",
+    "name": "Levure de boulanger",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": true,
+    "image": "webp/levure-de-boulanger.webp",
+    "references": [
+      {
+        "source": "06-631334.jpg",
+        "priceMAD": "9.00",
+        "regularPriceMAD": null,
+        "format": "125 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "levure-chimique",
+    "name": "Levure chimique",
+    "target": "initial",
+    "category": "epicerie",
+    "existing": true,
+    "image": "webp/levure-chimique.webp",
+    "references": [
+      {
+        "source": "07-631332.jpg",
+        "priceMAD": "6.00",
+        "regularPriceMAD": null,
+        "format": "5 unités",
+        "warning": null
+      },
+      {
+        "source": "09-631328.jpg",
+        "priceMAD": "5.50",
+        "regularPriceMAD": null,
+        "format": "10 × 8 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "sucre-vanille",
+    "name": "Sucre vanillé",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": true,
+    "image": "webp/sucre-vanille.webp",
+    "references": [
+      {
+        "source": "08-631330.jpg",
+        "priceMAD": "5.50",
+        "regularPriceMAD": null,
+        "format": "10 × 7.5 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "farine",
+    "name": "Farine",
+    "target": "initial",
+    "category": "epicerie",
+    "existing": true,
+    "image": "webp/farine.webp",
+    "references": [
+      {
+        "source": "10-631326.jpg",
+        "priceMAD": "58.25",
+        "regularPriceMAD": null,
+        "format": "10 kg",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "farine-complete",
+    "name": "Farine complète",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": true,
+    "image": "webp/farine-complete.webp",
+    "references": [
+      {
+        "source": "01-631324.jpg",
+        "priceMAD": "102.75",
+        "regularPriceMAD": null,
+        "format": "10 kg",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "farine-fino",
+    "name": "Farine fino",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": true,
+    "image": "webp/farine-fino.webp",
+    "references": [
+      {
+        "source": "02-631322.jpg",
+        "priceMAD": "25.90",
+        "regularPriceMAD": null,
+        "format": "2 kg",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "lentilles",
+    "name": "Lentilles",
+    "target": "initial",
+    "category": "epicerie",
+    "existing": true,
+    "image": "webp/lentilles.webp",
+    "references": [
+      {
+        "source": "03-631320.jpg",
+        "priceMAD": "9.10",
+        "regularPriceMAD": null,
+        "format": "500 g",
+        "warning": null
+      },
+      {
+        "source": "04-631318.jpg",
+        "priceMAD": "15.95",
+        "regularPriceMAD": null,
+        "format": "500 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "pois-chiches",
+    "name": "Pois chiches",
+    "target": "initial",
+    "category": "epicerie",
+    "existing": true,
+    "image": "webp/pois-chiches.webp",
+    "references": [
+      {
+        "source": "05-631316.jpg",
+        "priceMAD": "17.75",
+        "regularPriceMAD": null,
+        "format": "500 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "haricots-blancs",
+    "name": "Haricots blancs",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": true,
+    "image": "webp/haricots-blancs.webp",
+    "references": [
+      {
+        "source": "06-631314.jpg",
+        "priceMAD": "17.90",
+        "regularPriceMAD": null,
+        "format": "500 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "vermicelles",
+    "name": "Vermicelles",
+    "target": "initial",
+    "category": "epicerie",
+    "existing": true,
+    "image": "webp/vermicelles.webp",
+    "references": [
+      {
+        "source": "07-631312.jpg",
+        "priceMAD": "10.00",
+        "regularPriceMAD": null,
+        "format": "500 g",
+        "warning": null
+      },
+      {
+        "source": "09-631308.jpg",
+        "priceMAD": "12.00",
+        "regularPriceMAD": null,
+        "format": "500 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "vermicelles-de-chine",
+    "name": "Vermicelles de Chine",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": false,
+    "image": "webp/vermicelles-de-chine.webp",
+    "references": [
+      {
+        "source": "08-631310.jpg",
+        "priceMAD": "18.50",
+        "regularPriceMAD": null,
+        "format": "200 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "semoule-fine",
+    "name": "Semoule fine",
+    "target": "initial",
+    "category": "epicerie",
+    "existing": true,
+    "image": "webp/semoule-fine.webp",
+    "references": [
+      {
+        "source": "10-631306.jpg",
+        "priceMAD": "14.50",
+        "regularPriceMAD": null,
+        "format": "1 kg",
+        "warning": null
+      },
+      {
+        "source": "01-631304.jpg",
+        "priceMAD": "55.25",
+        "regularPriceMAD": null,
+        "format": "5 kg",
+        "warning": "5 kg + 1 kg gratuit : contenu réel à confirmer"
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "couscous",
+    "name": "Semoule couscous",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": true,
+    "image": "webp/couscous.webp",
+    "references": [
+      {
+        "source": "02-631302.jpg",
+        "priceMAD": "10.30",
+        "regularPriceMAD": null,
+        "format": "500 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "boisson-energisante",
+    "name": "Boisson énergisante",
+    "target": "extended",
+    "category": "boissons",
+    "existing": false,
+    "image": "webp/boisson-energisante.webp",
+    "references": [
+      {
+        "source": "03-631300.jpg",
+        "priceMAD": "19.50",
+        "regularPriceMAD": null,
+        "format": "25 cL",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "soda-a-l-orange",
+    "name": "Soda à l'orange",
+    "target": "extended",
+    "category": "boissons",
+    "existing": false,
+    "image": "webp/soda-a-l-orange.webp",
+    "references": [
+      {
+        "source": "04-631298.jpg",
+        "priceMAD": "3.00",
+        "regularPriceMAD": null,
+        "format": "25 cL",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "tonic",
+    "name": "Tonic",
+    "target": "extended",
+    "category": "boissons",
+    "existing": false,
+    "image": "webp/tonic.webp",
+    "references": [
+      {
+        "source": "05-631296.jpg",
+        "priceMAD": "11.50",
+        "regularPriceMAD": null,
+        "format": "1 L",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "soda-au-citron",
+    "name": "Soda au citron",
+    "target": "extended",
+    "category": "boissons",
+    "existing": false,
+    "image": "webp/soda-au-citron.webp",
+    "references": [
+      {
+        "source": "06-631294.jpg",
+        "priceMAD": "7.25",
+        "regularPriceMAD": null,
+        "format": "45 cL",
+        "warning": null
+      },
+      {
+        "source": "07-631292.jpg",
+        "priceMAD": "3.50",
+        "regularPriceMAD": null,
+        "format": "33 cL",
+        "warning": null
+      },
+      {
+        "source": "08-631290.jpg",
+        "priceMAD": "5.25",
+        "regularPriceMAD": null,
+        "format": "45 cL",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "cola",
+    "name": "Cola",
+    "target": "extended",
+    "category": "boissons",
+    "existing": false,
+    "image": "webp/cola.webp",
+    "references": [
+      {
+        "source": "09-631288.jpg",
+        "priceMAD": "2.90",
+        "regularPriceMAD": null,
+        "format": "25 cL",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "soda-a-l-orange-sans-sucre",
+    "name": "Soda à l'orange sans sucre",
+    "target": "extended",
+    "category": "boissons",
+    "existing": false,
+    "image": "webp/soda-a-l-orange-sans-sucre.webp",
+    "references": [
+      {
+        "source": "10-631286.jpg",
+        "priceMAD": "6.50",
+        "regularPriceMAD": "6.60",
+        "format": "50 cL",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "soda-a-la-pomme",
+    "name": "Soda à la pomme",
+    "target": "extended",
+    "category": "boissons",
+    "existing": false,
+    "image": "webp/soda-a-la-pomme.webp",
+    "references": [
+      {
+        "source": "01-631284.jpg",
+        "priceMAD": "8.25",
+        "regularPriceMAD": null,
+        "format": "1 L",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "soda-a-l-ananas",
+    "name": "Soda à l'ananas",
+    "target": "extended",
+    "category": "boissons",
+    "existing": false,
+    "image": "webp/soda-a-l-ananas.webp",
+    "references": [
+      {
+        "source": "02-631282.jpg",
+        "priceMAD": "8.25",
+        "regularPriceMAD": null,
+        "format": "1 L",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "eau-gazeuse",
+    "name": "Eau gazeuse",
+    "target": "extended",
+    "category": "boissons",
+    "existing": true,
+    "image": "webp/eau-gazeuse.webp",
+    "references": [
+      {
+        "source": "03-631280.jpg",
+        "priceMAD": "12.70",
+        "regularPriceMAD": null,
+        "format": "75 cL",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "chips-au-fromage-et-aux-oignons",
+    "name": "Chips au fromage et aux oignons",
+    "target": "extended",
+    "category": "epicerie",
+    "existing": false,
+    "image": "webp/chips-au-fromage-et-aux-oignons.webp",
+    "references": [
+      {
+        "source": "04-631278.jpg",
+        "priceMAD": "18.50",
+        "regularPriceMAD": null,
+        "format": "100 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "granola-aux-trois-chocolats",
+    "name": "Granola aux trois chocolats",
+    "target": "extended",
+    "category": "pain",
+    "existing": false,
+    "image": "webp/granola-aux-trois-chocolats.webp",
+    "references": [
+      {
+        "source": "05-631276.jpg",
+        "priceMAD": "41.95",
+        "regularPriceMAD": null,
+        "format": "340 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "cereales",
+    "name": "Céréales",
+    "target": "extended",
+    "category": "pain",
+    "existing": true,
+    "image": "webp/cereales.webp",
+    "references": [
+      {
+        "source": "06-631274.jpg",
+        "priceMAD": "43.25",
+        "regularPriceMAD": null,
+        "format": "335 g",
+        "warning": null
+      },
+      {
+        "source": "07-631272.jpg",
+        "priceMAD": "56.25",
+        "regularPriceMAD": null,
+        "format": "375 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "baguette",
+    "name": "Baguette",
+    "target": "extended",
+    "category": "pain",
+    "existing": true,
+    "image": "webp/baguette.webp",
+    "references": [
+      {
+        "source": "08-631270.jpg",
+        "priceMAD": "3.95",
+        "regularPriceMAD": null,
+        "format": "250 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "cafe-soluble",
+    "name": "Café soluble",
+    "target": "extended",
+    "category": "pain",
+    "existing": false,
+    "image": "webp/cafe-soluble.webp",
+    "references": [
+      {
+        "source": "09-630745.jpg",
+        "priceMAD": "27.95",
+        "regularPriceMAD": null,
+        "format": "45 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "miel",
+    "name": "Miel",
+    "target": "initial",
+    "category": "pain",
+    "existing": true,
+    "image": "webp/miel.webp",
+    "references": [
+      {
+        "source": "10-630704.jpg",
+        "priceMAD": "31.50",
+        "regularPriceMAD": "32.50",
+        "format": "250 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "confiture",
+    "name": "Confiture",
+    "target": "initial",
+    "category": "pain",
+    "existing": true,
+    "image": "webp/confiture.webp",
+    "references": [
+      {
+        "source": "01-630702.jpg",
+        "priceMAD": "10.50",
+        "regularPriceMAD": null,
+        "format": "21 cL",
+        "warning": "Poids net à vérifier, fiche en cL"
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "confiture-de-figue",
+    "name": "Confiture de figue",
+    "target": "extended",
+    "category": "pain",
+    "existing": false,
+    "image": "webp/confiture-de-figue.webp",
+    "references": [
+      {
+        "source": "02-630700.jpg",
+        "priceMAD": "19.20",
+        "regularPriceMAD": null,
+        "format": "37 cL",
+        "warning": "Poids net à vérifier, fiche en cL"
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "sel",
+    "name": "Sel alimentaire",
+    "target": "initial",
+    "category": "epicerie",
+    "existing": true,
+    "image": "webp/sel.webp",
+    "references": [
+      {
+        "source": "03-630698.jpg",
+        "priceMAD": "4.75",
+        "regularPriceMAD": null,
+        "format": "400 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "saint-pierre-metallise",
+    "name": "Saint-Pierre métallisé",
+    "target": "extended",
+    "category": "viandes",
+    "existing": false,
+    "image": "webp/saint-pierre-metallise.webp",
+    "references": [
+      {
+        "source": "04-630696.jpg",
+        "priceMAD": "66.95",
+        "regularPriceMAD": null,
+        "format": "1 kg",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "espadon",
+    "name": "Espadon",
+    "target": "extended",
+    "category": "viandes",
+    "existing": false,
+    "image": "webp/espadon.webp",
+    "references": [
+      {
+        "source": "05-630694.jpg",
+        "priceMAD": "189.95",
+        "regularPriceMAD": null,
+        "format": "1 kg",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "sole",
+    "name": "Sole",
+    "target": "extended",
+    "category": "viandes",
+    "existing": false,
+    "image": "webp/sole.webp",
+    "references": [
+      {
+        "source": "06-630692.jpg",
+        "priceMAD": "139.95",
+        "regularPriceMAD": null,
+        "format": "1 kg",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "anneaux-de-calamar",
+    "name": "Anneaux de calamar",
+    "target": "extended",
+    "category": "viandes",
+    "existing": false,
+    "image": "webp/anneaux-de-calamar.webp",
+    "references": [
+      {
+        "source": "07-630690.jpg",
+        "priceMAD": "46.75",
+        "regularPriceMAD": null,
+        "format": "500 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "merlan-colin",
+    "name": "Merlan colin",
+    "target": "extended",
+    "category": "viandes",
+    "existing": false,
+    "image": "webp/merlan-colin.webp",
+    "references": [
+      {
+        "source": "08-630688.jpg",
+        "priceMAD": "41.98",
+        "regularPriceMAD": null,
+        "format": "500 g",
+        "warning": "Identification commerciale à confirmer"
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "bar",
+    "name": "Bar",
+    "target": "extended",
+    "category": "viandes",
+    "existing": false,
+    "image": "webp/bar.webp",
+    "references": [
+      {
+        "source": "09-630686.jpg",
+        "priceMAD": "163.95",
+        "regularPriceMAD": null,
+        "format": "400–600 g",
+        "warning": "Base du prix non explicite : ne pas convertir"
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "merlan-ration",
+    "name": "Merlan ration",
+    "target": "extended",
+    "category": "viandes",
+    "existing": false,
+    "image": "webp/merlan-ration.webp",
+    "references": [
+      {
+        "source": "10-630684.jpg",
+        "priceMAD": "51.98",
+        "regularPriceMAD": null,
+        "format": "500 g",
+        "warning": "Identification commerciale à confirmer"
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "crevettes-grises",
+    "name": "Crevettes grises",
+    "target": "extended",
+    "category": "viandes",
+    "existing": false,
+    "image": "webp/crevettes-grises.webp",
+    "references": [
+      {
+        "source": "01-630682.jpg",
+        "priceMAD": "56.75",
+        "regularPriceMAD": null,
+        "format": "500 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "dorade-royale",
+    "name": "Dorade royale",
+    "target": "extended",
+    "category": "viandes",
+    "existing": false,
+    "image": "webp/dorade-royale.webp",
+    "references": [
+      {
+        "source": "02-630680.jpg",
+        "priceMAD": "103.48",
+        "regularPriceMAD": null,
+        "format": "1 kg",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "crevettes-roses",
+    "name": "Crevettes roses",
+    "target": "extended",
+    "category": "viandes",
+    "existing": false,
+    "image": "webp/crevettes-roses.webp",
+    "references": [
+      {
+        "source": "03-630678.jpg",
+        "priceMAD": "53.48",
+        "regularPriceMAD": null,
+        "format": "500 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "lamelles-de-calamar",
+    "name": "Lamelles de calamar",
+    "target": "extended",
+    "category": "viandes",
+    "existing": false,
+    "image": "webp/lamelles-de-calamar.webp",
+    "references": [
+      {
+        "source": "04-630676.jpg",
+        "priceMAD": "32.75",
+        "regularPriceMAD": null,
+        "format": "500 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "pageot-royal",
+    "name": "Pageot royal",
+    "target": "extended",
+    "category": "viandes",
+    "existing": false,
+    "image": "webp/pageot-royal.webp",
+    "references": [
+      {
+        "source": "05-630674.jpg",
+        "priceMAD": "179.95",
+        "regularPriceMAD": null,
+        "format": "1 kg",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "pageot-chama",
+    "name": "Pageot chama",
+    "target": "extended",
+    "category": "viandes",
+    "existing": false,
+    "image": "webp/pageot-chama.webp",
+    "references": [
+      {
+        "source": "06-630672.jpg",
+        "priceMAD": "43.48",
+        "regularPriceMAD": null,
+        "format": "500 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "lben",
+    "name": "Lben",
+    "target": "extended",
+    "category": "laitages",
+    "existing": true,
+    "image": "webp/lben.webp",
+    "references": [
+      {
+        "source": "07-630670.jpg",
+        "priceMAD": "4.90",
+        "regularPriceMAD": null,
+        "format": "440 g",
+        "warning": null
+      },
+      {
+        "source": "08-630668.jpg",
+        "priceMAD": "4.65",
+        "regularPriceMAD": null,
+        "format": "450 g",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  },
+  {
+    "key": "lait",
+    "name": "Lait",
+    "target": "initial",
+    "category": "laitages",
+    "existing": true,
+    "image": "webp/lait.webp",
+    "references": [
+      {
+        "source": "09-630666.jpg",
+        "priceMAD": "65.95",
+        "regularPriceMAD": null,
+        "format": "6 × 1 L",
+        "warning": null
+      }
+    ],
+    "priceImport": "not_applied_observation_date_unknown"
+  }
+]
