@@ -114,7 +114,7 @@ final class ParcoursRecetteTests: XCTestCase {
     /// Centre (en points) du bandeau turquoise le plus bas au milieu de l'écran : le bouton principal « Se connecter ».
     private func lowestTealBand() -> CGFloat? {
         guard let s = screenPixels() else { return nil }
-        let x = s.w / 2
+        let x = s.w / 4   // à gauche du texte blanc du bouton (au centre, le texte coupe le bandeau)
         func teal(_ y: Int) -> Bool {
             let o = (y * s.w + x) * 4
             let r = Int(s.px[o]), g = Int(s.px[o + 1]), b = Int(s.px[o + 2])
