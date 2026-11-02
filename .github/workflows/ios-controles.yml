@@ -1,0 +1,104 @@
+name: iPhone — hors connexion, session, clavier et affichage (recette Railway)
+# Recette Railway (HTTPS direct, données fictives). Un seul Mac, une seule compilation, puis :
+#  - hors connexion + fermeture/réouverture + session conservée (iPhone 16) ;
+#  - clavier et affichage sur un petit (iPhone SE 3e gén., 4,7") et un grand iPhone (16 Pro Max, 6,9").
+# Déclenchement : à la demande, ou commit contenant [controles]. Aucun accès à la production.
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/ios-kmp]
+permissions:
+  contents: read
+env:
+  RECETTE_URL: https://smartcourse-recette-recette.up.railway.app
+  RECETTE_FAMILLE: RecetteCourses
+jobs:
+  iphone:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[controles]')
+    runs-on: macos-15
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ~/.konan
+          key: ios-gradle-${{ hashFiles('ios/**/*.kts', 'ios/gradle/wrapper/gradle-wrapper.properties') }}
+      - name: Recette joignable, flux en direct
+        run: python3 scripts/sonde-sse.py "$RECETTE_URL" "$RECETTE_FAMILLE" marie 573918 10
+      - name: Projet Xcode (XcodeGen)
+        working-directory: ios/app
+        run: brew install xcodegen >/dev/null && xcodegen generate
+      - name: Simulateurs (iPhone 16, iPhone SE 3e génération, iPhone 16 Pro Max)
+        run: |
+          RT=$(xcrun simctl list runtimes available -j | python3 -c "import json,sys; r=[x for x in json.load(sys.stdin)['runtimes'] if x['name'].startswith('iOS 18')]; r.sort(key=lambda x:x['version']); print(r[-1]['identifier'])")
+          for spec in "SIM16:iPhone-16" "SIMSE:iPhone-SE-3rd-generation" "SIMMAX:iPhone-16-Pro-Max"; do
+            U=$(xcrun simctl create "Courses ${spec#*:}" "com.apple.CoreSimulator.SimDeviceType.${spec#*:}" "$RT")
+            echo "${spec%%:*}=$U" >> "$GITHUB_ENV"
+            xcrun simctl boot "$U" || true
+            xcrun simctl spawn "$U" defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true
+            xcrun simctl spawn "$U" defaults write com.apple.keyboard.preferences DidShowGestureKeyboardIntroduction -bool true
+          done
+      - name: Compilation (une fois pour les trois simulateurs)
+        working-directory: ios/app
+        run: |
+          set -o pipefail
+          xcodebuild build-for-testing -project Courses.xcodeproj -scheme Courses -destination "generic/platform=iOS Simulator" \
+            -derivedDataPath ../build/dd CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= 2>&1 | tee ../xcodebuild.log | grep -E "error:|BUILD|\*\*" | head -60
+      - name: Hors connexion, réouverture, session (iPhone 16)
+        working-directory: ios/app
+        env:
+          TEST_RUNNER_COURSES_SERVER: ${{ env.RECETTE_URL }}
+          TEST_RUNNER_COURSES_FAMILY: ${{ env.RECETTE_FAMILLE }}
+        run: |
+          set -o pipefail
+          bash ../../scripts/ios-reseau.sh "$SIM16" "$RECETTE_URL" 40 > ../reseau.log 2>&1 &
+          xcodebuild test-without-building -project Courses.xcodeproj -scheme Courses -destination "id=$SIM16" \
+            -only-testing:CoursesUITests/ParcoursRecetteTests/test4_HorsConnexion_ReouvertureEtSession \
+            -derivedDataPath ../build/dd -resultBundlePath ../h.xcresult 2>&1 | tee ../h.log | grep -E "error:|Test Case|iPhone :|Serveur commun" | tail -40
+      - name: Clavier et affichage — iPhone SE (petit écran)
+        if: always()
+        working-directory: ios/app
+        env:
+          TEST_RUNNER_COURSES_SERVER: ${{ env.RECETTE_URL }}
+          TEST_RUNNER_COURSES_FAMILY: ${{ env.RECETTE_FAMILLE }}
+        run: |
+          set -o pipefail
+          xcodebuild test-without-building -project Courses.xcodeproj -scheme Courses -destination "id=$SIMSE" \
+            -only-testing:CoursesUITests/ParcoursRecetteTests/test5_ClavierEtAffichage \
+            -derivedDataPath ../build/dd -resultBundlePath ../se.xcresult 2>&1 | tee ../se.log | grep -E "error:|Test Case" | tail -30
+      - name: Clavier et affichage — iPhone 16 Pro Max (grand écran)
+        if: always()
+        working-directory: ios/app
+        env:
+          TEST_RUNNER_COURSES_SERVER: ${{ env.RECETTE_URL }}
+          TEST_RUNNER_COURSES_FAMILY: ${{ env.RECETTE_FAMILLE }}
+        run: |
+          set -o pipefail
+          xcodebuild test-without-building -project Courses.xcodeproj -scheme Courses -destination "id=$SIMMAX" \
+            -only-testing:CoursesUITests/ParcoursRecetteTests/test5_ClavierEtAffichage \
+            -derivedDataPath ../build/dd -resultBundlePath ../max.xcresult 2>&1 | tee ../max.log | grep -E "error:|Test Case" | tail -30
+      - name: Chronologie, journal de l'application et captures
+        if: always()
+        run: |
+          sudo pfctl -f /etc/pf.conf >/dev/null 2>&1 || true
+          echo "── Réseau"; cat ios/reseau.log 2>/dev/null
+          echo "── Hors connexion (iPhone)"; grep -E "iPhone :|Serveur commun" ios/h.log | grep -v "t = " | head -20
+          echo "── Journal de l'application (iPhone 16)"
+          xcrun simctl spawn "$SIM16" log show --last 120m --style compact --info --debug --predicate 'eventMessage CONTAINS "[Courses"' 2>/dev/null | grep -E "CoursesFlux|CoursesData|CoursesIos" | tail -60 || true
+          for r in h se max; do
+            mkdir -p ios/captures/$r
+            xcrun xcresulttool export attachments --path ios/$r.xcresult --output-path ios/captures/$r 2>/dev/null || true
+            echo "── Captures $r"; cat ios/captures/$r/manifest.json 2>/dev/null | python3 -c "import json,sys; [print(a['exportedFileName'], a.get('suggestedHumanReadableName','')) for t in json.load(sys.stdin) for a in t.get('attachments',[])]" 2>/dev/null
+            for p in ios/captures/$r/*.png; do
+              sips -Z 360 -s format jpeg -s formatOptions 55 "$p" --out /tmp/s.jpg >/dev/null 2>&1 || continue
+              echo "CAPTURE-DEBUT $r/$(basename "$p")"; base64 -i /tmp/s.jpg | fold -w 180; echo "CAPTURE-FIN"
+            done
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: iphone-controles, path: "ios/captures/\nios/*.log" }

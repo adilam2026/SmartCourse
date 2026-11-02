@@ -29,6 +29,9 @@ object CoursesIos {
         val dir = (NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, true).first() as String) + "/store"
         Env.kv = FileKv(dir)
         val storage = KeychainStorage()
+        // Le trousseau iPhone survit à la désinstallation (contrairement aux données Android) : au premier lancement après une
+        // installation (dossier de l'application vide), la session d'une installation précédente est effacée.
+        if (Env.kv?.get("installation") == null) { storage.clearSession(); Env.kv?.put("installation", "1") }
         // Recette seulement : contrôles automatiques qui changent de profil (même compte, même serveur) : session locale effacée au
         // lancement, comme « Effacer les données » sur Android. Les données restent sur le serveur commun.
         if (!BuildConfig.FINAL && platform.Foundation.NSProcessInfo.processInfo.environment["COURSES_RESET"] == "1") storage.clearSession()

@@ -296,6 +296,31 @@ final class ParcoursRecetteTests: XCTestCase {
 
     private func stamp() -> String { ISO8601DateFormatter().string(from: Date()) }
 
+    /// Réseau du simulateur (recette) : fichier signal lu par scripts/ios-reseau.sh sur le Mac (pare-feu vers le serveur de recette).
+    private func reseau(_ coupe: Bool) {
+        let f = NSTemporaryDirectory() + (coupe ? "courses-reseau-coupe" : "courses-reseau-retablit")
+        FileManager.default.createFile(atPath: f, contents: Data())
+        print("\(stamp()) iPhone : réseau \(coupe ? "COUPÉ" : "RÉTABLI") demandé")
+        sleep(6)
+    }
+
+    /// Ouvre une liste vide pour la famille (API, administrateur) ; ferme d'abord les listes en cours.
+    private func freshList(_ cookie: String) -> String? {
+        guard let base = env["COURSES_SERVER"] else { return nil }
+        func call(_ method: String, _ path: String) -> [String: Any]? {
+            var r = URLRequest(url: URL(string: base + path)!); r.httpMethod = method; r.setValue(cookie, forHTTPHeaderField: "Cookie")
+            if method == "POST" { r.setValue("application/json", forHTTPHeaderField: "Content-Type"); r.httpBody = "{}".data(using: .utf8) }
+            var out: [String: Any]?
+            let done = expectation(description: path)
+            URLSession.shared.dataTask(with: r) { d, _, _ in out = d.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }; done.fulfill() }.resume()
+            wait(for: [done], timeout: 30)
+            return out
+        }
+        for l in (call("GET", "/api/lists/open")?["lists"] as? [[String: Any]] ?? []) { if let id = l["id"] as? String { _ = call("POST", "/api/lists/\(id)/close") } }
+        if let id = (call("GET", "/api/lists/active")?["list"] as? [String: Any])?["id"] as? String { _ = call("POST", "/api/lists/\(id)/close") }
+        return (call("POST", "/api/lists")?["list"] as? [String: Any])?["id"] as? String
+    }
+
     private func activeList(_ cookie: String) -> (id: String, items: [String])? {
         guard let base = env["COURSES_SERVER"], let u = URL(string: base + "/api/lists/active") else { return nil }
         var r = URLRequest(url: u); r.setValue(cookie, forHTTPHeaderField: "Cookie")
@@ -452,5 +477,95 @@ final class ParcoursRecetteTests: XCTestCase {
         attach("r-iphone-oranges-apres-reconnexion")
         XCTAssertTrue(oranges, "« Oranges » (ajouté sur Android pendant la coupure) n'apparaît pas seul après le rétablissement du réseau")
         XCTAssertFalse(anyContaining("Envoi en attente").firstMatch.exists, "message « Envoi en attente » restant après la reconnexion")
+    }
+    // ───── Hors connexion : ajout sans réseau, fermeture et réouverture hors connexion, session conservée, envoi au retour ─────
+
+    func test4_HorsConnexion_ReouvertureEtSession() throws {
+        relaunch(reset: true)
+        let api = try XCTUnwrap(apiLogin("adil", "482913"), "connexion API impossible")
+        let list = try XCTUnwrap(freshList(api), "liste de recette non ouverte")
+        try login("adil", "482913")
+        waitFor("Ajouter des articles", 40)
+        // Session conservée : fermeture puis réouverture, sans nouvelle saisie du code.
+        relaunch(reset: false)
+        XCTAssertTrue(anyContaining("Ajouter des articles").firstMatch.waitForExistence(timeout: 30), "session perdue après fermeture et réouverture")
+        XCTAssertFalse(any("Bienvenue").firstMatch.exists, "écran de connexion affiché après réouverture")
+        attach("h1-session-conservee")
+        // Hors connexion : ajout de « Citrons ».
+        reseau(true)
+        tapButton("Ajouter des articles")
+        search("Citrons")
+        addToSelection("Citrons", waitCard("Citrons", 20))
+        tapButton("Terminer ma sélection")
+        sleep(3)
+        attach("h2-ajout-hors-connexion")
+        XCTAssertTrue(anyContaining("attente").firstMatch.waitForExistence(timeout: 20), "aucune indication d'envoi en attente hors connexion")
+        XCTAssertTrue(anyContaining("Citrons").firstMatch.exists, "« Citrons » absent de la liste hors connexion")
+        // Fermeture et réouverture TOUJOURS hors connexion : session, liste et envoi en attente conservés.
+        app.terminate()
+        relaunch(reset: false)
+        XCTAssertTrue(anyContaining("Citrons").firstMatch.waitForExistence(timeout: 30), "liste locale perdue après réouverture hors connexion")
+        XCTAssertFalse(any("Bienvenue").firstMatch.exists, "session perdue après réouverture hors connexion")
+        XCTAssertTrue(anyContaining("attente").firstMatch.waitForExistence(timeout: 15), "envoi en attente perdu après réouverture hors connexion")
+        continueAfterFailure = true
+        XCTAssertTrue(anyContaining("Hors connexion").firstMatch.exists, "état « Hors connexion » non indiqué")
+        continueAfterFailure = false
+        attach("h3-reouverture-hors-connexion")
+        // Retour du réseau : envoi automatique, sans action.
+        reseau(false)
+        var envoye = false
+        for _ in 0..<60 { if !anyContaining("attente").firstMatch.exists { envoye = true; break }; sleep(2) }
+        attach("h4-reseau-revenu")
+        XCTAssertTrue(envoye, "l'envoi en attente n'est pas parti au retour du réseau")
+        waitServer("« Citrons » reçu par le serveur après le retour du réseau", minutes: 3) {
+            if let l = activeList(api), l.id == list, l.items.contains("Citrons") { return true }; return false
+        }
+    }
+
+    // ───── Clavier et affichage (lancé sur un petit et un grand iPhone) ─────
+
+    func test5_ClavierEtAffichage() throws {
+        relaunch(reset: true)
+        waitFor("Bienvenue", 40)
+        let w = app.windows.firstMatch.frame
+        func champs() -> [XCUIElement] {
+            app.buttons.allElementsBoundByIndex
+                .filter { !["Se connecter", "Première connexion", "Besoin d'aide ?"].contains($0.label) && !$0.label.hasPrefix("Serveur")
+                    && $0.frame.height >= 48 && $0.frame.height <= 64 && $0.frame.width > 200 }
+                .sorted { $0.frame.minY < $1.frame.minY }
+        }
+        func horsLargeur() -> [String] {
+            app.descendants(matching: .any).allElementsBoundByIndex.filter { $0.frame.width > 0 && ($0.frame.maxX > w.maxX + 1 || $0.frame.minX < w.minX - 1) }.map { "\($0.label) \($0.frame)" }
+        }
+        XCTAssertEqual(horsLargeur(), [], "éléments qui débordent de l'écran (connexion)")
+        attach("k0-connexion")
+        // Chaque champ touché reste visible au-dessus du clavier.
+        let c = champs()
+        XCTAssertGreaterThanOrEqual(c.count, 3, "champs de connexion")
+        for (i, n) in ["identifiant famille", "identifiant personnel", "code"].enumerated() where i < c.count {
+            press(champs()[i]); sleep(2)
+            let kb = app.keyboards.firstMatch
+            XCTAssertTrue(kb.waitForExistence(timeout: 8), "clavier absent (\(n))")
+            let f = champs().count > i ? champs()[i].frame : .zero
+            attach("k\(i + 1)-clavier-\(n.replacingOccurrences(of: " ", with: "-"))")
+            XCTAssertTrue(f.height > 0 && f.maxY <= kb.frame.minY + 1, "champ « \(n) » caché par le clavier (champ \(f), clavier \(kb.frame))")
+        }
+        press(waitFor("Bienvenue")); sleep(1)
+        try login("adil", "482913")
+        XCTAssertTrue(anyContaining("Ajouter des articles").firstMatch.waitForExistence(timeout: 40) || anyContaining("Créer une liste").firstMatch.exists, "écran de la liste")
+        XCTAssertEqual(horsLargeur(), [], "éléments qui débordent de l'écran (liste)")
+        attach("k4-liste")
+        if anyContaining("Ajouter des articles").firstMatch.exists { tapButton("Ajouter des articles") } else { tapButton("Créer une liste") }
+        let field = anyContaining("Rechercher un produit").firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 20), "recherche absente")
+        press(field); sleep(1); clearFocused(); typeKeys("car"); sleep(2)
+        let kb = app.keyboards.firstMatch
+        XCTAssertTrue(kb.exists, "clavier absent (recherche)")
+        let f = anyContaining("Rechercher un produit").allElementsBoundByIndex.first { $0.frame.height > 0 }?.frame ?? .zero
+        XCTAssertTrue(f.maxY <= kb.frame.minY + 1, "champ de recherche caché par le clavier")
+        let carte = waitCard("Carottes", 15)
+        XCTAssertTrue(carte.frame.minY < kb.frame.minY, "aucun résultat visible au-dessus du clavier")
+        XCTAssertEqual(horsLargeur(), [], "éléments qui débordent de l'écran (sélection)")
+        attach("k5-recherche-clavier")
     }
 }
