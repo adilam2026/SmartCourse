@@ -24,6 +24,17 @@ final class ParcoursRecetteTests: XCTestCase {
         app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", text))
     }
 
+    /// Fiche d'un article : Compose regroupe tout le texte de la fiche dans un libellé (« Tomates, au kilo, Dans la liste · 1 kg »).
+    @discardableResult
+    private func waitCard(_ name: String, _ timeout: TimeInterval = 20) -> XCUIElement {
+        let e = anyContaining(name).firstMatch
+        if !e.waitForExistence(timeout: timeout) {
+            attach("absent-\(name)")
+            XCTFail("fiche « \(name) » introuvable après \(Int(timeout)) s")
+        }
+        return e
+    }
+
     @discardableResult
     private func waitFor(_ label: String, _ timeout: TimeInterval = 20) -> XCUIElement {
         let e = any(label).firstMatch
@@ -300,13 +311,12 @@ final class ParcoursRecetteTests: XCTestCase {
         try login("marie", "573918")
         waitFor("Choisir mes articles", 40)
         search("Tomates")
-        let tomates = waitFor("Tomates", 20)
+        waitCard("Tomates", 20)
         attach("sens1-iphone-tomates-android")
-        XCTAssertTrue(anyContaining("Enregistré").firstMatch.waitForExistence(timeout: 20), "« Tomates » (ajouté sur Android) n'apparaît pas comme enregistré sur l'iPhone")
-        _ = tomates
+        XCTAssertTrue(anyContaining("Dans la liste").firstMatch.waitForExistence(timeout: 20), "« Tomates » (ajouté sur Android) n'apparaît pas « Dans la liste » sur l'iPhone")
         // Ajout d'« Oignons » depuis l'iPhone, avec sa photo
         search("Oignons")
-        let card = waitFor("Oignons", 20)
+        let card = waitCard("Oignons", 20)
         sleep(4)
         attach("sens1-iphone-catalogue-oignons")
         XCTAssertTrue(hasPhoto(in: card.frame) || hasPhoto(in: CGRect(x: card.frame.minX, y: card.frame.minY - card.frame.height * 2, width: card.frame.width, height: card.frame.height * 3)),
@@ -331,7 +341,7 @@ final class ParcoursRecetteTests: XCTestCase {
         attach("sens2-iphone-aucune-liste")
         tapButton("Créer une liste")
         search("Carottes")
-        let card = waitFor("Carottes", 20)
+        let card = waitCard("Carottes", 20)
         press(card); sleep(2)
         tapButton("Terminer ma sélection")
         attach("sens2-iphone-liste-creee")
@@ -340,7 +350,7 @@ final class ParcoursRecetteTests: XCTestCase {
             if let l = activeList(api), l.items.contains("Carottes") { list2 = l.id; return true }; return false
         }
         // Android ajoute « Bananes » : il doit apparaître seul sur l'iPhone (sans action)
-        let bananes = any("Bananes").firstMatch
+        let bananes = anyContaining("Bananes").firstMatch
         XCTAssertTrue(bananes.waitForExistence(timeout: 35 * 60), "« Bananes » (ajouté sur Android) n'apparaît pas sur l'iPhone")
         attach("sens2-iphone-bananes-android")
         XCTAssertEqual(activeList(api)?.id, list2, "« Bananes » n'est pas dans la liste créée sur l'iPhone")
