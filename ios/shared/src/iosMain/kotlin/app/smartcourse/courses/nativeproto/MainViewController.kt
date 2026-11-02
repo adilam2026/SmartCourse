@@ -46,7 +46,12 @@ object CoursesIos {
 
     fun viewController(): UIViewController {
         val s = boot()
-        return ComposeUIViewController {
+        return ComposeUIViewController(configure = {
+            // Recette : arborescence d'accessibilité toujours transmise (contrôles automatiques XCUITest). En version finale, le
+            // réglage par défaut la transmet dès qu'un service d'accessibilité (VoiceOver…) la demande.
+            @OptIn(androidx.compose.runtime.ExperimentalComposeApi::class)
+            if (!BuildConfig.FINAL) accessibilitySyncOptions = androidx.compose.ui.platform.AccessibilitySyncOptions.Always(debugLogger = null)
+        }) {
             CoursesTheme {
                 Box(Modifier.fillMaxSize()) { Root(s, false) }
             }

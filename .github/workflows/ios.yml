@@ -143,6 +143,12 @@ jobs:
           mkdir -p ios/captures
           xcrun xcresulttool export attachments --path ios/parcours.xcresult --output-path ios/captures 2>/dev/null || true
           ls -la ios/captures | head -30
+          echo "── Correspondance des captures"; cat ios/captures/manifest.json 2>/dev/null | head -80
+          # Captures réduites (JPEG 360 px) imprimées dans le journal, pour pouvoir les examiner sans télécharger d'artefact.
+          for p in ios/captures/*.png; do
+            sips -Z 360 -s format jpeg -s formatOptions 55 "$p" --out /tmp/s.jpg >/dev/null 2>&1 || continue
+            echo "CAPTURE-DEBUT $(basename "$p")"; base64 -i /tmp/s.jpg | fold -w 180; echo "CAPTURE-FIN"
+          done
           echo "── Arborescence de l'application vue par le test"
           for f in ios/captures/*.txt; do grep -l "Application" "$f" >/dev/null 2>&1 && { head -60 "$f"; break; }; done
           echo "── Messages de l'application sur le simulateur (10 dernières minutes)"
