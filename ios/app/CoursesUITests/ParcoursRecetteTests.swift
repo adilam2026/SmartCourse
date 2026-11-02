@@ -21,18 +21,31 @@ final class ParcoursRecetteTests: XCTestCase {
     }
 
     private func anyContaining(_ text: String) -> XCUIElementQuery {
-        app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", text))
+        app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS[c] %@ OR value CONTAINS[c] %@", text, text))
     }
 
     /// Fiche d'un article : Compose regroupe tout le texte de la fiche dans un libellé (« Tomates, au kilo, Dans la liste · 1 kg »).
+    /// Le champ de recherche contient aussi le nom tapé : il est écarté (champ de saisie, ou libellé égal au seul nom), comme tout
+    /// élément hors de l'écran ou sans cadre ; on garde la fiche la plus haute sous le champ de recherche.
     @discardableResult
     private func waitCard(_ name: String, _ timeout: TimeInterval = 20) -> XCUIElement {
-        let e = anyContaining(name).firstMatch
-        if !e.waitForExistence(timeout: timeout) {
-            attach("absent-\(name)")
-            XCTFail("fiche « \(name) » introuvable après \(Int(timeout)) s")
-        }
-        return e
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            let field = anyContaining("Rechercher un produit").allElementsBoundByIndex.first { $0.frame.height > 0 }
+            let top = field.map { $0.frame.maxY } ?? 0
+            let cards = anyContaining(name).allElementsBoundByIndex.filter { e in
+                guard onScreen(e), e.frame.height >= 40, e.frame.minY >= top - 1 else { return false }
+                let skip: [XCUIElement.ElementType] = [.textField, .searchField, .secureTextField, .keyboard, .key]
+                if skip.contains(e.elementType) { return false }
+                return e.label.lowercased() != name.lowercased() || e.frame.height >= 80
+            }
+            if let c = cards.min(by: { $0.frame.minY < $1.frame.minY }) { return c }
+            usleep(500_000)
+        } while Date() < deadline
+        attach("absent-\(name)")
+        print("Arborescence d'accessibilité (fiche \(name)) :\n\(app.debugDescription)")
+        XCTFail("fiche « \(name) » introuvable après \(Int(timeout)) s")
+        return anyContaining(name).firstMatch
     }
 
     @discardableResult
@@ -313,7 +326,13 @@ final class ParcoursRecetteTests: XCTestCase {
         search("Tomates")
         waitCard("Tomates", 20)
         attach("sens1-iphone-tomates-android")
-        XCTAssertTrue(anyContaining("Dans la liste").firstMatch.waitForExistence(timeout: 20), "« Tomates » (ajouté sur Android) n'apparaît pas « Dans la liste » sur l'iPhone")
+        // Repère « Dans la liste · 1 kg » de la fiche : libellé regroupé de la fiche ou texte séparé selon la version de Compose.
+        let enListe = anyContaining("Dans la liste").firstMatch.waitForExistence(timeout: 20)
+        if !enListe { print("Arborescence d'accessibilité (fiche Tomates) :\n\(app.debugDescription)") }
+        // Échec signalé sans arrêter le parcours : le reste du contrôle croisé (Android attend « Oignons ») doit se dérouler.
+        continueAfterFailure = true
+        XCTAssertTrue(enListe, "« Tomates » (ajouté sur Android) n'apparaît pas « Dans la liste » sur l'iPhone")
+        continueAfterFailure = false
         // Ajout d'« Oignons » depuis l'iPhone, avec sa photo
         search("Oignons")
         let card = waitCard("Oignons", 20)
