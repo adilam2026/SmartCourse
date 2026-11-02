@@ -172,7 +172,7 @@ fun secureRandom(): kotlin.random.Random = SecureRandomIos
 
 /* ───── Journal et réseau ───── */
 
-fun logInfo(tag: String, msg: String) { println("[$tag] $msg") }
+fun logInfo(tag: String, msg: String) { platform.Foundation.NSLog("[%@] %@", tag, msg) }
 
 /** Prévient à chaque retour du réseau (NWPathMonitor) ; renvoie la fonction qui arrête la surveillance. */
 fun watchNetwork(onAvailable: () -> Unit): (() -> Unit)? {

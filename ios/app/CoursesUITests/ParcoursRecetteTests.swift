@@ -165,9 +165,12 @@ final class ParcoursRecetteTests: XCTestCase {
             app.swipeUp(velocity: .slow); sleep(1)
         }
         let buttons = any("Se connecter").allElementsBoundByIndex.filter { onScreen($0) }.sorted { $0.frame.minY < $1.frame.minY }
+        sleep(2) // fin du défilement : un toucher pendant le défilement l'arrête au lieu de valider
         attach("3-avant-connexion")
-        press(try XCTUnwrap(buttons.last, "bouton « Se connecter » introuvable à l'écran"))
+        let bouton = try XCTUnwrap(buttons.last, "bouton « Se connecter » introuvable à l'écran")
+        press(bouton)
         sleep(3)
+        if any("Bienvenue").firstMatch.exists && !anyContaining("Connexion…").firstMatch.exists && onScreen(bouton) { press(bouton); sleep(3) }
         attach("4-apres-connexion")
 
         // 2. Personnel : accueil direct sur « Choisir mes articles », avec le catalogue de la famille
