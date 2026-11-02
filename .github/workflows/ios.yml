@@ -55,7 +55,12 @@ jobs:
   android-e2e:
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[android-e2e]')
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 60
+    # Mêmes groupes indépendants que le workflow Google Play (chacun part d'une recette neuve), plus Q (rappels d'achat).
+    strategy:
+      fail-fast: false
+      matrix:
+        sections: ["F,G,H", "C,D", "F,P,J", "K,S", "A", "T", "Q"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -71,6 +76,18 @@ jobs:
           keytool -genkeypair -noprompt -keystore $NATIF_KEYSTORE_FILE -storetype PKCS12 -alias essai -keyalg RSA -keysize 2048 -validity 2 -storepass essai-final -keypass essai-final -dname "CN=Essai version finale non distribuable"
           ./gradlew --no-daemon assembleRelease -Pfinal=1 -PserverUrl=http://10.0.2.2:3000 -PversionCode=1 -PversionName="ios-e2e-test"
           mkdir -p ../dist && cp app/build/outputs/apk/release/*.apk ../dist/Courses-final-test.apk
+      - name: Application d'essai « WhatsApp » (identifiant com.whatsapp, sans code ; émulateur de recette uniquement)
+        run: |
+          set -e; D=/tmp/wa; mkdir -p $D; B="$ANDROID_HOME/build-tools/36.0.0"
+          printf '%s\n' '<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.whatsapp" android:versionCode="1" android:versionName="essai">' \
+            '  <application android:hasCode="false" android:label="WhatsApp (essai)">' \
+            '    <activity android:name="android.app.Activity" android:exported="true">' \
+            '      <intent-filter><action android:name="android.intent.action.SEND"/><category android:name="android.intent.category.DEFAULT"/><data android:mimeType="text/plain"/></intent-filter>' \
+            '    </activity>' '  </application>' '</manifest>' > $D/AndroidManifest.xml
+          "$B/aapt2" link --manifest $D/AndroidManifest.xml -I "$ANDROID_HOME/platforms/android-36/android.jar" --min-sdk-version 26 --target-sdk-version 36 -o $D/u.apk
+          "$B/zipalign" -f 4 $D/u.apk $D/a.apk
+          keytool -genkeypair -noprompt -keystore $D/k.p12 -storetype PKCS12 -alias s -keyalg RSA -keysize 2048 -validity 2 -storepass essai-wa -keypass essai-wa -dname "CN=Essai WhatsApp"
+          "$B/apksigner" sign --ks $D/k.p12 --ks-pass pass:essai-wa --out dist/whatsapp-essai.apk $D/a.apk
       - name: Serveur local jetable
         run: |
           NO_TUNNEL=1 scripts/recette-locale.sh | tee /tmp/recette.out
@@ -79,19 +96,22 @@ jobs:
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
-      - name: Parcours complet de la version finale Android (émulateur)
+      - name: Parcours ${{ matrix.sections }} de la version finale Android (Android 16)
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 34
+          api-level: 36
           arch: x86_64
           target: google_apis
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
           script: bash scripts/native-e2e-final.sh dist/Courses-final-test.apk ${{ env.FAMILY_CODE }} native-final
+        env:
+          SECTIONS: ${{ matrix.sections }}
+          WA_STUB: dist/whatsapp-essai.apk
       - uses: actions/upload-artifact@v4
         if: always()
-        with: { name: android-e2e-final, path: native-final/ }
+        with: { name: "android-e2e-${{ strategy.job-index }}", path: native-final/ }
       - run: scripts/recette-locale.sh --stop
         if: always()
 
