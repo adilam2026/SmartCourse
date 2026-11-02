@@ -52,7 +52,7 @@ jobs:
   recette-android:
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[parcours]')
     runs-on: ubuntu-latest
-    timeout-minutes: 80
+    timeout-minutes: 130
     permissions: { contents: read, statuses: write }
     steps:
       - uses: actions/checkout@v4
@@ -85,7 +85,7 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
-          script: bash scripts/ios-sync-android.sh dist/recette.apk ${{ env.FAMILY_CODE }} ios-sync-android 60
+          script: bash scripts/ios-sync-android.sh dist/recette.apk ${{ env.FAMILY_CODE }} ios-sync-android 40
       - uses: actions/upload-artifact@v4
         if: always()
         with: { name: ios-sync-android, path: ios-sync-android/ }
@@ -95,7 +95,7 @@ jobs:
   parcours-iphone:
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[parcours]')
     runs-on: macos-15
-    timeout-minutes: 80
+    timeout-minutes: 130
     permissions: { contents: read, statuses: read }
     steps:
       - uses: actions/checkout@v4
@@ -137,12 +137,11 @@ jobs:
           [ -n "$D" ] || { echo "::error::serveur de recette non publié"; exit 1; }
           echo "COURSES_SERVER=${D% *}" >> "$GITHUB_ENV"; echo "COURSES_FAMILY=${D#* }" >> "$GITHUB_ENV"
           echo "Serveur de recette : ${D% *}"
-      - name: Parcours iPhone (connexion, catalogue et photos, ajout d'un produit)
+      - name: Parcours iPhone croisé avec Android (sens 1 puis sens 2)
         working-directory: ios/app
         env:
           TEST_RUNNER_COURSES_SERVER: ${{ env.COURSES_SERVER }}
           TEST_RUNNER_COURSES_FAMILY: ${{ env.COURSES_FAMILY }}
-          TEST_RUNNER_COURSES_PRODUCT: Oignons
         run: |
           set -o pipefail
           xcodebuild test-without-building -project Courses.xcodeproj -scheme Courses -destination "id=$SIM" \

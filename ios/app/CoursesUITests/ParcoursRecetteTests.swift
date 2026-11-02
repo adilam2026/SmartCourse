@@ -146,15 +146,13 @@ final class ParcoursRecetteTests: XCTestCase {
         return colors.count > 40
     }
 
-    // ───── Parcours ─────
+    // ───── Connexion (comme un utilisateur) ─────
 
-    func testConnexionCatalogueAjout() throws {
+    private func login(_ user: String, _ code: String) throws {
         let family = try XCTUnwrap(env["COURSES_FAMILY"], "code famille de recette absent")
-        let product = env["COURSES_PRODUCT"] ?? "Oignons"
-
         // 1. Écran de connexion (le même que sur Android)
         waitFor("Bienvenue", 40)
-        attach("1-connexion")
+        attach("connexion-\(user)")
         // Comme un utilisateur : toucher le champ (son indication), puis taper au clavier.
         // Compose Multiplatform expose chaque champ de saisie comme un élément touchable sans libellé, de la largeur de l'écran :
         // on les prend dans l'ordre de l'écran (identifiant famille, identifiant personnel, code), comme un utilisateur.
@@ -167,7 +165,7 @@ final class ParcoursRecetteTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(champs().count, 3, "champs de connexion : \(champs().count) trouvés")
         // Comme un utilisateur : toucher le premier champ, taper, puis « Retour » pour passer au champ suivant.
         press(champs()[0]); sleep(1)
-        for (i, texte) in [family, "marie", "573918"].enumerated() {
+        for (i, texte) in [family, user, code].enumerated() {
             if i > 0 && !app.keyboards.firstMatch.exists {
                 // Pas de passage automatique au champ suivant : toucher le champ n° i+1.
                 let c = champs()
@@ -217,25 +215,126 @@ final class ParcoursRecetteTests: XCTestCase {
         }
         XCTAssertTrue(ok, "le toucher sur « Se connecter » n'a rien déclenché (3 essais)")
         attach("4-apres-connexion")
+    }
 
-        // 2. Personnel : accueil direct sur « Choisir mes articles », avec le catalogue de la famille
+    // ───── Serveur commun (le même que celui d'Android) : attente de l'étape faite sur l'autre appareil ─────
+
+    private func apiLogin(_ user: String, _ code: String) -> String? {
+        guard let base = env["COURSES_SERVER"], let fam = env["COURSES_FAMILY"], let u = URL(string: base + "/api/auth/login") else { return nil }
+        var r = URLRequest(url: u); r.httpMethod = "POST"; r.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        r.httpBody = try? JSONSerialization.data(withJSONObject: ["familyCode": fam, "login": user, "secret": code, "clientFeatures": ["provisional"]])
+        var cookie: String?
+        let done = expectation(description: "connexion API")
+        URLSession.shared.dataTask(with: r) { _, resp, _ in
+            if let h = (resp as? HTTPURLResponse)?.value(forHTTPHeaderField: "Set-Cookie"), let c = h.components(separatedBy: ";").first, c.hasPrefix("sc_session=") { cookie = c }
+            done.fulfill()
+        }.resume()
+        wait(for: [done], timeout: 30)
+        return cookie
+    }
+
+    /// Liste en cours de la famille sur le serveur commun : (identifiant, noms des articles non retirés), ou nil s'il n'y en a pas.
+    private func activeList(_ cookie: String) -> (id: String, items: [String])? {
+        guard let base = env["COURSES_SERVER"], let u = URL(string: base + "/api/lists/active") else { return nil }
+        var r = URLRequest(url: u); r.setValue(cookie, forHTTPHeaderField: "Cookie")
+        var out: (String, [String])?
+        let done = expectation(description: "liste API")
+        URLSession.shared.dataTask(with: r) { data, _, _ in
+            if let d = data, let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any], let l = o["list"] as? [String: Any], let id = l["id"] as? String {
+                let items = (l["items"] as? [[String: Any]] ?? []).filter { ($0["status"] as? String) != "removed" }.compactMap { $0["name"] as? String }
+                out = (id, items)
+            }
+            done.fulfill()
+        }.resume()
+        wait(for: [done], timeout: 30)
+        return out
+    }
+
+    /// Attend (jusqu'à [minutes]) que le serveur commun vérifie [cond] : étape faite sur l'appareil Android.
+    private func waitServer(_ what: String, minutes: Double = 35, _ cond: () -> Bool) {
+        let end = Date().addingTimeInterval(minutes * 60)
+        while Date() < end { if cond() { print("Serveur commun : \(what)"); return }; sleep(10) }
+        XCTFail("serveur commun : « \(what) » pas observé en \(Int(minutes)) min")
+    }
+
+    /// Recherche dans « Choisir mes articles » / « Ajouter des articles », comme un utilisateur.
+    private func search(_ text: String) {
+        let field = anyContaining("Rechercher un produit").firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 20), "champ de recherche absent")
+        press(field); sleep(1)
+        typeKeys(text.lowercased()); sleep(2)
+    }
+
+    /// Touche un bouton par son libellé ; s'il a un cadre d'accessibilité vide, il est repéré à l'image (bandeau turquoise le plus bas).
+    private func tapButton(_ label: String) {
+        let b = anyContaining(label).allElementsBoundByIndex.filter { $0.frame.height > 0 && onScreen($0) }.last
+        if let b { press(b) } else if let y = lowestTealBand() {
+            app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: app.frame.width / 2, dy: y)).tap()
+        } else { attach("absent-\(label)"); XCTFail("bouton « \(label) » introuvable") }
+        sleep(3)
+    }
+
+    private func relaunch(reset: Bool) {
+        app.terminate()
+        app.launchEnvironment["COURSES_RESET"] = reset ? "1" : "0"
+        app.launch()
+    }
+
+    // ───── Sens 1 : liste créée sur Android, modifiée sur l'iPhone (personnel : marie) ─────
+
+    func test1_ListeCreeeSurAndroid_ModifieeSurIPhone() throws {
+        relaunch(reset: true)
+        let api = try XCTUnwrap(apiLogin("marie", "573918"), "connexion API impossible")
+        var list1 = ""
+        waitServer("liste créée sur Android avec « Tomates »") {
+            if let l = activeList(api), l.items.contains("Tomates") { list1 = l.id; return true }; return false
+        }
+        try login("marie", "573918")
         waitFor("Choisir mes articles", 40)
-        var card = waitFor(product, 30)
-        // L'article peut être plus bas dans le catalogue : faire défiler jusqu'à le voir en entier.
-        for _ in 0..<12 where !onScreen(card) { app.swipeUp(velocity: .slow); sleep(1); card = any(product).firstMatch }
-        sleep(4) // chargement des photos depuis le serveur (cookie de session)
-        attach("3-catalogue")
-        XCTAssertTrue(hasPhoto(in: card.frame.insetBy(dx: 0, dy: 0)) || hasPhoto(in: CGRect(x: card.frame.minX, y: card.frame.minY - card.frame.height, width: card.frame.width, height: card.frame.height * 2)),
-                      "photo du produit « \(product) » non affichée")
-
-        // 3. Ajout du produit à la liste : touché, puis « Terminer ma sélection » (envoi au serveur)
-        press(card)
-        sleep(2)
-        attach("4-produit-choisi")
-        let done = anyContaining("Terminer ma sélection").allElementsBoundByIndex.filter { $0.frame.height > 0 }
-        press(try XCTUnwrap(done.last, "« Terminer ma sélection » introuvable"))
-        sleep(6)
-        attach("5-selection-envoyee")
+        search("Tomates")
+        let tomates = waitFor("Tomates", 20)
+        attach("sens1-iphone-tomates-android")
+        XCTAssertTrue(anyContaining("Enregistré").firstMatch.waitForExistence(timeout: 20), "« Tomates » (ajouté sur Android) n'apparaît pas comme enregistré sur l'iPhone")
+        _ = tomates
+        // Ajout d'« Oignons » depuis l'iPhone, avec sa photo
+        search("Oignons")
+        let card = waitFor("Oignons", 20)
+        sleep(4)
+        attach("sens1-iphone-catalogue-oignons")
+        XCTAssertTrue(hasPhoto(in: card.frame) || hasPhoto(in: CGRect(x: card.frame.minX, y: card.frame.minY - card.frame.height * 2, width: card.frame.width, height: card.frame.height * 3)),
+                      "photo du produit « Oignons » non affichée")
+        press(card); sleep(2)
+        tapButton("Terminer ma sélection")
+        attach("sens1-iphone-oignons-envoye")
         XCTAssertFalse(anyContaining("Envoi en attente").firstMatch.exists, "la demande est restée en attente d'envoi")
+        waitServer("« Oignons » dans la liste créée sur Android", minutes: 2) {
+            if let l = activeList(api), l.id == list1, l.items.contains("Oignons") { return true }; return false
+        }
+    }
+
+    // ───── Sens 2 : liste créée sur l'iPhone, modifiée sur Android (administrateur : adil) ─────
+
+    func test2_ListeCreeeSurIPhone_ModifieeSurAndroid() throws {
+        relaunch(reset: true)
+        let api = try XCTUnwrap(apiLogin("adil", "482913"), "connexion API impossible")
+        waitServer("liste du sens 1 clôturée (aucune liste en cours)") { activeList(api) == nil }
+        try login("adil", "482913")
+        waitFor("Créer une liste", 40)
+        attach("sens2-iphone-aucune-liste")
+        tapButton("Créer une liste")
+        search("Carottes")
+        let card = waitFor("Carottes", 20)
+        press(card); sleep(2)
+        tapButton("Terminer ma sélection")
+        attach("sens2-iphone-liste-creee")
+        var list2 = ""
+        waitServer("liste créée sur l'iPhone avec « Carottes »", minutes: 2) {
+            if let l = activeList(api), l.items.contains("Carottes") { list2 = l.id; return true }; return false
+        }
+        // Android ajoute « Bananes » : il doit apparaître seul sur l'iPhone (sans action)
+        let bananes = any("Bananes").firstMatch
+        XCTAssertTrue(bananes.waitForExistence(timeout: 35 * 60), "« Bananes » (ajouté sur Android) n'apparaît pas sur l'iPhone")
+        attach("sens2-iphone-bananes-android")
+        XCTAssertEqual(activeList(api)?.id, list2, "« Bananes » n'est pas dans la liste créée sur l'iPhone")
     }
 }
