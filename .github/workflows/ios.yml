@@ -136,13 +136,19 @@ jobs:
         run: |
           set -o pipefail
           xcodebuild test-without-building -project Courses.xcodeproj -scheme Courses -destination 'platform=iOS Simulator,name=iPhone 16' \
-            -derivedDataPath ../build/dd -resultBundlePath ../parcours.xcresult 2>&1 | tee ../xctest.log | grep -E "Test Case|error|XCTAssert|failed|passed|Arborescence" | head -120
+            -derivedDataPath ../build/dd -resultBundlePath ../parcours.xcresult 2>&1 | tee ../xctest.log | grep -vE "^\s*(export|cd) |^\s*$" | tail -150
       - name: Captures d'écran du parcours
         if: always()
         run: |
           mkdir -p ios/captures
           xcrun xcresulttool export attachments --path ios/parcours.xcresult --output-path ios/captures 2>/dev/null || true
           ls -la ios/captures | head -30
+          echo "── Arborescence de l'application vue par le test"
+          for f in ios/captures/*.txt; do grep -l "Application" "$f" >/dev/null 2>&1 && { head -60 "$f"; break; }; done
+          echo "── Messages de l'application sur le simulateur (10 dernières minutes)"
+          xcrun simctl spawn booted log show --last 15m --style compact --predicate 'process == "Courses"' 2>/dev/null | grep -vE "CFNetwork|BackBoard|UIKit|Accessibility" | tail -80 || true
+          xcrun simctl list devices booted | head -5
+          ls ~/Library/Logs/DiagnosticReports 2>/dev/null | grep -i courses | head; for f in ~/Library/Logs/DiagnosticReports/Courses*; do [ -f "$f" ] && head -60 "$f"; done
       - uses: actions/upload-artifact@v4
         if: always()
         with: { name: parcours-iphone, path: "ios/captures/\nios/xctest.log\nios/xcodebuild.log" }
