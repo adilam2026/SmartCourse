@@ -111,8 +111,8 @@ class CatalogRepo(private val api: ApiClient) {
         val qs = buildList {
             add("offset=$offset"); add("limit=$limit")
             status?.let { add("status=$it") }
-            category?.let { add("category=" + java.net.URLEncoder.encode(it, "UTF-8")) }
-            if (query.isNotBlank()) add("q=" + java.net.URLEncoder.encode(query.trim(), "UTF-8"))
+            category?.let { add("category=" + app.smartcourse.courses.nativeproto.urlEncode(it)) }
+            if (query.isNotBlank()) add("q=" + app.smartcourse.courses.nativeproto.urlEncode(query.trim()))
             if (withCounts) add("counts=1")
             if (presentFirst) add("presentFirst=1")
         }.joinToString("&")

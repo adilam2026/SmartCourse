@@ -1,6 +1,6 @@
 package app.smartcourse.courses.nativeproto
 
-import android.os.Bundle
+import kotlin.math.roundToLong
 import androidx.annotation.DrawableRes
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
@@ -13,14 +13,14 @@ import app.smartcourse.courses.nativeproto.net.PriceRef
 import app.smartcourse.courses.nativeproto.net.LineAmount
 import app.smartcourse.courses.nativeproto.net.fmtPrice
 import app.smartcourse.courses.nativeproto.net.lineAmount
-import java.util.Locale
 
 /** Paramètres de lancement (adb) : servent uniquement à ouvrir un écran dans un état précis pour les captures. */
 object Launch {
-    var extras: Bundle? = null
+    /** Paramètres reçus au lancement (Android : extras de l'intent, build de recette seulement). */
+    var extras: Map<String, Any?>? = null
     private val used = mutableSetOf<String>()
-    fun str(k: String): String? = extras?.getString(k)
-    fun flag(k: String): Boolean = extras?.let { it.getBoolean(k, false) || it.getString(k) == "true" } ?: false
+    fun str(k: String): String? = extras?.get(k) as? String
+    fun flag(k: String): Boolean = extras?.let { it[k] == true || it[k] == "true" } ?: false
     private val usedStr = mutableSetOf<String>()
     fun strOnce(k: String): String? { if (k in usedStr) return null; usedStr += k; return str(k) }
     /** Vrai une seule fois : l'état de lancement n'est appliqué qu'à la première ouverture de l'écran. */
@@ -55,7 +55,7 @@ data class Product(
 
 /** Texte comparable pour la recherche : minuscules, sans accents ni ligatures (« Pâte » = « pate », « Œufs » = « oeufs »). */
 fun flatSearch(s: String): String =
-    java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD).replace(Regex("\\p{M}+"), "").lowercase()
+    stripMarks(s).lowercase()
         .replace("œ", "oe").replace("æ", "ae").replace('’', '\'').replace(Regex("\\s+"), " ").trim()
 
 /** Le produit correspond-il à la recherche (nom ou mots de la référence commune) ? */
@@ -65,7 +65,7 @@ fun matchesSearch(p: Product, q: String): Boolean {
 }
 
 fun fmtNum(v: Double): String {
-    val s = String.format(Locale.US, "%.3f", v).trimEnd('0').trimEnd('.')
+    val s = fixed3(v).trimEnd('0').trimEnd('.')
     return s.replace('.', ',')
 }
 
@@ -78,7 +78,7 @@ fun qtyText(p: Product, q: Int): String = when (p.unit) {
 }
 
 fun priceText(cents: Int, p: Product): String {
-    val s = String.format(Locale.US, "%d,%02d", cents / 100, cents % 100)
+    val s = centsText(cents.toLong())
     return "$s DH / ${refLabel(p)}"
 }
 
@@ -280,7 +280,7 @@ fun Demo.estimate(): Pair<Long, Int> {
         val p = byId[l.productId] ?: return@forEach
         val price = prices[p.id]
         if (price == null) { missing++; return@forEach }
-        total += if (p.unit == UnitKind.COUNT) price.toLong() * l.qty else Math.round(price.toDouble() * l.qty / 1000.0)
+        total += if (p.unit == UnitKind.COUNT) price.toLong() * l.qty else (price.toDouble() * l.qty / 1000.0).roundToLong()
     }
     return total to missing
 }
@@ -293,13 +293,13 @@ fun unitKindOf(serverUnit: String): UnitKind = when (serverUnit) { "kg" -> UnitK
 fun countLabelOf(serverUnit: String): String = when (serverUnit) { "piece" -> "pièce"; "boite" -> "boîte"; else -> serverUnit }
 
 /** Quantité du serveur (kg, litres ou unités) → entier de l'application (g, ml ou unités). */
-fun toBase(serverUnit: String, q: Double): Int = if (unitKindOf(serverUnit) == UnitKind.COUNT) Math.round(q).toInt() else Math.round(q * 1000).toInt()
+fun toBase(serverUnit: String, q: Double): Int = if (unitKindOf(serverUnit) == UnitKind.COUNT) q.roundToLong().toInt() else (q * 1000).roundToLong().toInt()
 
 fun toServer(serverUnit: String, base: Int): Double = if (unitKindOf(serverUnit) == UnitKind.COUNT) base.toDouble() else base / 1000.0
 
 /** Quantité en texte décimal exact pour le calcul des prix. */
 fun serverQtyText(serverUnit: String, base: Int): String =
-    if (unitKindOf(serverUnit) == UnitKind.COUNT) base.toString() else java.math.BigDecimal(base).movePointLeft(3).stripTrailingZeros().toPlainString()
+    if (unitKindOf(serverUnit) == UnitKind.COUNT) base.toString() else app.smartcourse.courses.nativeproto.net.milliToPlain(base.toLong())
 
 /** Liste en cours de la famille (option « plusieurs listes »). */
 data class OpenList(val id: String, val name: String?, val createdAt: String, val remaining: Int, val purchased: Int, val current: Boolean)

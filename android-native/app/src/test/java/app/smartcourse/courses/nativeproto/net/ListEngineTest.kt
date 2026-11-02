@@ -12,7 +12,6 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import java.time.Instant
 
 class ListEngineTest {
     private lateinit var server: MockWebServer
@@ -27,7 +26,7 @@ class ListEngineTest {
     }
     @After fun tearDown() { runCatching { server.shutdown() } }
 
-    private fun engine(scope: String = "f1|p1") = ListEngine(api, kv, scope, now = { Instant.parse("2026-05-12T09:00:00Z") }, newId = { "00000000-0000-4000-8000-" + (++seq).toString().padStart(12, '0') })
+    private fun engine(scope: String = "f1|p1") = ListEngine(api, kv, scope, now = { "2026-05-12T09:00:00Z" }, newId = { "00000000-0000-4000-8000-" + (++seq).toString().padStart(12, '0') })
 
     private fun item(id: String, pid: String, name: String, status: String = "to_buy", rev: Int = 1, q: Double = 1.0, unit: String = "kg", purchase: Boolean = false) =
         """{"id":"$id","productId":"$pid","category":"legumes","name":"$name","brand":null,"photoUrl":null,"productActive":true,"status":"$status","rev":$rev,"quantity":$q,"unit":"$unit","price":{"amount":"2.90","refQty":"1","refUnit":"kg","source":"base"},"priceFrozen":true${if (purchase) ""","purchase":{"id":"pu-$id","at":"2026-05-12T08:00:00Z","by":{"id":"u","displayName":"Lamiaa"},"quantity":$q,"unit":"$unit"}""" else ""}}"""

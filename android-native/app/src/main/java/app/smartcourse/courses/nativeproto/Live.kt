@@ -1,8 +1,5 @@
 package app.smartcourse.courses.nativeproto
 
-import android.content.Context
-import android.net.ConnectivityManager
-import android.net.Network
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -28,29 +25,22 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import java.time.OffsetDateTime
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 /** Contexte de l'application, renseigné au démarrage (stockage local, connectivité). */
 object Env {
     var kv: KeyValueStore? = null
-    var context: Context? = null
 }
 
 /** L'instance de données réelles actuellement affichée, pour les changements de premier plan / arrière-plan de l'activité. */
 object LiveHolder { var current: AppData? = null }
 
-private val DATE_FMT = DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.FRENCH)
-private val TIME_FMT = DateTimeFormatter.ofPattern("HH:mm", Locale.FRENCH)
 
 fun frenchDate(iso: String?): String = try {
-    if (iso == null) "" else OffsetDateTime.parse(iso).atZoneSameInstant(ZoneId.systemDefault()).format(DATE_FMT).replaceFirstChar { it.uppercase() }
+    if (iso == null) "" else formatInstant(iso, "EEEE d MMMM").replaceFirstChar { it.uppercase() }
 } catch (_: Exception) { "" }
 
 fun clockTime(iso: String?): String? = try {
-    if (iso == null) null else OffsetDateTime.parse(iso).atZoneSameInstant(ZoneId.systemDefault()).format(TIME_FMT)
+    if (iso == null) null else formatInstant(iso, "HH:mm")
 } catch (_: Exception) { null }
 
 private fun CatProduct.toProduct() = Product(
@@ -81,7 +71,7 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
     private var draftListId: String? = "\u0000"
     private val qtyEdits = HashMap<String, Int>()
     private val qtyJobs = HashMap<String, Job>()
-    private var netCallback: ConnectivityManager.NetworkCallback? = null
+    private var netWatch: (() -> Unit)? = null
 
     private val catKey = "catalog|$scopeKey"
     private val modeKey = "selmode|$scopeKey"
@@ -90,12 +80,12 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
     /** Compte supprimé : plus rien de ce profil ne reste sur le téléphone (copie de la liste, envois en attente, catalogue, réglages). */
     fun wipeLocal() {
         engine.wipeLocal()
-        for (k in listOf(catKey, modeKey, orgKey, Notifier.key(scopeKey), Notifier.seenKey(scopeKey))) kv.remove(k)
+        for (k in listOf(catKey, modeKey, orgKey, NotifyKeys.key(scopeKey), NotifyKeys.seenKey(scopeKey))) kv.remove(k)
     }
 
     init {
         demo.data = this
-        engine.trace = { android.util.Log.i("CoursesData", it) }
+        engine.trace = { logInfo("CoursesData", it) }
         kv.get(catKey)?.let { s -> try { parseCatalog(json.parseToJsonElement(s) as JsonObject) } catch (_: Exception) { null } }?.let { catalog = it.products; if (it.categories.isNotEmpty()) demo.categoryList = it.categories }
         // Préférences d'affichage DE CE PROFIL (téléphone) : celles d'un profil précédent ne sont jamais reprises ; valeurs par défaut sinon.
         demo.selMode = SelMode.parse(kv.get(modeKey))
@@ -203,7 +193,7 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
         demo.pendingOps = engine.pendingOps
         demo.orphanCount = engine.orphans.size
         demo.hasList = engine.list != null
-        demo.listDate = frenchDate(engine.list?.createdAt ?: java.time.OffsetDateTime.now().toString())
+        demo.listDate = frenchDate(engine.list?.createdAt ?: nowOffsetIso())
         demo.listName = engine.list?.name
         demo.currentListId = engine.list?.id
         online = engine.online
@@ -298,18 +288,14 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
 
     fun onBackground() {
         started = false
-        android.util.Log.i("CoursesNotif", "application en arrière-plan : flux en direct fermé")
+        logInfo("CoursesNotif", "application en arrière-plan : flux en direct fermé")
         streamJob?.cancel(); retryJob?.cancel(); draftJob?.cancel()
-        netCallback?.let { cb -> try { (Env.context?.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager)?.unregisterNetworkCallback(cb) } catch (_: Exception) { } }
-        netCallback = null
+        netWatch?.invoke()
+        netWatch = null
     }
 
     private fun registerNetwork() {
-        val cm = Env.context?.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return
-        val cb = object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) { scope.launch { if (started) flushAndRefresh() } }
-        }
-        try { cm.registerDefaultNetworkCallback(cb); netCallback = cb } catch (_: Exception) { }
+        netWatch = watchNetwork { scope.launch { if (started) flushAndRefresh() } }
     }
 
     private fun startStream() {
@@ -355,14 +341,14 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
         val rep = engine.flush()
         if (rep.messages.isNotEmpty()) demo.say(rep.messages.joinToString(" "))
         if (!rep.networkDown) engine.refresh()
-        android.util.Log.i("CoursesData", "flush envoyées=${rep.sent} gardées=${rep.orphaned} réseau=${rep.networkDown} messages=${rep.messages} | à reprendre=${engine.orphans.size} en attente=${engine.pendingOps} liste=${engine.list?.id} en ligne=${engine.online}")
+        logInfo("CoursesData", "flush envoyées=${rep.sent} gardées=${rep.orphaned} réseau=${rep.networkDown} messages=${rep.messages} | à reprendre=${engine.orphans.size} en attente=${engine.pendingOps} liste=${engine.list?.id} en ligne=${engine.online}")
         demo.listLoaded = true
         if (engine.catalogRev != catalogRevLoaded && engine.online) refreshCatalog()
         render(); syncDraft()
         // Les demandes déjà vues À L'ÉCRAN (application au premier plan) ne donnent pas de notification plus tard.
         if (started) engine.list?.let { l ->
-            kv.put(Notifier.seenKey(scopeKey), l.validations.joinToString(",") { it.id })
-            android.util.Log.i("CoursesNotif", "repère mis à jour au premier plan : ${l.validations.size} demande(s) vue(s)")
+            kv.put(NotifyKeys.seenKey(scopeKey), l.validations.joinToString(",") { it.id })
+            logInfo("CoursesNotif", "repère mis à jour au premier plan : ${l.validations.size} demande(s) vue(s)")
         }
     }
 
@@ -370,7 +356,7 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
 
     /** Références proches (catalogue commun) pour une recherche : jamais bloquant, vide hors connexion. */
     suspend fun suggest(q: String): List<Suggestion> {
-        val r = session.api.call("GET", "/api/catalog/suggest?q=" + java.net.URLEncoder.encode(q.trim(), "UTF-8"))
+        val r = session.api.call("GET", "/api/catalog/suggest?q=" + urlEncode(q.trim()))
         if (r !is Outcome.Ok) return emptyList()
         val labels = demo.categoryList.toMap()
         return try {

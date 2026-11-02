@@ -1,11 +1,9 @@
 package app.smartcourse.courses.nativeproto.net
 
-import java.math.BigDecimal
-import java.math.BigInteger
-
 /*
  * Prix indicatifs : calcul décimal exact, port fidèle de server/src/pricing.ts (aucun nombre à virgule flottante dans un montant).
  * Les cas de test sont générés à partir du code TypeScript lui-même (scripts/gen-pricing-vectors.mjs).
+ * Calcul en entiers 64 bits commun à Android et à l'iPhone : chaque produit est vérifié (dépassement = montant non calculé, jamais faux).
  */
 
 data class PriceRef(
@@ -45,17 +43,33 @@ fun parseMilli(v: String): Long? {
 private fun kindOfRef(u: String): String = when (u) { "kg", "g" -> "mass"; "litre", "ml" -> "volume"; else -> "count:$u" }
 private fun kindOfUnit(u: String): String = when (u) { "kg" -> "mass"; "litre" -> "volume"; else -> "count:$u" }
 
-private fun refBase(p: PriceRef): BigInteger? {
+private fun refBase(p: PriceRef): Long? {
     val m = parseMilli(p.refQty) ?: return null
     if (m <= 0) return null
-    if (p.refUnit == "g" || p.refUnit == "ml") return if (m % 1000 == 0L) BigInteger.valueOf(m / 1000) else null
-    return BigInteger.valueOf(m)
+    if (p.refUnit == "g" || p.refUnit == "ml") return if (m % 1000 == 0L) m / 1000 else null
+    return m
 }
 
-private fun half(n: BigInteger, d: BigInteger): Long {
-    val two = BigInteger.TWO
-    return two.multiply(n).add(d).divide(two.multiply(d)).toLong()
+/** Produit exact de nombres positifs ; null au-delà des entiers 64 bits. */
+private fun mul(vararg xs: Long): Long? {
+    var r = 1L
+    for (x in xs) {
+        if (x != 0L && r > Long.MAX_VALUE / x) return null
+        r *= x
+    }
+    return r
 }
+
+/** Arrondi au plus proche, demi vers le haut : (2n + d) / 2d. */
+private fun half(n: Long?, d: Long?): Long? {
+    if (n == null || d == null) return null
+    val num = mul(2, n) ?: return null
+    if (num > Long.MAX_VALUE - d) return null
+    val den = mul(2, d) ?: return null
+    return (num + d) / den
+}
+
+private fun ok(v: Long?): LineAmount = if (v == null) LineAmount.No("incompatible") else LineAmount.Ok(v)
 
 /** Montant d'une ligne en centimes, ou la raison pour laquelle il n'est pas calculé (jamais 0 par défaut). [qty] en unités du serveur (kg, litre, pièces…). */
 fun lineAmount(price: PriceRef?, qty: String, unit: String): LineAmount {
@@ -66,14 +80,11 @@ fun lineAmount(price: PriceRef?, qty: String, unit: String): LineAmount {
     if (cents == null || q == null || q <= 0 || ref == null) return LineAmount.No("incompatible")
     val pk = kindOfRef(price.refUnit)
     val uk = kindOfUnit(unit)
-    val c = BigInteger.valueOf(cents)
-    val bq = BigInteger.valueOf(q)
-    if (pk == uk) return LineAmount.Ok(half(c.multiply(bq), ref))
+    if (pk == uk) return ok(half(mul(cents, q), ref))
     val w = if (price.pieceWeightG.isNullOrEmpty()) null else parseCents(price.pieceWeightG)
     if (w == null || w <= 0) return LineAmount.No("incompatible")
-    val bw = BigInteger.valueOf(w)
-    if (pk == "mass" && unit == "piece") return LineAmount.Ok(half(c.multiply(bq).multiply(bw), ref.multiply(BigInteger.valueOf(100000))))
-    if (price.refUnit == "piece" && unit == "kg") return LineAmount.Ok(half(c.multiply(bq).multiply(BigInteger.valueOf(100)).multiply(BigInteger.valueOf(1000)), bw.multiply(ref)))
+    if (pk == "mass" && unit == "piece") return ok(half(mul(cents, q, w), mul(ref, 100000)))
+    if (price.refUnit == "piece" && unit == "kg") return ok(half(mul(cents, q, 100, 1000), mul(w, ref)))
     return LineAmount.No("incompatible")
 }
 
@@ -98,18 +109,24 @@ fun fmtMoney(cents: Long): String = "${cents / 100},${(cents % 100).toString().p
 private val UNIT_SINGULAR = mapOf("piece" to "pièce", "paquet" to "paquet", "bouteille" to "bouteille", "brique" to "brique", "pot" to "pot", "boite" to "boîte", "botte" to "botte", "rouleau" to "rouleau", "sachet" to "sachet", "cube" to "cube", "kg" to "kg", "litre" to "litre", "g" to "g", "ml" to "ml")
 private val CONTAINER = Regex("^(flacon|bidon|bombe|rouleau|barquette|sachet|petit pain|quantité)\\b", RegexOption.IGNORE_CASE)
 
-private fun numOf(v: String): BigDecimal = BigDecimal(v.trim().replace(",", "."))
-private fun trimNum(v: String): String = numOf(v).stripTrailingZeros().toPlainString().replace('.', ',')
+/** Millièmes → nombre décimal sans zéros inutiles : 1500 → « 1.5 », 1000 → « 1 », 250 → « 0.25 ». */
+fun milliToPlain(m: Long): String {
+    val a = if (m < 0) -m else m
+    val frac = (a % 1000).toString().padStart(3, '0').trimEnd('0')
+    return (if (m < 0) "-" else "") + (a / 1000).toString() + if (frac.isEmpty()) "" else ".$frac"
+}
+
+private fun trimNum(v: String): String = (parseMilli(v)?.let(::milliToPlain) ?: v.trim()).replace('.', ',')
 
 /** « 9,90 DH / kg », « 12,50 DH / 500 g », « 14,00 DH / paquet de 250 g ». */
 fun fmtPrice(p: PriceRef): String {
     val cents = parseCents(p.amount)
     val head = if (cents == null) p.amount else fmtMoney(cents)
-    val q = numOf(p.refQty)
+    val q = parseMilli(p.refQty)
     val u = UNIT_SINGULAR[p.refUnit] ?: p.refUnit
-    val one = q.compareTo(BigDecimal.ONE) == 0
+    val one = q == 1000L
     val metric = p.refUnit == "kg" || p.refUnit == "g" || p.refUnit == "ml" || p.refUnit == "litre"
-    val per = if (one) u else "${trimNum(p.refQty)} ${if (metric) u else if (q > BigDecimal.ONE) pluralOf(u) else u}"
+    val per = if (one) u else "${trimNum(p.refQty)} ${if (metric) u else if (q != null && q > 1000L) pluralOf(u) else u}"
     if (!p.packaging.isNullOrEmpty() && CONTAINER.containsMatchIn(p.packaging)) return "$head / ${p.packaging}"
     val pack = if (!p.packaging.isNullOrEmpty()) (if (p.refUnit in COUNT_UNITS) " de ${p.packaging}" else " (${p.packaging})") else ""
     return "$head / $per$pack"

@@ -28,21 +28,17 @@ import app.smartcourse.courses.nativeproto.net.Failure
 import app.smartcourse.courses.nativeproto.net.Outcome
 import app.smartcourse.courses.nativeproto.net.Session
 import app.smartcourse.courses.nativeproto.net.serverMessage
-import coil.ImageLoader
-import coil.compose.AsyncImage
 
 /** Session réelle quand l'utilisateur est connecté ; null dans les écrans de démonstration (données fictives). */
 val LocalSession = compositionLocalOf<Session?> { null }
-val LocalImageLoader = compositionLocalOf<ImageLoader?> { null }
 
 /** Photo du serveur (avec le cookie de session), mise en cache sur le téléphone. */
 @Composable
 fun RemotePhoto(path: String?, size: Dp, radius: Dp = 10.dp, modifier: Modifier = Modifier) {
     val base = LocalSession.current?.serverAddress
-    val loader = LocalImageLoader.current
     Box(modifier.size(size).clip(RoundedCornerShape(radius)).background(if (path == null) C.TealSoft else Color(0xFFEFF4F8)), contentAlignment = Alignment.Center) {
-        if (path != null && base != null && loader != null) {
-            AsyncImage(model = base + path, imageLoader = loader, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+        if (path != null && base != null) {
+            ServerImage(base + path, ContentScale.Crop, Modifier.fillMaxSize())
         } else if (path == null) NeutralIcon(Modifier.fillMaxSize(0.55f))
     }
 }
@@ -88,13 +84,12 @@ fun ProductPhoto(p: Product, size: Dp, modifier: Modifier = Modifier, radius: Dp
 @Composable
 fun ProductImage(p: Product, modifier: Modifier, contentScale: ContentScale = ContentScale.Crop) {
     if (p.photo != 0) {
-        androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(p.photo), null, modifier, contentScale = contentScale)
+        androidx.compose.foundation.Image(localPainter(p.photo), null, modifier, contentScale = contentScale)
     } else {
         val base = LocalSession.current?.serverAddress
-        val loader = LocalImageLoader.current
         Box(modifier.background(if (p.photoUrl == null) C.TealSoft else Color(0xFFEFF4F8)), contentAlignment = Alignment.Center) {
-            if (p.photoUrl != null && base != null && loader != null) {
-                AsyncImage(model = base + p.photoUrl, imageLoader = loader, contentDescription = null, contentScale = contentScale, modifier = Modifier.fillMaxSize())
+            if (p.photoUrl != null && base != null) {
+                ServerImage(base + p.photoUrl, contentScale, Modifier.fillMaxSize())
             } else if (p.photoUrl == null) NeutralIcon(Modifier.fillMaxSize(0.42f))
         }
     }

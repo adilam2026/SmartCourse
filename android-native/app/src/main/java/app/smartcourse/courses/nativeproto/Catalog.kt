@@ -2,6 +2,7 @@
 
 package app.smartcourse.courses.nativeproto
 
+import kotlin.math.roundToLong
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -172,9 +173,9 @@ internal fun PricePill(text: String?, onClick: () -> Unit) {
 
 @Composable
 private fun PriceEditSheet(p: Product, current: Int?, onDismiss: () -> Unit, onSave: (Int?) -> Unit) {
-    var text by remember { mutableStateOf(current?.let { String.format(java.util.Locale.US, "%d,%02d", it / 100, it % 100) } ?: "") }
+    var text by remember { mutableStateOf(current?.let { centsText(it.toLong()) } ?: "") }
     var why by remember { mutableStateOf(false) }
-    val cents = text.trim().replace(',', '.').toDoubleOrNull()?.takeIf { it > 0 }?.let { Math.round(it * 100).toInt() }
+    val cents = text.trim().replace(',', '.').toDoubleOrNull()?.takeIf { it > 0 }?.let { (it * 100).roundToLong().toInt() }
     AppSheet(onDismiss) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             ProductPhoto(p, 56.dp, radius = 14.dp)

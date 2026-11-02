@@ -192,7 +192,7 @@ private fun PriceSheet(p: CatProduct, onDismiss: () -> Unit, onChanged: () -> Un
             scope.launch {
                 val body = if (!valid || !priceChanged) null else buildJsonObject {
                     put("amount", (cents!! / 100).toString() + "." + (cents % 100).toString().padStart(2, '0'))
-                    put("refQty", java.math.BigDecimal(milli!!).movePointLeft(3).stripTrailingZeros().toPlainString())
+                    put("refQty", app.smartcourse.courses.nativeproto.net.milliToPlain(milli!!.toLong()))
                     put("refUnit", unit)
                     if (kind == UnitKind.COUNT && packaging.isNotBlank()) put("packaging", packaging.trim())
                 }

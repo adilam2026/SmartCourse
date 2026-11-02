@@ -1,7 +1,6 @@
 // Fichier généré par scripts/gen-cities-kt.py depuis server/src/cities.ts : ne pas modifier à la main (un test compare les deux listes).
 package app.smartcourse.courses.nativeproto
 
-import java.text.Normalizer
 
 val CITIES: List<String> = listOf(
     "Agadir",
@@ -153,5 +152,5 @@ val CITIES: List<String> = listOf(
 )
 
 /** Même normalisation que le serveur (flatCity) : sans accents, sans casse, tirets et apostrophes = espaces. */
-fun flatCity(s: String): String = Normalizer.normalize(s, Normalizer.Form.NFD).replace(Regex("\\p{M}"), "").lowercase()
+fun flatCity(s: String): String = stripMarks(s).lowercase()
     .replace(Regex("['’-]"), " ").replace(Regex("\\s+"), " ").trim()

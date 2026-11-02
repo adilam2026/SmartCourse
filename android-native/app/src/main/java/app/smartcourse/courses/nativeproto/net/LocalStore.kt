@@ -1,6 +1,6 @@
 package app.smartcourse.courses.nativeproto.net
 
-import java.io.File
+import kotlin.jvm.Synchronized
 
 /**
  * Stockage local du téléphone (cache hors connexion, brouillons, « Envoi en attente »).
@@ -18,23 +18,4 @@ class MemoryKv : KeyValueStore {
     @Synchronized override fun get(key: String) = m[key]
     @Synchronized override fun put(key: String, value: String) { m[key] = value }
     @Synchronized override fun remove(key: String) { m.remove(key) }
-}
-
-class FileKv(private val dir: File) : KeyValueStore {
-    init { dir.mkdirs() }
-
-    private fun file(key: String) = File(dir, key.map { if (it.isLetterOrDigit() || it == '-' || it == '_') it else '~' }.joinToString("") + ".json")
-
-    @Synchronized override fun get(key: String): String? = try { file(key).takeIf { it.exists() }?.readText() } catch (_: Exception) { null }
-
-    @Synchronized override fun put(key: String, value: String) {
-        try {
-            val f = file(key)
-            val tmp = File(dir, f.name + ".tmp")
-            tmp.writeText(value)
-            if (!tmp.renameTo(f)) { f.delete(); tmp.renameTo(f) }
-        } catch (_: Exception) { /* disque plein : le cache est facultatif, l'action en cours n'est pas bloquée */ }
-    }
-
-    @Synchronized override fun remove(key: String) { try { file(key).delete() } catch (_: Exception) { } }
 }

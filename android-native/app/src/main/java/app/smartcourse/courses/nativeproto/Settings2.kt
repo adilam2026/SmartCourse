@@ -2,13 +2,6 @@
 
 package app.smartcourse.courses.nativeproto
 
-import android.Manifest
-import android.content.Intent
-import android.net.Uri
-import android.os.Build
-import android.provider.Settings
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,7 +21,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -43,8 +35,6 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-import java.time.Duration
-import java.time.Instant
 
 /** Les écrans « Récupération », « Notifications », « Sauvegarde » et « À propos » (démonstration : exemples ; connecté : données réelles). */
 @Composable
@@ -62,7 +52,7 @@ fun StubScreen(title: String, onBack: () -> Unit) {
 }
 
 @Composable
-private fun InfoRow(text: String) {
+internal fun InfoRow(text: String) {
     Row(Modifier.padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Icon(Icons.Rounded.Info, null, tint = C.Muted, modifier = Modifier.size(18.dp))
         Text(text, style = MaterialTheme.typography.bodySmall)
@@ -71,12 +61,12 @@ private fun InfoRow(text: String) {
 
 private fun ago(iso: String?): String? = try {
     if (iso == null) null else {
-        val d = Duration.between(Instant.parse(iso), Instant.now())
+        val d = secondsSince(iso)
         when {
-            d.toMinutes() < 1 -> "à l'instant"
-            d.toMinutes() < 60 -> "il y a ${d.toMinutes()} min"
-            d.toHours() < 48 -> "il y a ${d.toHours()} h"
-            else -> "il y a ${d.toDays()} jours"
+            (d / 60) < 1 -> "à l'instant"
+            (d / 60) < 60 -> "il y a ${(d / 60)} min"
+            (d / 3600) < 48 -> "il y a ${(d / 3600)} h"
+            else -> "il y a ${(d / 86400)} jours"
         }
     }
 } catch (_: Exception) { null }
@@ -170,61 +160,6 @@ fun RecoveryScreen(onBack: () -> Unit) {
     }
 }
 
-/* ───────────── Notifications ───────────── */
-
-@Composable
-fun NotificationsScreen(onBack: () -> Unit) {
-    val demo = LocalDemo.current
-    val data = demo.data
-    val ctx = LocalContext.current
-    val kv = Env.kv
-    val staff = data?.me?.role == "staff"
-    var on by remember { mutableStateOf(if (data != null && kv != null) Notifier.enabled(kv, data.scopeKey) else false) }
-    var allowed by remember { mutableStateOf(Notifier.canPost(ctx)) }
-    fun enable() {
-        if (data == null || kv == null) { on = true; demo.simulated("activation des notifications"); return }
-        kv.put(Notifier.key(data.scopeKey), "on"); Notifier.ensureChannel(ctx); Notifier.schedule(ctx); on = true
-        demo.say("Notifications activées.")
-    }
-    val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
-        allowed = Notifier.canPost(ctx)
-        if (ok) enable() else { on = false; demo.say("Android a refusé les notifications. Vous pouvez les autoriser dans les réglages du téléphone.") }
-    }
-    Column(Modifier.fillMaxSize()) {
-        TopBar("Notifications et rappels", "Réglages propres à ce profil", onBack = onBack)
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            SCard(padding = PaddingValues(vertical = 4.dp)) {
-                val toggle: (Boolean) -> Unit = { want ->
-                    if (!want) {
-                        on = false
-                        if (data != null && kv != null) { kv.remove(Notifier.key(data.scopeKey)); Notifier.cancel(ctx) }
-                        demo.say("Notifications désactivées.")
-                    } else if (Build.VERSION.SDK_INT >= 33 && !Notifier.canPost(ctx)) ask.launch(Manifest.permission.POST_NOTIFICATIONS) else enable()
-                }
-                Row(Modifier.fillMaxWidth().androidx_toggle(on, !staff, toggle).heightIn(min = 56.dp).padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Nouvelles demandes", style = MaterialTheme.typography.titleSmall, color = if (staff) C.Muted else C.Ink)
-                        Text(if (staff) "Réservé aux parents et aux administrateurs." else "Être prévenu quand quelqu'un ajoute des articles à la liste.", style = MaterialTheme.typography.bodySmall)
-                    }
-                    TealSwitch(on, toggle, enabled = !staff)
-                }
-            }
-            if (on && !allowed && !staff) SCard(padding = PaddingValues(16.dp)) {
-                Text("Android bloque les notifications de cette application.", style = MaterialTheme.typography.titleSmall, color = C.Amber)
-                Spacer(Modifier.height(8.dp))
-                SecondaryButton("Ouvrir les réglages du téléphone", {
-                    ctx.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, ctx.packageName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                }, Modifier.fillMaxWidth(), height = 52.dp)
-            }
-            ReminderSettings(allowed) { allowed = Notifier.canPost(ctx) }
-            InfoRow("Les notifications ne sont pas instantanées : l'application vérifie le serveur environ toutes les 15 minutes (Android choisit le moment exact) et à chaque ouverture. Aucun service tiers n'est utilisé.")
-            InfoRow("Une notification n'affiche que le prénom de la personne et le nombre de demandes, jamais le contenu de la liste.")
-            Spacer(Modifier.height(12.dp))
-        }
-    }
-    LaunchedEffect(Unit) { allowed = Notifier.canPost(ctx) }
-}
-
 /* ───────────── Sauvegarde ───────────── */
 
 @Composable
@@ -249,7 +184,7 @@ fun BackupScreen(onBack: () -> Unit) {
                 val last = s["lastBackupAt"]?.jsonPrimitive?.contentOrNull
                 val ver = s["lastVerifiedOkAt"]?.jsonPrimitive?.contentOrNull
                 val failed = s["lastVerifyFailedAt"]?.jsonPrimitive?.contentOrNull
-                val fresh = last != null && try { Duration.between(Instant.parse(last), Instant.now()).toHours() < 36 } catch (_: Exception) { false }
+                val fresh = last != null && try { secondsSince(last) / 3600 < 36 } catch (_: Exception) { false }
                 val healthy = configured && fresh && ver != null && (failed == null || failed < ver)
                 SCard(padding = PaddingValues(16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -276,10 +211,10 @@ fun BackupScreen(onBack: () -> Unit) {
 fun AboutScreen(onBack: () -> Unit) {
     val demo = LocalDemo.current
     val data = demo.data
-    val ctx = LocalContext.current
+    val host = platformHost()
     fun open(path: String) {
         val base = data?.session?.serverAddress ?: run { demo.simulated("ouverture de la page"); return }
-        try { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(base + path)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) { demo.say("Aucun navigateur disponible.") }
+        if (!host.openUrl(base + path)) demo.say("Aucun navigateur disponible.")
     }
     Column(Modifier.fillMaxSize()) {
         TopBar("À propos", onBack = onBack)
@@ -289,7 +224,7 @@ fun AboutScreen(onBack: () -> Unit) {
                 Text("Les courses en famille", style = MaterialTheme.typography.bodySmall)
                 Spacer(Modifier.height(12.dp))
                 AboutLine("Version", BuildConfig.VERSION_NAME)
-                AboutLine("Application", "native (Android)")
+                AboutLine("Application", PLATFORM_LABEL)
                 if (!BuildConfig.FINAL) AboutLine("Serveur", data?.session?.serverAddress?.substringAfter("://") ?: "démonstration")
                 data?.me?.let { AboutLine("Profil", it.displayName + " · " + when (it.role) { "admin" -> "administrateur"; "parent" -> "parent"; else -> "personnel" }) }
             }
@@ -399,75 +334,3 @@ fun ResetFamilySheet(onDismiss: () -> Unit) {
 
 
 /** Rappels d'achat personnels : jours, horaires (ajout, modification, suppression). État réel d'Android affiché. */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun ReminderSettings(allowed: Boolean, refresh: () -> Unit) {
-    val demo = LocalDemo.current
-    val data = demo.data
-    val ctx = LocalContext.current
-    val kv = Env.kv
-    var prefs by remember { mutableStateOf(if (data != null && kv != null) Reminders.load(kv, data.scopeKey) else ReminderPrefs()) }
-    var editing by remember { mutableStateOf<Int?>(null) } // index de l'horaire modifié ; -1 = nouvel horaire
-    fun save(p: ReminderPrefs) {
-        prefs = p
-        if (data != null && kv != null) Reminders.save(ctx, kv, data.scopeKey, p)
-    }
-    val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { refresh() }
-    LaunchedEffect(Unit) { refresh() }
-    Text("Rappels d'achat (pour moi)", style = MaterialTheme.typography.titleSmall, color = C.Muted, modifier = Modifier.padding(start = 4.dp, top = 4.dp))
-    SCard(padding = PaddingValues(vertical = 4.dp)) {
-        val toggle: (Boolean) -> Unit = { want ->
-            save(prefs.copy(enabled = want))
-            if (want && Build.VERSION.SDK_INT >= 33 && !Notifier.canPost(ctx)) ask.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
-        Row(Modifier.fillMaxWidth().androidx_toggle(prefs.enabled, true, toggle).heightIn(min = 56.dp).padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(Modifier.weight(1f)) {
-                Text("Me rappeler les articles restants", style = MaterialTheme.typography.titleSmall)
-                Text("Seulement s'il reste des articles à acheter dans la liste en cours.", style = MaterialTheme.typography.bodySmall)
-            }
-            TealSwitch(prefs.enabled, toggle)
-        }
-        if (prefs.enabled) Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                ReminderPrefs.DAY_LABELS.forEach { (d, l) ->
-                    ToggleChip(l, d in prefs.days) { save(prefs.copy(days = if (d in prefs.days) prefs.days - d else prefs.days + d)) }
-                }
-            }
-            if (prefs.days.isEmpty()) Text("Choisissez au moins un jour.", color = C.Amber, style = MaterialTheme.typography.bodySmall)
-            prefs.times.sorted().forEach { t ->
-                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(C.Bg).padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(t, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                    IconButton({ editing = prefs.times.indexOf(t) }) { Icon(Icons.Rounded.Edit, "Modifier l'horaire $t", tint = C.Ink) }
-                    IconButton({ save(prefs.copy(times = prefs.times - t)) }) { Icon(Icons.Rounded.Delete, "Supprimer l'horaire $t", tint = C.Ink) }
-                }
-            }
-            if (prefs.times.isEmpty()) Text("Ajoutez au moins un horaire.", color = C.Amber, style = MaterialTheme.typography.bodySmall)
-            if (prefs.times.size < 6) SecondaryButton("Ajouter un horaire", { editing = -1 }, Modifier.fillMaxWidth(), leading = Icons.Rounded.Add)
-        }
-    }
-    if (prefs.enabled && !allowed) SCard(padding = PaddingValues(16.dp)) {
-        Text("Rappels enregistrés, mais Android bloque les notifications : vous ne les recevrez pas.", style = MaterialTheme.typography.titleSmall, color = C.Amber)
-        Spacer(Modifier.height(8.dp))
-        SecondaryButton("Ouvrir les réglages du téléphone", {
-            ctx.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, ctx.packageName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-        }, Modifier.fillMaxWidth(), height = 52.dp)
-    }
-    if (prefs.enabled) InfoRow("Heure locale du téléphone. Les rappels peuvent être différés par Android (économie de batterie, mise en veille, mode Ne pas déranger…) : l'heure de réception n'est pas garantie. Un rappel n'affiche jamais de montant.")
-    editing?.let { idx ->
-        val initial = if (idx >= 0) prefs.times.getOrNull(idx)?.let { ReminderPrefs.parseTime(it) } else null
-        val state = rememberTimePickerState(initial?.hour ?: 18, initial?.minute ?: 0, is24Hour = true)
-        AlertDialog(
-            onDismissRequest = { editing = null },
-            confirmButton = { TextButton({
-                val t = String.format(java.util.Locale.US, "%02d:%02d", state.hour, state.minute)
-                val list = prefs.times.toMutableList()
-                if (idx >= 0 && idx < list.size) list[idx] = t else list += t
-                save(prefs.copy(times = list.distinct()))
-                editing = null
-            }) { Text("Enregistrer", color = C.TealDark) } },
-            dismissButton = { TextButton({ editing = null }) { Text("Annuler", color = C.Ink) } },
-            title = { Text(if (idx >= 0) "Modifier l'horaire" else "Nouvel horaire") },
-            text = { TimePicker(state) },
-        )
-    }
-}

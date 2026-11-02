@@ -120,7 +120,7 @@ fun ReorderDestination(nav: (String) -> Unit) {
     val entries = demo.reorderDestination ?: return
     val data = demo.data ?: return
     var naming by remember { mutableStateOf(false) }
-    val defaultName = "Commande du " + java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("d MMMM", java.util.Locale.FRENCH))
+    val defaultName = "Commande du " + formatDate(todayIso(), "d MMMM")
     if (!naming) OpenListsSheet(
         title = "Recommander dans…",
         intro = "Choisissez une liste en cours, ou créez-en une nouvelle. La commande d'origine ne sera pas modifiée.",

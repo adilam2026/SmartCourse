@@ -181,7 +181,7 @@ fun OperationsScreen(onBack: () -> Unit) {
         val q = buildString {
             append("month=$month&type=${listOf("all", "expense", "income")[type]}&scope=${listOf("all", "courses", "hors_courses")[scope]}")
             category?.let { append("&categoryId=${it.id}") }
-            merchant?.let { append("&merchant=${java.net.URLEncoder.encode(it, "UTF-8")}") }
+            merchant?.let { append("&merchant=${urlEncode(it)}") }
         }
         when (val r = Fin.call(data, "GET", "/api/budget/operations?$q", OpsResult.serializer())) { is FinR.Ok -> { res = r.v; error = null }; is FinR.Err -> error = r.message }
     }

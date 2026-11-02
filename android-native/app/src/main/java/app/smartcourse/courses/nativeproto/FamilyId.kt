@@ -42,7 +42,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -73,12 +72,12 @@ object FamilyIdRules {
     fun valid(s: String) = PATTERN.matches(s)
 
     /** Saisie : seuls les caractères permis sont gardés (accents retirés), 30 au plus. */
-    fun clean(s: String): String = java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD).replace(Regex("\\p{M}+"), "")
+    fun clean(s: String): String = stripMarks(s)
         .filter { it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' || it == '_' }.take(30)
 
     /** Proposition d'après le nom affiché (même calcul que le serveur) : « Famille Hélène » → « FamilleHelene ». */
     fun propose(name: String): String {
-        val words = java.text.Normalizer.normalize(name, java.text.Normalizer.Form.NFD).replace(Regex("\\p{M}+"), "")
+        val words = stripMarks(name)
             .split(Regex("[^A-Za-z0-9]+")).filter { it.isNotEmpty() }
         var id = words.joinToString("") { it.first().uppercaseChar() + it.substring(1) }
         if (id.length < 4) id = "Famille$id"
@@ -197,7 +196,7 @@ fun FamilyIdScreen(onBack: () -> Unit) {
     val data = demo.data
     val session = data?.session
     val scope = rememberCoroutineScope()
-    val ctx = LocalContext.current
+    val host = platformHost()
     var loaded by remember { mutableStateOf(false) }
     var loginId by remember { mutableStateOf<String?>(null) }
     var code by remember { mutableStateOf("") }
@@ -241,12 +240,12 @@ fun FamilyIdScreen(onBack: () -> Unit) {
                     Spacer(Modifier.height(12.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         SecondaryButton("Partager", {
-                            if (AccessShare.share(ctx, AccessShare.familyMessage(loginId!!), "Partager l'identifiant famille") == "none") demo.say("Aucune application de partage disponible.")
+                            if (host.share(AccessShare.familyMessage(loginId!!), "Partager l'identifiant famille") == "none") demo.say("Aucune application de partage disponible.")
                         }, Modifier.weight(1f), leading = Icons.Rounded.Share)
                         SecondaryButton("Modifier", { editing = true; value = loginId!! }, Modifier.weight(1f))
                     }
                     Spacer(Modifier.height(6.dp))
-                    SecondaryButton(if (copied) "Copié" else "Copier", { AccessShare.copy(ctx, "Identifiant famille", loginId!!); copied = true }, Modifier.fillMaxWidth(), leading = if (copied) Icons.Rounded.Check else Icons.Rounded.ContentCopy)
+                    SecondaryButton(if (copied) "Copié" else "Copier", { host.copy("Identifiant famille", loginId!!); copied = true }, Modifier.fillMaxWidth(), leading = if (copied) Icons.Rounded.Check else Icons.Rounded.ContentCopy)
                     Spacer(Modifier.height(10.dp))
                     Text("Modifier : même contrôle de disponibilité et même confirmation. L'identifiant remplacé devient un alias permanent : il permet toujours de se connecter et n'est jamais réattribué à une autre famille.", style = MaterialTheme.typography.bodySmall)
                 }

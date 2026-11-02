@@ -32,7 +32,7 @@ private fun pct(done: Int, total: Int) = if (total == 0) 0 else (done * 100) / t
 @Composable
 fun AdminListScreen(nav: (String) -> Unit) {
     val demo = LocalDemo.current
-    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val host = platformHost()
     var editId by remember { mutableStateOf<String?>(null) }
     var menu by remember { mutableStateOf(Launch.once("menu")) }
     var confirmClose by remember { mutableStateOf(Launch.once("confirm")) }
@@ -71,7 +71,7 @@ fun AdminListScreen(nav: (String) -> Unit) {
                     if (canShare) DropdownMenuItem(
                         text = { Text("Partager la liste") },
                         leadingIcon = { Icon(Icons.Rounded.Share, null, tint = C.Ink) },
-                        onClick = { menu = false; if (demo.live) shareList(ctx, demo) else demo.simulated("partage de la liste") },
+                        onClick = { menu = false; if (demo.live) shareList(host, demo) else demo.simulated("partage de la liste") },
                     )
                 }
             }
@@ -96,7 +96,7 @@ fun AdminListScreen(nav: (String) -> Unit) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Pill("estimé", C.Amber, C.AmberSoft)
                         Text(
-                            "≈ ${String.format(java.util.Locale.US, "%d,%02d", cents / 100, cents % 100)} DH" + if (miss > 0) " · $miss sans prix" else "",
+                            "≈ ${centsText(cents.toLong())} DH" + if (miss > 0) " · $miss sans prix" else "",
                             style = MaterialTheme.typography.titleSmall,
                         )
                     }
@@ -347,11 +347,10 @@ private fun StaffCard(l: Line, demo: Demo) {
 }
 
 /** Partage du texte de la liste (messagerie, notes…) : uniquement les articles et quantités. */
-fun shareList(ctx: android.content.Context, demo: Demo) {
+fun shareList(host: PlatformHost, demo: Demo) {
     val text = buildString {
         append("Liste de courses — ${demo.listDate}\n")
         demo.lines.filter { !it.bought }.forEach { l -> demo.lineProduct(l)?.let { p -> append("• ${p.name} : ${qtyText(p, l.qty)}\n") } }
     }
-    val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(android.content.Intent.EXTRA_TEXT, text) }
-    try { ctx.startActivity(android.content.Intent.createChooser(send, "Partager la liste").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) { demo.say("Aucune application de partage disponible.") }
+    if (!host.shareSheet(text, "Partager la liste")) demo.say("Aucune application de partage disponible.")
 }

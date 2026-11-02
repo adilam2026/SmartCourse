@@ -5,8 +5,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
-import java.time.Instant
-import java.util.UUID
 
 /** Ligne affichée : la liste du serveur, plus ce qui attend encore d'être envoyé. */
 data class EffLine(
@@ -32,8 +30,8 @@ class ListEngine(
     private val api: ApiClient,
     private val kv: KeyValueStore,
     private val scope: String,
-    private val now: () -> Instant = { Instant.now() },
-    private val newId: () -> String = { UUID.randomUUID().toString() },
+    private val now: () -> String = { app.smartcourse.courses.nativeproto.nowInstantIso() },
+    private val newId: () -> String = { app.smartcourse.courses.nativeproto.randomUuid() },
 ) {
     var list: ListData? = null; private set
     var outbox: List<Batch> = emptyList(); private set
@@ -153,7 +151,7 @@ class ListEngine(
 
     /* ───── Écriture ───── */
 
-    private fun stamp() = now().toString()
+    private fun stamp() = now()
 
     fun op(type: String, productId: String? = null, itemId: String? = null, purchaseId: String? = null, quantity: Double? = null, baseRev: Int? = null,
            name: String? = null, unit: String? = null, category: String? = null, photoUrl: String? = null) =

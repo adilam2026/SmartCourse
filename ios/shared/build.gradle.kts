@@ -16,9 +16,24 @@ val mesure = project.findProperty("mesure") == "1"
 
 // Fichiers propres à Android, remplacés pour iOS par leur équivalent dans src/iosMain (même nom de classes et de fonctions).
 val androidOnly = listOf(
-    "MainActivity.kt", "Notify.kt", "Reminders.kt", "ShareAccess.kt", "AppUpdate.kt",
-    "net/SessionStorage.kt", "net/LocalStore.kt", "net/Api.kt", "Real.kt",
+    "MainActivity.kt", "Notify.kt", "Reminders.kt", "AppUpdate.kt", "PlatformAndroid.kt", "NotificationsAndroid.kt",
+    "net/HttpAndroid.kt", "net/StorageAndroid.kt",
 )
+
+// Images fournies avec l'application : les fichiers Android (drawable-nodpi), copiés tels quels en ressources Compose.
+val androidImages = tasks.register<Sync>("androidImages") {
+    from(rootDir.resolve("../android-native/app/src/main/res/drawable-nodpi"))
+    into(layout.buildDirectory.dir("androidRes/drawable"))
+}
+
+compose.resources {
+    packageOfResClass = "app.smartcourse.courses.nativeproto.res"
+    publicResClass = false
+    generateResClass = always
+    customDirectory("commonMain", provider { layout.buildDirectory.dir("androidRes").get() })
+}
+tasks.matching { it.name.contains("ComposeResources", ignoreCase = true) || it.name.contains("ResourceAccessors", ignoreCase = true) }
+    .configureEach { dependsOn(androidImages) }
 
 kotlin {
     val xcf = XCFramework("Courses")
@@ -44,15 +59,15 @@ kotlin {
                 implementation("org.jetbrains.androidx.navigation:navigation-compose:2.8.0-alpha10")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
-                implementation("com.ionspin.kotlin:bignum:0.3.10")
                 implementation("io.ktor:ktor-client-core:3.0.3")
+                implementation("androidx.annotation:annotation:1.9.1")
             }
         }
         iosMain {
             if (mesure) kotlin.setSrcDirs(emptyList<String>())
             dependencies {
                 implementation("io.ktor:ktor-client-darwin:3.0.3")
+                implementation("com.liftric:kvault:1.12.0")
             }
         }
     }

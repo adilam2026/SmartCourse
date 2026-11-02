@@ -31,11 +31,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import java.time.LocalDate
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.Locale
-import java.util.UUID
 
 /* ───────────── Modèle (réponses du serveur, montants en unités mineures entières) ───────────── */
 
@@ -115,13 +110,11 @@ fun amountError(s: String, decimals: Int): String? {
 
 fun minorToInput(minor: Long, decimals: Int): String = money(minor, decimals, null).replace(" ", "")
 
-private val DAY_FMT = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.FRENCH)
-private val MONTH_FMT = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.FRENCH)
-fun today(): String = LocalDate.now(ZoneId.systemDefault()).toString()
-fun dayLabel(d: String): String = try { val x = LocalDate.parse(d); if (x == LocalDate.now()) "Aujourd'hui, ${x.format(DateTimeFormatter.ofPattern("d MMMM", Locale.FRENCH))}" else x.format(DAY_FMT) } catch (_: Exception) { d }
-fun shortDay(d: String): String = try { LocalDate.parse(d).format(DateTimeFormatter.ofPattern("d MMM", Locale.FRENCH)) } catch (_: Exception) { d }
-fun monthLabel(m: String): String = try { LocalDate.parse("$m-01").format(MONTH_FMT).replaceFirstChar { it.uppercase() } } catch (_: Exception) { m }
-fun shiftMonth(m: String, by: Long): String = LocalDate.parse("$m-01").plusMonths(by).toString().substring(0, 7)
+fun today(): String = todayIso()
+fun dayLabel(d: String): String = try { if (isToday(d)) "Aujourd'hui, ${formatDate(d, "d MMMM")}" else formatDate(d, "d MMM yyyy") } catch (_: Exception) { d }
+fun shortDay(d: String): String = try { formatDate(d, "d MMM") } catch (_: Exception) { d }
+fun monthLabel(m: String): String = try { formatDate("$m-01", "MMMM yyyy").replaceFirstChar { it.uppercase() } } catch (_: Exception) { m }
+fun shiftMonth(m: String, by: Long): String = plusMonths("$m-01", by).substring(0, 7)
 
 /* ───────────── Appels au serveur ───────────── */
 
@@ -160,7 +153,7 @@ object Fin {
         else -> explain(r)
     }
 
-    fun newRequest(): String = UUID.randomUUID().toString()
+    fun newRequest(): String = randomUuid()
 
     fun paymentBody(requestId: String, merchant: String, amount: String, date: String, note: String) = buildJsonObject {
         put("requestId", requestId); put("merchant", merchant.trim()); put("amount", amount.trim()); put("date", date)
@@ -286,11 +279,11 @@ fun DateRow(label: String, date: String, onClick: () -> Unit) {
 
 @Composable
 fun DatePick(date: String, onPick: (String) -> Unit, onDismiss: () -> Unit) {
-    val init = try { LocalDate.parse(date).atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli() } catch (_: Exception) { null }
+    val init = try { dateToUtcMillis(date) } catch (_: Exception) { null }
     val st = rememberDatePickerState(initialSelectedDateMillis = init)
     DatePickerDialog(
         onDismissRequest = onDismiss,
-        confirmButton = { TextButton({ st.selectedDateMillis?.let { onPick(java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneOffset.UTC).toLocalDate().toString()) } ?: onDismiss() }) { Text("Choisir") } },
+        confirmButton = { TextButton({ st.selectedDateMillis?.let { onPick(utcMillisToDate(it)) } ?: onDismiss() }) { Text("Choisir") } },
         dismissButton = { TextButton(onDismiss) { Text("Annuler") } },
     ) { DatePicker(st) }
 }

@@ -38,12 +38,6 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import java.time.LocalDate
-import java.time.OffsetDateTime
-import java.time.YearMonth
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 /*
  * Statistiques d'achats. Un achat = un article coché « Acheté » (les achats corrigés ne comptent pas). Les quantités gardent l'unité
@@ -66,7 +60,7 @@ private sealed interface StatsView {
 
 private val PERIODS = listOf("Ce mois", "Mois précédent", "3 mois")
 private val PERIOD_NAMES = listOf("Ce mois", "Mois précédent", "3 derniers mois")
-private fun periodQuery(period: Int) = when (period) { 0 -> "period=month"; 1 -> "period=month&month=${YearMonth.now().minusMonths(1)}"; else -> "period=last3" }
+private fun periodQuery(period: Int) = when (period) { 0 -> "period=month"; 1 -> "period=month&month=${shiftMonth(currentMonth(), -1)}"; else -> "period=last3" }
 
 private fun unitsOf(arr: JsonArray?): List<UnitTotal> = arr?.map { it.jsonObject }?.map { u ->
     UnitTotal(u["unit"]?.jsonPrimitive?.contentOrNull, u["purchases"]?.jsonPrimitive?.intOrNull ?: 0, u["quantity"]?.jsonPrimitive?.doubleOrNull, u["unknownQuantity"]?.jsonPrimitive?.intOrNull ?: 0)
@@ -90,11 +84,9 @@ private fun cumulText(units: List<UnitTotal>): String? {
     return if (parts.isEmpty()) null else parts.joinToString(" et ")
 }
 
-private val DAY_FMT = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.FRENCH)
-private val WHEN_FMT = DateTimeFormatter.ofPattern("EEE d MMM yyyy · HH:mm", Locale.FRENCH)
-private fun dayText(day: String?) = try { LocalDate.parse(day).format(DAY_FMT) } catch (_: Exception) { "" }
+private fun dayText(day: String?) = try { formatDate(day!!, "d MMM yyyy") } catch (_: Exception) { "" }
 private fun rangeText(from: String?, to: String?) = if (from == null || to == null) "" else if (from == to) "le ${dayText(from)}" else "du ${dayText(from)} au ${dayText(to)}"
-private fun whenText(iso: String) = try { OffsetDateTime.parse(iso).atZoneSameInstant(ZoneId.systemDefault()).format(WHEN_FMT).replaceFirstChar { it.uppercase() } } catch (_: Exception) { iso }
+private fun whenText(iso: String) = try { formatInstant(iso, "EEE d MMM yyyy · HH:mm").replaceFirstChar { it.uppercase() } } catch (_: Exception) { iso }
 
 private fun failText(r: Outcome.Fail) = when (r.failure) {
     Failure.FORBIDDEN -> "Votre profil n'a pas accès aux statistiques."

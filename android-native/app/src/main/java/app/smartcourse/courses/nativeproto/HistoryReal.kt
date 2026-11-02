@@ -121,7 +121,7 @@ private fun HistoryReal(nav: (String) -> Unit) {
 
     fun load(before: String? = null) {
         scope.launch {
-            when (val r = data.session.api.call("GET", "/api/lists?limit=30" + (before?.let { "&before=" + java.net.URLEncoder.encode(it, "UTF-8") } ?: ""))) {
+            when (val r = data.session.api.call("GET", "/api/lists?limit=30" + (before?.let { "&before=" + urlEncode(it) } ?: ""))) {
                 is Outcome.Ok -> {
                     val page = r.value["lists"]!!.jsonArray.map { parsePast(it.jsonObject) }
                     orders = (if (before == null) emptyList() else orders ?: emptyList()) + page

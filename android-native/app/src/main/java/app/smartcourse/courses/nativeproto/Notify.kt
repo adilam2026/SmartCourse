@@ -40,8 +40,8 @@ object Notifier {
     const val CHANNEL = "demandes"
     private const val WORK = "courses-demandes"
 
-    fun key(scope: String) = "notif|$scope"
-    fun seenKey(scope: String) = "seenval|$scope"
+    fun key(scope: String) = NotifyKeys.key(scope)
+    fun seenKey(scope: String) = NotifyKeys.seenKey(scope)
     fun enabled(kv: KeyValueStore, scope: String) = kv.get(key(scope)) == "on"
 
     fun ensureChannel(ctx: Context) {

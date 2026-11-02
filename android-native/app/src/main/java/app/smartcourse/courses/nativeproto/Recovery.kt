@@ -123,7 +123,7 @@ fun CreateFamilyForm(session: Session) {
     var citySheet by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    var requestId by remember { mutableStateOf(java.util.UUID.randomUUID().toString()) }
+    var requestId by remember { mutableStateOf(randomUuid()) }
     // Étape 2 : demande enregistrée, code envoyé
     var signupId by remember { mutableStateOf<String?>(null) }
     var masked by remember { mutableStateOf("") }
@@ -205,12 +205,12 @@ fun CreateFamilyForm(session: Session) {
                 if (f != null && f.code == "family_id_taken") {
                     // Pris entre la demande et la validation : retour au formulaire, avec de nouvelles propositions.
                     takenNow = (checkFamilyId(session.api, familyId, false) as? FamilyIdStatus.Taken) ?: FamilyIdStatus.Taken(emptyList())
-                    signupId = null; otp = ""; requestId = java.util.UUID.randomUUID().toString()
+                    signupId = null; otp = ""; requestId = randomUuid()
                     error = verifyMessage(f)
                 } else if (f != null) {
                     error = verifyMessage(f)
                     if (f.code == "code_expired" || f.code == "too_many_attempts") needNew = true
-                    if (f.code == "signup_expired" || f.code == "signup_not_found") { signupId = null; requestId = java.util.UUID.randomUUID().toString() }
+                    if (f.code == "signup_expired" || f.code == "signup_not_found") { signupId = null; requestId = randomUuid() }
                 }
                 busy = false
             }
@@ -220,7 +220,7 @@ fun CreateFamilyForm(session: Session) {
         Spacer(Modifier.height(4.dp))
         Text(
             "Modifier mes informations", color = C.TealDark, style = MaterialTheme.typography.labelLarge, textDecoration = TextDecoration.Underline, textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { signupId = null; otp = ""; error = null; requestId = java.util.UUID.randomUUID().toString() }.padding(horizontal = 12.dp, vertical = 14.dp),
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { signupId = null; otp = ""; error = null; requestId = randomUuid() }.padding(horizontal = 12.dp, vertical = 14.dp),
         )
         return
     }
@@ -291,7 +291,7 @@ fun CreateFamilyForm(session: Session) {
                     uncertain = r.value["delivery"]?.jsonPrimitive?.contentOrNull == "uncertain"; needNew = false
                 }
                 is Outcome.Fail -> {
-                    error = startMessage(r); requestId = java.util.UUID.randomUUID().toString()
+                    error = startMessage(r); requestId = randomUuid()
                     if (r.code == "family_id_taken") takenNow = (checkFamilyId(session.api, familyId, false) as? FamilyIdStatus.Taken) ?: FamilyIdStatus.Taken(emptyList())
                 }
             }

@@ -54,7 +54,6 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.stateDescription
@@ -219,7 +218,7 @@ fun SearchBox(value: String, onChange: (String) -> Unit, placeholder: String, mo
 @Composable
 fun Photo(@DrawableRes res: Int, size: Dp, modifier: Modifier = Modifier, radius: Dp = 12.dp) {
     Image(
-        painterResource(res), contentDescription = null,
+        localPainter(res), contentDescription = null,
         modifier = modifier.size(size).clip(RoundedCornerShape(radius)).background(Color(0xFFEFF4F8)),
         contentScale = ContentScale.Crop,
     )
