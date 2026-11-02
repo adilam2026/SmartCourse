@@ -39,7 +39,9 @@ final class ParcoursRecetteTests: XCTestCase {
                 if skip.contains(e.elementType) { return false }
                 return e.label.lowercased() != name.lowercased() || e.frame.height >= 80
             }
-            if let c = cards.min(by: { $0.frame.minY < $1.frame.minY }) { return c }
+            // Une fiche est un bouton (cliquable) ; à défaut, tout élément restant.
+            let buttons = cards.filter { $0.elementType == .button }
+            if let c = (buttons.isEmpty ? cards : buttons).min(by: { $0.frame.minY < $1.frame.minY }) { return c }
             usleep(500_000)
         } while Date() < deadline
         attach("absent-\(name)")
@@ -298,6 +300,23 @@ final class ParcoursRecetteTests: XCTestCase {
         typeKeys(text.lowercased()); sleep(2)
     }
 
+    /// Ajoute l'article à la sélection : touche le « + » (« Ajouter ») de sa fiche, sinon la fiche elle-même, puis vérifie que
+    /// « Terminer ma sélection » devient actif (sélection réellement prise en compte).
+    private func addToSelection(_ name: String, _ card: XCUIElement) {
+        print("Fiche « \(name) » : \(card.label) \(card.frame)")
+        for attempt in 0..<3 {
+            let plus = any("Ajouter").allElementsBoundByIndex.filter { onScreen($0) }
+                .min { abs($0.frame.midY - card.frame.midY) < abs($1.frame.midY - card.frame.midY) }
+            if attempt < 2, let plus { press(plus) } else { press(card) }
+            sleep(2)
+            let done = anyContaining("Terminer ma sélection").allElementsBoundByIndex.filter { $0.frame.height > 0 }
+            if done.contains(where: { $0.isEnabled }) { return }
+        }
+        attach("selection-\(name)-non-prise")
+        print("Arborescence d'accessibilité (sélection \(name)) :\n\(app.debugDescription)")
+        XCTFail("« \(name) » n'a pas pu être ajouté à la sélection")
+    }
+
     /// Touche un bouton par son libellé ; s'il a un cadre d'accessibilité vide, il est repéré à l'image (bandeau turquoise le plus bas).
     private func tapButton(_ label: String) {
         let b = anyContaining(label).allElementsBoundByIndex.filter { $0.frame.height > 0 && onScreen($0) }.last
@@ -341,7 +360,7 @@ final class ParcoursRecetteTests: XCTestCase {
         attach("sens1-iphone-catalogue-oignons")
         XCTAssertTrue(hasPhoto(in: card.frame) || hasPhoto(in: CGRect(x: card.frame.minX, y: card.frame.minY - card.frame.height * 2, width: card.frame.width, height: card.frame.height * 3)),
                       "photo du produit « Oignons » non affichée")
-        press(card); sleep(2)
+        addToSelection("Oignons", card)
         tapButton("Terminer ma sélection")
         attach("sens1-iphone-oignons-envoye")
         XCTAssertFalse(anyContaining("Envoi en attente").firstMatch.exists, "la demande est restée en attente d'envoi")
@@ -362,7 +381,7 @@ final class ParcoursRecetteTests: XCTestCase {
         tapButton("Créer une liste")
         search("Carottes")
         let card = waitCard("Carottes", 20)
-        press(card); sleep(2)
+        addToSelection("Carottes", card)
         tapButton("Terminer ma sélection")
         attach("sens2-iphone-liste-creee")
         var list2 = ""
