@@ -294,6 +294,7 @@ final class ParcoursRecetteTests: XCTestCase {
         let field = anyContaining("Rechercher un produit").firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 20), "champ de recherche absent")
         press(field); sleep(1)
+        clearFocused()   // la recherche précédente reste dans le champ
         typeKeys(text.lowercased()); sleep(2)
     }
 
