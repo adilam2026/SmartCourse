@@ -137,12 +137,23 @@ final class ParcoursRecetteTests: XCTestCase {
                 .sorted { $0.frame.minY < $1.frame.minY }
         }
         XCTAssertGreaterThanOrEqual(champs().count, 3, "champs de connexion : \(champs().count) trouvés")
+        // Comme un utilisateur : toucher le premier champ, taper, puis « Retour » pour passer au champ suivant.
+        press(champs()[0]); sleep(1)
         for (i, texte) in [family, "marie", "573918"].enumerated() {
-            // Clavier fermé avant chaque champ (il recouvrirait les champs du bas), champs recherchés à nouveau.
-            if app.keyboards.firstMatch.exists { press(waitFor("Bienvenue")); sleep(1) }
-            let c = champs()
-            XCTAssertGreaterThan(c.count, i, "champ n° \(i + 1) introuvable")
-            press(c[i]); sleep(1); typeKeys(texte); sleep(1)
+            if i > 0 && !app.keyboards.firstMatch.exists {
+                // Pas de passage automatique au champ suivant : toucher le champ n° i+1.
+                let c = champs()
+                if c.count <= i {
+                    print("Éléments touchables à l'écran :")
+                    for b in app.buttons.allElementsBoundByIndex { print("  « \(b.label) » \(b.frame)") }
+                    attach("champ-absent-\(i + 1)")
+                    XCTFail("champ n° \(i + 1) introuvable"); return
+                }
+                press(c[i]); sleep(1)
+            }
+            typeKeys(texte); sleep(1)
+            if i < 2, let ret = [app.keyboards.buttons["Return"], app.keyboards.buttons["Next"], app.keyboards.buttons["next"], app.keyboards.buttons["Suivant"]].first(where: { $0.exists }) { press(ret); sleep(1) }
+            attach("saisie-\(i + 1)")
         }
         attach("2-connexion-remplie")
         // Le clavier recouvre le bouton du bas : on le ferme (toucher le titre), puis on touche le bouton à son emplacement.
