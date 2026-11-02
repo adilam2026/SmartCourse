@@ -96,9 +96,15 @@ final class ParcoursRecetteTests: XCTestCase {
         waitFor("Bienvenue", 40)
         attach("1-connexion")
         // Comme un utilisateur : toucher le champ (son indication), puis taper au clavier.
-        fill("Identifiant famille", family)
-        fill("Identifiant personnel", "marie")
-        fill("Code d'accès personnel", "573918")
+        // Compose Multiplatform expose chaque champ de saisie comme un élément touchable sans libellé, de la largeur de l'écran :
+        // on les prend dans l'ordre de l'écran (identifiant famille, identifiant personnel, code), comme un utilisateur.
+        let champs = app.buttons.allElementsBoundByIndex
+            .filter { $0.label.isEmpty && $0.frame.height >= 48 && $0.frame.height <= 64 && $0.frame.width > 250 }
+            .sorted { $0.frame.minY < $1.frame.minY }
+        XCTAssertGreaterThanOrEqual(champs.count, 3, "champs de connexion : \(champs.count) trouvés")
+        for (champ, texte) in zip(champs.prefix(3), [family, "marie", "573918"]) {
+            champ.tap(); sleep(1); app.typeText(texte); sleep(1)
+        }
         attach("2-connexion-remplie")
         let buttons = any("Se connecter").allElementsBoundByIndex.filter { $0.isHittable }
         try XCTUnwrap(buttons.last, "bouton « Se connecter » introuvable").tap()
