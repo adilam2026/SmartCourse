@@ -34,6 +34,7 @@ object CoursesIos {
         // Recette seulement : adresse du serveur de recette fournie au lancement par les contrôles automatiques (simulateur).
         else platform.Foundation.NSProcessInfo.processInfo.environment["COURSES_SERVER"]?.let { (it as? String)?.let(::normalizeServer)?.let(s::setServer) }
         s.start()
+        logInfo("CoursesIos", "démarrage ; serveur ${if (s.serverAddress != null) "défini" else "absent"}")
         session = s
         s
     }

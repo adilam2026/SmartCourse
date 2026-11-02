@@ -153,6 +153,7 @@ fun LoginScreen(session: Session?, onSimulated: (Role) -> Unit) {
                 error?.let { Banner(it) }
                 if (error != null || notice != null || farewell != null) Spacer(Modifier.height(10.dp))
                 PrimaryButton(if (busy) "Connexion…" else "Se connecter", {
+                    logInfo("CoursesUi", "connexion demandée")
                     error = null
                     session?.clearNotice()
                     if (session == null) {

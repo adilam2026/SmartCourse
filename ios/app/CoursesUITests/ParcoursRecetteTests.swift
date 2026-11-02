@@ -168,9 +168,13 @@ final class ParcoursRecetteTests: XCTestCase {
         sleep(2) // fin du défilement : un toucher pendant le défilement l'arrête au lieu de valider
         attach("3-avant-connexion")
         let bouton = try XCTUnwrap(buttons.last, "bouton « Se connecter » introuvable à l'écran")
-        press(bouton)
+        if bouton.isHittable { bouton.tap() } else { press(bouton) }
         sleep(3)
-        if any("Bienvenue").firstMatch.exists && !anyContaining("Connexion…").firstMatch.exists && onScreen(bouton) { press(bouton); sleep(3) }
+        attach("4a-apres-premier-toucher")
+        if any("Bienvenue").firstMatch.exists && !anyContaining("Connexion…").firstMatch.exists {
+            print("Boutons « Se connecter » : " + any("Se connecter").allElementsBoundByIndex.map { "\($0.frame) hittable=\($0.isHittable)" }.joined(separator: " ; "))
+            press(bouton); sleep(3)
+        }
         attach("4-apres-connexion")
 
         // 2. Personnel : accueil direct sur « Choisir mes articles », avec le catalogue de la famille
