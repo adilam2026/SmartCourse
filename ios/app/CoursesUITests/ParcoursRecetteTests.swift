@@ -164,17 +164,24 @@ final class ParcoursRecetteTests: XCTestCase {
             if let last = b.last, last.frame.minY > 400 { break }
             app.swipeUp(velocity: .slow); sleep(1)
         }
-        let buttons = any("Se connecter").allElementsBoundByIndex.filter { onScreen($0) }.sorted { $0.frame.minY < $1.frame.minY }
-        sleep(2) // fin du défilement : un toucher pendant le défilement l'arrête au lieu de valider
-        attach("3-avant-connexion")
-        let bouton = try XCTUnwrap(buttons.last, "bouton « Se connecter » introuvable à l'écran")
-        if bouton.isHittable { bouton.tap() } else { press(bouton) }
-        sleep(3)
-        attach("4a-apres-premier-toucher")
-        if any("Bienvenue").firstMatch.exists && !anyContaining("Connexion…").firstMatch.exists {
-            print("Boutons « Se connecter » : " + any("Se connecter").allElementsBoundByIndex.map { "\($0.frame) hittable=\($0.isHittable)" }.joined(separator: " ; "))
-            press(bouton); sleep(3)
+        // Position relevée APRÈS l'arrêt du défilement (relevée pendant, elle est périmée et le toucher tombe à côté).
+        var ok = false
+        for essai in 1...3 {
+            sleep(2)
+            let buttons = any("Se connecter").allElementsBoundByIndex.filter { onScreen($0) }.sorted { $0.frame.minY < $1.frame.minY }
+            let bouton = try XCTUnwrap(buttons.last, "bouton « Se connecter » introuvable à l'écran")
+            print("Essai \(essai) : « Se connecter » à \(bouton.frame)")
+            attach("3-avant-connexion-\(essai)")
+            press(bouton)
+            // Le toucher a pris si : « Connexion… », un message, ou l'écran suivant.
+            for _ in 0..<8 {
+                if anyContaining("Connexion…").firstMatch.exists || anyContaining("Choisir mes articles").firstMatch.exists
+                    || anyContaining("Renseignez").firstMatch.exists || anyContaining("incorrect").firstMatch.exists { ok = true; break }
+                usleep(500_000)
+            }
+            if ok { break }
         }
+        XCTAssertTrue(ok, "le toucher sur « Se connecter » n'a rien déclenché (3 essais)")
         attach("4-apres-connexion")
 
         // 2. Personnel : accueil direct sur « Choisir mes articles », avec le catalogue de la famille
