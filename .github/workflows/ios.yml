@@ -85,7 +85,7 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
-          script: bash scripts/ios-sync-android.sh dist/recette.apk ${{ env.FAMILY_CODE }} ios-sync-android Oignons 50
+          script: bash scripts/ios-sync-android.sh dist/recette.apk ${{ env.FAMILY_CODE }} ios-sync-android 60
       - uses: actions/upload-artifact@v4
         if: always()
         with: { name: ios-sync-android, path: ios-sync-android/ }
