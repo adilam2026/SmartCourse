@@ -145,6 +145,12 @@ jobs:
           [ -n "$D" ] || { echo "::error::serveur de recette non publié"; exit 1; }
           echo "COURSES_SERVER=${D% *}" >> "$GITHUB_ENV"; echo "COURSES_FAMILY=${D#* }" >> "$GITHUB_ENV"
           echo "Serveur de recette : ${D% *}"
+          # Flux en direct (SSE) au travers du tunnel, vu depuis cette machine : chaque événement doit arriver tout de suite.
+          U=${D% *}; J=$(mktemp)
+          curl -fsS -c "$J" -H 'Content-Type: application/json' -d "{\"familyCode\":\"${D#* }\",\"login\":\"marie\",\"code\":\"573918\"}" "$U/api/auth/login" >/dev/null \
+            && { timeout 40 curl -sN -b "$J" -H 'Accept: text/event-stream' "$U/api/events" | while IFS= read -r l; do case "$l" in event:*) echo "$(date -u +%T) $l";; esac; done; echo "fin de la sonde du flux"; } \
+            || echo "sonde du flux : connexion impossible"
+          rm -f "$J"
       - name: Parcours iPhone croisé avec Android (sens 1 puis sens 2)
         working-directory: ios/app
         env:
@@ -176,7 +182,7 @@ jobs:
           echo "── Arborescence de l'application vue par le test"
           for f in ios/captures/*.txt; do grep -l "Application" "$f" >/dev/null 2>&1 && { head -60 "$f"; break; }; done
           echo "── Messages de l'application sur le simulateur (10 dernières minutes)"
-          xcrun simctl spawn "$SIM" log show --last 15m --style compact --predicate 'process == "Courses"' 2>/dev/null | grep -E "\[Courses|error|Error|failed" | grep -v "xctest" | tail -80 || true
+          xcrun simctl spawn "$SIM" log show --last 90m --style compact --predicate 'process == "Courses"' 2>/dev/null | grep -E "\[Courses|error|Error|failed" | grep -v "xctest" | tail -80 || true
           xcrun simctl list devices booted | head -5
           ls ~/Library/Logs/DiagnosticReports 2>/dev/null | grep -i courses | head; for f in ~/Library/Logs/DiagnosticReports/Courses*; do [ -f "$f" ] && head -60 "$f"; done
       - uses: actions/upload-artifact@v4

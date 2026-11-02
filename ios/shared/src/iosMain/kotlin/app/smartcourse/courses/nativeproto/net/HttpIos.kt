@@ -1,5 +1,6 @@
 package app.smartcourse.courses.nativeproto.net
 
+import app.smartcourse.courses.nativeproto.logInfo
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.darwin.Darwin
 import io.ktor.client.engine.darwin.DarwinHttpRequestException
@@ -96,13 +97,20 @@ class IosTransport : HttpTransport {
                 headers { headers.forEach { (k, v) -> append(k, v) } }
                 timeout { socketTimeoutMillis = 70_000; requestTimeoutMillis = Long.MAX_VALUE }
             }.execute { r ->
+                logInfo("CoursesFlux", "flux ouvert : ${r.status.value}")
                 if (!onStatus(r.status.value)) return@execute
                 val ch = r.bodyAsChannel()
-                while (true) onLine(ch.readUTF8Line() ?: break)
+                while (true) {
+                    val line = ch.readUTF8Line() ?: break
+                    if (line.startsWith("event:")) logInfo("CoursesFlux", "événement reçu : ${line.substring(6).trim()}")
+                    onLine(line)
+                }
+                logInfo("CoursesFlux", "flux fermé par le serveur")
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
+            logInfo("CoursesFlux", "flux interrompu : ${e::class.simpleName} ${e.message}")
             throw TransportException(map(e))
         }
     }
