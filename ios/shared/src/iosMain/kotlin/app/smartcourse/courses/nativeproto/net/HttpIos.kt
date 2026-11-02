@@ -74,15 +74,18 @@ class IosTransport : HttpTransport {
         values.flatMap { it.split(Regex(",(?=\\s*[A-Za-z0-9_\\-]+=)")).map(String::trim) }
 
     override suspend fun send(method: String, url: String, headers: Map<String, String>, body: String?): HttpResponse = try {
+        app.smartcourse.courses.nativeproto.logInfo("CoursesHttp", "$method ${url.substringBefore('?')}")
         val r = client.request(url) {
             this.method = HttpMethod.parse(method)
             headers { headers.forEach { (k, v) -> append(k, v) } }
             if (body != null) { contentType(ContentType.Application.Json.withParameter("charset", "utf-8")); setBody(body) }
         }
+        app.smartcourse.courses.nativeproto.logInfo("CoursesHttp", "$method ${url.substringBefore('?')} -> ${r.status.value}")
         HttpResponse(r.status.value, r.bodyAsText(), splitCookies(r.headers.getAll("Set-Cookie") ?: emptyList()))
     } catch (e: CancellationException) {
         throw e
     } catch (e: Throwable) {
+        app.smartcourse.courses.nativeproto.logInfo("CoursesHttp", "$method ${url.substringBefore('?')} échec : ${e::class.simpleName} ${e.message?.take(160)}")
         throw TransportException(map(e))
     }
 
