@@ -56,6 +56,24 @@ final class ParcoursRecetteTests: XCTestCase {
         field.typeText(text)
     }
 
+    /// Saisie touche par touche sur le clavier iOS (Compose ne déclare pas le focus clavier au test : typeText est refusé).
+    /// Minuscules et chiffres : le serveur compare le code famille sans tenir compte des majuscules.
+    private func typeKeys(_ text: String) {
+        let kb = app.keyboards.firstMatch
+        if !kb.waitForExistence(timeout: 8) { attach("clavier-absent"); XCTFail("clavier absent après avoir touché le champ"); return }
+        for ch in text.lowercased() {
+            let s = String(ch)
+            var tries = 0
+            while !kb.keys[s].exists && tries < 4 {
+                tries += 1
+                if kb.keys[s.uppercased()].exists, let shift = [kb.buttons["shift"], kb.keys["shift"]].first(where: { $0.exists }) { shift.tap(); continue }
+                if let more = [kb.keys["more"], kb.buttons["more"], kb.keys["numbers"], kb.keys["letters"]].first(where: { $0.exists }) { more.tap() }
+            }
+            if !kb.keys[s].exists { attach("touche-absente-\(s)"); XCTFail("touche « \(s) » introuvable sur le clavier"); return }
+            kb.keys[s].tap()
+        }
+    }
+
     private func fill(_ hint: String, _ text: String) {
         let e = waitFor(hint, 15)
         e.tap()
@@ -103,7 +121,7 @@ final class ParcoursRecetteTests: XCTestCase {
             .sorted { $0.frame.minY < $1.frame.minY }
         XCTAssertGreaterThanOrEqual(champs.count, 3, "champs de connexion : \(champs.count) trouvés")
         for (champ, texte) in zip(champs.prefix(3), [family, "marie", "573918"]) {
-            champ.tap(); sleep(1); app.typeText(texte); sleep(1)
+            champ.tap(); sleep(1); typeKeys(texte); sleep(1)
         }
         attach("2-connexion-remplie")
         let buttons = any("Se connecter").allElementsBoundByIndex.filter { $0.isHittable }
