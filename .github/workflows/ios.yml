@@ -115,6 +115,10 @@ jobs:
         run: |
           UDID=$(xcrun simctl list devices available -j | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; c=[(k,x) for k,v in d.items() if 'iOS-18' in k for x in v if x['name'].startswith('iPhone')]; c.sort(key=lambda t:t[0]); print(c[-1][1]['udid'])")
           echo "SIM=$UDID" >> "$GITHUB_ENV"; xcrun simctl list devices available | grep "$UDID"
+          # Simulateur neuf : sans l'écran d'introduction du clavier (« Speed up your typing… »), qui recouvre les touches.
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl spawn "$UDID" defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true
+          xcrun simctl spawn "$UDID" defaults write com.apple.keyboard.preferences DidShowGestureKeyboardIntroduction -bool true
       - name: Compilation de l'application iPhone et de ses contrôles (simulateur)
         working-directory: ios/app
         run: |

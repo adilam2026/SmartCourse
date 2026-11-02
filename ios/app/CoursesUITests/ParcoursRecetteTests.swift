@@ -61,6 +61,9 @@ final class ParcoursRecetteTests: XCTestCase {
     private func typeKeys(_ text: String) {
         let kb = app.keyboards.firstMatch
         if !kb.waitForExistence(timeout: 8) { attach("clavier-absent"); XCTFail("clavier absent après avoir touché le champ"); return }
+        // Introduction du clavier iOS (première utilisation) : la fermer
+        let intro = app.buttons["Continue"]
+        if intro.waitForExistence(timeout: 1) { press(intro); sleep(1) }
         for ch in text.lowercased() {
             let s = String(ch)
             var tries = 0
