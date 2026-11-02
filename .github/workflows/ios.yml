@@ -147,7 +147,7 @@ jobs:
           echo "Serveur de recette : ${D% *}"
           # Flux en direct (SSE) au travers du tunnel, vu depuis cette machine : chaque événement doit arriver tout de suite.
           U=${D% *}; J=$(mktemp)
-          curl -fsS -c "$J" -H 'Content-Type: application/json' -d "{\"familyCode\":\"${D#* }\",\"login\":\"marie\",\"code\":\"573918\"}" "$U/api/auth/login" >/dev/null \
+          curl -fsS -c "$J" -H 'Content-Type: application/json' -d "{\"familyCode\":\"${D#* }\",\"login\":\"marie\",\"secret\":\"573918\"}" "$U/api/auth/login" >/dev/null \
             && { timeout 40 curl -sN -b "$J" -H 'Accept: text/event-stream' "$U/api/events" | while IFS= read -r l; do case "$l" in event:*) echo "$(date -u +%T) $l";; esac; done; echo "fin de la sonde du flux"; } \
             || echo "sonde du flux : connexion impossible"
           rm -f "$J"
