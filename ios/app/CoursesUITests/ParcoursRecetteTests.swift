@@ -104,8 +104,9 @@ final class ParcoursRecetteTests: XCTestCase {
         let x = cg.width / 2
         func teal(_ y: Int) -> Bool {
             let o = y * bpr + x * bpp
-            let b = Int(p[o]), g = Int(p[o + 1]), r = Int(p[o + 2])   // BGRA
-            return g > 120 && b > 110 && r < 90 && g - r > 60
+            // Turquoise (≈ 20, 184, 166) quel que soit l'ordre des canaux (RGBA ou BGRA) : vert fort, un canal fort, un canal faible.
+            let c0 = Int(p[o]), g = Int(p[o + 1]), c2 = Int(p[o + 2])
+            return g > 120 && max(c0, c2) > 110 && min(c0, c2) < 90 && g - min(c0, c2) > 60
         }
         var bands: [(Int, Int)] = [], start: Int? = nil
         for y in 0..<cg.height {
