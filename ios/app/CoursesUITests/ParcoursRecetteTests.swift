@@ -66,12 +66,18 @@ final class ParcoursRecetteTests: XCTestCase {
             var tries = 0
             while !kb.keys[s].exists && tries < 4 {
                 tries += 1
-                if kb.keys[s.uppercased()].exists, let shift = [kb.buttons["shift"], kb.keys["shift"]].first(where: { $0.exists }) { shift.tap(); continue }
-                if let more = [kb.keys["more"], kb.buttons["more"], kb.keys["numbers"], kb.keys["letters"]].first(where: { $0.exists }) { more.tap() }
+                if kb.keys[s.uppercased()].exists, let shift = [kb.buttons["shift"], kb.keys["shift"]].first(where: { $0.exists }) { press(shift); continue }
+                if let more = [kb.keys["more"], kb.buttons["more"], kb.keys["numbers"], kb.keys["letters"]].first(where: { $0.exists }) { press(more) }
             }
             if !kb.keys[s].exists { attach("touche-absente-\(s)"); XCTFail("touche « \(s) » introuvable sur le clavier"); return }
-            kb.keys[s].tap()
+            press(kb.keys[s])
         }
+    }
+
+    /// Toucher à l'emplacement de l'élément (comme un doigt), sans action d'accessibilité préalable.
+    private func press(_ e: XCUIElement) {
+        e.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        usleep(250_000)
     }
 
     private func fill(_ hint: String, _ text: String) {
