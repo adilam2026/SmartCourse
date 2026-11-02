@@ -159,17 +159,16 @@ final class ParcoursRecetteTests: XCTestCase {
         // Le clavier recouvre le bas de l'écran : le fermer (toucher le titre), faire défiler, puis toucher « Se connecter ».
         press(waitFor("Bienvenue"))
         sleep(1)
-        for _ in 0..<4 {
-            let b = any("Se connecter").allElementsBoundByIndex.filter { onScreen($0) }.sorted { $0.frame.minY < $1.frame.minY }
-            if let last = b.last, last.frame.minY > 400 { break }
-            app.swipeUp(velocity: .slow); sleep(1)
+        // Deux éléments s'appellent « Se connecter » : l'onglet en haut (demi-largeur) et le bouton du bas (pleine largeur).
+        func boutonConnexion() -> XCUIElement? {
+            any("Se connecter").allElementsBoundByIndex.filter { onScreen($0) && $0.frame.width > 250 }.first
         }
+        for _ in 0..<4 where boutonConnexion() == nil { app.swipeUp(velocity: .slow); sleep(2) }
         // Position relevée APRÈS l'arrêt du défilement (relevée pendant, elle est périmée et le toucher tombe à côté).
         var ok = false
         for essai in 1...3 {
             sleep(2)
-            let buttons = any("Se connecter").allElementsBoundByIndex.filter { onScreen($0) }.sorted { $0.frame.minY < $1.frame.minY }
-            let bouton = try XCTUnwrap(buttons.last, "bouton « Se connecter » introuvable à l'écran")
+            let bouton = try XCTUnwrap(boutonConnexion(), "bouton « Se connecter » (pleine largeur) introuvable à l'écran")
             print("Essai \(essai) : « Se connecter » à \(bouton.frame)")
             attach("3-avant-connexion-\(essai)")
             press(bouton)

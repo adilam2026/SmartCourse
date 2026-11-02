@@ -29,6 +29,9 @@ object CoursesIos {
         val dir = (NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, true).first() as String) + "/store"
         Env.kv = FileKv(dir)
         val storage = KeychainStorage()
+        // Recette seulement : contrôles automatiques qui changent de profil (même compte, même serveur) : session locale effacée au
+        // lancement, comme « Effacer les données » sur Android. Les données restent sur le serveur commun.
+        if (!BuildConfig.FINAL && platform.Foundation.NSProcessInfo.processInfo.environment["COURSES_RESET"] == "1") storage.clearSession()
         val s = Session(storage, ApiClient(storage), scope)
         if (BuildConfig.FINAL) s.setServer(BuildConfig.SERVER_URL)
         // Recette seulement : adresse du serveur de recette fournie au lancement par les contrôles automatiques (simulateur).
