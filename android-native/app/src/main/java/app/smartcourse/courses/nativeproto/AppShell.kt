@@ -57,10 +57,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import app.smartcourse.courses.nativeproto.net.ApiClient
-import app.smartcourse.courses.nativeproto.net.imageClient
 import app.smartcourse.courses.nativeproto.net.AuthState
-import app.smartcourse.courses.nativeproto.net.EncryptedStorage
-import app.smartcourse.courses.nativeproto.net.FileKv
 import app.smartcourse.courses.nativeproto.net.Me
 import app.smartcourse.courses.nativeproto.net.Outcome
 import app.smartcourse.courses.nativeproto.net.ProfilesRepo

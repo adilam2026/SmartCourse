@@ -47,8 +47,6 @@ kotlin {
 
     sourceSets {
         commonMain {
-            kotlin.srcDir(androidSources)
-            if (!mesure) kotlin.exclude(androidOnly.map { "app/smartcourse/courses/nativeproto/$it" })
             dependencies {
                 implementation(compose.runtime)
                 implementation(compose.foundation)
@@ -63,8 +61,13 @@ kotlin {
                 implementation("androidx.annotation:annotation:1.9.1")
             }
         }
+        // Sources Android dans la partie iPhone (pas dans « commonMain ») : en Kotlin 2, le code commun ne voit pas les déclarations
+        // propres à une plateforme ; ici une seule plateforme est compilée, ce qui évite d'imposer expect/actual à Android.
         iosMain {
-            if (mesure) kotlin.setSrcDirs(emptyList<String>())
+            if (mesure) kotlin.setSrcDirs(listOf(androidSources)) else {
+                kotlin.srcDir(androidSources)
+                kotlin.exclude(androidOnly.map { "app/smartcourse/courses/nativeproto/$it" })
+            }
             dependencies {
                 implementation("io.ktor:ktor-client-darwin:3.0.3")
                 implementation("com.liftric:kvault:1.12.0")

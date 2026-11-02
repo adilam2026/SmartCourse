@@ -45,3 +45,104 @@ jobs:
           set -o pipefail
           ./gradlew --no-daemon :shared:linkDebugFrameworkIosSimulatorArm64 2>&1 | tee ../ios-build.log || {
             echo "::error::Compilation iOS en échec"; grep -E '^e: ' ../ios-build.log | sed -E 's#file://[^ ]*/(nativeproto|ios/shared)/#\1/#' | head -150; exit 1; }
+
+  # ───── Parcours de l'étape 1 (sur demande : « [parcours] » dans le message de commit, ou lancement manuel) ─────
+  # Linux : serveur de recette jetable (données fictives) + tunnel HTTPS temporaire + application Android (émulateur).
+  # Mac : application iPhone (simulateur) sur le MÊME serveur, par le tunnel. Les deux se retrouvent par un statut du commit.
+  recette-android:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[parcours]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 80
+    permissions: { contents: read, statuses: write }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4
+      - name: APK de recette Android (mêmes sources que l'iPhone)
+        working-directory: android-native
+        run: ./gradlew --no-daemon assembleRelease -PversionCode=1 -PversionName=ios-parcours && mkdir -p ../dist && cp app/build/outputs/apk/release/*.apk ../dist/recette.apk
+      - name: Serveur de recette jetable + tunnel ; adresse publiée pour le Mac
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          scripts/recette-locale.sh | tee /tmp/recette.out
+          URL=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' /tmp/recette.out | head -1)
+          CODE=$(grep -oE 'Code famille : [A-Z0-9]+' /tmp/recette.out | awk '{print $4}')
+          echo "FAMILY_CODE=$CODE" >> "$GITHUB_ENV"
+          curl -fsS -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/statuses/${{ github.sha }}" \
+            -d "{\"state\":\"pending\",\"context\":\"ios-recette\",\"description\":\"$URL $CODE\"}" >/dev/null
+      - name: KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - name: Android connecté ; attend l'ajout fait sur l'iPhone et le vérifie à l'écran
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
+          script: bash scripts/ios-sync-android.sh dist/recette.apk ${{ env.FAMILY_CODE }} ios-sync-android Oignons 50
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: ios-sync-android, path: ios-sync-android/ }
+      - if: always()
+        run: scripts/recette-locale.sh --stop
+
+  parcours-iphone:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[parcours]')
+    runs-on: macos-15
+    timeout-minutes: 80
+    permissions: { contents: read, statuses: read }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ~/.konan
+          key: ios-gradle-${{ hashFiles('ios/**/*.kts', 'ios/gradle/wrapper/gradle-wrapper.properties') }}
+      - name: Projet Xcode (XcodeGen)
+        working-directory: ios/app
+        run: brew install xcodegen >/dev/null && xcodegen generate
+      - name: Compilation de l'application iPhone et de ses contrôles (simulateur)
+        working-directory: ios/app
+        run: |
+          set -o pipefail
+          xcodebuild build-for-testing -project Courses.xcodeproj -scheme Courses -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -derivedDataPath ../build/dd CODE_SIGNING_ALLOWED=NO 2>&1 | tee ../xcodebuild.log | grep -E "error:|warning: .*Courses|BUILD|\*\*" | head -80
+      - name: Attente du serveur de recette (adresse publiée par la tâche Linux)
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          for _ in $(seq 1 120); do
+            D=$(curl -fsS -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/${{ github.repository }}/commits/${{ github.sha }}/statuses" | jq -r '[.[]|select(.context=="ios-recette")][0].description // empty')
+            [ -n "$D" ] && break; sleep 20
+          done
+          [ -n "$D" ] || { echo "::error::serveur de recette non publié"; exit 1; }
+          echo "COURSES_SERVER=${D% *}" >> "$GITHUB_ENV"; echo "COURSES_FAMILY=${D#* }" >> "$GITHUB_ENV"
+          echo "Serveur de recette : ${D% *}"
+      - name: Parcours iPhone (connexion, catalogue et photos, ajout d'un produit)
+        working-directory: ios/app
+        env:
+          TEST_RUNNER_COURSES_SERVER: ${{ env.COURSES_SERVER }}
+          TEST_RUNNER_COURSES_FAMILY: ${{ env.COURSES_FAMILY }}
+          TEST_RUNNER_COURSES_PRODUCT: Oignons
+        run: |
+          set -o pipefail
+          xcodebuild test-without-building -project Courses.xcodeproj -scheme Courses -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -derivedDataPath ../build/dd -resultBundlePath ../parcours.xcresult 2>&1 | tee ../xctest.log | grep -E "Test Case|error|XCTAssert|failed|passed|Arborescence" | head -120
+      - name: Captures d'écran du parcours
+        if: always()
+        run: |
+          mkdir -p ios/captures
+          xcrun xcresulttool export attachments --path ios/parcours.xcresult --output-path ios/captures 2>/dev/null || true
+          ls -la ios/captures | head -30
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: parcours-iphone, path: "ios/captures/\nios/xctest.log\nios/xcodebuild.log" }
