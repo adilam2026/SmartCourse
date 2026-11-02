@@ -132,6 +132,12 @@ class Session(val storage: SessionStorage, val api: ApiClient, private val scope
         state = AuthState.SignedOut
     }
 
+    /**
+     * Ce que la plateforme doit retirer du serveur avec la session qui se termine, juste avant sa révocation (iPhone : l'appareil
+     * enregistré pour les notifications APNs). Aucun sur Android. Rejoué avec la révocation si le réseau manquait.
+     */
+    var beforeRevoke: (suspend (server: String, cookie: String) -> Unit)? = null
+
     /** Déconnexion : l'application se ferme tout de suite ; la révocation côté serveur est tentée, puis rejouée si le réseau manque. */
     fun signOut() {
         val server = storage.server
@@ -142,6 +148,7 @@ class Session(val storage: SessionStorage, val api: ApiClient, private val scope
         state = AuthState.SignedOut
         if (server != null && cookie != null) {
             scope.launch {
+                beforeRevoke?.invoke(server, cookie)
                 if (api.logout(server, cookie) is Outcome.Fail) storage.pendingRevoke = "$server|$cookie"
             }
         }
@@ -150,7 +157,7 @@ class Session(val storage: SessionStorage, val api: ApiClient, private val scope
     private fun retryPendingRevoke() {
         val p = storage.pendingRevoke ?: return
         val server = p.substringBefore('|'); val cookie = p.substringAfter('|')
-        scope.launch { if (api.logout(server, cookie) is Outcome.Ok) storage.pendingRevoke = null }
+        scope.launch { beforeRevoke?.invoke(server, cookie); if (api.logout(server, cookie) is Outcome.Ok) storage.pendingRevoke = null }
     }
 
     fun clearNotice() { notice = null; farewell = null }

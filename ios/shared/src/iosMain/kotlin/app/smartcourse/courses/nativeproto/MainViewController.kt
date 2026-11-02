@@ -24,6 +24,8 @@ import platform.UIKit.UIViewController
 object CoursesIos {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var session: Session? = null
+    /** Session de l'application (notifications, rappels). */
+    val current: Session? get() = session
 
     private fun boot(): Session = session ?: run {
         val dir = (NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, true).first() as String) + "/store"
@@ -39,6 +41,7 @@ object CoursesIos {
         if (BuildConfig.FINAL) s.setServer(BuildConfig.SERVER_URL)
         // Recette seulement : adresse du serveur de recette fournie au lancement par les contrôles automatiques (simulateur).
         else platform.Foundation.NSProcessInfo.processInfo.environment["COURSES_SERVER"]?.let { (it as? String)?.let(::normalizeServer)?.let(s::setServer) }
+        s.beforeRevoke = { server, cookie -> NotifIos.forget(server, cookie) }   // déconnexion : cet iPhone ne reçoit plus rien
         s.start()
         logInfo("CoursesIos", "démarrage ; serveur ${if (s.serverAddress != null) "défini" else "absent"}")
         session = s
@@ -46,10 +49,13 @@ object CoursesIos {
     }
 
     /** Application au premier plan (ouverture ou retour) : session vérifiée, flux en direct rouvert. */
-    fun onForeground() { session?.verify(); LiveHolder.current?.onForeground() }
+    fun onForeground() { session?.verify(); LiveHolder.current?.onForeground(); NotifIos.refreshStatus { NotifIos.syncRegistration() } }
 
     /** Application en arrière-plan : flux en direct fermé (comme onStop sur Android). */
-    fun onBackground() { LiveHolder.current?.onBackground() }
+    fun onBackground() { LiveHolder.current?.onBackground(); NotifIos.scheduleReminders() }
+
+    /** Jeton APNs reçu d'Apple (AppDelegate Swift), en hexadécimal. */
+    fun onApnsToken(hex: String) = NotifIos.onToken(hex)
 
     fun viewController(): UIViewController {
         val s = boot()

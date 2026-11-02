@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Db } from "./db.js";
 import type { Guard } from "./guard.js";
 import type { PushService } from "./push.js";
+import { apnsEndpoint } from "./apns.js";
 
 const b64url = z.string().regex(/^[A-Za-z0-9_-]+={0,2}$/).min(8).max(256);
 const subscription = z.object({
@@ -51,6 +52,41 @@ export function pushRoutes(app: FastifyInstance, { db, guard, push }: { db: Db; 
     await db.query("DELETE FROM push_subscriptions WHERE endpoint = $1 AND profile_id <> $2", [endpoint, a.profileId]);
     if (a.role === "staff") await db.query("DELETE FROM push_subscriptions WHERE endpoint = $1", [endpoint]);
     const mine = (await db.query("SELECT 1 FROM push_subscriptions WHERE endpoint = $1 AND profile_id = $2", [endpoint, a.profileId])).rows.length > 0;
+    return { registered: mine };
+  });
+
+  // iPhone (APNs) : l'application envoie le jeton que l'iPhone a reçu d'Apple. Mêmes règles que pour un navigateur : un appareil
+  // appartient à un seul profil à la fois, jamais au personnel, au plus MAX_DEVICES par profil.
+  const apnsToken = z.string().regex(/^[0-9a-fA-F]{64,200}$/);
+  const apnsBody = z.object({ token: apnsToken, environment: z.enum(["sandbox", "production"]) });
+  app.post("/api/push/apns", { preHandler: guard("history.read") }, async (req, reply) => {
+    const a = req.auth!;
+    const b = apnsBody.parse(req.body);
+    const endpoint = apnsEndpoint(b.environment, b.token);
+    await db.query(
+      `INSERT INTO push_subscriptions (family_id, profile_id, endpoint, p256dh, auth, user_agent) VALUES ($1,$2,$3,'','','iPhone')
+       ON CONFLICT (endpoint) DO UPDATE SET family_id = EXCLUDED.family_id, profile_id = EXCLUDED.profile_id, failures = 0`,
+      [a.familyId, a.profileId, endpoint],
+    );
+    await db.query(
+      `DELETE FROM push_subscriptions WHERE id IN (
+         SELECT id FROM push_subscriptions WHERE profile_id = $1 ORDER BY created_at DESC OFFSET $2)`,
+      [a.profileId, MAX_DEVICES],
+    );
+    return reply.code(201).send({ ok: true });
+  });
+  const endpoints = (token: string) => [apnsEndpoint("sandbox", token), apnsEndpoint("production", token)];
+  app.delete("/api/push/apns", { preHandler: guard() }, async (req) => {
+    const { token } = z.object({ token: apnsToken }).parse(req.body);
+    const r = await db.query("DELETE FROM push_subscriptions WHERE endpoint = ANY($1) AND profile_id = $2", [endpoints(token), req.auth!.profileId]);
+    return { removed: r.rowCount ?? 0 };
+  });
+  app.post("/api/push/apns/check", { preHandler: guard() }, async (req) => {
+    const a = req.auth!;
+    const { token } = z.object({ token: apnsToken }).parse(req.body);
+    await db.query("DELETE FROM push_subscriptions WHERE endpoint = ANY($1) AND profile_id <> $2", [endpoints(token), a.profileId]);
+    if (a.role === "staff") await db.query("DELETE FROM push_subscriptions WHERE endpoint = ANY($1)", [endpoints(token)]);
+    const mine = (await db.query("SELECT 1 FROM push_subscriptions WHERE endpoint = ANY($1) AND profile_id = $2", [endpoints(token), a.profileId])).rows.length > 0;
     return { registered: mine };
   });
 }

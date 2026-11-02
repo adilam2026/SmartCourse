@@ -216,13 +216,13 @@ class IosHost : PlatformHost {
 @Composable
 fun platformHost(): PlatformHost = remember { IosHost() }
 
-/* ───── Rappels et notifications : version iPhone préparée à part (APNs), hors de cette première étape ───── */
+/* ───── Rappels et notifications (NotificationsIos.kt) ───── */
 
+/** Rappels d'achat et enregistrement APNs du profil connecté : repris à chaque connexion (retirés à la déconnexion). */
 @Composable
-fun RemindersEffect(profileId: String?) { }
-
-@Composable
-fun NotificationsScreen(onBack: () -> Unit) = StubScreen("Notifications et rappels", onBack)
+fun RemindersEffect(profileId: String?) {
+    LaunchedEffect(profileId) { NotifIos.refreshStatus { NotifIos.scheduleReminders(); NotifIos.syncRegistration() } }
+}
 
 /** Pas de bouton « Retour » système sur iPhone : le retour passe par les boutons de l'écran (même parcours). */
 @Composable

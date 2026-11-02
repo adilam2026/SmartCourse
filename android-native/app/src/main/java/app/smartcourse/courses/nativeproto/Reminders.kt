@@ -35,43 +35,25 @@ import java.time.ZonedDateTime
  * Pas d'alarme exacte (permission restreinte par Google Play) : le rappel est demandé dans une fenêtre de 10 minutes après l'horaire,
  * mais Android peut le différer davantage (économie de batterie, veille) : aucun délai n'est garanti. Au déclenchement, la liste est vérifiée : aucun rappel s'il ne reste rien à acheter.
  */
-data class ReminderPrefs(val enabled: Boolean = false, val days: Set<Int> = setOf(1, 2, 3, 4, 5, 6, 7), val times: List<String> = listOf("18:00")) {
-    fun encode() = "${if (enabled) 1 else 0}|${days.sorted().joinToString(",")}|${times.joinToString(",")}"
-
-    /** Prochain horaire strictement après [now], dans le fuseau du téléphone (changements d'heure compris). */
-    fun next(now: ZonedDateTime): ZonedDateTime? {
-        if (!enabled || days.isEmpty() || times.isEmpty()) return null
-        val parsed = times.mapNotNull { parseTime(it) }.sorted()
-        for (d in 0..7) {
-            val date = now.toLocalDate().plusDays(d.toLong())
-            if (date.dayOfWeek.value !in days) continue
-            for (t in parsed) {
-                val at = ZonedDateTime.of(date, t, now.zone)
-                if (at.isAfter(now)) return at
-            }
+/** Prochain horaire strictement après [now], dans le fuseau du téléphone (changements d'heure compris). */
+fun ReminderPrefs.next(now: ZonedDateTime): ZonedDateTime? {
+    if (!enabled || days.isEmpty() || times.isEmpty()) return null
+    val parsed = times.mapNotNull { ReminderPrefs.parseTime(it)?.let { (h, m) -> LocalTime.of(h, m) } }.sorted()
+    for (d in 0..7) {
+        val date = now.toLocalDate().plusDays(d.toLong())
+        if (date.dayOfWeek.value !in days) continue
+        for (t in parsed) {
+            val at = ZonedDateTime.of(date, t, now.zone)
+            if (at.isAfter(now)) return at
         }
-        return null
     }
-
-    companion object {
-        fun decode(s: String?): ReminderPrefs {
-            if (s.isNullOrBlank()) return ReminderPrefs()
-            val p = s.split("|")
-            return ReminderPrefs(
-                enabled = p.getOrNull(0) == "1",
-                days = p.getOrNull(1)?.split(",")?.mapNotNull { it.toIntOrNull() }?.filter { it in 1..7 }?.toSet() ?: emptySet(),
-                times = p.getOrNull(2)?.split(",")?.filter { parseTime(it) != null }?.distinct() ?: emptyList(),
-            )
-        }
-        fun parseTime(s: String): LocalTime? = try { LocalTime.parse(s.trim()) } catch (_: Exception) { null }
-        val DAY_LABELS = listOf(1 to "Lun", 2 to "Mar", 3 to "Mer", 4 to "Jeu", 5 to "Ven", 6 to "Sam", 7 to "Dim")
-    }
+    return null
 }
 
 object Reminders {
     const val CHANNEL = "rappels"
     private const val ACTION_FIRE = "app.smartcourse.courses.REMINDER"
-    fun key(scope: String) = "remind|$scope"
+    fun key(scope: String) = ReminderPrefs.key(scope)
     private fun lastKey(scope: String) = "remindlast|$scope"
 
     fun load(kv: KeyValueStore, scope: String) = ReminderPrefs.decode(kv.get(key(scope)))

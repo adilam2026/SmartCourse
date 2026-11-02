@@ -2,7 +2,8 @@
 # Réseau du simulateur piloté par les contrôles iPhone (Mac de CI, recette seulement). Le test écrit un fichier signal dans son
 # dossier temporaire (sur ce Mac, sous le dossier du simulateur) : « courses-reseau-coupe » coupe l'accès de ce Mac au serveur de
 # recette (pare-feu pf, connexions en cours comprises) ; « courses-reseau-retablit » le rend. Le serveur et Android ne sont pas
-# touchés. Horodatages en UTC. Usage : ios-reseau.sh UDID_SIMULATEUR URL [DURÉE_MAX_MIN]
+# touchés. « courses-push » : notification APNs simulée (xcrun simctl push, même contenu que celui envoyé par le serveur).
+# Horodatages en UTC. Usage : ios-reseau.sh UDID_SIMULATEUR URL [DURÉE_MAX_MIN]
 set -uo pipefail
 SIM=$1; URL=$2; MAX=${3:-110}
 HOST=$(python3 -c 'import sys,urllib.parse;print(urllib.parse.urlparse(sys.argv[1]).hostname)' "$URL")
@@ -22,6 +23,10 @@ END=$(( $(date +%s) + MAX * 60 ))
 while [ "$(date +%s)" -lt "$END" ]; do
   take courses-reseau-coupe && cut
   take courses-reseau-retablit && restore
+  if take courses-push; then
+    printf '%s' '{"aps":{"alert":{"title":"Liste mise à jour","body":"Marie a ajouté 1 produit"},"sound":"default","thread-id":"recette"},"listId":"recette","url":"/"}' > /tmp/push.json
+    xcrun simctl push "$SIM" app.smartcourse.courses.recette /tmp/push.json && echo "$(date -u +%T) NOTIFICATION APNs simulée envoyée"
+  fi
   sleep 1
 done
 restore

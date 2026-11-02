@@ -60,6 +60,23 @@ jobs:
           xcodebuild test-without-building -project Courses.xcodeproj -scheme Courses -destination "id=$SIM16" \
             -only-testing:CoursesUITests/ParcoursRecetteTests/test4_HorsConnexion_ReouvertureEtSession \
             -derivedDataPath ../build/dd -resultBundlePath ../h.xcresult 2>&1 | tee ../h.log | grep -E "error:|Test Case|iPhone :|Serveur commun" | tail -40
+      - name: Notifications de demandes (APNs simulée) et rappels (iPhone 16)
+        if: always()
+        working-directory: ios/app
+        env:
+          TEST_RUNNER_COURSES_SERVER: ${{ env.RECETTE_URL }}
+          TEST_RUNNER_COURSES_FAMILY: ${{ env.RECETTE_FAMILLE }}
+        run: |
+          set -o pipefail
+          pkill -f ios-reseau.sh || true
+          bash ../../scripts/ios-reseau.sh "$SIM16" "$RECETTE_URL" 30 >> ../reseau.log 2>&1 &
+          xcodebuild test-without-building -project Courses.xcodeproj -scheme Courses -destination "id=$SIM16" \
+            -only-testing:CoursesUITests/ParcoursRecetteTests/test6_NotificationsEtRappels \
+            -derivedDataPath ../build/dd -resultBundlePath ../n.xcresult 2>&1 | tee ../n.log | grep -E "error:|Test Case" | tail -30
+          echo "── Rappels et notifications dans le journal de l'application"
+          xcrun simctl spawn "$SIM16" log show --last 20m --style compact --info --debug --predicate 'eventMessage CONTAINS "[Courses"' 2>/dev/null | grep -E "CoursesRappel|CoursesNotif" | tail -20
+          xcrun simctl spawn "$SIM16" log show --last 20m --style compact --info --debug --predicate 'eventMessage CONTAINS "[Courses"' 2>/dev/null | grep -q "rappel(s) programmé(s)" \
+            || { echo "::error::aucun rappel programmé"; exit 1; }
       - name: Clavier et affichage — iPhone SE (petit écran)
         if: always()
         working-directory: ios/app
@@ -90,7 +107,7 @@ jobs:
           echo "── Hors connexion (iPhone)"; grep -E "iPhone :|Serveur commun" ios/h.log | grep -v "t = " | head -20
           echo "── Journal de l'application (iPhone 16)"
           xcrun simctl spawn "$SIM16" log show --last 120m --style compact --info --debug --predicate 'eventMessage CONTAINS "[Courses"' 2>/dev/null | grep -E "CoursesFlux|CoursesData|CoursesIos" | tail -60 || true
-          for r in h se max; do
+          for r in h n se max; do
             mkdir -p ios/captures/$r
             xcrun xcresulttool export attachments --path ios/$r.xcresult --output-path ios/captures/$r 2>/dev/null || true
             echo "── Captures $r"; cat ios/captures/$r/manifest.json 2>/dev/null | python3 -c "import json,sys; [print(a['exportedFileName'], a.get('suggestedHumanReadableName','')) for t in json.load(sys.stdin) for a in t.get('attachments',[])]" 2>/dev/null

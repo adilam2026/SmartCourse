@@ -1,0 +1,123 @@
+name: iPhone — version finale et TestFlight
+# 1. « archive-verifiee » (aucun compte Apple) : construit la VERSION FINALE pour un vrai iPhone (Release, arm64, non signée) et vérifie
+#    son contenu : identifiant, nom, serveur fixé, HTTPS seul, icône, manifeste de confidentialité, notifications APNs.
+# 2. « testflight » (à la demande, avec les accès Apple) : même construction, signée automatiquement par la clé API App Store Connect,
+#    puis envoyée sur TestFlight. Secrets nécessaires (jamais affichés) : APPLE_TEAM_ID, ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8.
+on:
+  workflow_dispatch:
+    inputs:
+      envoi:
+        description: "Signer et envoyer sur TestFlight (accès Apple requis)"
+        type: boolean
+        default: false
+      serveur:
+        description: "Serveur de la version finale"
+        type: choice
+        options: [production, recette]
+        default: production
+      version:
+        description: "Numéro de version affiché (ex. 1.0)"
+        default: "1.0"
+  push:
+    branches: [claude/ios-kmp]
+permissions:
+  contents: read
+env:
+  PROD_URL: https://smartcourse-production-c7ce.up.railway.app
+  RECETTE_URL: https://smartcourse-recette-recette.up.railway.app
+jobs:
+  archive-verifiee:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[archive]')
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ~/.konan
+          key: ios-gradle-${{ hashFiles('ios/**/*.kts', 'ios/gradle/wrapper/gradle-wrapper.properties') }}
+      - name: Projet Xcode (XcodeGen)
+        working-directory: ios/app
+        run: brew install xcodegen >/dev/null && xcodegen generate
+      - name: Version finale pour iPhone (Release, arm64, sans signature)
+        working-directory: ios/app
+        run: |
+          set -o pipefail
+          URL=$([ "${{ inputs.serveur }}" = recette ] && echo "$RECETTE_URL" || echo "$PROD_URL")
+          xcodebuild archive -project Courses.xcodeproj -scheme Courses -configuration Release -destination "generic/platform=iOS" \
+            -archivePath ../build/Courses.xcarchive COURSES_SERVER_URL="$URL" MARKETING_VERSION="${{ inputs.version || '1.0' }}" \
+            CURRENT_PROJECT_VERSION=$((100 + ${{ github.run_number }})) CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO 2>&1 \
+            | tee ../archive.log | grep -E "error:|warning: .*(Courses|Info|privacy|icon)|ARCHIVE|\*\*" | head -60
+      - name: Contenu de la version finale
+        run: |
+          A=ios/build/Courses.xcarchive/Products/Applications/Courses.app
+          P="$A/Info.plist"; OK=0; check() { if eval "$2"; then echo "OK    $1"; else echo "ÉCHEC $1"; OK=1; fi; }
+          check "identifiant app.smartcourse.courses" '[ "$(plutil -extract CFBundleIdentifier raw "$P")" = app.smartcourse.courses ]'
+          check "nom affiché « Mes Courses »" '[ "$(plutil -extract CFBundleDisplayName raw "$P")" = "Mes Courses" ]'
+          check "version $(plutil -extract CFBundleShortVersionString raw "$P") ($(plutil -extract CFBundleVersion raw "$P"))" 'true'
+          check "HTTPS seul (aucune exception de transport)" '! plutil -extract NSAppTransportSecurity raw "$P" >/dev/null 2>&1'
+          check "icône de l'application (1024 px, sans transparence)" '[ -f "$A/Assets.car" ] && plutil -extract CFBundleIcons raw "$P" >/dev/null 2>&1 || [ -f "$A/AppIcon60x60@2x.png" ]'
+          check "manifeste de confidentialité" '[ -f "$A/PrivacyInfo.xcprivacy" ]'
+          check "binaire arm64 (vrai iPhone)" 'lipo -archs "$A/Courses" | grep -q arm64'
+          check "serveur fixé : $(strings "$A/Courses" | grep -oE "https://smartcourse-[a-z0-9.-]+up\.railway\.app" | sort -u | tr '\n' ' ')" 'strings "$A/Courses" | grep -q "up.railway.app"'
+          check "aucune adresse de recette locale dans la version de production" '[ "${{ inputs.serveur }}" = recette ] || ! strings "$A/Courses" | grep -q "10.0.2.2"'
+          check "droit « notifications » APNs (production) prévu à la signature" 'grep -q "<string>production</string>" ios/app/Courses/Courses-final.entitlements'
+          du -sh "$A"; exit $OK
+
+  testflight:
+    if: github.event_name == 'workflow_dispatch' && inputs.envoi
+    needs: archive-verifiee
+    runs-on: macos-15
+    timeout-minutes: 60
+    environment: testflight
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - name: Accès Apple présents
+        env:
+          TEAM: ${{ secrets.APPLE_TEAM_ID }}
+          KID: ${{ secrets.ASC_KEY_ID }}
+          ISS: ${{ secrets.ASC_ISSUER_ID }}
+          P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          for v in TEAM KID ISS P8; do [ -n "${!v}" ] || { echo "::error::secret Apple manquant ($v) : voir docs/ios-testflight.md"; exit 1; }; done
+          umask 077; mkdir -p ~/.appstoreconnect/private_keys
+          printf '%s' "$P8" > ~/.appstoreconnect/private_keys/AuthKey_$KID.p8
+      - name: Projet Xcode (XcodeGen)
+        working-directory: ios/app
+        run: brew install xcodegen >/dev/null && xcodegen generate
+      - name: Archive signée (signature automatique, certificat et profil gérés par Apple)
+        working-directory: ios/app
+        env:
+          TEAM: ${{ secrets.APPLE_TEAM_ID }}
+          KID: ${{ secrets.ASC_KEY_ID }}
+          ISS: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -o pipefail
+          URL=$([ "${{ inputs.serveur }}" = recette ] && echo "$RECETTE_URL" || echo "$PROD_URL")
+          xcodebuild archive -project Courses.xcodeproj -scheme Courses -configuration Release -destination "generic/platform=iOS" \
+            -archivePath ../build/Courses.xcarchive COURSES_SERVER_URL="$URL" MARKETING_VERSION="${{ inputs.version }}" \
+            CURRENT_PROJECT_VERSION=$((100 + ${{ github.run_number }})) DEVELOPMENT_TEAM="$TEAM" CODE_SIGN_STYLE=Automatic \
+            -allowProvisioningUpdates -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_$KID.p8 \
+            -authenticationKeyID "$KID" -authenticationKeyIssuerID "$ISS" 2>&1 | tee ../archive.log | grep -E "error:|ARCHIVE|\*\*" | head -40
+      - name: Envoi sur TestFlight
+        working-directory: ios/app
+        env:
+          TEAM: ${{ secrets.APPLE_TEAM_ID }}
+          KID: ${{ secrets.ASC_KEY_ID }}
+          ISS: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -o pipefail
+          cp ExportOptions.plist /tmp/export.plist && plutil -insert teamID -string "$TEAM" /tmp/export.plist
+          xcodebuild -exportArchive -archivePath ../build/Courses.xcarchive -exportOptionsPlist /tmp/export.plist -exportPath ../build/export \
+            -allowProvisioningUpdates -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_$KID.p8 \
+            -authenticationKeyID "$KID" -authenticationKeyIssuerID "$ISS" 2>&1 | tee ../export.log | grep -E "error:|Upload|EXPORT|\*\*" | head -40
+      - name: Effacer la clé
+        if: always()
+        run: rm -rf ~/.appstoreconnect

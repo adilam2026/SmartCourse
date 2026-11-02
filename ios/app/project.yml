@@ -13,23 +13,39 @@ targets:
   Courses:
     type: application
     platform: iOS
-    sources: [Courses]
+    sources:
+      - path: Courses
+        excludes: ["Info-final.plist", "*.entitlements"]
     preBuildScripts:
       - name: Framework Kotlin (écrans et règles communs)
         script: |
           cd "$SRCROOT/.."
-          ./gradlew --no-daemon :shared:embedAndSignAppleFrameworkForXcode
+          # Variante (recette / finale), serveur et version transmis aux écrans communs (BuildConfig généré).
+          ./gradlew --no-daemon :shared:embedAndSignAppleFrameworkForXcode -Pfinal="$COURSES_FINAL" -PserverUrl="$COURSES_SERVER_URL" \
+            -PversionName="$MARKETING_VERSION" -PversionCode="$CURRENT_PROJECT_VERSION"
         basedOnDependencyAnalysis: false
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: app.smartcourse.courses.recette
         PRODUCT_NAME: Courses
-        INFOPLIST_FILE: Courses/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         FRAMEWORK_SEARCH_PATHS: "$(SRCROOT)/../shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)"
         OTHER_LDFLAGS: ["-framework", "CoursesShared", "-framework", "Security", "-framework", "Network", "-lsqlite3"]
         ENABLE_USER_SCRIPT_SANDBOXING: NO
         TARGETED_DEVICE_FAMILY: "1"
         SWIFT_VERSION: "5.0"
+      configs:
+        # Recette (Debug) : application « Mes Courses (recette) », serveur choisi au lancement, accès des contrôles automatiques.
+        Debug:
+          PRODUCT_BUNDLE_IDENTIFIER: app.smartcourse.courses.recette
+          INFOPLIST_FILE: Courses/Info.plist
+          COURSES_FINAL: "0"
+        # Version finale (Release) : TestFlight / App Store. Identifiant, équipe Apple et serveur fournis par le workflow TestFlight.
+        Release:
+          PRODUCT_BUNDLE_IDENTIFIER: $(COURSES_BUNDLE_ID)
+          COURSES_BUNDLE_ID: app.smartcourse.courses
+          INFOPLIST_FILE: Courses/Info-final.plist
+          CODE_SIGN_ENTITLEMENTS: Courses/Courses-final.entitlements
+          COURSES_FINAL: "1"
   CoursesUITests:
     type: bundle.ui-testing
     platform: iOS

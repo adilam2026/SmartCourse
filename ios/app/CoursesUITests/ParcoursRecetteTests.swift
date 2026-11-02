@@ -568,4 +568,42 @@ final class ParcoursRecetteTests: XCTestCase {
         XCTAssertEqual(horsLargeur(), [], "éléments qui débordent de l'écran (sélection)")
         attach("k5-recherche-clavier")
     }
+    // ───── Notifications : autorisation, réception d'une notification de demande (APNs simulée), rappels programmés ─────
+
+    func test6_NotificationsEtRappels() throws {
+        relaunch(reset: true)
+        let api = try XCTUnwrap(apiLogin("adil", "482913"), "connexion API impossible")
+        _ = try XCTUnwrap(freshList(api), "liste de recette non ouverte")
+        try login("adil", "482913")
+        waitFor("Ajouter des articles", 40)
+        // Un article à acheter (les rappels ne sont programmés que s'il reste quelque chose).
+        tapButton("Ajouter des articles"); search("Carottes"); addToSelection("Carottes", waitCard("Carottes", 20)); tapButton("Terminer ma sélection"); sleep(3)
+        // Réglages → Notifications et rappels
+        tapButton("Réglages"); sleep(2)
+        press(waitFor("Notifications et rappels", 20)); sleep(2)
+        attach("n1-ecran-notifications")
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        func autoriser() {
+            for l in ["Allow", "Autoriser"] where springboard.buttons[l].waitForExistence(timeout: 6) { springboard.buttons[l].tap(); sleep(2); return }
+        }
+        press(waitFor("Nouvelles demandes", 15)); autoriser()
+        press(waitFor("Me rappeler les articles restants", 15)); autoriser()
+        sleep(2)
+        attach("n2-notifications-activees")
+        XCTAssertFalse(anyContaining("bloque les notifications").firstMatch.exists, "notifications bloquées malgré l'autorisation")
+        XCTAssertTrue(anyContaining("Lun").firstMatch.exists, "jours des rappels non affichés")
+        // Application quittée : rappels programmés (journal), puis notification de demande reçue et touchée.
+        XCUIDevice.shared.press(.home); sleep(3)
+        FileManager.default.createFile(atPath: NSTemporaryDirectory() + "courses-push", contents: Data())
+        let banner = springboard.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Marie a ajouté 1 produit")).firstMatch
+        XCTAssertTrue(banner.waitForExistence(timeout: 30), "notification de demande non affichée (application fermée)")
+        attach("n3-notification-recue")
+        banner.tap(); sleep(3)
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 15), "le toucher n'ouvre pas l'application")
+        attach("n4-application-ouverte")
+        // Application ouverte : la notification s'affiche aussi.
+        FileManager.default.createFile(atPath: NSTemporaryDirectory() + "courses-push", contents: Data())
+        XCTAssertTrue(springboard.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Marie a ajouté 1 produit")).firstMatch.waitForExistence(timeout: 30), "notification non affichée application ouverte")
+        attach("n5-notification-application-ouverte")
+    }
 }

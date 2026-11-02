@@ -20,6 +20,39 @@ val androidOnly = listOf(
     "net/HttpAndroid.kt", "net/StorageAndroid.kt",
 )
 
+// Variante : recette (par défaut) ou FINALE (-Pfinal=1, TestFlight / App Store) : serveur fixé à la compilation (HTTPS obligatoire),
+// aucun accès de recette. Mêmes règles que la version finale Android. Fichier BuildConfig.kt généré (mêmes champs qu'Android).
+val final = project.findProperty("final") == "1"
+val serverUrl = (project.findProperty("serverUrl") as String?)?.trim().orEmpty()
+if (final && !serverUrl.startsWith("https://")) throw GradleException("Version finale iPhone : -PserverUrl=https://… obligatoire")
+val versionName = (project.findProperty("versionName") as String?)?.ifBlank { null } ?: "0.1-ios-recette"
+val versionCode = (project.findProperty("versionCode") as String?)?.toIntOrNull() ?: 1
+val buildConfigDir = layout.buildDirectory.dir("generated/buildconfig/iosMain")
+val generateBuildConfig = tasks.register("generateBuildConfig") {
+    inputs.property("final", final); inputs.property("serverUrl", serverUrl)
+    inputs.property("versionName", versionName); inputs.property("versionCode", versionCode)
+    outputs.dir(buildConfigDir)
+    doLast {
+        val f = buildConfigDir.get().file("app/smartcourse/courses/nativeproto/BuildConfig.kt").asFile
+        f.parentFile.mkdirs()
+        f.writeText(
+            """
+            |package app.smartcourse.courses.nativeproto
+            |
+            |/** Généré par ios/shared/build.gradle.kts (équivalent du BuildConfig Android, mêmes champs). Ne pas modifier. */
+            |object BuildConfig {
+            |    const val FINAL = $final
+            |    const val RECETTE_HOOKS = false
+            |    const val SERVER_URL = "${serverUrl.replace("\"", "")}"
+            |    const val VERSION_NAME = "${versionName.replace("\"", "")}"
+            |    const val VERSION_CODE = $versionCode
+            |}
+            |""".trimMargin()
+        )
+    }
+}
+tasks.matching { it.name.startsWith("compileKotlinIos") }.configureEach { dependsOn(generateBuildConfig) }
+
 // Images fournies avec l'application : les fichiers Android (drawable-nodpi), copiés tels quels en ressources Compose.
 val androidImages = tasks.register<Sync>("androidImages") {
     from(rootDir.resolve("../android-native/app/src/main/res/drawable-nodpi"))
@@ -65,6 +98,7 @@ kotlin {
         iosMain {
             if (mesure) kotlin.setSrcDirs(listOf(androidSources)) else {
                 kotlin.srcDir(androidSources)
+                kotlin.srcDir(generateBuildConfig.map { buildConfigDir.get() })
                 kotlin.exclude(androidOnly.map { "app/smartcourse/courses/nativeproto/$it" })
             }
             dependencies {

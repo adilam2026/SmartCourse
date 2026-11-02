@@ -1,4 +1,5 @@
 import webpush from "web-push";
+import { apnsSenderFromEnv, isApns } from "./apns.js";
 import type { AuthContext } from "./auth.js";
 import type { Db } from "./db.js";
 
@@ -56,10 +57,13 @@ export class PushService {
 
   constructor(
     private db: Db,
-    opts: { sender?: PushSender; subject?: string } = {},
+    opts: { sender?: PushSender; apnsSender?: PushSender; subject?: string } = {},
   ) {
     this.subject = opts.subject ?? process.env.VAPID_SUBJECT ?? `https://${process.env.RAILWAY_PUBLIC_DOMAIN ?? "smartcourse-production-c7ce.up.railway.app"}`;
-    this.send = opts.sender ?? ((sub, payload) => this.webPushSend(sub, payload));
+    const web: PushSender = opts.sender ?? ((sub, payload) => this.webPushSend(sub, payload));
+    // iPhone (APNs) ou navigateur (Web Push) : même notification, transport choisi par l'adresse enregistrée.
+    let apns = opts.apnsSender;
+    this.send = (sub, payload) => (isApns(sub.endpoint) ? (apns ??= apnsSenderFromEnv())(sub, payload) : web(sub, payload));
   }
   private subject: string;
 
