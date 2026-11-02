@@ -156,11 +156,19 @@ final class ParcoursRecetteTests: XCTestCase {
             attach("saisie-\(i + 1)")
         }
         attach("2-connexion-remplie")
-        // Le clavier recouvre le bouton du bas : on le ferme (toucher le titre), puis on touche le bouton à son emplacement.
+        // Le clavier recouvre le bas de l'écran : le fermer (toucher le titre), faire défiler, puis toucher « Se connecter ».
         press(waitFor("Bienvenue"))
         sleep(1)
-        let buttons = any("Se connecter").allElementsBoundByIndex.filter { $0.frame.height > 0 }.sorted { $0.frame.minY < $1.frame.minY }
-        press(try XCTUnwrap(buttons.last, "bouton « Se connecter » introuvable"))
+        for _ in 0..<4 {
+            let b = any("Se connecter").allElementsBoundByIndex.filter { onScreen($0) }.sorted { $0.frame.minY < $1.frame.minY }
+            if let last = b.last, last.frame.minY > 400 { break }
+            app.swipeUp(velocity: .slow); sleep(1)
+        }
+        let buttons = any("Se connecter").allElementsBoundByIndex.filter { onScreen($0) }.sorted { $0.frame.minY < $1.frame.minY }
+        attach("3-avant-connexion")
+        press(try XCTUnwrap(buttons.last, "bouton « Se connecter » introuvable à l'écran"))
+        sleep(3)
+        attach("4-apres-connexion")
 
         // 2. Personnel : accueil direct sur « Choisir mes articles », avec le catalogue de la famille
         waitFor("Choisir mes articles", 40)
