@@ -130,12 +130,18 @@ final class ParcoursRecetteTests: XCTestCase {
         // Comme un utilisateur : toucher le champ (son indication), puis taper au clavier.
         // Compose Multiplatform expose chaque champ de saisie comme un élément touchable sans libellé, de la largeur de l'écran :
         // on les prend dans l'ordre de l'écran (identifiant famille, identifiant personnel, code), comme un utilisateur.
-        let champs = app.buttons.allElementsBoundByIndex
-            .filter { $0.label.isEmpty && $0.frame.height >= 48 && $0.frame.height <= 64 && $0.frame.width > 250 }
-            .sorted { $0.frame.minY < $1.frame.minY }
-        XCTAssertGreaterThanOrEqual(champs.count, 3, "champs de connexion : \(champs.count) trouvés")
-        for (champ, texte) in zip(champs.prefix(3), [family, "marie", "573918"]) {
-            champ.tap(); sleep(1); typeKeys(texte); sleep(1)
+        func champs() -> [XCUIElement] {
+            app.buttons.allElementsBoundByIndex
+                .filter { $0.label.isEmpty && $0.frame.height >= 48 && $0.frame.height <= 64 && $0.frame.width > 250 }
+                .sorted { $0.frame.minY < $1.frame.minY }
+        }
+        XCTAssertGreaterThanOrEqual(champs().count, 3, "champs de connexion : \(champs().count) trouvés")
+        for (i, texte) in [family, "marie", "573918"].enumerated() {
+            // Clavier fermé avant chaque champ (il recouvrirait les champs du bas), champs recherchés à nouveau.
+            if app.keyboards.firstMatch.exists { press(waitFor("Bienvenue")); sleep(1) }
+            let c = champs()
+            XCTAssertGreaterThan(c.count, i, "champ n° \(i + 1) introuvable")
+            press(c[i]); sleep(1); typeKeys(texte); sleep(1)
         }
         attach("2-connexion-remplie")
         // Le clavier recouvre le bouton du bas : on le ferme (toucher le titre), puis on touche le bouton à son emplacement.
