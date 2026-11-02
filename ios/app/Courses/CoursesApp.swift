@@ -1,5 +1,5 @@
 import SwiftUI
-import Courses
+import CoursesShared
 
 /// Coquille iPhone : affiche les écrans communs (Kotlin, Compose Multiplatform). Aucune logique ni aucun écran propre ici.
 @main

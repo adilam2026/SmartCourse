@@ -36,10 +36,10 @@ tasks.matching { it.name != "androidImages" && it.name.contains("Resource", igno
     .configureEach { dependsOn(androidImages) }
 
 kotlin {
-    val xcf = XCFramework("Courses")
+    val xcf = XCFramework("CoursesShared")
     listOf(iosArm64(), iosSimulatorArm64()).forEach {
         it.binaries.framework {
-            baseName = "Courses"
+            baseName = "CoursesShared"
             isStatic = true
             xcf.add(this)
         }
