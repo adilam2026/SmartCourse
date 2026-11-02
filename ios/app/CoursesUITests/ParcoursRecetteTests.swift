@@ -132,7 +132,8 @@ final class ParcoursRecetteTests: XCTestCase {
         // on les prend dans l'ordre de l'écran (identifiant famille, identifiant personnel, code), comme un utilisateur.
         func champs() -> [XCUIElement] {
             app.buttons.allElementsBoundByIndex
-                .filter { $0.label.isEmpty && $0.frame.height >= 48 && $0.frame.height <= 64 && $0.frame.width > 250 }
+                .filter { !["Se connecter", "Première connexion", "Besoin d'aide ?"].contains($0.label) && !$0.label.hasPrefix("Serveur")
+                    && $0.frame.height >= 48 && $0.frame.height <= 64 && $0.frame.width > 250 }
                 .sorted { $0.frame.minY < $1.frame.minY }
         }
         XCTAssertGreaterThanOrEqual(champs().count, 3, "champs de connexion : \(champs().count) trouvés")
