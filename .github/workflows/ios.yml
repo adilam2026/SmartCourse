@@ -113,7 +113,9 @@ jobs:
         run: brew install xcodegen >/dev/null && xcodegen generate
       - name: Simulateur iPhone disponible sur cette machine
         run: |
-          UDID=$(xcrun simctl list devices available -j | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; c=[(k,x) for k,v in d.items() if 'iOS-18' in k for x in v if x['name'].startswith('iPhone')]; c.sort(key=lambda t:(t[1]['name']=='iPhone 16', t[0])); print(c[-1][1]['udid'])")
+          # iPhone 16 sous iOS 18 (écran de 6,1 pouces), créé pour ce contrôle : même taille d'écran à chaque exécution.
+          RT=$(xcrun simctl list runtimes available -j | python3 -c "import json,sys; r=[x for x in json.load(sys.stdin)['runtimes'] if x['name'].startswith('iOS 18')]; r.sort(key=lambda x:x['version']); print(r[-1]['identifier'])")
+          UDID=$(xcrun simctl create "iPhone 16 Courses" com.apple.CoreSimulator.SimDeviceType.iPhone-16 "$RT")
           echo "SIM=$UDID" >> "$GITHUB_ENV"; xcrun simctl list devices available | grep "$UDID"
           # Simulateur neuf : sans l'écran d'introduction du clavier (« Speed up your typing… »), qui recouvre les touches.
           xcrun simctl boot "$UDID" || true

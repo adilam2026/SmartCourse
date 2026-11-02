@@ -168,7 +168,11 @@ final class ParcoursRecetteTests: XCTestCase {
         var ok = false
         for essai in 1...3 {
             sleep(2)
-            let bouton = try XCTUnwrap(boutonConnexion(), "bouton « Se connecter » (pleine largeur) introuvable à l'écran")
+            guard let bouton = boutonConnexion() else {
+                print("Éléments « Se connecter » : " + any("Se connecter").allElementsBoundByIndex.map { "\($0.elementType.rawValue) \($0.frame)" }.joined(separator: " ; "))
+                attach("bouton-absent")
+                XCTFail("bouton « Se connecter » (pleine largeur) introuvable à l'écran"); return
+            }
             print("Essai \(essai) : « Se connecter » à \(bouton.frame)")
             attach("3-avant-connexion-\(essai)")
             press(bouton)
