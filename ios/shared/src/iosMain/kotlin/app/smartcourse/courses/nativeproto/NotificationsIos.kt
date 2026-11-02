@@ -18,6 +18,7 @@ import platform.Foundation.NSDateComponents
 import platform.Foundation.NSURL
 import platform.UIKit.UIApplication
 import platform.UIKit.UIApplicationOpenNotificationSettingsURLString
+import platform.UIKit.registerForRemoteNotifications
 import platform.UserNotifications.UNAuthorizationOptionAlert
 import platform.UserNotifications.UNAuthorizationOptionBadge
 import platform.UserNotifications.UNAuthorizationOptionSound
@@ -128,9 +129,9 @@ object NotifIos {
         val remaining = list?.takeIf { it.status == "active" }?.items?.count { it.status == "to_buy" } ?: 0
         if (remaining <= 0) { logInfo("CoursesRappel", "rien à acheter : aucun rappel programmé"); return }
         val content = UNMutableNotificationContent().apply {
-            title = if (remaining == 1) "Il reste 1 article à acheter" else "Il reste $remaining articles à acheter"
-            body = if (me.role == "staff") "Ouvrez la liste du jour." else "Ouvrez votre liste de courses."
-            sound = UNNotificationSound.defaultSound
+            setTitle(if (remaining == 1) "Il reste 1 article à acheter" else "Il reste $remaining articles à acheter")
+            setBody(if (me.role == "staff") "Ouvrez la liste du jour." else "Ouvrez votre liste de courses.")
+            setSound(UNNotificationSound.defaultSound)
         }
         var n = 0
         for (d in prefs.days) prefs.times.take(6).forEachIndexed { i, t ->
