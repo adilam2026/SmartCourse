@@ -18,6 +18,9 @@ closeall_api() { api GET /api/lists/open >/dev/null; for l in $(jq -r '.lists[]?
 in_active() { sql "SELECT count(*) FROM list_items i JOIN products p ON p.id=i.product_id JOIN lists l ON l.id=i.list_id JOIN families f ON f.id=l.family_id
   JOIN profiles pr ON pr.id=i.added_by WHERE f.code='$FAMILY' AND l.status='active' AND p.name='$1' AND i.status<>'removed' ${2:+AND pr.login='$2'}"; }
 active_id() { sql "SELECT l.id FROM lists l JOIN families f ON f.id=l.family_id WHERE f.code='$FAMILY' AND l.status='active' ORDER BY l.created_at DESC LIMIT 1"; }
+# Connexion par position des champs (identifiant famille, identifiant personnel, code), comme le parcours final Android.
+fill_field() { $UI field "$1" >/dev/null || return 1; sleep 1; clear_field; adb shell input text "${2// /%s}"; sleep 1; }
+signin() { fill_field 0 "$1"; hide_kb; fill_field 1 "$2"; hide_kb; fill_field 2 "$3"; hide_kb; $UI tap "Se connecter" --last >/dev/null; sleep 3; }
 wait_sql() { local q=$1 n=0; for _ in $(seq 1 $((WAIT_MIN * 6))); do n=$(eval "$q"); [ "${n:-0}" -ge 1 ] && return 0; sleep 10; done; return 1; }
 add_from_selection() { # Android : « Ajouter des articles » / « Créer une liste » → recherche → article → « Terminer ma sélection »
   fill "Rechercher un produit" "$1"; hide_kb; $UI wait "$1" 10 >/dev/null; $UI tap "$1" --last >/dev/null; sleep 2

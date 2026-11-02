@@ -77,6 +77,14 @@ final class ParcoursRecetteTests: XCTestCase {
         }
     }
 
+    /// Vide le champ qui a le clavier (l'application retient l'identifiant famille et l'identifiant personnel, comme sur Android).
+    private func clearFocused(max: Int = 40) {
+        let kb = app.keyboards.firstMatch
+        guard kb.waitForExistence(timeout: 8) else { return }
+        guard let del = [kb.keys["delete"], kb.buttons["delete"], kb.keys["Supprimer"], kb.buttons["Supprimer"], kb.keys["Delete"]].first(where: { $0.exists }) else { return }
+        for _ in 0..<max { del.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap() }
+    }
+
     private func onScreen(_ e: XCUIElement) -> Bool {
         let f = e.frame, w = app.windows.firstMatch.frame
         return e.exists && f.height > 0 && f.minY >= w.minY + 60 && f.maxY <= w.maxY - 90
@@ -177,7 +185,7 @@ final class ParcoursRecetteTests: XCTestCase {
                 }
                 press(c[i]); sleep(1)
             }
-            typeKeys(texte); sleep(1)
+            clearFocused(); typeKeys(texte); sleep(1)
             if i < 2, let ret = [app.keyboards.buttons["Return"], app.keyboards.buttons["Next"], app.keyboards.buttons["next"], app.keyboards.buttons["Suivant"]].first(where: { $0.exists }) { press(ret); sleep(1) }
             attach("saisie-\(i + 1)")
         }
