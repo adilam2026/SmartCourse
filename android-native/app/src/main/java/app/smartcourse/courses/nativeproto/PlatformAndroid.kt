@@ -173,3 +173,7 @@ fun RemindersEffect(profileId: String?) {
     val appCtx = LocalContext.current
     androidx.compose.runtime.LaunchedEffect(profileId) { Reminders.schedule(appCtx) }
 }
+
+/** Bouton ou geste « Retour » du système (Android) ; sur iPhone, le retour passe par les boutons de l'écran. */
+@Composable
+fun PlatformBackHandler(enabled: Boolean = true, onBack: () -> Unit) = androidx.activity.compose.BackHandler(enabled, onBack)

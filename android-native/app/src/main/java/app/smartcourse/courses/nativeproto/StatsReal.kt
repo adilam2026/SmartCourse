@@ -136,7 +136,7 @@ private fun StatsReal() {
             view = StatsView.All
         }, onOpen = { r -> view = StatsView.Detail(r.productId, r.name, r.photoUrl, fromAll = false) })
         StatsView.All -> {
-            androidx.activity.compose.BackHandler { view = StatsView.Overview }
+            PlatformBackHandler { view = StatsView.Overview }
             LaunchedEffect(resetScroll) { if (resetScroll) { allState.scrollToItem(0); resetScroll = false } }
             AllProducts(
                 period, all, query, { query = it }, allState,
@@ -152,7 +152,7 @@ private fun StatsReal() {
         }
         is StatsView.Detail -> {
             val back = { view = if (v.fromAll) StatsView.All else StatsView.Overview }
-            androidx.activity.compose.BackHandler { back() }
+            PlatformBackHandler { back() }
             ProductHistoryScreen(v, period, back)
         }
     }

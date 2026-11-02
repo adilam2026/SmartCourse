@@ -91,7 +91,7 @@ class IosTransport : HttpTransport {
             client.prepareRequest(url) {
                 method = HttpMethod.Get
                 headers { headers.forEach { (k, v) -> append(k, v) } }
-                timeout { socketTimeoutMillis = 70_000; requestTimeoutMillis = HttpTimeout.INFINITE_TIMEOUT_MS }
+                timeout { socketTimeoutMillis = 70_000; requestTimeoutMillis = Long.MAX_VALUE }
             }.execute { r ->
                 if (!onStatus(r.status.value)) return@execute
                 val ch = r.bodyAsChannel()

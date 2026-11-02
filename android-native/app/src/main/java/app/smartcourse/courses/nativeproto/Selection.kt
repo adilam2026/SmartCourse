@@ -81,7 +81,7 @@ fun SelectionScreen(nav: (String) -> Unit, onBack: () -> Unit) {
         shown.forEach { (c, ps) -> if (!(byCategory && openCat != null && q.isBlank())) add(c); addAll(ps) }
     }
     if (openCat != null && (!byCategory || groups[openCat] == null) && q.isBlank()) openCat = null
-    androidx.activity.compose.BackHandler(enabled = byCategory && openCat != null && q.isBlank()) { openCat = null }
+    PlatformBackHandler(enabled = byCategory && openCat != null && q.isBlank()) { openCat = null }
     var display by remember { mutableStateOf(false) }
     val count = demo.selChanges
 

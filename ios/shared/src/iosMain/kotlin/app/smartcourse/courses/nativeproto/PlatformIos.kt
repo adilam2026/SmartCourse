@@ -222,3 +222,7 @@ fun RemindersEffect(profileId: String?) { }
 
 @Composable
 fun NotificationsScreen(onBack: () -> Unit) = StubScreen("Notifications et rappels", onBack)
+
+/** Pas de bouton « Retour » système sur iPhone : le retour passe par les boutons de l'écran (même parcours). */
+@Composable
+fun PlatformBackHandler(enabled: Boolean = true, onBack: () -> Unit) { }
