@@ -113,7 +113,7 @@ jobs:
         run: brew install xcodegen >/dev/null && xcodegen generate
       - name: Simulateur iPhone disponible sur cette machine
         run: |
-          UDID=$(xcrun simctl list devices available -j | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; c=[(k,x) for k,v in d.items() if 'iOS' in k for x in v if x['name'].startswith('iPhone')]; c.sort(key=lambda t:t[0]); print(c[-1][1]['udid'])")
+          UDID=$(xcrun simctl list devices available -j | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; c=[(k,x) for k,v in d.items() if 'iOS-18' in k for x in v if x['name'].startswith('iPhone')]; c.sort(key=lambda t:t[0]); print(c[-1][1]['udid'])")
           echo "SIM=$UDID" >> "$GITHUB_ENV"; xcrun simctl list devices available | grep "$UDID"
       - name: Compilation de l'application iPhone et de ses contrôles (simulateur)
         working-directory: ios/app
