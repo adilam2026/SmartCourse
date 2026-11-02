@@ -77,6 +77,11 @@ final class ParcoursRecetteTests: XCTestCase {
         }
     }
 
+    private func onScreen(_ e: XCUIElement) -> Bool {
+        let f = e.frame, w = app.windows.firstMatch.frame
+        return e.exists && f.height > 0 && f.minY >= w.minY + 60 && f.maxY <= w.maxY - 90
+    }
+
     /// Toucher à l'emplacement de l'élément (comme un doigt), sans action d'accessibilité préalable.
     private func press(_ e: XCUIElement) {
         e.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
@@ -133,23 +138,28 @@ final class ParcoursRecetteTests: XCTestCase {
             champ.tap(); sleep(1); typeKeys(texte); sleep(1)
         }
         attach("2-connexion-remplie")
-        let buttons = any("Se connecter").allElementsBoundByIndex.filter { $0.isHittable }
-        try XCTUnwrap(buttons.last, "bouton « Se connecter » introuvable").tap()
+        // Le clavier recouvre le bouton du bas : on le ferme (toucher le titre), puis on touche le bouton à son emplacement.
+        press(waitFor("Bienvenue"))
+        sleep(1)
+        let buttons = any("Se connecter").allElementsBoundByIndex.filter { $0.frame.height > 0 }.sorted { $0.frame.minY < $1.frame.minY }
+        press(try XCTUnwrap(buttons.last, "bouton « Se connecter » introuvable"))
 
         // 2. Personnel : accueil direct sur « Choisir mes articles », avec le catalogue de la famille
         waitFor("Choisir mes articles", 40)
-        let card = waitFor(product, 30)
+        var card = waitFor(product, 30)
+        // L'article peut être plus bas dans le catalogue : faire défiler jusqu'à le voir en entier.
+        for _ in 0..<12 where !onScreen(card) { app.swipeUp(velocity: .slow); sleep(1); card = any(product).firstMatch }
         sleep(4) // chargement des photos depuis le serveur (cookie de session)
         attach("3-catalogue")
         XCTAssertTrue(hasPhoto(in: card.frame.insetBy(dx: 0, dy: 0)) || hasPhoto(in: CGRect(x: card.frame.minX, y: card.frame.minY - card.frame.height, width: card.frame.width, height: card.frame.height * 2)),
                       "photo du produit « \(product) » non affichée")
 
         // 3. Ajout du produit à la liste : touché, puis « Terminer ma sélection » (envoi au serveur)
-        card.tap()
+        press(card)
         sleep(2)
         attach("4-produit-choisi")
-        let done = anyContaining("Terminer ma sélection").allElementsBoundByIndex.filter { $0.isHittable }
-        try XCTUnwrap(done.last, "« Terminer ma sélection » introuvable").tap()
+        let done = anyContaining("Terminer ma sélection").allElementsBoundByIndex.filter { $0.frame.height > 0 }
+        press(try XCTUnwrap(done.last, "« Terminer ma sélection » introuvable"))
         sleep(6)
         attach("5-selection-envoyee")
         XCTAssertFalse(anyContaining("Envoi en attente").firstMatch.exists, "la demande est restée en attente d'envoi")
