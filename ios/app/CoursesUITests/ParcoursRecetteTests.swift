@@ -268,6 +268,34 @@ final class ParcoursRecetteTests: XCTestCase {
     }
 
     /// Liste en cours de la famille sur le serveur commun : (identifiant, noms des articles non retirés), ou nil s'il n'y en a pas.
+    /// Renomme la liste en cours (signal pour l'autre appareil ou le Mac, par le serveur commun).
+    private func renameList(_ cookie: String, _ id: String, _ name: String) {
+        guard let base = env["COURSES_SERVER"], let u = URL(string: base + "/api/lists/" + id) else { return }
+        var r = URLRequest(url: u); r.httpMethod = "PATCH"; r.setValue(cookie, forHTTPHeaderField: "Cookie")
+        r.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        r.httpBody = try? JSONSerialization.data(withJSONObject: ["name": name])
+        let done = expectation(description: "renommage")
+        URLSession.shared.dataTask(with: r) { _, resp, _ in
+            print("Signal « \(name) » : HTTP \((resp as? HTTPURLResponse)?.statusCode ?? 0)"); done.fulfill()
+        }.resume()
+        wait(for: [done], timeout: 30)
+    }
+
+    private func listName(_ cookie: String) -> String? {
+        guard let base = env["COURSES_SERVER"], let u = URL(string: base + "/api/lists/active") else { return nil }
+        var r = URLRequest(url: u); r.setValue(cookie, forHTTPHeaderField: "Cookie")
+        var out: String?
+        let done = expectation(description: "nom de liste")
+        URLSession.shared.dataTask(with: r) { data, _, _ in
+            if let d = data, let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any], let l = o["list"] as? [String: Any] { out = l["name"] as? String ?? "" }
+            done.fulfill()
+        }.resume()
+        wait(for: [done], timeout: 30)
+        return out
+    }
+
+    private func stamp() -> String { ISO8601DateFormatter().string(from: Date()) }
+
     private func activeList(_ cookie: String) -> (id: String, items: [String])? {
         guard let base = env["COURSES_SERVER"], let u = URL(string: base + "/api/lists/active") else { return nil }
         var r = URLRequest(url: u); r.setValue(cookie, forHTTPHeaderField: "Cookie")
@@ -393,5 +421,36 @@ final class ParcoursRecetteTests: XCTestCase {
         XCTAssertTrue(bananes.waitForExistence(timeout: 35 * 60), "« Bananes » (ajouté sur Android) n'apparaît pas sur l'iPhone")
         attach("sens2-iphone-bananes-android")
         XCTAssertEqual(activeList(api)?.id, list2, "« Bananes » n'est pas dans la liste créée sur l'iPhone")
+    }
+    // ───── Contrôle restant (service Railway de recette, HTTPS direct) : ajout sur Android visible SEUL sur l'iPhone,
+    //       puis reconnexion automatique après une coupure réseau. Aucune actualisation manuelle. ─────
+
+    func test3_AjoutAndroidVisibleSurIPhone_EtReconnexion() throws {
+        relaunch(reset: true)
+        let api = try XCTUnwrap(apiLogin("adil", "482913"), "connexion API impossible")
+        var list = ""
+        waitServer("liste vide ouverte par Android", minutes: 60) {
+            if let l = activeList(api), l.items.isEmpty, (listName(api) ?? "x").isEmpty { list = l.id; return true }; return false
+        }
+        try login("adil", "482913")
+        waitFor("Ajouter des articles", 40)
+        sleep(5)   // flux en direct ouvert
+        attach("r-iphone-liste-vide")
+        XCTAssertFalse(anyContaining("Bananes").firstMatch.exists, "« Bananes » déjà présent avant l'ajout sur Android")
+        renameList(api, list, "iphone-pret-1")
+        print("\(stamp()) iPhone : liste affichée, signal envoyé à Android ; attente de « Bananes » sans aucune action")
+        let bananes = anyContaining("Bananes").firstMatch.waitForExistence(timeout: 20 * 60)
+        print("\(stamp()) iPhone : « Bananes » \(bananes ? "affiché" : "NON affiché")")
+        attach("r-iphone-bananes")
+        XCTAssertTrue(bananes, "« Bananes » (ajouté sur Android) n'apparaît pas seul sur l'iPhone")
+        guard bananes else { return }
+        // Coupure réseau : le Mac coupe l'accès au serveur ; Android ajoute « Oranges » pendant la coupure.
+        renameList(api, list, "iphone-coupure")
+        print("\(stamp()) iPhone : coupure réseau demandée ; attente de « Oranges » après rétablissement, sans aucune action")
+        let oranges = anyContaining("Oranges").firstMatch.waitForExistence(timeout: 20 * 60)
+        print("\(stamp()) iPhone : « Oranges » \(oranges ? "affiché" : "NON affiché")")
+        attach("r-iphone-oranges-apres-reconnexion")
+        XCTAssertTrue(oranges, "« Oranges » (ajouté sur Android pendant la coupure) n'apparaît pas seul après le rétablissement du réseau")
+        XCTAssertFalse(anyContaining("Envoi en attente").firstMatch.exists, "message « Envoi en attente » restant après la reconnexion")
     }
 }

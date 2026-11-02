@@ -22,6 +22,11 @@ for (const [displayName, login, role] of F.others) {
   const r = await fetch(`${base}/api/profiles`, { method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ displayName, login, role, secret: "573918", secretConfirm: "573918", city: "Casablanca" }) });
   if (r.status !== 201) throw new Error(`profil ${login} : ${r.status}`);
 }
+// FAMILY_LOGIN_ID : identifiant famille fixe (service de recette Railway), pour que les contrôles automatiques le connaissent.
+if (process.env.FAMILY_LOGIN_ID) {
+  const r = await fetch(`${base}/api/family/login-id`, { method: "PUT", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ loginId: process.env.FAMILY_LOGIN_ID }) });
+  if (r.status !== 200) throw new Error(`identifiant famille : ${r.status}`);
+}
 const l = await fetch(`${base}/api/lists`, { method: "POST", headers: { cookie } });
 if (l.status !== 201) throw new Error(`liste : ${l.status}`);
 console.log(JSON.stringify({ familyCode }));

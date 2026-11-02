@@ -1,0 +1,125 @@
+name: iPhone ↔ Android — contrôle restant sur la recette Railway (HTTPS)
+# Service Railway de RECETTE (projet séparé de la production, base et données fictives) : les deux appareils le joignent
+# directement en HTTPS, sans tunnel. Contrôles : 1) le flux en direct (SSE) envoie « ready » tout de suite ; 2) un ajout fait
+# sur Android apparaît seul sur l'iPhone ; 3) après une coupure réseau de l'iPhone, il se reconnecte et affiche seul l'ajout
+# fait pendant la coupure. Les contrôles déjà réussis ne sont pas relancés. Aucun accès à la production.
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/ios-kmp]
+permissions:
+  contents: read
+env:
+  # Adresse publique du service de recette (pas un secret). Vide tant que le service n'est pas créé.
+  RECETTE_URL: ""
+  RECETTE_FAMILLE: RecetteCourses
+jobs:
+  sonde:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[railway]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Recette joignable et flux en direct (« ready » immédiat), vu d'une autre machine
+        run: |
+          [ -n "$RECETTE_URL" ] || { echo "::error::RECETTE_URL vide : le service Railway de recette n'est pas encore renseigné"; exit 1; }
+          curl -fsS --max-time 20 "$RECETTE_URL/health" && echo
+          python3 scripts/sonde-sse.py "$RECETTE_URL" "$RECETTE_FAMILLE" marie 573918 10
+
+  recette-android:
+    needs: sonde
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4
+      - name: APK de recette Android (mêmes sources que l'iPhone)
+        working-directory: android-native
+        run: ./gradlew --no-daemon assembleRelease -PversionCode=1 -PversionName=ios-parcours && mkdir -p ../dist && cp app/build/outputs/apk/release/*.apk ../dist/recette.apk
+      - name: KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - name: Android ajoute « Bananes », puis « Oranges » pendant la coupure de l'iPhone
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
+          script: bash scripts/ios-sync-railway.sh dist/recette.apk ${{ env.RECETTE_URL }} ${{ env.RECETTE_FAMILLE }} ios-sync-railway 60
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: ios-sync-railway, path: ios-sync-railway/ }
+
+  parcours-iphone:
+    needs: sonde
+    runs-on: macos-15
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ~/.konan
+          key: ios-gradle-${{ hashFiles('ios/**/*.kts', 'ios/gradle/wrapper/gradle-wrapper.properties') }}
+      - name: Projet Xcode (XcodeGen)
+        working-directory: ios/app
+        run: brew install xcodegen >/dev/null && xcodegen generate
+      - name: Simulateur iPhone disponible sur cette machine
+        run: |
+          RT=$(xcrun simctl list runtimes available -j | python3 -c "import json,sys; r=[x for x in json.load(sys.stdin)['runtimes'] if x['name'].startswith('iOS 18')]; r.sort(key=lambda x:x['version']); print(r[-1]['identifier'])")
+          UDID=$(xcrun simctl create "iPhone 16 Courses" com.apple.CoreSimulator.SimDeviceType.iPhone-16 "$RT")
+          echo "SIM=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl spawn "$UDID" defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true
+          xcrun simctl spawn "$UDID" defaults write com.apple.keyboard.preferences DidShowGestureKeyboardIntroduction -bool true
+      - name: Compilation de l'application iPhone et de ses contrôles (simulateur)
+        working-directory: ios/app
+        run: |
+          set -o pipefail
+          xcodebuild build-for-testing -project Courses.xcodeproj -scheme Courses -destination "id=$SIM" \
+            -derivedDataPath ../build/dd CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= 2>&1 | tee ../xcodebuild.log | grep -E "error:|warning: .*Courses|BUILD|\*\*" | head -80
+      - name: Flux en direct vu depuis ce Mac (« ready » immédiat)
+        run: python3 scripts/sonde-sse.py "$RECETTE_URL" "$RECETTE_FAMILLE" marie 573918 10
+      - name: Ajout Android visible seul sur l'iPhone, puis reconnexion après coupure réseau
+        working-directory: ios/app
+        env:
+          TEST_RUNNER_COURSES_SERVER: ${{ env.RECETTE_URL }}
+          TEST_RUNNER_COURSES_FAMILY: ${{ env.RECETTE_FAMILLE }}
+        run: |
+          set -o pipefail
+          # Coupure réseau pilotée par le test (signal « iphone-coupure » sur le serveur), en parallèle.
+          bash ../../scripts/ios-coupure-reseau.sh "$RECETTE_URL" "$RECETTE_FAMILLE" 120 > ../coupure.log 2>&1 &
+          xcodebuild test-without-building -project Courses.xcodeproj -scheme Courses -destination "id=$SIM" \
+            -only-testing:CoursesUITests/ParcoursRecetteTests/test3_AjoutAndroidVisibleSurIPhone_EtReconnexion \
+            -derivedDataPath ../build/dd -resultBundlePath ../parcours.xcresult 2>&1 | tee ../xctest.log | grep -vE "^\s*(export|cd) |^\s*$" | tail -150
+      - name: Chronologie (iPhone, coupure réseau) et journal du flux de l'application
+        if: always()
+        run: |
+          echo "── Coupure réseau"; cat ios/coupure.log 2>/dev/null
+          sudo pfctl -f /etc/pf.conf >/dev/null 2>&1 || true
+          echo "── Test iPhone"; grep -E "iPhone :|Signal «" ios/xctest.log | grep -v "t = " | head -20
+          echo "── Flux en direct de l'application iPhone"
+          xcrun simctl spawn "$SIM" log show --last 120m --style compact --info --debug --predicate 'eventMessage CONTAINS "[Courses"' 2>/dev/null | grep -E "CoursesFlux|CoursesData|CoursesIos" | tail -120 || true
+      - name: Captures d'écran
+        if: always()
+        run: |
+          mkdir -p ios/captures
+          xcrun xcresulttool export attachments --path ios/parcours.xcresult --output-path ios/captures 2>/dev/null || true
+          cat ios/captures/manifest.json 2>/dev/null | head -60
+          for p in ios/captures/*.png; do
+            sips -Z 360 -s format jpeg -s formatOptions 55 "$p" --out /tmp/s.jpg >/dev/null 2>&1 || continue
+            echo "CAPTURE-DEBUT $(basename "$p")"; base64 -i /tmp/s.jpg | fold -w 180; echo "CAPTURE-FIN"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: parcours-iphone-railway, path: "ios/captures/\nios/xctest.log\nios/coupure.log" }
