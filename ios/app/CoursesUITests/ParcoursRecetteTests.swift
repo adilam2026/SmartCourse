@@ -56,6 +56,14 @@ final class ParcoursRecetteTests: XCTestCase {
         field.typeText(text)
     }
 
+    private func fill(_ hint: String, _ text: String) {
+        let e = waitFor(hint, 15)
+        e.tap()
+        sleep(1)
+        app.typeText(text)
+        sleep(1)
+    }
+
     /// Une photo est affichée dans [frame] : l'image n'est pas une surface unie (le fond « photo à venir » est uni).
     private func hasPhoto(in frame: CGRect) -> Bool {
         let shot = XCUIScreen.main.screenshot().image
@@ -87,11 +95,10 @@ final class ParcoursRecetteTests: XCTestCase {
         // 1. Écran de connexion (le même que sur Android)
         waitFor("Bienvenue", 40)
         attach("1-connexion")
-        let f = fields()
-        XCTAssertGreaterThanOrEqual(f.count, 3, "champs de connexion : \(f.count) trouvés")
-        type(f[0], family)
-        type(f[1], "marie")
-        type(f[2], "573918")
+        // Comme un utilisateur : toucher le champ (son indication), puis taper au clavier.
+        fill("Identifiant famille", family)
+        fill("Identifiant personnel", "marie")
+        fill("Code d'accès personnel", "573918")
         attach("2-connexion-remplie")
         let buttons = any("Se connecter").allElementsBoundByIndex.filter { $0.isHittable }
         try XCTUnwrap(buttons.last, "bouton « Se connecter » introuvable").tap()
