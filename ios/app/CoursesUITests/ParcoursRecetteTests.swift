@@ -96,45 +96,52 @@ final class ParcoursRecetteTests: XCTestCase {
         sleep(1)
     }
 
+    /// Capture d'écran redessinée en RGBA 8 bits sRGB (le format natif des captures varie : 16 bits, Display P3…).
+    private func screenPixels() -> (px: [UInt8], w: Int, h: Int, scale: CGFloat)? {
+        let shot = XCUIScreen.main.screenshot().image
+        guard let cg = shot.cgImage else { return nil }
+        let w = cg.width, h = cg.height
+        var px = [UInt8](repeating: 0, count: w * h * 4)
+        let ok: Bool = px.withUnsafeMutableBytes { buf in
+            guard let ctx = CGContext(data: buf.baseAddress, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+                                      space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+            ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+            return true
+        }
+        return ok ? (px, w, h, CGFloat(w) / shot.size.width) : nil
+    }
+
     /// Centre (en points) du bandeau turquoise le plus bas au milieu de l'écran : le bouton principal « Se connecter ».
     private func lowestTealBand() -> CGFloat? {
-        let shot = XCUIScreen.main.screenshot().image
-        guard let cg = shot.cgImage, let data = cg.dataProvider?.data, let p = CFDataGetBytePtr(data) else { return nil }
-        let scale = CGFloat(cg.width) / shot.size.width, bpr = cg.bytesPerRow, bpp = cg.bitsPerPixel / 8
-        let x = cg.width / 2
+        guard let s = screenPixels() else { return nil }
+        let x = s.w / 2
         func teal(_ y: Int) -> Bool {
-            let o = y * bpr + x * bpp
-            // Turquoise (≈ 20, 184, 166) quel que soit l'ordre des canaux (RGBA ou BGRA) : vert fort, un canal fort, un canal faible.
-            let c0 = Int(p[o]), g = Int(p[o + 1]), c2 = Int(p[o + 2])
-            return g > 120 && max(c0, c2) > 110 && min(c0, c2) < 90 && g - min(c0, c2) > 60
+            let o = (y * s.w + x) * 4
+            let r = Int(s.px[o]), g = Int(s.px[o + 1]), b = Int(s.px[o + 2])
+            return g > 110 && b > 100 && r < 100 && g - r > 50
         }
         var bands: [(Int, Int)] = [], start: Int? = nil
-        for y in 0..<cg.height {
+        for y in 0..<s.h {
             if teal(y) { if start == nil { start = y } } else if let s0 = start { bands.append((s0, y)); start = nil }
         }
-        let ok = bands.filter { CGFloat($0.1 - $0.0) / scale >= 36 }
+        let ok = bands.filter { CGFloat($0.1 - $0.0) / s.scale >= 36 }
+        print("Bandeaux turquoise (points) : " + ok.map { "\(CGFloat($0.0) / s.scale)–\(CGFloat($0.1) / s.scale)" }.joined(separator: ", "))
         guard let last = ok.last else { return nil }
-        return CGFloat(last.0 + last.1) / 2 / scale
+        return CGFloat(last.0 + last.1) / 2 / s.scale
     }
 
     /// Une photo est affichée dans [frame] : l'image n'est pas une surface unie (le fond « photo à venir » est uni).
     private func hasPhoto(in frame: CGRect) -> Bool {
-        let shot = XCUIScreen.main.screenshot().image
-        guard let cg = shot.cgImage else { return false }
-        let scale = CGFloat(cg.width) / shot.size.width
-        let r = CGRect(x: frame.minX * scale, y: frame.minY * scale, width: frame.width * scale, height: frame.height * scale).integral
-        guard let crop = cg.cropping(to: r), let data = crop.dataProvider?.data, let p = CFDataGetBytePtr(data) else { return false }
-        let bpr = crop.bytesPerRow, bpp = crop.bitsPerPixel / 8
+        guard let s = screenPixels() else { return false }
         var colors = Set<UInt32>()
-        var y = 0
-        while y < crop.height {
-            var x = 0
-            while x < crop.width {
-                let o = y * bpr + x * bpp
-                colors.insert(UInt32(p[o] >> 4) << 8 | UInt32(p[o + 1] >> 4) << 4 | UInt32(p[o + 2] >> 4))
-                x += 4
+        let x0 = max(0, Int(frame.minX * s.scale)), x1 = min(s.w, Int(frame.maxX * s.scale))
+        let y0 = max(0, Int(frame.minY * s.scale)), y1 = min(s.h, Int(frame.maxY * s.scale))
+        guard x1 > x0, y1 > y0 else { return false }
+        for y in stride(from: y0, to: y1, by: 4) {
+            for x in stride(from: x0, to: x1, by: 4) {
+                let o = (y * s.w + x) * 4
+                colors.insert(UInt32(s.px[o] >> 4) << 8 | UInt32(s.px[o + 1] >> 4) << 4 | UInt32(s.px[o + 2] >> 4))
             }
-            y += 4
         }
         return colors.count > 40
     }
