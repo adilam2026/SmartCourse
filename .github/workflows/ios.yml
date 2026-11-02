@@ -89,6 +89,14 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with: { name: ios-sync-android, path: ios-sync-android/ }
+      - name: Serveur commun gardé jusqu'à la fin des contrôles iPhone (l'iPhone attend encore « Bananes »)
+        if: always()
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          for _ in $(seq 1 135); do
+            D=$(curl -fsS -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/${{ github.repository }}/commits/${{ github.sha }}/statuses" | jq -r '[.[]|select(.context=="ios-fin")][0].state // empty')
+            [ -n "$D" ] && { echo "contrôles iPhone terminés"; break; }; sleep 20
+          done
       - if: always()
         run: scripts/recette-locale.sh --stop
 
@@ -96,7 +104,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[parcours]')
     runs-on: macos-15
     timeout-minutes: 130
-    permissions: { contents: read, statuses: read }
+    permissions: { contents: read, statuses: write }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -146,6 +154,13 @@ jobs:
           set -o pipefail
           xcodebuild test-without-building -project Courses.xcodeproj -scheme Courses -destination "id=$SIM" \
             -derivedDataPath ../build/dd -resultBundlePath ../parcours.xcresult 2>&1 | tee ../xctest.log | grep -vE "^\s*(export|cd) |^\s*$" | tail -150
+      - name: Fin des contrôles iPhone signalée (le serveur de recette peut s'arrêter)
+        if: always()
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          curl -fsS -X POST -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/statuses/${{ github.sha }}" \
+            -d '{"state":"success","context":"ios-fin","description":"contrôles iPhone terminés"}' >/dev/null || true
       - name: Captures d'écran du parcours
         if: always()
         run: |
