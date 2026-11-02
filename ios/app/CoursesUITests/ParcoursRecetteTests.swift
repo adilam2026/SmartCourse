@@ -96,6 +96,26 @@ final class ParcoursRecetteTests: XCTestCase {
         sleep(1)
     }
 
+    /// Centre (en points) du bandeau turquoise le plus bas au milieu de l'écran : le bouton principal « Se connecter ».
+    private func lowestTealBand() -> CGFloat? {
+        let shot = XCUIScreen.main.screenshot().image
+        guard let cg = shot.cgImage, let data = cg.dataProvider?.data, let p = CFDataGetBytePtr(data) else { return nil }
+        let scale = CGFloat(cg.width) / shot.size.width, bpr = cg.bytesPerRow, bpp = cg.bitsPerPixel / 8
+        let x = cg.width / 2
+        func teal(_ y: Int) -> Bool {
+            let o = y * bpr + x * bpp
+            let b = Int(p[o]), g = Int(p[o + 1]), r = Int(p[o + 2])   // BGRA
+            return g > 120 && b > 110 && r < 90 && g - r > 60
+        }
+        var bands: [(Int, Int)] = [], start: Int? = nil
+        for y in 0..<cg.height {
+            if teal(y) { if start == nil { start = y } } else if let s0 = start { bands.append((s0, y)); start = nil }
+        }
+        let ok = bands.filter { CGFloat($0.1 - $0.0) / scale >= 36 }
+        guard let last = ok.last else { return nil }
+        return CGFloat(last.0 + last.1) / 2 / scale
+    }
+
     /// Une photo est affichée dans [frame] : l'image n'est pas une surface unie (le fond « photo à venir » est uni).
     private func hasPhoto(in frame: CGRect) -> Bool {
         let shot = XCUIScreen.main.screenshot().image
@@ -168,14 +188,17 @@ final class ParcoursRecetteTests: XCTestCase {
         var ok = false
         for essai in 1...3 {
             sleep(2)
-            guard let bouton = boutonConnexion() else {
-                print("Éléments « Se connecter » : " + any("Se connecter").allElementsBoundByIndex.map { "\($0.elementType.rawValue) \($0.frame)" }.joined(separator: " ; "))
-                attach("bouton-absent")
-                XCTFail("bouton « Se connecter » (pleine largeur) introuvable à l'écran"); return
-            }
-            print("Essai \(essai) : « Se connecter » à \(bouton.frame)")
             attach("3-avant-connexion-\(essai)")
-            press(bouton)
+            if let bouton = boutonConnexion(), bouton.frame.height > 0 {
+                print("Essai \(essai) : « Se connecter » (accessibilité) à \(bouton.frame)")
+                press(bouton)
+            } else if let y = lowestTealBand() {
+                // Compose donne à ce bouton un cadre d'accessibilité vide : il est repéré à l'image (bandeau turquoise le plus bas).
+                print("Essai \(essai) : « Se connecter » repéré à l'image, y = \(y)")
+                app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: app.frame.width / 2, dy: y)).tap()
+            } else {
+                attach("bouton-absent"); XCTFail("bouton « Se connecter » introuvable (accessibilité et image)"); return
+            }
             // Le toucher a pris si : « Connexion… », un message, ou l'écran suivant.
             for _ in 0..<8 {
                 if anyContaining("Connexion…").firstMatch.exists || anyContaining("Choisir mes articles").firstMatch.exists
