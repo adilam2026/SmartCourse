@@ -1,0 +1,29 @@
+name: iPhone (Kotlin Multiplatform) — compilation et contrôles
+# Branche dédiée claude/ios-kmp. Mac GitHub Actions : aucun Mac nécessaire chez l'utilisateur. Aucun accès à la production.
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/ios-kmp]
+    paths: ['ios/**', 'android-native/app/src/main/**', 'scripts/ios-*', '.github/workflows/ios.yml']
+permissions:
+  contents: read
+jobs:
+  mesure:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ~/.konan
+          key: ios-gradle-${{ hashFiles('ios/**/*.kts', 'ios/gradle/wrapper/gradle-wrapper.properties') }}
+      - name: Mesure de la réutilisation (compilation iOS des fichiers Android, sans adaptation)
+        run: scripts/ios-mesure.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: ios-mesure, path: 'ios-mesure*' }
