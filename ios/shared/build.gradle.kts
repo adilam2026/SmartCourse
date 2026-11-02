@@ -30,9 +30,9 @@ compose.resources {
     packageOfResClass = "app.smartcourse.courses.nativeproto.res"
     publicResClass = false
     generateResClass = always
-    customDirectory("commonMain", provider { layout.buildDirectory.dir("androidRes").get() })
+    customDirectory("commonMain", androidImages.map { layout.buildDirectory.dir("androidRes").get() })
 }
-tasks.matching { it.name.contains("ComposeResources", ignoreCase = true) || it.name.contains("ResourceAccessors", ignoreCase = true) }
+tasks.matching { it.name != "androidImages" && it.name.contains("Resource", ignoreCase = true) }
     .configureEach { dependsOn(androidImages) }
 
 kotlin {

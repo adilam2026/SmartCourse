@@ -131,6 +131,9 @@ fun secondsSince(iso: String): Long = (-parseInstant(iso).timeIntervalSinceNow).
 fun nowInstantIso(): String =
     NSISO8601DateFormatter().apply { formatOptions = NSISO8601DateFormatWithInternetDateTime or NSISO8601DateFormatWithFractionalSeconds }.stringFromDate(NSDate())
 fun nowOffsetIso(): String = nowInstantIso()
+fun isoSecondsAgo(s: Long): String =
+    NSISO8601DateFormatter().apply { formatOptions = NSISO8601DateFormatWithInternetDateTime or NSISO8601DateFormatWithFractionalSeconds }
+        .stringFromDate(NSDate(timeIntervalSinceReferenceDate = NSDate().timeIntervalSinceReferenceDate - s))
 
 /* ───── Texte ───── */
 

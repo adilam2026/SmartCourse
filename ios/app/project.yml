@@ -1,0 +1,51 @@
+# Application iPhone « Mes Courses » (recette) : coquille SwiftUI minimale qui affiche les écrans communs (Compose Multiplatform).
+# Projet Xcode généré sur le Mac de CI par XcodeGen (aucun fichier .xcodeproj dans le dépôt).
+name: Courses
+options:
+  bundleIdPrefix: app.smartcourse
+  deploymentTarget:
+    iOS: "16.0"
+settings:
+  base:
+    MARKETING_VERSION: "0.1"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  Courses:
+    type: application
+    platform: iOS
+    sources: [Courses]
+    preBuildScripts:
+      - name: Framework Kotlin (écrans et règles communs)
+        script: |
+          cd "$SRCROOT/.."
+          ./gradlew --no-daemon :shared:embedAndSignAppleFrameworkForXcode
+        basedOnDependencyAnalysis: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.smartcourse.courses.recette
+        PRODUCT_NAME: Courses
+        INFOPLIST_FILE: Courses/Info.plist
+        FRAMEWORK_SEARCH_PATHS: "$(SRCROOT)/../shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)"
+        OTHER_LDFLAGS: ["-framework", "Courses"]
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+        TARGETED_DEVICE_FAMILY: "1"
+        SWIFT_VERSION: "5.0"
+  CoursesUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [CoursesUITests]
+    dependencies:
+      - target: Courses
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.smartcourse.courses.recette.uitests
+        TEST_TARGET_NAME: Courses
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  Courses:
+    build:
+      targets:
+        Courses: all
+        CoursesUITests: [test]
+    test:
+      targets: [CoursesUITests]

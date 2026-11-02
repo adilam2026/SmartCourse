@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
 package app.smartcourse.courses.nativeproto
 
 import android.Manifest

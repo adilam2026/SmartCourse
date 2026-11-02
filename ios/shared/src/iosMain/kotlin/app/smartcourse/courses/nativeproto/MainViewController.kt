@@ -8,6 +8,7 @@ import app.smartcourse.courses.nativeproto.net.ApiClient
 import app.smartcourse.courses.nativeproto.net.FileKv
 import app.smartcourse.courses.nativeproto.net.KeychainStorage
 import app.smartcourse.courses.nativeproto.net.Session
+import app.smartcourse.courses.nativeproto.net.normalizeServer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -30,6 +31,8 @@ object CoursesIos {
         val storage = KeychainStorage()
         val s = Session(storage, ApiClient(storage), scope)
         if (BuildConfig.FINAL) s.setServer(BuildConfig.SERVER_URL)
+        // Recette seulement : adresse du serveur de recette fournie au lancement par les contrôles automatiques (simulateur).
+        else platform.Foundation.NSProcessInfo.processInfo.environment["COURSES_SERVER"]?.let { (it as? String)?.let(::normalizeServer)?.let(s::setServer) }
         s.start()
         session = s
         s

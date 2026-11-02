@@ -166,7 +166,7 @@ fun RecoveryScreen(onBack: () -> Unit) {
 fun BackupScreen(onBack: () -> Unit) {
     val demo = LocalDemo.current
     val data = demo.data
-    var st by remember { mutableStateOf<JsonObject?>(if (data == null) buildJsonObject { put("configured", true); put("schedule", "Une sauvegarde chiffrée par jour, suivie d'une restauration de vérification."); put("lastBackupAt", Instant.now().minusSeconds(7200).toString()); put("lastVerifiedOkAt", Instant.now().minusSeconds(7000).toString()) } else null) }
+    var st by remember { mutableStateOf<JsonObject?>(if (data == null) buildJsonObject { put("configured", true); put("schedule", "Une sauvegarde chiffrée par jour, suivie d'une restauration de vérification."); put("lastBackupAt", isoSecondsAgo(7200)); put("lastVerifiedOkAt", isoSecondsAgo(7000)) } else null) }
     var error by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) {
         if (data != null) when (val r = data.session.api.call("GET", "/api/admin/backup-status")) {

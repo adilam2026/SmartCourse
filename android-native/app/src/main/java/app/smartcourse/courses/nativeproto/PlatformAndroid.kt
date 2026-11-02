@@ -85,6 +85,7 @@ fun secondsSince(iso: String): Long = Duration.between(Instant.parse(iso), Insta
 
 fun nowInstantIso(): String = Instant.now().toString()
 fun nowOffsetIso(): String = OffsetDateTime.now().toString()
+fun isoSecondsAgo(s: Long): String = Instant.now().minusSeconds(s).toString()
 
 /* ───── Texte ───── */
 
@@ -161,7 +162,8 @@ fun watchNetwork(onAvailable: () -> Unit): (() -> Unit)? {
     }
     return try {
         cm.registerDefaultNetworkCallback(cb)
-        { try { cm.unregisterNetworkCallback(cb) } catch (_: Exception) { } }
+        val stop: () -> Unit = { try { cm.unregisterNetworkCallback(cb) } catch (_: Exception) { } }
+        stop
     } catch (_: Exception) { null }
 }
 
