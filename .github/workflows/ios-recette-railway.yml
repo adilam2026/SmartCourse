@@ -11,7 +11,7 @@ permissions:
   contents: read
 env:
   # Adresse publique du service de recette (pas un secret). Vide tant que le service n'est pas créé.
-  RECETTE_URL: ""
+  RECETTE_URL: https://smartcourse-recette-recette.up.railway.app
   RECETTE_FAMILLE: RecetteCourses
 jobs:
   sonde:
