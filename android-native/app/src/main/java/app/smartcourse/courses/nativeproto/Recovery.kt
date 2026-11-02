@@ -237,7 +237,9 @@ fun CreateFamilyForm(session: Session) {
     Spacer(Modifier.height(8.dp))
     FormField(name, { name = it }, "Votre prénom", leading = Icons.Rounded.Person)
     Spacer(Modifier.height(10.dp))
-    FormField(login, { login = it.trim().lowercase().filter { ch -> ch.isLetterOrDigit() || ch in "._-" }.take(30) }, "Identifiant personnel", leading = Icons.Rounded.Person)
+    FormField(login, { login = it.trim().lowercase().filter { ch -> ch.isLetterOrDigit() || ch in "._-" }.take(30) }, "Identifiant personnel", leading = Icons.Rounded.Person,
+        keyboard = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Ascii,
+            capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.None, autoCorrectEnabled = false))
     Spacer(Modifier.height(10.dp))
     // Pays d'abord ; la ville seulement pour le Maroc (jamais déduite du GPS ni de l'adresse IP).
     SecondaryButton(if (country == null) "Pays : à choisir (obligatoire)" else "Pays : ${countryName(country)}", { countrySheet = true }, Modifier.fillMaxWidth(), height = 54.dp)
