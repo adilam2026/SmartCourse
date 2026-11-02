@@ -64,8 +64,12 @@ jobs:
           check "icône de l'application (1024 px, sans transparence)" '[ -f "$A/Assets.car" ] && plutil -extract CFBundleIcons raw "$P" >/dev/null 2>&1 || [ -f "$A/AppIcon60x60@2x.png" ]'
           check "manifeste de confidentialité" '[ -f "$A/PrivacyInfo.xcprivacy" ]'
           check "binaire arm64 (vrai iPhone)" 'lipo -archs "$A/Courses" | grep -q arm64'
-          check "serveur fixé : $(strings "$A/Courses" | grep -oE "https://smartcourse-[a-z0-9.-]+up\.railway\.app" | sort -u | tr '\n' ' ')" 'strings "$A/Courses" | grep -q "up.railway.app"'
-          check "aucune adresse de recette locale dans la version de production" '[ "${{ inputs.serveur }}" = recette ] || ! strings "$A/Courses" | grep -q "10.0.2.2"'
+          # Les textes Kotlin sont rangés en UTF-16 dans le binaire : recherche dans ce codage, et dans le BuildConfig généré.
+          URL=$([ "${{ inputs.serveur }}" = recette ] && echo "$RECETTE_URL" || echo "$PROD_URL")
+          has16() { python3 -c 'import sys; d=open(sys.argv[1],"rb").read(); sys.exit(0 if sys.argv[2].encode("utf-16-le") in d else 1)' "$A/Courses" "$1"; }
+          BC=$(find ios/shared/build/generated/buildconfig -name BuildConfig.kt | head -1); cat "$BC"
+          check "version finale (FINAL = true) et serveur fixé : $URL" 'grep -q "FINAL = true" "$BC" && grep -q "SERVER_URL = \"$URL\"" "$BC" && has16 "$URL"'
+          check "aucune adresse de recette locale dans la version de production" '[ "${{ inputs.serveur }}" = recette ] || ! has16 "10.0.2.2"'
           check "droit « notifications » APNs (production) prévu à la signature" 'grep -q "<string>production</string>" ios/app/Courses/Courses-final.entitlements'
           du -sh "$A"; exit $OK
 
