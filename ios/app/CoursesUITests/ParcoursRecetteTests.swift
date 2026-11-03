@@ -397,7 +397,7 @@ final class ParcoursRecetteTests: XCTestCase {
     }
 
     private func relaunch(reset: Bool) {
-        app.terminate()
+        if app.state != .notRunning { app.terminate() }   // fermer seulement une application réellement lancée
         app.launchEnvironment["COURSES_RESET"] = reset ? "1" : "0"
         app.launch()
     }
@@ -612,7 +612,7 @@ final class ParcoursRecetteTests: XCTestCase {
             if fiche == nil { usleep(500_000) }
         }
         attach("k5-recherche-clavier")
-        if fiche == nil { for e in anyContaining("Courgettes").allElementsBoundByIndex { print("Courgettes : « \(e.label) » \(e.frame)") } }
+        for e in anyContaining("Courgettes").allElementsBoundByIndex { print("Courgettes : « \(e.label) » type \(e.elementType.rawValue) \(e.frame) ; recherche \(f) ; clavier \(kb.frame)") }
         let carte = try XCTUnwrap(fiche, "fiche « Courgettes » pas entièrement visible au-dessus du clavier (clavier \(kb.frame))")
         press(carte); sleep(2)
         XCTAssertTrue(app.keyboards.firstMatch.exists, "le clavier s'est fermé en sélectionnant")
