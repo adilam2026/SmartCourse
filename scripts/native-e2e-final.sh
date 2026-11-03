@@ -242,7 +242,7 @@ launch
 expect "P3b. la demande survit à la fermeture de l'application" $UI wait "Envoi en attente" 25
 docker start sc-recette-app >/dev/null; server_wait
 expect "P4. reprise : envoi au retour du réseau" $UI gone "Envoi en attente" 90
-expect "P4b. serveur : une seule ligne, quantité remplacée ($(st Tomates))" test "$(st Tomates)" = "1.500 kg to_buy"
+expect "P4b. serveur : une seule ligne, quantité remplacée ($(st Tomates))" test "$(st Tomates)" = "1.250 kg to_buy"
 tapt "Compte"
 expect "P5. personnel : « Se déconnecter » dans Compte" $UI wait "Se déconnecter" 8
 adb shell input keyevent KEYCODE_BACK; sleep 1
@@ -282,14 +282,14 @@ launch
 expect "J3. trois jours plus tard : sélection et quantité conservées" bash -c "$UI wait 'Choisir mes articles' 20 && $UI wait 'Dans la liste · 1 kg' 15"
 $UI tap "Modifier la quantité : Tomates" >/dev/null; sleep 2; $UI tap "Augmenter" >/dev/null; sleep 1; $UI tap "Mettre à jour" >/dev/null; sleep 2
 $UI tap "Terminer ma sélection" >/dev/null; sleep 4
-expect "J3b. modification enregistrée sur la MÊME liste ($(items_of $LJ))" test "$(items_of $LJ)" = "Tomates 1.500 to_buy"
+expect "J3b. modification enregistrée sur la MÊME liste ($(items_of $LJ))" test "$(items_of $LJ)" = "Tomates 1.250 to_buy"
 expect "J3c. serveur : toujours une seule liste ouverte" test "$(sql "SELECT count(*) FROM lists l JOIN families f ON f.id=l.family_id WHERE f.code='$FAMILY' AND l.status='active'")" = 1
 # Clôture EN LIGNE par un parent
 login_api lamiaa 573918; api POST "/api/lists/$LJ/close" -d '{}' >/dev/null
 expect "J4. clôture par le parent apprise : sélections de cette liste réinitialisées" $UI gone "Enregistré ·" 30
 expect "J4b. reste sur Choisir, articles et photos toujours affichés" bash -c "$UI has 'Choisir mes articles' && $UI has 'Tomates' && $UI has 'Légumes et herbes'"
 ARCH=$(items_of $LJ)
-expect "J4c. historique : liste archivée avec son contenu ($ARCH)" test "$(sql "SELECT status FROM lists WHERE id='$LJ'")" = archived -a "$ARCH" = "Tomates 1.500 to_buy"
+expect "J4c. historique : liste archivée avec son contenu ($ARCH)" test "$(sql "SELECT status FROM lists WHERE id='$LJ'")" = archived -a "$ARCH" = "Tomates 1.250 to_buy"
 shot final-13-apres-cloture
 # Clôture HORS CONNEXION : demande non envoyée + brouillon non validé pendant que le parent clôture
 login_api adil 482913; api POST /api/lists -d '{}' >/dev/null; LK=$(jq -r .list.id /tmp/api.out)
@@ -310,11 +310,11 @@ expect "J6c. historique non modifié par les demandes tardives ($(items_of $LK))
 expect "J6d. reste sur Choisir" $UI has "Choisir mes articles"
 shot final-14-reprendre-apres-cloture-hors-connexion
 $UI tap "Reprendre" >/dev/null; sleep 2
-expect "J7. reprise : demande (Tomates 1,5 kg) et brouillon (Carottes) repris dans la sélection" bash -c "$UI wait 'Terminer ma sélection (2)' 10 && $UI has '1,5 kg'"
+expect "J7. reprise : demande (Tomates 1,25 kg) et brouillon (Carottes) repris dans la sélection" bash -c "$UI wait 'Terminer ma sélection (2)' 10 && $UI has '1,25 kg'"
 $UI tap "Terminer ma sélection" >/dev/null; sleep 6
 NEWL=$(sql "SELECT l.id FROM lists l JOIN families f ON f.id=l.family_id WHERE f.code='$FAMILY' AND l.status='active'")
-expect "J7b. serveur : nouvelle liste du jour avec les articles repris ($(items_of ${NEWL:-00000000-0000-0000-0000-000000000000}))" test "$(items_of ${NEWL:-00000000-0000-0000-0000-000000000000})" = "Carottes 1.000 to_buy,Tomates 1.500 to_buy"
-expect "J7c. les listes archivées restent intactes" test "$(items_of $LJ)" = "Tomates 1.500 to_buy" -a "$(items_of $LK)" = "Tomates 1.000 to_buy"
+expect "J7b. serveur : nouvelle liste du jour avec les articles repris ($(items_of ${NEWL:-00000000-0000-0000-0000-000000000000}))" test "$(items_of ${NEWL:-00000000-0000-0000-0000-000000000000})" = "Carottes 1.000 to_buy,Tomates 1.250 to_buy"
+expect "J7c. les listes archivées restent intactes" test "$(items_of $LJ)" = "Tomates 1.250 to_buy" -a "$(items_of $LK)" = "Tomates 1.000 to_buy"
 adb shell settings put global auto_time 1 >/dev/null 2>&1; setclock "$(date -u +%s)"
 
 fi

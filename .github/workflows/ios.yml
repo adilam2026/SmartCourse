@@ -53,14 +53,15 @@ jobs:
   # la version finale Android (scripts/native-e2e-final.sh, le même que pour Google Play), APK final de TEST (clé jetable, serveur
   # local de l'émulateur — jamais distribué). Seulement avec [android-e2e] ou à la demande.
   android-e2e:
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[android-e2e]')
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[android-e2e')
     runs-on: ubuntu-latest
     timeout-minutes: 60
     # Mêmes groupes indépendants que le workflow Google Play (chacun part d'une recette neuve), plus Q (rappels d'achat).
     strategy:
       fail-fast: false
       matrix:
-        sections: ["F,G,H", "C,D", "F,P,J", "K,S", "A", "T", "Q"]
+        # [android-e2e:F,P,J] dans le message : ce seul groupe.
+        sections: ${{ fromJSON(contains(github.event.head_commit.message, '[android-e2e:F,P,J]') && '["F,P,J"]' || '["F,G,H","C,D","F,P,J","K,S","A","T","Q"]') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
