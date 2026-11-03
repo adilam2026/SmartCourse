@@ -105,7 +105,9 @@ jobs:
         if: always()
         run: |
           sudo pfctl -f /etc/pf.conf >/dev/null 2>&1 || true
+          set +e
           echo "── Réseau"; cat ios/reseau.log 2>/dev/null
+          echo "── Éléments « Carottes » vus par le test (clavier et affichage)"; grep -hE "Carottes" ios/se.log ios/max.log 2>/dev/null | grep -vE "t = |Find|Check" | head -30
           echo "── Hors connexion (iPhone)"; grep -E "iPhone :|Serveur commun" ios/h.log | grep -v "t = " | head -20
           echo "── Journal de l'application (iPhone 16)"
           xcrun simctl spawn "$SIM16" log show --last 120m --style compact --info --debug --predicate 'eventMessage CONTAINS "[Courses"' 2>/dev/null | grep -E "CoursesFlux|CoursesData|CoursesIos" | tail -60 || true

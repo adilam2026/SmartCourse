@@ -594,8 +594,16 @@ final class ParcoursRecetteTests: XCTestCase {
         XCTAssertTrue(kb.exists, "clavier absent (recherche)")
         let f = anyContaining("Rechercher un produit").allElementsBoundByIndex.first { $0.frame.height > 0 }?.frame ?? .zero
         XCTAssertTrue(f.maxY <= kb.frame.minY + 1, "champ de recherche caché par le clavier")
-        let carte = waitCard("Carottes", 15)
-        XCTAssertTrue(carte.frame.minY < kb.frame.minY, "aucun résultat visible au-dessus du clavier")
+        // Un résultat est visible s'il commence au-dessus du clavier (sur petit écran, le bas de la fiche peut passer dessous).
+        var vu: CGRect? = nil
+        for _ in 0..<30 where vu == nil {
+            vu = anyContaining("Carottes").allElementsBoundByIndex.map { $0.frame }
+                .first { $0.height > 0 && $0.minY > f.maxY && $0.minY < kb.frame.minY }
+            if vu == nil { usleep(500_000) }
+        }
+        if vu == nil { for e in anyContaining("Carottes").allElementsBoundByIndex { print("Carottes : « \(e.label) » \(e.elementType.rawValue) \(e.frame)") } }
+        attach("k5-recherche-clavier")
+        XCTAssertNotNil(vu, "aucun résultat visible au-dessus du clavier (clavier \(kb.frame))")
         XCTAssertEqual(horsLargeur(), [], "éléments qui débordent de l'écran (sélection)")
         attach("k5-recherche-clavier")
     }
