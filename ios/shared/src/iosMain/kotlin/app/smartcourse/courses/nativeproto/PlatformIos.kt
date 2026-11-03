@@ -15,6 +15,17 @@ import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import app.smartcourse.courses.nativeproto.net.COOKIE_NAME
 import app.smartcourse.courses.nativeproto.net.IosTransport
+import kotlinx.cinterop.addressOf
+import kotlinx.cinterop.usePinned
+import kotlinx.coroutines.delay
+import platform.Foundation.NSCachesDirectory
+import platform.Foundation.NSData
+import platform.Foundation.NSFileManager
+import platform.Foundation.NSSearchPathForDirectoriesInDomains
+import platform.Foundation.NSUserDomainMask
+import platform.Foundation.dataWithContentsOfFile
+import platform.Foundation.writeToFile
+import platform.posix.memcpy
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
@@ -60,16 +71,40 @@ import platform.darwin.dispatch_get_main_queue
  * Mêmes noms, mêmes paramètres, même résultat attendu.
  */
 
-/* ───── Images du serveur (avec le cookie de session), gardées en mémoire ───── */
+/* ───── Images du serveur (avec le cookie de session) : mémoire, puis disque (comme le cache d'images Android) ───── */
 
 private object ImageCache {
     private val mem = LinkedHashMap<String, ImageBitmap>()
+    private val dir: String by lazy {
+        val d = (NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, true).first() as String) + "/images"
+        NSFileManager.defaultManager.createDirectoryAtPath(d, withIntermediateDirectories = true, attributes = null, error = null)
+        d
+    }
+    /** Nom de fichier stable pour une adresse (FNV-1a 64 bits). */
+    private fun file(url: String): String {
+        var h = -0x340d631b7bdddcdbL
+        for (c in url) { h = h xor c.code.toLong(); h *= 0x100000001b3L }
+        return "$dir/${h.toULong().toString(16)}"
+    }
     fun get(url: String): ImageBitmap? = mem[url]
     fun put(url: String, img: ImageBitmap) {
         mem[url] = img
         if (mem.size > 300) mem.remove(mem.keys.first())
     }
+    fun readDisk(url: String): ByteArray? {
+        val d = NSData.dataWithContentsOfFile(file(url)) ?: return null
+        val n = d.length.toInt()
+        if (n == 0) return null
+        return ByteArray(n).apply { usePinned { memcpy(it.addressOf(0), d.bytes, d.length) } }
+    }
+    fun writeDisk(url: String, bytes: ByteArray) {
+        if (bytes.isEmpty()) return
+        bytes.usePinned { NSData.create(bytes = it.addressOf(0), length = bytes.size.toULong()) }.writeToFile(file(url), atomically = true)
+    }
 }
+
+private fun decode(bytes: ByteArray): ImageBitmap? =
+    try { org.jetbrains.skia.Image.makeFromEncoded(bytes).toComposeImageBitmap() } catch (_: Throwable) { null }
 
 @Composable
 fun ServerImage(url: String, contentScale: ContentScale, modifier: Modifier) {
@@ -77,12 +112,22 @@ fun ServerImage(url: String, contentScale: ContentScale, modifier: Modifier) {
     var img by remember(url) { mutableStateOf(ImageCache.get(url)) }
     LaunchedEffect(url) {
         if (img != null) return@LaunchedEffect
+        // Disque d'abord : hors connexion, après réouverture de l'application, les photos déjà vues restent affichées.
+        ImageCache.readDisk(url)?.let(::decode)?.let { ImageCache.put(url, it); img = it }
         val transport = session.api.transport as? IosTransport ?: return@LaunchedEffect
-        val headers = session.storage.cookie?.let { mapOf("Cookie" to "$COOKIE_NAME=$it") } ?: emptyMap()
-        val bytes = transport.bytes(url, headers) ?: return@LaunchedEffect
-        val decoded = try { org.jetbrains.skia.Image.makeFromEncoded(bytes).toComposeImageBitmap() } catch (_: Throwable) { null } ?: return@LaunchedEffect
-        ImageCache.put(url, decoded)
-        img = decoded
+        // Réseau absent ou serveur injoignable : nouvel essai, de plus en plus espacé (le réseau revient sans action).
+        var wait = 5_000L
+        while (true) {
+            val headers = session.storage.cookie?.let { mapOf("Cookie" to "$COOKIE_NAME=$it") } ?: emptyMap()
+            val bytes = transport.bytes(url, headers)
+            val decoded = bytes?.let(::decode)
+            if (bytes != null && decoded != null) {
+                ImageCache.put(url, decoded); ImageCache.writeDisk(url, bytes); img = decoded
+                return@LaunchedEffect
+            }
+            if (img != null) return@LaunchedEffect   // version du disque affichée : pas d'insistance
+            delay(wait); wait = (wait * 2).coerceAtMost(60_000L)
+        }
     }
     img?.let { Image(it, null, modifier, contentScale = contentScale) }
 }

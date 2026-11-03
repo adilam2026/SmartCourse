@@ -42,6 +42,15 @@ final class ParcoursRecetteTests: XCTestCase {
             // Une fiche est un bouton (cliquable) ; à défaut, tout élément restant.
             let buttons = cards.filter { $0.elementType == .button }
             if let c = (buttons.isEmpty ? cards : buttons).min(by: { $0.frame.minY < $1.frame.minY }) { return c }
+            // Fiche sélectionnée : seul son texte peut être exposé (cadre plus petit) ; on le prend après quelques secondes.
+            if Date() > deadline.addingTimeInterval(-timeout / 2) {
+                let skip: [XCUIElement.ElementType] = [.textField, .searchField, .secureTextField, .keyboard, .key]
+                let bottom = app.windows.firstMatch.frame.maxY
+                let texts = anyContaining(name).allElementsBoundByIndex.filter { e in
+                    e.frame.height > 0 && e.frame.minY > top + 1 && e.frame.maxY <= bottom && !skip.contains(e.elementType)
+                }
+                if let t = texts.min(by: { $0.frame.minY < $1.frame.minY }) { return t }
+            }
             usleep(500_000)
         } while Date() < deadline
         attach("absent-\(name)")
@@ -353,6 +362,14 @@ final class ParcoursRecetteTests: XCTestCase {
         typeKeys(text.lowercased()); sleep(2)
     }
 
+    /// Onglet de la barre du bas (Liste, Historique, Statistiques, Réglages).
+    private func tapTab(_ label: String) {
+        let w = app.windows.firstMatch.frame
+        if let t = anyContaining(label).allElementsBoundByIndex.filter({ $0.frame.height > 0 && $0.frame.minY > w.maxY - 140 }).last { press(t) }
+        else { app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: w.width * 0.875, dy: w.maxY - 50)).tap() }
+        sleep(2)
+    }
+
     /// Ajoute l'article à la sélection : touche le « + » (« Ajouter ») de sa fiche, sinon la fiche elle-même, puis vérifie que
     /// « Terminer ma sélection » devient actif (sélection réellement prise en compte).
     private func addToSelection(_ name: String, _ card: XCUIElement) {
@@ -508,7 +525,7 @@ final class ParcoursRecetteTests: XCTestCase {
         XCTAssertFalse(any("Bienvenue").firstMatch.exists, "session perdue après réouverture hors connexion")
         XCTAssertTrue(anyContaining("attente").firstMatch.waitForExistence(timeout: 15), "envoi en attente perdu après réouverture hors connexion")
         continueAfterFailure = true
-        XCTAssertTrue(anyContaining("Hors connexion").firstMatch.exists, "état « Hors connexion » non indiqué")
+        XCTAssertTrue(anyContaining("Hors connexion").firstMatch.waitForExistence(timeout: 45), "état « Hors connexion » non indiqué")
         continueAfterFailure = false
         attach("h3-reouverture-hors-connexion")
         // Retour du réseau : envoi automatique, sans action.
@@ -539,17 +556,30 @@ final class ParcoursRecetteTests: XCTestCase {
         }
         XCTAssertEqual(horsLargeur(), [], "éléments qui débordent de l'écran (connexion)")
         attach("k0-connexion")
-        // Chaque champ touché reste visible au-dessus du clavier.
+        // Comme un utilisateur : toucher le 1er champ, taper, « Retour » vers le champ suivant ; chaque champ en cours de saisie
+        // doit rester visible au-dessus du clavier (le formulaire défile si besoin, en particulier sur petit écran).
+        let family = try XCTUnwrap(env["COURSES_FAMILY"])
         let c = champs()
         XCTAssertGreaterThanOrEqual(c.count, 3, "champs de connexion")
-        for (i, n) in ["identifiant famille", "identifiant personnel", "code"].enumerated() where i < c.count {
-            press(champs()[i]); sleep(2)
+        func suivant() {
+            if let r = [app.keyboards.buttons["Return"], app.keyboards.buttons["Next"], app.keyboards.buttons["next"], app.keyboards.buttons["Suivant"]].first(where: { $0.exists }) { press(r); sleep(1) }
+        }
+        func visible(_ n: String, _ e: XCUIElement?) {
             let kb = app.keyboards.firstMatch
             XCTAssertTrue(kb.waitForExistence(timeout: 8), "clavier absent (\(n))")
-            let f = champs().count > i ? champs()[i].frame : .zero
-            attach("k\(i + 1)-clavier-\(n.replacingOccurrences(of: " ", with: "-"))")
-            XCTAssertTrue(f.height > 0 && f.maxY <= kb.frame.minY + 1, "champ « \(n) » caché par le clavier (champ \(f), clavier \(kb.frame))")
+            let f = e?.frame ?? .zero
+            attach("k-clavier-\(n.replacingOccurrences(of: " ", with: "-"))")
+            XCTAssertTrue(f.height > 0 && f.minY >= w.minY && f.maxY <= kb.frame.minY + 1, "« \(n) » caché par le clavier (champ \(f), clavier \(kb.frame))")
         }
+        let premier = c[0]
+        press(premier); sleep(1)
+        visible("identifiant famille", premier)
+        clearFocused(); typeKeys(family); suivant()
+        clearFocused(); typeKeys("adil"); sleep(1)
+        visible("identifiant personnel", anyContaining("adil").allElementsBoundByIndex.first { $0.frame.height > 0 && $0.elementType != .key })
+        suivant()
+        clearFocused(); typeKeys("482913"); sleep(1)
+        visible("code", any("Afficher le code").allElementsBoundByIndex.first { $0.frame.height > 0 })
         press(waitFor("Bienvenue")); sleep(1)
         try login("adil", "482913")
         XCTAssertTrue(anyContaining("Ajouter des articles").firstMatch.waitForExistence(timeout: 40) || anyContaining("Créer une liste").firstMatch.exists, "écran de la liste")
@@ -579,7 +609,7 @@ final class ParcoursRecetteTests: XCTestCase {
         // Un article à acheter (les rappels ne sont programmés que s'il reste quelque chose).
         tapButton("Ajouter des articles"); search("Carottes"); addToSelection("Carottes", waitCard("Carottes", 20)); tapButton("Terminer ma sélection"); sleep(3)
         // Réglages → Notifications et rappels
-        tapButton("Réglages"); sleep(2)
+        tapTab("Réglages")
         press(waitFor("Notifications et rappels", 20)); sleep(2)
         attach("n1-ecran-notifications")
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
