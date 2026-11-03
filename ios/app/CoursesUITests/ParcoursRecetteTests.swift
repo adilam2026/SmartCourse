@@ -362,6 +362,33 @@ final class ParcoursRecetteTests: XCTestCase {
         typeKeys(text.lowercased()); sleep(2)
     }
 
+    /// Pastilles turquoise (bouton « + » des fiches, ~40 points) entre [top] et [bottom] (points), repérées à l'image : avec le
+    /// clavier ouvert, Compose n'expose pas toujours les fiches dans l'arborescence d'accessibilité.
+    private func tealDots(top: CGFloat, bottom: CGFloat) -> [CGRect] {
+        guard let s = screenPixels() else { return [] }
+        let step = 2, y0 = max(0, Int(top * s.scale)), y1 = min(s.h, Int(bottom * s.scale))
+        func teal(_ x: Int, _ y: Int) -> Bool {
+            let o = (y * s.w + x) * 4
+            let r = Int(s.px[o]), g = Int(s.px[o + 1]), b = Int(s.px[o + 2])
+            return g > 110 && b > 100 && r < 100 && g - r > 50
+        }
+        var seen = Set<Int>(), out: [CGRect] = []
+        for y in stride(from: y0, to: y1, by: step) { for x in stride(from: 0, to: s.w, by: step) where teal(x, y) && !seen.contains(y * s.w + x) {
+            var stack = [(x, y)], minX = x, maxX = x, minY = y, maxY = y
+            seen.insert(y * s.w + x)
+            while let (cx, cy) = stack.popLast() {
+                minX = min(minX, cx); maxX = max(maxX, cx); minY = min(minY, cy); maxY = max(maxY, cy)
+                for (nx, ny) in [(cx + step, cy), (cx - step, cy), (cx, cy + step), (cx, cy - step)]
+                where nx >= 0 && nx < s.w && ny >= y0 && ny < y1 && !seen.contains(ny * s.w + nx) && teal(nx, ny) {
+                    seen.insert(ny * s.w + nx); stack.append((nx, ny))
+                }
+            }
+            let r = CGRect(x: CGFloat(minX) / s.scale, y: CGFloat(minY) / s.scale, width: CGFloat(maxX - minX) / s.scale, height: CGFloat(maxY - minY) / s.scale)
+            if r.width >= 24 && r.width <= 60 && r.height >= 24 && r.height <= 60 { out.append(r) }
+        } }
+        return out
+    }
+
     /// Onglet de la barre du bas (Liste, Historique, Statistiques, Réglages).
     private func tapTab(_ label: String) {
         let w = app.windows.firstMatch.frame
@@ -603,22 +630,23 @@ final class ParcoursRecetteTests: XCTestCase {
         XCTAssertTrue(kb.exists, "clavier absent (recherche)")
         let f = anyContaining("Rechercher un produit").allElementsBoundByIndex.first { $0.frame.height > 0 }?.frame ?? .zero
         XCTAssertTrue(f.maxY <= kb.frame.minY + 1, "champ de recherche caché par le clavier")
-        // La fiche du résultat doit être ENTIÈREMENT visible au-dessus du clavier (nom compris), puis sélectionnable clavier ouvert.
-        var fiche: XCUIElement? = nil
-        for _ in 0..<30 where fiche == nil {
-            fiche = anyContaining("Courgettes").allElementsBoundByIndex.first { e in
-                let r = e.frame; return r.height >= 100 && r.minY > f.maxY && r.maxY <= kb.frame.minY + 1
-            }
-            if fiche == nil { usleep(500_000) }
-        }
+        // La fiche du résultat doit être ENTIÈREMENT visible au-dessus du clavier, puis sélectionnable clavier ouvert. Le nom est sur
+        // la même ligne que le bouton « + » de la fiche : bouton entièrement au-dessus du clavier = fiche entière visible.
+        let haut = max(f.maxY, app.windows.firstMatch.frame.height * 0.15)
+        var points: [CGRect] = []
+        for _ in 0..<20 where points.isEmpty { points = tealDots(top: haut, bottom: kb.frame.minY); if points.isEmpty { usleep(500_000) } }
         attach("k5-recherche-clavier")
-        for e in anyContaining("Courgettes").allElementsBoundByIndex { print("Courgettes : « \(e.label) » type \(e.elementType.rawValue) \(e.frame) ; recherche \(f) ; clavier \(kb.frame)") }
-        let carte = try XCTUnwrap(fiche, "fiche « Courgettes » pas entièrement visible au-dessus du clavier (clavier \(kb.frame))")
-        press(carte); sleep(2)
+        print("Boutons « + » vus au-dessus du clavier : \(points) ; clavier \(kb.frame)")
+        let plus = try XCTUnwrap(points.first, "fiche « Courgettes » : bouton « + » non visible au-dessus du clavier (clavier \(kb.frame))")
+        XCTAssertTrue(plus.maxY <= kb.frame.minY, "fiche coupée par le clavier")
+        app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: plus.midX, dy: plus.midY)).tap(); sleep(2)
         XCTAssertTrue(app.keyboards.firstMatch.exists, "le clavier s'est fermé en sélectionnant")
         attach("k6-selection-clavier-ouvert")
         // Clavier fermé : la barre « Terminer ma sélection » revient, avec l'article choisi.
-        press(waitFor(app.staticTexts["Ajouter des articles"].exists ? "Ajouter des articles" : "Choisir mes articles")); sleep(2)
+        // Toucher le titre de l'écran (zone non interactive) ferme le clavier, comme un utilisateur.
+        let titre = app.windows.firstMatch.frame
+        app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: titre.width / 2, dy: titre.height * 0.085)).tap(); sleep(2)
+        XCTAssertFalse(app.keyboards.firstMatch.exists, "le clavier ne se ferme pas en touchant le titre")
         XCTAssertTrue(anyContaining("Terminer ma sélection (").firstMatch.waitForExistence(timeout: 10), "article non sélectionné ou barre « Terminer ma sélection » absente après fermeture du clavier")
         attach("k7-clavier-ferme")
         XCTAssertEqual(horsLargeur(), [], "éléments qui débordent de l'écran (sélection)")
