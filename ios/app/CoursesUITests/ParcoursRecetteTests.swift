@@ -584,7 +584,9 @@ final class ParcoursRecetteTests: XCTestCase {
             var out: [String] = []
             func walk(_ e: XCUIElementSnapshot) {
                 let f = e.frame
-                if f.width > 0 && (f.maxX > w.maxX + 1 || f.minX < w.minX - 1) { out.append("\(e.label) \(f)") }
+                // Touches et clavier exclus (dessinés par iOS, pas par l'application) ; éléments hors de l'écran (clavier masqué) ignorés.
+                let systeme = [XCUIElement.ElementType.key, .keyboard].contains(e.elementType)
+                if !systeme && f.width > 0 && f.minY < w.maxY && f.maxY > w.minY && (f.maxX > w.maxX + 1 || f.minX < w.minX - 1) { out.append("\(e.label) \(f)") }
                 e.children.forEach(walk)
             }
             walk(snap)
@@ -643,10 +645,11 @@ final class ParcoursRecetteTests: XCTestCase {
         XCTAssertTrue(app.keyboards.firstMatch.exists, "le clavier s'est fermé en sélectionnant")
         attach("k6-selection-clavier-ouvert")
         // Clavier fermé : la barre « Terminer ma sélection » revient, avec l'article choisi.
-        // Toucher le titre de l'écran (zone non interactive) ferme le clavier, comme un utilisateur.
-        let titre = app.windows.firstMatch.frame
-        app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: titre.width / 2, dy: titre.height * 0.085)).tap(); sleep(2)
-        XCTAssertFalse(app.keyboards.firstMatch.exists, "le clavier ne se ferme pas en touchant le titre")
+        // Comme un utilisateur sur iPhone : la touche « retour » du clavier le ferme.
+        let retour = [app.keyboards.buttons["return"], app.keyboards.buttons["Return"], app.keyboards.buttons["search"], app.keyboards.buttons["Search"], app.keyboards.buttons["Rechercher"]].first { $0.exists }
+        XCTAssertNotNil(retour, "touche « retour » absente du clavier")
+        if let retour { press(retour); sleep(2) }
+        XCTAssertFalse(app.keyboards.firstMatch.exists, "la touche « retour » ne ferme pas le clavier")
         XCTAssertTrue(anyContaining("Terminer ma sélection (").firstMatch.waitForExistence(timeout: 10), "article non sélectionné ou barre « Terminer ma sélection » absente après fermeture du clavier")
         attach("k7-clavier-ferme")
         XCTAssertEqual(horsLargeur(), [], "éléments qui débordent de l'écran (sélection)")
