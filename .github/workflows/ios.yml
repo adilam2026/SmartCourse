@@ -61,7 +61,8 @@ jobs:
       fail-fast: false
       matrix:
         # [android-e2e:F,P,J] dans le message : ce seul groupe.
-        sections: ${{ fromJSON(contains(github.event.head_commit.message, '[android-e2e:F,P,J]') && '["F,P,J"]' || '["F,G,H","C,D","F,P,J","K,S","A","T","Q"]') }}
+        # [android-e2e:connexion] : groupes passant par l'écran de connexion (F,G,H et C,D).
+        sections: ${{ fromJSON(contains(github.event.head_commit.message, '[android-e2e:F,P,J]') && '["F,P,J"]' || (contains(github.event.head_commit.message, '[android-e2e:connexion]') && '["F,G,H","C,D"]' || '["F,G,H","C,D","F,P,J","K,S","A","T","Q"]')) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4

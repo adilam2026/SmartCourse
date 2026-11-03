@@ -21,6 +21,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
@@ -138,12 +139,12 @@ fun LoginScreen(session: Session?, onSimulated: (Role) -> Unit) {
             if (tab == 0) {
                 // Identifiant famille (ex. LesTaha04) ou ancien code famille : majuscules indifférentes, aucune majuscule imposée.
                 FormField(family, { family = it.trim() }, "Identifiant famille", leading = Icons.Rounded.Group, focus = focus,
-                    keyboard = KeyboardOptions(keyboardType = KeyboardType.Ascii, capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false))
+                    keyboard = KeyboardOptions(keyboardType = KeyboardType.Ascii, capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, imeAction = ImeAction.Next))
                 Text("Ex. LesTaha04. L'ancien code famille à 8 caractères reste accepté.", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 4.dp, top = 4.dp))
                 Spacer(Modifier.height(10.dp))
                 // Identifiant personnel : pas de correction automatique (le clavier iPhone change « adil » en « adult »).
                 FormField(login, { login = it }, "Identifiant personnel", leading = Icons.Rounded.Person,
-                    keyboard = KeyboardOptions(keyboardType = KeyboardType.Ascii, capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false))
+                    keyboard = KeyboardOptions(keyboardType = KeyboardType.Ascii, capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, imeAction = ImeAction.Next))
                 Spacer(Modifier.height(10.dp))
                 CodeField(code, { code = it }, "Code d'accès personnel", legacy = true)
                 Text("Votre code à vous. Il n'existe pas de mot de passe commun à la famille.", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 4.dp, top = 4.dp))

@@ -14,7 +14,7 @@ env:
   RECETTE_FAMILLE: RecetteCourses
 jobs:
   iphone:
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[controles]')
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[controles')
     runs-on: macos-15
     timeout-minutes: 120
     steps:
@@ -50,6 +50,8 @@ jobs:
           xcodebuild build-for-testing -project Courses.xcodeproj -scheme Courses -destination "id=$SIM16" ONLY_ACTIVE_ARCH=YES \
             -derivedDataPath ../build/dd CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= 2>&1 | tee ../xcodebuild.log | grep -E "error:|BUILD|\*\*" | head -60
       - name: Hors connexion, réouverture, session (iPhone 16)
+        # [controles:clavier] : seulement les contrôles du clavier et de l'affichage.
+        if: ${{ !contains(github.event.head_commit.message, '[controles:clavier]') }}
         working-directory: ios/app
         env:
           TEST_RUNNER_COURSES_SERVER: ${{ env.RECETTE_URL }}
@@ -61,7 +63,7 @@ jobs:
             -only-testing:CoursesUITests/ParcoursRecetteTests/test4_HorsConnexion_ReouvertureEtSession \
             -derivedDataPath ../build/dd -resultBundlePath ../h.xcresult 2>&1 | tee ../h.log | grep -E "error:|Test Case|iPhone :|Serveur commun" | tail -40
       - name: Notifications de demandes (APNs simulée) et rappels (iPhone 16)
-        if: always()
+        if: ${{ always() && !contains(github.event.head_commit.message, '[controles:clavier]') }}
         working-directory: ios/app
         env:
           TEST_RUNNER_COURSES_SERVER: ${{ env.RECETTE_URL }}
