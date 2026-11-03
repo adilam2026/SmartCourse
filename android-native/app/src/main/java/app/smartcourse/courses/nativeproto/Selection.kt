@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -85,6 +86,13 @@ fun SelectionScreen(nav: (String) -> Unit, onBack: () -> Unit) {
     var display by remember { mutableStateOf(false) }
     val count = demo.selChanges
 
+    // Petit écran, clavier ouvert : la barre « Terminer ma sélection » laisserait trop peu de place pour afficher une fiche entière
+    // (iPhone SE : environ 170 points pour une fiche de 190). Elle s'efface pendant la saisie et revient dès que le clavier se ferme ;
+    // sur un écran plus grand, rien ne change.
+    val density = LocalDensity.current
+    val imeOpen = WindowInsets.ime.getBottom(density) > 0
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+    val roomy = maxHeight >= 520.dp
     Column(Modifier.fillMaxSize()) {
         // Personnel : écran principal, sans flèche de retour (Liste du jour reste accessible par l'onglet du bas). L'icône Affichage est
         // sur la ligne du titre, juste à gauche de l'icône profil.
@@ -136,7 +144,7 @@ fun SelectionScreen(nav: (String) -> Unit, onBack: () -> Unit) {
             }
         }
         // Une seule action finale
-        Column(
+        if (!imeOpen || roomy) Column(
             Modifier.fillMaxWidth().shadow(10.dp, ambientColor = C.Navy.copy(alpha = 0.12f), spotColor = C.Navy.copy(alpha = 0.25f))
                 .background(Color.White).navigationBarsPadding().padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 8.dp),
         ) {
@@ -159,6 +167,7 @@ fun SelectionScreen(nav: (String) -> Unit, onBack: () -> Unit) {
                 Modifier.fillMaxWidth(), enabled = count > 0, trailing = Icons.AutoMirrored.Rounded.ArrowForward,
             )
         }
+    }
     }
 
     if (display) DisplaySheet { display = false }

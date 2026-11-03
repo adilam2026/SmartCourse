@@ -598,22 +598,29 @@ final class ParcoursRecetteTests: XCTestCase {
         if anyContaining("Ajouter des articles").firstMatch.exists { tapButton("Ajouter des articles") } else { tapButton("Créer une liste") }
         let field = anyContaining("Rechercher un produit").firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 20), "recherche absente")
-        press(field); sleep(1); clearFocused(); typeKeys("car"); sleep(2)
+        press(field); sleep(1); clearFocused(); typeKeys("courg"); sleep(2)
         let kb = app.keyboards.firstMatch
         XCTAssertTrue(kb.exists, "clavier absent (recherche)")
         let f = anyContaining("Rechercher un produit").allElementsBoundByIndex.first { $0.frame.height > 0 }?.frame ?? .zero
         XCTAssertTrue(f.maxY <= kb.frame.minY + 1, "champ de recherche caché par le clavier")
-        // Un résultat est visible s'il commence au-dessus du clavier (sur petit écran, le bas de la fiche peut passer dessous).
-        var vu: CGRect? = nil
-        for _ in 0..<30 where vu == nil {
-            // Fiche (ou, sur petit écran où la fiche est coupée par la barre du bas, l'en-tête de ses résultats « … 1 article »).
-            vu = (anyContaining("Carottes").allElementsBoundByIndex + anyContaining("article").allElementsBoundByIndex).map { $0.frame }
-                .first { $0.height > 0 && $0.minY > f.maxY && $0.minY < kb.frame.minY }
-            if vu == nil { usleep(500_000) }
+        // La fiche du résultat doit être ENTIÈREMENT visible au-dessus du clavier (nom compris), puis sélectionnable clavier ouvert.
+        var fiche: XCUIElement? = nil
+        for _ in 0..<30 where fiche == nil {
+            fiche = anyContaining("Courgettes").allElementsBoundByIndex.first { e in
+                let r = e.frame; return r.height >= 100 && r.minY > f.maxY && r.maxY <= kb.frame.minY + 1
+            }
+            if fiche == nil { usleep(500_000) }
         }
-        if vu == nil { for e in anyContaining("Carottes").allElementsBoundByIndex { print("Carottes : « \(e.label) » \(e.elementType.rawValue) \(e.frame)") } }
         attach("k5-recherche-clavier")
-        XCTAssertNotNil(vu, "aucun résultat visible au-dessus du clavier (clavier \(kb.frame))")
+        if fiche == nil { for e in anyContaining("Courgettes").allElementsBoundByIndex { print("Courgettes : « \(e.label) » \(e.frame)") } }
+        let carte = try XCTUnwrap(fiche, "fiche « Courgettes » pas entièrement visible au-dessus du clavier (clavier \(kb.frame))")
+        press(carte); sleep(2)
+        XCTAssertTrue(app.keyboards.firstMatch.exists, "le clavier s'est fermé en sélectionnant")
+        attach("k6-selection-clavier-ouvert")
+        // Clavier fermé : la barre « Terminer ma sélection » revient, avec l'article choisi.
+        press(waitFor(app.staticTexts["Ajouter des articles"].exists ? "Ajouter des articles" : "Choisir mes articles")); sleep(2)
+        XCTAssertTrue(anyContaining("Terminer ma sélection (").firstMatch.waitForExistence(timeout: 10), "article non sélectionné ou barre « Terminer ma sélection » absente après fermeture du clavier")
+        attach("k7-clavier-ferme")
         XCTAssertEqual(horsLargeur(), [], "éléments qui débordent de l'écran (sélection)")
         attach("k5-recherche-clavier")
     }
