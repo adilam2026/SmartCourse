@@ -551,8 +551,17 @@ final class ParcoursRecetteTests: XCTestCase {
                     && $0.frame.height >= 48 && $0.frame.height <= 64 && $0.frame.width > 200 }
                 .sorted { $0.frame.minY < $1.frame.minY }
         }
+        // Un seul instantané de l'écran (parcourir les éléments un à un échoue si l'écran change pendant le parcours).
         func horsLargeur() -> [String] {
-            app.descendants(matching: .any).allElementsBoundByIndex.filter { $0.frame.width > 0 && ($0.frame.maxX > w.maxX + 1 || $0.frame.minX < w.minX - 1) }.map { "\($0.label) \($0.frame)" }
+            guard let snap = try? app.snapshot() else { return [] }
+            var out: [String] = []
+            func walk(_ e: XCUIElementSnapshot) {
+                let f = e.frame
+                if f.width > 0 && (f.maxX > w.maxX + 1 || f.minX < w.minX - 1) { out.append("\(e.label) \(f)") }
+                e.children.forEach(walk)
+            }
+            walk(snap)
+            return out
         }
         XCTAssertEqual(horsLargeur(), [], "éléments qui débordent de l'écran (connexion)")
         attach("k0-connexion")
