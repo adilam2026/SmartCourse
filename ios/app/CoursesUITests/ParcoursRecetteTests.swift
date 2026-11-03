@@ -571,10 +571,11 @@ final class ParcoursRecetteTests: XCTestCase {
             attach("k-clavier-\(n.replacingOccurrences(of: " ", with: "-"))")
             XCTAssertTrue(f.height > 0 && f.minY >= w.minY && f.maxY <= kb.frame.minY + 1, "« \(n) » caché par le clavier (champ \(f), clavier \(kb.frame))")
         }
-        let premier = c[0]
-        press(premier); sleep(1)
-        visible("identifiant famille", premier)
-        clearFocused(); typeKeys(family); suivant()
+        press(c[0]); sleep(1)
+        clearFocused(); typeKeys(family); sleep(1)
+        // Champ retrouvé par le texte tapé (la référence d'avant l'ouverture du clavier n'est plus fiable).
+        visible("identifiant famille", anyContaining(family).allElementsBoundByIndex.first { $0.frame.height > 0 && $0.elementType != .key })
+        suivant()
         clearFocused(); typeKeys("adil"); sleep(1)
         visible("identifiant personnel", anyContaining("adil").allElementsBoundByIndex.first { $0.frame.height > 0 && $0.elementType != .key })
         suivant()
@@ -616,8 +617,14 @@ final class ParcoursRecetteTests: XCTestCase {
         func autoriser() {
             for l in ["Allow", "Autoriser"] where springboard.buttons[l].waitForExistence(timeout: 6) { springboard.buttons[l].tap(); sleep(2); return }
         }
-        press(waitFor("Nouvelles demandes", 15)); autoriser()
-        press(waitFor("Me rappeler les articles restants", 15)); autoriser()
+        // Lignes regroupées (titre + description dans un seul libellé) : recherche par « contient ».
+        func ligne(_ t: String) -> XCUIElement {
+            let e = anyContaining(t).firstMatch
+            XCTAssertTrue(e.waitForExistence(timeout: 15), "« \(t) » introuvable")
+            return e
+        }
+        press(ligne("Nouvelles demandes")); autoriser()
+        press(ligne("Me rappeler les articles restants")); autoriser()
         sleep(2)
         attach("n2-notifications-activees")
         XCTAssertFalse(anyContaining("bloque les notifications").firstMatch.exists, "notifications bloquées malgré l'autorisation")
