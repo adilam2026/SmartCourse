@@ -597,7 +597,8 @@ final class ParcoursRecetteTests: XCTestCase {
         // Un résultat est visible s'il commence au-dessus du clavier (sur petit écran, le bas de la fiche peut passer dessous).
         var vu: CGRect? = nil
         for _ in 0..<30 where vu == nil {
-            vu = anyContaining("Carottes").allElementsBoundByIndex.map { $0.frame }
+            // Fiche (ou, sur petit écran où la fiche est coupée par la barre du bas, l'en-tête de ses résultats « … 1 article »).
+            vu = (anyContaining("Carottes").allElementsBoundByIndex + anyContaining("article").allElementsBoundByIndex).map { $0.frame }
                 .first { $0.height > 0 && $0.minY > f.maxY && $0.minY < kb.frame.minY }
             if vu == nil { usleep(500_000) }
         }
