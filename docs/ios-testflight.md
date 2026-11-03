@@ -12,39 +12,12 @@
 | Rappels d'achat : notifications locales aux jours et horaires choisis | `NotificationsIos.kt` |
 | Envoi APNs par le serveur (HTTP/2, jeton ES256), mêmes destinataires et même texte que les autres appareils | `server/src/apns.ts` (tests : `server/test/apns.test.ts`) |
 | Construction vérifiée de la version finale (arm64, non signée) | workflow « iPhone — version finale et TestFlight », tâche `archive-verifiee` |
-| Signature automatique + envoi TestFlight | même workflow, tâche `testflight` (attend les accès ci-dessous) |
+| Signature (certificat et profil fournis) + envoi TestFlight | même workflow, tâche `testflight` (attend les accès ci-dessous) |
 
-## Actions Apple, dans l'ordre où elles deviennent nécessaires
+## Actions Apple
 
-**Étape 1 — dès maintenant, pour pouvoir envoyer une première version TestFlight (signature + TestFlight) :**
-
-1. **Adhérer à l'Apple Developer Program** (99 $ par an) avec l'Apple ID qui publiera l'application. Validation par Apple :
-   de quelques heures à quelques jours.
-2. **App Store Connect → Apps → « + » → Nouvelle app** : plateforme iOS, nom « Mes Courses », langue principale français,
-   identifiant de bundle **`app.smartcourse.courses`** (à créer dans la liste proposée si besoin), SKU libre.
-3. **App Store Connect → Utilisateurs et accès → Intégrations → Clés API App Store Connect** : créer une clé
-   d'**accès « Admin »** (nécessaire pour que la signature automatique crée le certificat et le profil de distribution),
-   télécharger le fichier `.p8` (une seule fois possible), noter l'**ID de la clé** et l'**ID de l'émetteur**.
-4. **GitHub → dépôt → Settings → Secrets and variables → Actions** : ajouter 4 secrets
-   (ne jamais les copier dans une conversation) :
-   - `APPLE_TEAM_ID` : identifiant d'équipe (Apple Developer → Membership, 10 caractères) ;
-   - `ASC_KEY_ID`, `ASC_ISSUER_ID` : ceux de la clé API ;
-   - `ASC_KEY_P8` : le contenu complet du fichier `.p8`.
-5. Me prévenir : je lance le workflow avec « Signer et envoyer sur TestFlight » ; la version apparaît dans App Store Connect →
-   TestFlight après le traitement d'Apple (≈ 10 à 30 min). Pour l'installer sur votre iPhone : TestFlight → Testeurs internes →
-   vous ajouter, puis l'app **TestFlight** sur l'iPhone.
-
-**Étape 2 — pour les notifications de demandes (APNs), au moment de les essayer sur l'iPhone :**
-
-6. **Apple Developer → Certificates, Identifiers & Profiles → Keys → « + »** : cocher **Apple Push Notifications service (APNs)**,
-   télécharger le fichier `.p8`, noter l'**ID de la clé**. (La capacité « Push Notifications » de l'identifiant
-   `app.smartcourse.courses` est activée automatiquement par la signature, grâce au fichier d'entitlements.)
-7. **Railway → service de recette** d'abord, puis production après votre accord : variables
-   `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_TOPIC` = `app.smartcourse.courses`, `APNS_KEY_P8` = contenu du `.p8`.
-   Sans elles, l'iPhone s'enregistre mais le serveur n'envoie rien (message dans ses journaux).
-
-**Étape 3 — publication App Store (plus tard) :** fiche App Store (textes, captures 6,9" et 6,5"), confidentialité de l'app
-(à remplir dans App Store Connect, conforme au manifeste), compte de démonstration pour la revue Apple.
+Guide détaillé, dans l'ordre : **`docs/ios-apple-etapes.md`** (inscription, identifiant et application, certificat et profil de
+distribution, clé API au rôle **Developer** — pas Admin —, secrets GitHub, premier envoi TestFlight, clé APNs et test réel).
 
 ## Serveur
 
