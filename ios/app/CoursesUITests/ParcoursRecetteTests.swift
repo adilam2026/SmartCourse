@@ -406,6 +406,11 @@ final class ParcoursRecetteTests: XCTestCase {
                 .min { abs($0.frame.midY - card.frame.midY) < abs($1.frame.midY - card.frame.midY) }
             if attempt < 2, let plus { press(plus) } else { press(card) }
             sleep(2)
+            // Clavier ouvert : la barre « Terminer ma sélection » est masquée (petits écrans) ; on ferme le clavier pour la voir,
+            // au lieu de toucher « + » une seconde fois (ce qui ouvrirait la fiche de quantité).
+            if app.keyboards.firstMatch.exists, let ret = ["Return", "return", "Search", "search", "Rechercher", "OK"].lazy.map({ self.app.keyboards.buttons[$0] }).first(where: { $0.exists }) {
+                press(ret); sleep(2)
+            }
             let done = anyContaining("Terminer ma sélection").allElementsBoundByIndex.filter { $0.frame.height > 0 }
             if done.contains(where: { $0.isEnabled }) { return }
         }
