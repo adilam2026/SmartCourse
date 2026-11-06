@@ -8,7 +8,7 @@ const j = (r) => r.json();
 const play = process.env.SEED_PLAY === "1";
 const F = play
   ? { family: "Famille Martin", admin: ["Sophie", "sophie", "482913"], mail: "famille.martin@example.org", others: [["Karim", "karim", "parent"], ["Nadia", "nadia", "staff"]] }
-  : { family: "Recette", admin: ["Adil", "adil", "482913"], mail: "recette@example.org", others: [["Lamiaa", "lamiaa", "parent"], ["Marie", "marie", "staff"]] };
+  : { family: process.env.SEED_NAME ?? "Recette", admin: ["Adil", "adil", "482913"], mail: process.env.SEED_MAIL ?? "recette@example.org", others: [["Lamiaa", "lamiaa", "parent"], ["Marie", "marie", "staff"]] };
 const setup = await fetch(`${base}/api/setup/family`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ installToken: token, familyName: F.family, admin: { displayName: F.admin[0], login: F.admin[1], secret: F.admin[2], secretConfirm: F.admin[2], recoveryEmail: F.mail, city: "Casablanca" } }) });
 if (setup.status !== 201) throw new Error(`création de la famille : ${setup.status} ${await setup.text()}`);
 const { familyCode } = await j(setup);

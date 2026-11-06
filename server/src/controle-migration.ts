@@ -65,7 +65,7 @@ export async function controleDeploiement(scratch: pg.Client, scratchUrl: string
   lines.push(`  Migrations rejouées comme au démarrage du serveur : ${applied.length ? applied.join(", ") : "aucune (sauvegarde déjà à jour)"}`);
 
   // 2. Migrations
-  check(endSchema === "030_unit_decisions.sql", "dernière migration 030_unit_decisions.sql");
+  check(endSchema >= "030_unit_decisions.sql", `migrations appliquées jusqu'à 030_unit_decisions.sql au moins (${endSchema})`);
 
   // 3. Personnalisations des familles intactes (empreintes anonymes)
   for (const k of ["products", "product_ids", "family_photos", "family_prices", "purchases", "list_items", "templates"])

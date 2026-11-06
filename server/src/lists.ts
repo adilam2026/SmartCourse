@@ -1,3 +1,4 @@
+import { checkCreation, MSG_EXPLICIT, MSG_IMPLICIT, QUOTA_CODE, recordCreation } from "./list-quota.js";
 import type pg from "pg";
 import { withTx, type Db } from "./db.js";
 import type { AuthContext } from "./auth.js";
@@ -375,37 +376,65 @@ export async function currentActiveListId(db: Pick<Db, "query">, a: AuthContext)
   return r.rows[0]?.id;
 }
 
-export async function ensureActiveList(db: Db, hub: SseHub, a: AuthContext): Promise<string> {
-  const find = async () => currentActiveListId(db, a);
-  const cur = await find();
+/**
+ * Liste en cours pour une demande d'articles ; créée si aucune n'est en cours (création IMPLICITE : personnel, demandes envoyées au
+ * retour du réseau). [requestKey] = identifiant du lot de demandes : un lot rejoué retrouve la liste qu'il avait créée, sans recompter.
+ * Règle des listes gratuites atteinte : refus 404 « quota_reached » et AUCUNE liste créée — les anciennes versions gardent alors les
+ * articles demandés (« Reprendre ») au lieu de les perdre ; les nouvelles affichent l'écran adapté.
+ */
+export async function ensureActiveList(db: Db, hub: SseHub, a: AuthContext, requestKey?: string | null): Promise<string> {
+  const cur = await currentActiveListId(db, a);
   if (cur) return cur;
+  let r: { id: string | null; created: boolean };
   try {
-    const r = await db.query<{ id: string }>("INSERT INTO lists (family_id, created_by) VALUES ($1,$2) RETURNING id", [a.familyId, a.profileId]);
-    hub.broadcast(a.familyId, "list.created", { listId: r.rows[0]!.id });
-    return r.rows[0]!.id;
+    r = await withTx(db, async (c) => {
+      const check = await checkCreation(c, a.familyId, requestKey);
+      if (check.replayOf !== undefined) return { id: check.replayOf, created: false };
+      const other = await currentActiveListId(c, a); // un autre appareil vient de la créer (servi avant nous, famille verrouillée)
+      if (other) return { id: other, created: false };
+      if (check.state.blocked) throw new HttpError(404, QUOTA_CODE, MSG_IMPLICIT);
+      const ins = await c.query<{ id: string }>("INSERT INTO lists (family_id, created_by) VALUES ($1,$2) RETURNING id", [a.familyId, a.profileId]);
+      await recordCreation(c, a, ins.rows[0]!.id, "implicit", requestKey, check);
+      return { id: ins.rows[0]!.id, created: true };
+    });
   } catch (e: any) {
     if (e.code === "23505") {
-      const other = await find(); // un autre appareil vient de la créer
+      const other = await currentActiveListId(db, a);
       if (other) return other;
     }
     throw e;
   }
+  if (!r.id) throw new HttpError(404, "not_found", "Liste introuvable");
+  if (r.created) hub.broadcast(a.familyId, "list.created", { listId: r.id });
+  return r.id;
 }
 
-export async function createList(db: Db, hub: SseHub, a: AuthContext, name?: string): Promise<{ id: string }> {
+/**
+ * « Créer une liste » (création EXPLICITE). [requestId] (nouvelles versions) : une requête rejouée renvoie la même liste, sans recompter.
+ * Règle des listes gratuites atteinte : refus 409 « quota_reached », aucune liste créée.
+ */
+export async function createList(db: Db, hub: SseHub, a: AuthContext, name?: string, requestId?: string | null): Promise<{ id: string; replayed: boolean }> {
+  let r: { id: string; replayed: boolean };
   try {
-    const r = await db.query<{ id: string }>("INSERT INTO lists (family_id, created_by, name) VALUES ($1,$2,$3) RETURNING id", [a.familyId, a.profileId, name ?? null]);
-    // La nouvelle liste devient celle que son auteur consulte (les autres membres restent sur la leur).
-    await db.query("UPDATE profiles SET current_list_id = $2 WHERE id = $1", [a.profileId, r.rows[0]!.id]);
-    hub.broadcast(a.familyId, "list.created", { listId: r.rows[0]!.id });
-    return r.rows[0]!;
+    r = await withTx(db, async (c) => {
+      const check = await checkCreation(c, a.familyId, requestId);
+      if (check.replayOf !== undefined) {
+        if (!check.replayOf) throw new HttpError(404, "not_found", "Liste introuvable");
+        return { id: check.replayOf, replayed: true };
+      }
+      if (check.state.blocked) throw new HttpError(409, QUOTA_CODE, MSG_EXPLICIT);
+      const ins = await c.query<{ id: string }>("INSERT INTO lists (family_id, created_by, name) VALUES ($1,$2,$3) RETURNING id", [a.familyId, a.profileId, name ?? null]);
+      await recordCreation(c, a, ins.rows[0]!.id, "explicit", requestId, check);
+      // La nouvelle liste devient celle que son auteur consulte (les autres membres restent sur la leur).
+      await c.query("UPDATE profiles SET current_list_id = $2 WHERE id = $1", [a.profileId, ins.rows[0]!.id]);
+      return { id: ins.rows[0]!.id, replayed: false };
+    });
   } catch (e: any) {
-    if (e.code === "23505") {
-      const cur = await db.query("SELECT id FROM lists WHERE family_id = $1 AND status = 'active'", [a.familyId]);
-      throw new HttpError(409, "active_exists", "Une liste est déjà en cours");
-    }
+    if (e.code === "23505") throw new HttpError(409, "active_exists", "Une liste est déjà en cours");
     throw e;
   }
+  if (!r.replayed) hub.broadcast(a.familyId, "list.created", { listId: r.id });
+  return r;
 }
 
 /** Réévaluation EXPLICITE d'une liste en cours : les lignes à acheter reprennent les prix actuels. Une liste archivée ne change jamais. */

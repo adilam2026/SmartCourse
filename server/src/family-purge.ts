@@ -6,7 +6,7 @@ import { HttpError } from "./errors.js";
 import type { PhotoStore } from "./photos.js";
 
 /** Tables carrying family_id : counted for identification, deleted, and compared before/after for the OTHER families. */
-const FAMILY_TABLES = ["profiles", "products", "unit_corrections", "lists", "list_items", "purchases", "validations", "list_events", "push_subscriptions", "push_events", "family_prices", "list_templates", "audit_log", "finance_operations", "finance_operation_history", "finance_budgets", "finance_account_history", "finance_categories", "finance_merchants", "finance_rights", "list_payment_status"] as const;
+const FAMILY_TABLES = ["profiles", "products", "unit_corrections", "lists", "list_items", "purchases", "validations", "list_events", "push_subscriptions", "push_events", "family_prices", "list_templates", "audit_log", "finance_operations", "finance_operation_history", "finance_budgets", "finance_account_history", "finance_categories", "finance_merchants", "finance_rights", "list_payment_status", "list_creations", "family_entitlements"] as const;
 
 export interface FamilyIdentity {
   id: string;
@@ -123,6 +123,9 @@ export async function purgeFamily(db: Db, store: PhotoStore, familyId: string, e
     const mine = "(SELECT id FROM profiles WHERE family_id = $1)";
     const steps: string[] = [
       // Budget de la famille (avant les listes et les profils qu'il référence)
+      "DELETE FROM list_creations WHERE family_id = $1",
+      "DELETE FROM entitlement_events WHERE family_id = $1 OR entitlement_id IN (SELECT id FROM family_entitlements WHERE family_id = $1)",
+      "DELETE FROM family_entitlements WHERE family_id = $1",
       "DELETE FROM list_payment_status WHERE family_id = $1",
       "DELETE FROM finance_operation_history WHERE family_id = $1",
       "DELETE FROM finance_operations WHERE family_id = $1",

@@ -25,4 +25,14 @@ if [ -n "${INSTALL_TOKEN:-}" ]; then
     echo "Recette : famille fictive déjà présente (installation déjà faite)."
   fi
 fi
+# Recette seulement : règle des listes gratuites ACTIVE (la production reste désactivée tant que le propriétaire ne l'a pas décidé).
+# - RecetteCourses (contrôles iPhone ↔ Android) : droit « opérateur » de recette, pour que ces contrôles ne soient jamais bloqués ;
+# - RecetteQuota (deuxième famille fictive, mêmes membres) : sert aux essais de la limite et des achats de test des stores.
+if [ -n "${INSTALL_TOKEN:-}" ] && ! node dist/admin-cli.js family-exists RecetteQuota >/dev/null 2>&1; then
+  T2=$(node dist/admin-cli.js token 2>/dev/null | grep -oE '#/install/[^ ]+' | sed 's#.*/##')
+  if [ -n "$T2" ] && INSTALL_TOKEN="$T2" BASE="http://127.0.0.1:$P" FAMILY_LOGIN_ID=RecetteQuota SEED_NAME="Recette quota" SEED_MAIL=recette-quota@example.org \
+       node /app/recette/recette-seed.mjs >/dev/null 2>&1; then echo "Recette : famille fictive RecetteQuota créée."; else echo "Recette : création de RecetteQuota impossible."; fi
+fi
+node dist/admin-cli.js quota-activate --execute --note "recette" >/dev/null 2>&1 && echo "Recette : règle des listes gratuites active." || echo "Recette : activation de la règle des listes gratuites impossible."
+node dist/admin-cli.js recette-operator-right RecetteCourses 2>&1 | tail -1
 wait "$APP"

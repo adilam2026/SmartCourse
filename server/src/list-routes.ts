@@ -5,6 +5,7 @@ import { HttpError } from "./errors.js";
 import type { Guard } from "./guard.js";
 import type { SseHub } from "./hub.js";
 import type { PushService } from "./push.js";
+import { quotaState } from "./list-quota.js";
 import { applyOps, closeList, createList, deleteArchivedList, ensureActiveList, getActiveListView, getListView, listHistory, openLists, repriceList, type OpIn } from "./lists.js";
 import { can, type Action } from "./permissions.js";
 
@@ -70,9 +71,16 @@ export function listRoutes(app: FastifyInstance, { db, hub, guard, push }: { db:
   });
 
   app.post("/api/lists", { preHandler: guard("list.create") }, async (req, reply) => {
-    const { name } = z.object({ name: z.string().trim().min(1).max(40).optional() }).parse(req.body ?? {});
-    const { id } = await createList(db, hub, req.auth!, name);
-    return reply.code(201).send({ list: await getListView(db, req.auth!, id) });
+    // requestId (nouvelles versions) : une requête rejouée (réponse perdue) renvoie la même liste, jamais une deuxième création comptée.
+    const { name, requestId } = z.object({ name: z.string().trim().min(1).max(40).optional(), requestId: uuid.optional() }).parse(req.body ?? {});
+    const { id, replayed } = await createList(db, hub, req.auth!, name, requestId);
+    return reply.code(replayed ? 200 : 201).send({ list: await getListView(db, req.auth!, id) });
+  });
+
+  // Listes gratuites restantes et droit payant de la famille (tous les membres) ; seuls les administrateurs peuvent acheter.
+  app.get("/api/family/plan", { preHandler: guard() }, async (req) => {
+    const st = await quotaState(db, req.auth!.familyId);
+    return { plan: { ...st, canPurchase: req.auth!.role === "admin" } };
   });
 
   app.get("/api/lists", { preHandler: guard("history.read") }, async (req) => {
@@ -92,7 +100,7 @@ export function listRoutes(app: FastifyInstance, { db, hub, guard, push }: { db:
     for (const op of ops) if (!can(req.auth!.role, REQUIRED[op.type])) throw new HttpError(403, "forbidden", "Action non autorisée");
     const current = (await getActiveListView(db, req.auth!)) as { id: string } | null;
     if (!current && !ops.some((o) => o.type === "add" || o.type === "request_again")) throw new HttpError(404, "not_found", "Liste introuvable");
-    const id = current?.id ?? (await ensureActiveList(db, hub, req.auth!));
+    const id = current?.id ?? (await ensureActiveList(db, hub, req.auth!, batch?.id));
     return applyOps(db, hub, req.auth!, id, ops, batch, push);
   });
 

@@ -121,7 +121,7 @@ describe("APNs : envoi", () => {
     const { privateKey, publicKey } = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
     const seen: { headers: http2.IncomingHttpHeaders; body: string }[] = [];
     const server = http2.createServer();
-    server.on("stream", (stream, headers) => {
+    server.on("stream", (stream: http2.ServerHttp2Stream, headers) => {
       let body = "";
       stream.setEncoding("utf8");
       stream.on("data", (c) => (body += c));

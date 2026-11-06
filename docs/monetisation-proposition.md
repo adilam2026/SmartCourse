@@ -89,12 +89,23 @@ app_config.list_quota_enabled  boolean DEFAULT false             -- interrupteur
   restent accessibles.
 - Compte › « Mes Courses Famille » : état du droit (offre, renouvellement, échéance), Restaurer, Gérer l'abonnement.
 
-## 6. Anciennes versions Android
+## 6. Anciennes versions — constat vérifié et transition
 
-1. Publier la version avec paiement (nécessaire de toute façon pour acheter).
-2. Mise à jour **conseillée**, puis **obligatoire** pour les versions sans paiement (politique existante).
-3. Activer la règle seulement ensuite. Même avant l'obligation, le serveur reste sûr pour elles : aucune donnée perdue (404 →
-   « Reprendre ») et messages clairs (409), mais elles ne peuvent pas acheter.
+| Application installée | Mécanisme de mise à jour imposable ? | À la limite (sans mise à jour) |
+|---|---|---|
+| **« SmartCourse » actuelle** (Trusted Web Activity, écrans servis par le serveur) | Pas besoin : ses écrans se mettent à jour d'eux-mêmes au déploiement du serveur (`/version.json`, rechargement automatique). | Elle recevra le message « listes gratuites utilisées » ; **aucun achat possible** depuis cette application (pas de Google Play Billing dans une page web, et aucun lien de paiement externe) : elle invite à passer par l'application Mes Courses. |
+| **Mes Courses native**, versions construites **à partir du 24/10/2026** (versionCode ≥ 1189 ; premiers bundles signés : 1192 et 1196, `AppUpdate.kt`) — la 1188 du 20/10 ne l'a pas | **Oui** : `app_update_policy` (conseillée / obligatoire) est lue par ces versions. | Refus serveur compréhensible, données gardées. |
+| **Mes Courses native**, versions **antérieures** au 24/10/2026 | **Non** : elles n'interrogent pas `/api/app/update` ; une mise à jour obligatoire ne peut **pas** leur être imposée rétroactivement. | « Créer une liste » : 409 → « Action impossible dans l'état actuel. Actualisez l'écran. » (message générique de ces versions) ; demande du personnel sans liste : **404** → articles **gardés** (« La liste n'existe plus : vos articles sont gardés, appuyez sur « Reprendre » »). Aucune donnée perdue, mais message imprécis. |
+
+Transition (décidée : conseillée puis obligatoire, sans rien activer en production pour l'instant) :
+1. publier la version avec paiement ;
+2. mise à jour conseillée, puis obligatoire (`min_code`) — effective seulement pour les versions ≥ 1189 ;
+3. versions antérieures : refus serveur sans perte (ci-dessus) ; message de remplacement possible uniquement par une mise à jour
+   installée par l'utilisateur ; prévenir les familles concernées (e-mail de récupération) avant l'activation ;
+4. activer la règle (`quota-activate --execute`), jamais avant votre accord.
+
+Décisions validées : compteur permanent (chaque création compte, même sous un droit payant ; aucun nouveau lot à l'expiration),
+mise à jour conseillée puis obligatoire, lot serveur d'abord sur la recette.
 
 ## 7. Validation (recette uniquement, environnements de test des stores)
 
