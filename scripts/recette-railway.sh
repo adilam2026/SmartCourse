@@ -37,4 +37,5 @@ if [ -n "${INSTALL_TOKEN:-}" ] && ! node dist/admin-cli.js family-exists Recette
 fi
 node dist/admin-cli.js quota-activate --execute --note "recette" >/dev/null 2>&1 && echo "Recette : règle des listes gratuites active." || echo "Recette : activation de la règle des listes gratuites impossible."
 node dist/admin-cli.js recette-operator-right RecetteCourses 2>&1 | tail -1
+node dist/admin-cli.js recette-manager RecetteCourses 2>&1 | tail -1
 wait "$APP"

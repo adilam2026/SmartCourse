@@ -50,7 +50,13 @@ object CoursesIos {
     }
 
     /** Application au premier plan (ouverture ou retour) : session vérifiée, flux en direct rouvert. */
-    fun onForeground() { session?.verify(); LiveHolder.current?.onForeground(); NotifIos.refreshStatus { NotifIos.syncRegistration() } }
+    fun onForeground() {
+        session?.verify(); LiveHolder.current?.onForeground(); NotifIos.refreshStatus { NotifIos.syncRegistration() }
+        checkUpdate()
+    }
+
+    /** Mise à jour : vérifiée à chaque ouverture et à chaque retour (ex. au retour de l'App Store), connecté ou non. */
+    private fun checkUpdate() { session?.let { s -> scope.launch { AppUpdate.check(s.api, BuildConfig.VERSION_CODE) } } }
 
     /** Application en arrière-plan : flux en direct fermé (comme onStop sur Android). */
     fun onBackground() { LiveHolder.current?.onBackground(); NotifIos.scheduleReminders() }
@@ -76,6 +82,7 @@ object CoursesIos {
 
     fun viewController(): UIViewController {
         val s = boot()
+        checkUpdate()
         return ComposeUIViewController(configure = {
             // Recette : arborescence d'accessibilité toujours transmise (contrôles automatiques XCUITest). En version finale, le
             // réglage par défaut la transmet dès qu'un service d'accessibilité (VoiceOver…) la demande.
@@ -83,7 +90,10 @@ object CoursesIos {
             if (!BuildConfig.FINAL) accessibilitySyncOptions = androidx.compose.ui.platform.AccessibilitySyncOptions.Always(debugLogger = null)
         }) {
             CoursesTheme {
-                Box(Modifier.fillMaxSize()) { Root(s, false) }
+                Box(Modifier.fillMaxSize()) {
+                    Root(s, false)
+                    UpdateGate() // proposition facultative ou blocage décidés par le serveur (jamais sur une simple panne réseau)
+                }
             }
         }
     }

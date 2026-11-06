@@ -1178,7 +1178,9 @@ expect "Z3. reportée : l'application s'utilise, le message ne revient pas à ch
 tapt "Historique"; tapt "Liste"
 expect "Z3b. toujours pas de message après un changement d'écran" $UI gone "Une nouvelle version" 3
 expect "Z4. obligation refusée sans confirmation de disponibilité sur Google Play" test "$(api PUT /api/gestion/app-update -d "{\"latestVersionCode\":$((VC+1)),\"minVersionCode\":$((VC+1))}")" = 400
-policy "{\"latestVersionCode\":$((VC+1)),\"minVersionCode\":$((VC+1)),\"availableOnPlay\":true}"
+api PUT /api/gestion/app-update -d "{\"latestVersionCode\":$((VC+1)),\"minVersionCode\":$((VC+1)),\"availableOnPlay\":true}" >/dev/null
+expect "Z4c. obligation refusée sans confirmation du déploiement à 100 %" grep -q rollout_not_confirmed /tmp/api.out
+policy "{\"latestVersionCode\":$((VC+1)),\"minVersionCode\":$((VC+1)),\"availableOnPlay\":true,\"rolloutComplete\":true}"
 # Vérification au plus toutes les 30 min au premier plan : l'obligation est vue à la prochaine ouverture de l'application
 adb shell input keyevent KEYCODE_HOME; sleep 2; adb shell am start -n "$ACT" >/dev/null 2>&1; sleep 4
 expect "Z4b. retour au premier plan moins de 30 min après : pas de nouvelle vérification (fréquence raisonnable)" $UI gone "Pour continuer à utiliser" 3
@@ -1193,19 +1195,29 @@ back_to_app; sleep 3
 expect "Z7. retour sans mise à jour : blocage maintenu" $UI wait "Pour continuer à utiliser Mes Courses" 15
 adb shell input keyevent KEYCODE_BACK; sleep 2; adb shell am start -n "$ACT" >/dev/null 2>&1; sleep 4
 expect "Z7b. le bouton Retour ne contourne pas le blocage" $UI wait "Pour continuer à utiliser Mes Courses" 15
-# Panne réseau : l'application relancée n'est jamais bloquée faute de pouvoir vérifier
+# Panne réseau : l'application relancée n'est jamais bloquée faute de pouvoir vérifier ; une demande faite hors connexion est gardée
 adb shell am force-stop $PKG
 adb shell cmd connectivity airplane-mode enable >/dev/null 2>&1; adb shell svc wifi disable >/dev/null 2>&1; adb shell svc data disable >/dev/null 2>&1; sleep 4
 adb shell am start -W -n "$ACT" >/dev/null 2>&1; sleep 6
 expect "Z8. panne réseau : aucun faux blocage" bash -c "sleep 8; ! $UI has 'Pour continuer à utiliser'"
 shot final-z3-hors-connexion
 adb shell cmd connectivity airplane-mode disable >/dev/null 2>&1; adb shell svc wifi enable >/dev/null 2>&1; adb shell svc data enable >/dev/null 2>&1; sleep 8
+# Retour du réseau : blocage au retour au premier plan (vérification due tant qu'un blocage est connu ou au plus tard 30 min)
+launch
+expect "Z8b. réseau revenu : blocage rétabli" $UI wait "Pour continuer à utiliser Mes Courses" 20
+# Appareil incapable d'installer la version exigée (système minimal 99) : jamais bloqué
+policy "{\"latestVersionCode\":$((VC+1)),\"minVersionCode\":$((VC+1)),\"minOs\":99,\"availableOnPlay\":true,\"rolloutComplete\":true}"
+launch
+expect "Z8c. appareil trop ancien pour la version exigée : pas de blocage" bash -c "sleep 8; ! $UI has 'Pour continuer à utiliser'"
+policy "{\"latestVersionCode\":$((VC+1)),\"minVersionCode\":$((VC+1)),\"minOs\":null,\"availableOnPlay\":true,\"rolloutComplete\":true}"
+launch
+expect "Z8d. blocage de nouveau actif" $UI wait "Pour continuer à utiliser Mes Courses" 20
 # Annulation de l'obligation côté serveur : effet immédiat au retour dans l'application
 policy "{\"latestVersionCode\":$((VC+1)),\"minVersionCode\":null}"
 adb shell input keyevent KEYCODE_HOME; sleep 2; adb shell am start -n "$ACT" >/dev/null 2>&1; sleep 5
 expect "Z9. obligation annulée : accès rétabli" bash -c "$UI gone 'Pour continuer à utiliser' 8 && $UI wait 'Ma liste' 10"
 # « Après mise à jour » : la version installée atteint la version exigée
-policy "{\"latestVersionCode\":$VC,\"minVersionCode\":$VC,\"availableOnPlay\":true}"
+policy "{\"latestVersionCode\":$VC,\"minVersionCode\":$VC,\"availableOnPlay\":true,\"rolloutComplete\":true}"
 launch; sleep 3
 expect "Z10. version installée = version minimale : accès normal, aucun message" bash -c "$UI gone 'Pour continuer à utiliser' 8 && $UI gone 'Une nouvelle version' 3"
 TOM=$(st Tomates)

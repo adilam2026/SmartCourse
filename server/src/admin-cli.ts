@@ -47,6 +47,27 @@ try {
         for (const b of all) console.log(`  ${b.key}  (${b.at.toISOString()})`);
       } else console.log("\nAucun stockage de sauvegarde configuré ici : vérifiez les sauvegardes existantes dans Railway.");
     }
+  } else if (cmd === "recette-manager" && args[0]) {
+    // RECETTE SEULEMENT : l'administrateur (adil) de la famille fictive indiquée devient gestionnaire, pour que les contrôles
+    // automatiques puissent régler la mise à jour de l'application (/gestion/mise-a-jour). Refusé hors d'un projet « recette ».
+    if (!/recette/i.test(process.env.RAILWAY_PROJECT_NAME ?? "")) throw new Error("Refus : commande réservée au service de recette.");
+    const { familyIdFor } = await import("./family-id.js");
+    const fid = await familyIdFor(db, args[0]);
+    if (!fid) throw new Error(`Famille ${args[0]} introuvable.`);
+    const r = await db.query("INSERT INTO catalog_managers (profile_id) SELECT id FROM profiles WHERE family_id = $1 AND login = 'adil' ON CONFLICT DO NOTHING", [fid]);
+    console.log(`Recette : gestionnaire de mise à jour ${r.rowCount ? "ajouté" : "déjà présent"}.`);
+  } else if (cmd === "update-status" || cmd === "update-disable") {
+    // Mise à jour de l'application : état, et coupure de secours du blocage (sans la page de gestion) ; numéros conservés.
+    const { readPolicy, disableRequired } = await import("./app-update.js");
+    for (const p of ["android", "ios"] as const) {
+      const r = await readPolicy(db, p);
+      console.log(`${p} : dernière ${r?.latest_code ?? "—"}, minimale ${r?.min_code ?? "—"}, blocage ${r?.required_active ? "ACTIF" : "désactivé"}, système minimal ${r?.min_os ?? "—"}, fiche ${r?.store_url ? "renseignée" : "absente"}`);
+    }
+    if (cmd === "update-disable") {
+      const which = args[0] === "android" || args[0] === "ios" ? [args[0]] : (["android", "ios"] as ("android" | "ios")[]);
+      const n = await disableRequired(db, which as ("android" | "ios")[], "Blocage désactivé (admin-cli)");
+      console.log(n ? `Blocage désactivé : ${which.join(", ")} (effet immédiat).` : "Aucun blocage actif.");
+    }
   } else if (cmd === "store-status" || cmd === "store-reconcile") {
     // Achats : état agrégé (aucun identifiant) ; rapprochement avec les stores (à planifier chaque jour, sans risque : relit les stores).
     const counts = (
@@ -123,7 +144,7 @@ try {
       console.log(`Import : ${inserted} prix écrits, ${skipped} déjà présents (conservés${replace ? "" : ", utilisez --replace pour les remplacer"}), ${res.length - kept.length} lignes exclues. Aucun prix de famille modifié.`);
     } else console.log(`Simulation seulement : ${kept.length} lignes seraient importées. Pour écrire : admin-cli prices-import <fichier.csv> --execute`);
   } else {
-    console.log("Usage :\n  admin-cli reset <CODE_FAMILLE> <identifiant>\n  admin-cli token\n  admin-cli purge-family <CODE_FAMILLE> [--execute --confirm <CODE_FAMILLE>]\n  admin-cli prices-report <tableau.csv>\n  admin-cli prices-import <tableau.csv> [--execute] [--replace]\n  admin-cli quota-status | quota-activate [--execute] | quota-deactivate [--execute]\n  admin-cli store-status | store-reconcile");
+    console.log("Usage :\n  admin-cli reset <CODE_FAMILLE> <identifiant>\n  admin-cli token\n  admin-cli purge-family <CODE_FAMILLE> [--execute --confirm <CODE_FAMILLE>]\n  admin-cli prices-report <tableau.csv>\n  admin-cli prices-import <tableau.csv> [--execute] [--replace]\n  admin-cli quota-status | quota-activate [--execute] | quota-deactivate [--execute]\n  admin-cli store-status | store-reconcile\n  admin-cli update-status | update-disable [android|ios]");
     process.exitCode = 1;
   }
 } catch (e) {

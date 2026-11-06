@@ -566,6 +566,113 @@ final class ParcoursRecetteTests: XCTestCase {
         }
     }
 
+    // ───── Mise à jour de l'application (réglage serveur iPhone, recette) ─────
+
+    /// Appel API JSON (gestionnaire de recette) : code HTTP et réponse.
+    @discardableResult
+    private func apiJSON(_ cookie: String, _ method: String, _ path: String, _ body: [String: Any?]? = nil) -> (Int, [String: Any]?) {
+        guard let base = env["COURSES_SERVER"], let u = URL(string: base + path) else { return (0, nil) }
+        var r = URLRequest(url: u); r.httpMethod = method; r.setValue(cookie, forHTTPHeaderField: "Cookie")
+        if let b = body {
+            r.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            r.httpBody = try? JSONSerialization.data(withJSONObject: b.mapValues { $0 ?? NSNull() })
+        }
+        var out: (Int, [String: Any]?) = (0, nil)
+        let done = expectation(description: path)
+        URLSession.shared.dataTask(with: r) { d, resp, _ in
+            out = ((resp as? HTTPURLResponse)?.statusCode ?? 0, d.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] })
+            done.fulfill()
+        }.resume()
+        wait(for: [done], timeout: 30)
+        return out
+    }
+
+    /// Réglage iPhone sur la recette. Numéro de build de cette version de recette : 1.
+    private func politique(_ cookie: String, latest: Int?, min: Int?, actif: Bool, minOs: Int? = nil) {
+        let body: [String: Any?] = ["platform": "ios", "latestVersionCode": latest, "minVersionCode": min, "requiredActive": actif, "minOs": minOs,
+                                     "storeUrl": "https://apps.apple.com/app/id0000000000", "availableOnStore": true, "rolloutComplete": true, "note": "contrôle iPhone (recette)"]
+        let (code, rep) = apiJSON(cookie, "PUT", "/api/gestion/app-update", body)
+        print("\(stamp()) iPhone : réglage mise à jour latest=\(latest.map(String.init) ?? "—") min=\(min.map(String.init) ?? "—") actif=\(actif) → \(code) \(rep ?? [:])")
+        XCTAssertEqual(code, 200, "réglage de mise à jour refusé : \(rep ?? [:])")
+    }
+
+    private var bloque: XCUIElement { anyContaining("Pour continuer à utiliser Mes Courses").firstMatch }
+    private var proposition: XCUIElement { anyContaining("Une nouvelle version de Mes Courses est disponible").firstMatch }
+
+    func test7_MiseAJourObligatoire() throws {
+        relaunch(reset: true)
+        let api = try XCTUnwrap(apiLogin("adil", "482913"), "connexion API impossible")
+        defer { politique(api, latest: nil, min: nil, actif: false) } // jamais laissé actif, même en cas d'échec
+        politique(api, latest: nil, min: nil, actif: false)
+        let list = try XCTUnwrap(freshList(api), "liste de recette non ouverte")
+        try login("adil", "482913")
+        waitFor("Ajouter des articles", 40)
+        // 1. Version autorisée et à jour : rien.
+        XCTAssertFalse(proposition.waitForExistence(timeout: 6), "proposition affichée sans raison")
+        XCTAssertFalse(bloque.exists, "blocage affiché sans raison")
+        attach("m1-a-jour")
+        // 2. Dernière version 2 (installée : 1), blocage préparé mais désactivé : proposition facultative, « Plus tard » possible.
+        politique(api, latest: 2, min: 2, actif: false)
+        relaunch(reset: false)
+        XCTAssertTrue(proposition.waitForExistence(timeout: 30), "proposition facultative absente")
+        XCTAssertTrue(any("Plus tard").firstMatch.exists, "« Plus tard » absent")
+        attach("m2-proposition")
+        press(any("Plus tard").firstMatch); sleep(2)
+        XCTAssertTrue(anyContaining("Ajouter des articles").firstMatch.waitForExistence(timeout: 15), "application inutilisable après « Plus tard »")
+        XCTAssertFalse(bloque.exists, "blocage alors qu'il est désactivé")
+        // 3. Blocage activé, mais iPhone hors connexion au lancement : aucun blocage (vérification impossible), modification en attente.
+        politique(api, latest: 2, min: 2, actif: true)
+        reseau(true)
+        relaunch(reset: false)
+        XCTAssertTrue(anyContaining("Ajouter des articles").firstMatch.waitForExistence(timeout: 30), "application inutilisable hors connexion")
+        sleep(8)
+        XCTAssertFalse(bloque.exists, "blocage déclenché par une simple panne réseau")
+        tapButton("Ajouter des articles")
+        search("Citrons")
+        addToSelection("Citrons", waitCard("Citrons", 20))
+        tapButton("Terminer ma sélection")
+        sleep(3)
+        XCTAssertTrue(anyContaining("attente").firstMatch.waitForExistence(timeout: 20), "aucune modification en attente hors connexion")
+        attach("m3-hors-connexion-sans-blocage")
+        // 4. Réseau rétabli, retour au premier plan : blocage (version 1 < minimale 2) ; la modification en attente part quand même.
+        reseau(false)
+        XCUIDevice.shared.press(.home); sleep(3); app.activate()
+        XCTAssertTrue(bloque.waitForExistence(timeout: 45), "écran « Mise à jour nécessaire » absent")
+        XCTAssertTrue(anyContaining("Mise à jour nécessaire").firstMatch.exists)
+        XCTAssertTrue(any("Mettre à jour").firstMatch.exists, "bouton vers la fiche App Store absent")
+        XCTAssertFalse(any("Plus tard").firstMatch.exists, "le blocage ne doit pas proposer « Plus tard »")
+        attach("m4-bloque")
+        waitServer("modification faite hors connexion reçue par le serveur malgré le blocage", minutes: 3) {
+            if let l = activeList(api), l.id == list, l.items.contains("Citrons") { return true }; return false
+        }
+        // 5. Relance : toujours bloqué ; puis appareil trop ancien pour la version exigée (iOS minimal 99) : pas bloqué.
+        relaunch(reset: false)
+        XCTAssertTrue(bloque.waitForExistence(timeout: 30), "blocage perdu à la relance")
+        politique(api, latest: 2, min: 2, actif: true, minOs: 99)
+        relaunch(reset: false)
+        sleep(8)
+        XCTAssertFalse(bloque.exists, "appareil incapable d'installer la version exigée bloqué quand même")
+        attach("m5-appareil-trop-ancien")
+        // 6. Désactivation immédiate côté serveur : accès rétabli au retour au premier plan, données intactes.
+        politique(api, latest: 2, min: 2, actif: true, minOs: nil)
+        relaunch(reset: false)
+        XCTAssertTrue(bloque.waitForExistence(timeout: 30), "blocage non rétabli")
+        politique(api, latest: 2, min: 2, actif: false)
+        XCUIDevice.shared.press(.home); sleep(3); app.activate()
+        var libre = false
+        for _ in 0..<20 { if !bloque.exists { libre = true; break }; sleep(2) }
+        XCTAssertTrue(libre, "blocage toujours affiché après sa désactivation")
+        XCTAssertTrue(anyContaining("Citrons").firstMatch.waitForExistence(timeout: 20), "liste perdue après le blocage")
+        attach("m6-desactive")
+        // 7. Version installée = version minimale (1) : autorisée, aucun blocage.
+        politique(api, latest: 1, min: 1, actif: true)
+        relaunch(reset: false)
+        sleep(8)
+        XCTAssertFalse(bloque.exists, "version minimale installée bloquée")
+        XCTAssertFalse(proposition.exists, "proposition alors que la version est à jour")
+        attach("m7-version-minimale")
+    }
+
     // ───── Clavier et affichage (lancé sur un petit et un grand iPhone) ─────
 
     func test5_ClavierEtAffichage() throws {

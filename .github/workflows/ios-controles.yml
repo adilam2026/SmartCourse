@@ -51,7 +51,7 @@ jobs:
             -derivedDataPath ../build/dd CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= 2>&1 | tee ../xcodebuild.log | grep -E "error:|BUILD|\*\*" | head -60
       - name: Hors connexion, réouverture, session (iPhone 16)
         # [controles:clavier] : seulement les contrôles du clavier et de l'affichage.
-        if: ${{ !contains(github.event.head_commit.message, '[controles:clavier]') }}
+        if: ${{ !contains(github.event.head_commit.message, '[controles:clavier]') && !contains(github.event.head_commit.message, '[controles:maj]') }}
         working-directory: ios/app
         env:
           TEST_RUNNER_COURSES_SERVER: ${{ env.RECETTE_URL }}
@@ -63,7 +63,7 @@ jobs:
             -only-testing:CoursesUITests/ParcoursRecetteTests/test4_HorsConnexion_ReouvertureEtSession \
             -derivedDataPath ../build/dd -resultBundlePath ../h.xcresult 2>&1 | tee ../h.log | grep -E "error:|Test Case|iPhone :|Serveur commun" | tail -40
       - name: Notifications de demandes (APNs simulée) et rappels (iPhone 16)
-        if: ${{ always() && !contains(github.event.head_commit.message, '[controles:clavier]') }}
+        if: ${{ always() && !contains(github.event.head_commit.message, '[controles:clavier]') && !contains(github.event.head_commit.message, '[controles:maj]') }}
         working-directory: ios/app
         env:
           TEST_RUNNER_COURSES_SERVER: ${{ env.RECETTE_URL }}
@@ -79,8 +79,21 @@ jobs:
           xcrun simctl spawn "$SIM16" log show --last 20m --style compact --info --debug --predicate 'eventMessage CONTAINS "[Courses"' 2>/dev/null | grep -E "CoursesRappel|CoursesNotif" | tail -20
           xcrun simctl spawn "$SIM16" log show --last 20m --style compact --info --debug --predicate 'eventMessage CONTAINS "[Courses"' 2>/dev/null | grep -q "rappel(s) programmé(s)" \
             || { echo "::error::aucun rappel programmé"; exit 1; }
+      - name: Mise à jour de l'application — proposée, bloquante, hors connexion, appareil trop ancien, désactivée (iPhone 16)
+        # [controles:maj] : seulement ce contrôle. Réglage iPhone de la RECETTE modifié pendant le test, puis remis à zéro.
+        if: ${{ always() && !contains(github.event.head_commit.message, '[controles:clavier]') }}
+        working-directory: ios/app
+        env:
+          TEST_RUNNER_COURSES_SERVER: ${{ env.RECETTE_URL }}
+          TEST_RUNNER_COURSES_FAMILY: ${{ env.RECETTE_FAMILLE }}
+        run: |
+          set -o pipefail
+          bash ../../scripts/ios-reseau.sh "$SIM16" "$RECETTE_URL" 30 > ../reseau-maj.log 2>&1 &
+          xcodebuild test-without-building -project Courses.xcodeproj -scheme Courses -destination "id=$SIM16" \
+            -only-testing:CoursesUITests/ParcoursRecetteTests/test7_MiseAJourObligatoire \
+            -derivedDataPath ../build/dd -resultBundlePath ../maj.xcresult 2>&1 | tee ../maj.log | grep -E "error:|Test Case|iPhone :|Serveur commun" | tail -40
       - name: Clavier et affichage — iPhone SE (petit écran)
-        if: always()
+        if: ${{ always() && !contains(github.event.head_commit.message, '[controles:maj]') }}
         working-directory: ios/app
         env:
           TEST_RUNNER_COURSES_SERVER: ${{ env.RECETTE_URL }}
@@ -91,7 +104,7 @@ jobs:
             -only-testing:CoursesUITests/ParcoursRecetteTests/test5_ClavierEtAffichage \
             -derivedDataPath ../build/dd -resultBundlePath ../se.xcresult 2>&1 | tee ../se.log | grep -E "error:|Test Case" | tail -30
       - name: Clavier et affichage — iPhone 16 Pro Max (grand écran)
-        if: always()
+        if: ${{ always() && !contains(github.event.head_commit.message, '[controles:maj]') }}
         working-directory: ios/app
         env:
           TEST_RUNNER_COURSES_SERVER: ${{ env.RECETTE_URL }}
@@ -106,12 +119,13 @@ jobs:
         run: |
           sudo pfctl -f /etc/pf.conf >/dev/null 2>&1 || true
           set +e
-          echo "── Réseau"; cat ios/reseau.log 2>/dev/null
+          echo "── Réseau"; cat ios/reseau.log ios/reseau-maj.log 2>/dev/null
+          echo "── Mise à jour (iPhone)"; grep -E "iPhone :|Serveur commun" ios/maj.log 2>/dev/null | grep -v "t = " | head -30
           echo "── Éléments « Carottes » vus par le test (clavier et affichage)"; grep -hE "Carottes|Courgettes :" ios/se.log ios/max.log 2>/dev/null | grep -vE "t = |Find|Check" | head -30
           echo "── Hors connexion (iPhone)"; grep -E "iPhone :|Serveur commun" ios/h.log | grep -v "t = " | head -20
           echo "── Journal de l'application (iPhone 16)"
-          xcrun simctl spawn "$SIM16" log show --last 120m --style compact --info --debug --predicate 'eventMessage CONTAINS "[Courses"' 2>/dev/null | grep -E "CoursesFlux|CoursesData|CoursesIos" | tail -60 || true
-          for r in h n se max; do
+          xcrun simctl spawn "$SIM16" log show --last 120m --style compact --info --debug --predicate 'eventMessage CONTAINS "[Courses"' 2>/dev/null | grep -E "CoursesFlux|CoursesData|CoursesIos|CoursesUpdate" | tail -60 || true
+          for r in h n maj se max; do
             mkdir -p ios/captures/$r
             xcrun xcresulttool export attachments --path ios/$r.xcresult --output-path ios/captures/$r 2>/dev/null || true
             echo "── Captures $r"; cat ios/captures/$r/manifest.json 2>/dev/null | python3 -c "import json,sys; [print(a['exportedFileName'], a.get('suggestedHumanReadableName','')) for t in json.load(sys.stdin) for a in t.get('attachments',[])]" 2>/dev/null
