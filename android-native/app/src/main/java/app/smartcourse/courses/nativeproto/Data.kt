@@ -249,6 +249,10 @@ class Demo(initialRole: Role? = null, val live: Boolean = false) {
     var data: AppData? = null
     var pendingOps by mutableStateOf(0)
     var orphanCount by mutableStateOf(0)
+    /** Listes gratuites et droit payant de la famille (serveur) ; null tant que non chargé ou serveur ancien. */
+    var plan by mutableStateOf<FamilyPlan?>(null)
+    /** Création refusée (listes gratuites utilisées) : l'écran « Mes Courses Famille » est demandé. */
+    var planPrompt by mutableStateOf(false)
     var listLoaded by mutableStateOf(!live)
     /** Catégories (clé, libellé), même vides : choix de la catégorie d'un nouveau produit. */
     var categoryList by mutableStateOf(listOf("autres" to "Autres"))

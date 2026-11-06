@@ -109,7 +109,7 @@ private fun tabFor(route: String?): String? = when {
     route == null -> null
     route.startsWith("v06") -> "v06"
     route.startsWith("b") -> "b1"
-    route in listOf("v08", "v09", "v10", "v11") || route.startsWith("stub") -> "v07"
+    route in listOf("v08", "v09", "v10", "v11", "v20") || route.startsWith("stub") -> "v07"
     else -> route
 }
 
@@ -161,6 +161,8 @@ fun App(session: Session, me: Me?) {
         nav.navigate(r) { if (tab) { if (staff) popUpTo(nav.graph.startDestinationId) { inclusive = false } else popUpTo("v02") { inclusive = false }; launchSingleTop = true } }
     }
     val back: () -> Unit = { nav.popBackStack() }
+    // Création refusée (listes gratuites utilisées) : l'écran « Mes Courses Famille » s'ouvre (offres ou message selon le rôle).
+    LaunchedEffect(demo.planPrompt) { if (demo.planPrompt) { demo.planPrompt = false; if (route != "v20") nav.navigate("v20") } }
     val baseTabs = if (demo.role == Role.ADMIN) (if (me?.role == "parent") ADMIN_TABS.filter { it.route != "v07" } else ADMIN_TABS) else STAFF_TABS
     // Onglet Budget : seulement si l'option est activée ET que ce profil peut consulter le suivi financier (droit vérifié par le serveur).
     val tabs = if (demo.role == Role.ADMIN && demo.budget?.let { it.enabled && it.rights.view } == true)
@@ -204,6 +206,7 @@ fun App(session: Session, me: Me?) {
                         composable("v15") { LocationScreen(back) }
                         composable("v17") { AdvancedSettingsScreen(back, go) }
                         composable("v18") { FamilyIdScreen(back) }
+                        composable("v20") { PlanScreen(back) }
                         // Module Budget (option familiale) : vue d'ensemble, historique, opération, budgets, Mon compte, réglages, droits.
                         composable("b1") { BudgetScreen(go) }
                         composable("b2") { OperationsScreen(back) }
@@ -225,7 +228,7 @@ fun App(session: Session, me: Me?) {
             demo.pendingSheet = if (r.startsWith("v04?sheet=")) r.substringAfter("=") else null
             nav.navigate(r.substringBefore("?")) { launchSingleTop = true }
         }
-        if (account && me != null) AccountSheet(me, session, { account = false }, { account = false; confirmLogout = true }, { account = false; cityPicker = true }, { account = false; deleteAccount = true })
+        if (account && me != null) AccountSheet(me, session, { account = false }, { account = false; confirmLogout = true }, { account = false; cityPicker = true }, { account = false; deleteAccount = true }, { account = false; nav.navigate("v20") })
         if (deleteAccount && me != null) DeleteAccountSheet(me, session, { deleteAccount = false }, { deleteAccount = false; deleteFamily = true })
         if (deleteFamily) ResetFamilySheet { deleteFamily = false }
         if (cityPicker && me != null) CityPickerSheet(me.city, { city ->
@@ -283,7 +286,8 @@ fun App(session: Session, me: Me?) {
 }
 
 @Composable
-private fun AccountSheet(me: Me, session: Session, onDismiss: () -> Unit, onLogout: () -> Unit, onCity: () -> Unit, onDeleteAccount: () -> Unit) {
+private fun AccountSheet(me: Me, session: Session, onDismiss: () -> Unit, onLogout: () -> Unit, onCity: () -> Unit, onDeleteAccount: () -> Unit, onPlan: () -> Unit = {}) {
+    val demo = LocalDemo.current
     val roleLabel = when (me.role) { "admin" -> if (me.primary == true) "Administrateur principal" else "Administrateur"; "parent" -> "Parent"; else -> "Personnel" }
     AppSheet(onDismiss) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -307,6 +311,11 @@ private fun AccountSheet(me: Me, session: Session, onDismiss: () -> Unit, onLogo
         if (!BuildConfig.FINAL) Text("Serveur : ${session.serverAddress?.substringAfter("://") ?: "—"}", style = MaterialTheme.typography.bodyMedium)
         Text(if (session.online) "État : connecté" else "État : hors connexion, session conservée", style = MaterialTheme.typography.bodyMedium, color = if (session.online) C.TealDark else C.Amber)
         Spacer(Modifier.height(16.dp))
+        // Listes gratuites et offre de la famille : accessible à tous les rôles (achat réservé aux administrateurs, sur l'écran même).
+        demo.plan?.takeIf { it.quotaActive || it.entitled }?.let {
+            SecondaryButton("Mes Courses Famille", onPlan, Modifier.fillMaxWidth())
+            Spacer(Modifier.height(8.dp))
+        }
         SecondaryButton("Se déconnecter", onLogout, Modifier.fillMaxWidth(), danger = true)
         // Suppression du compte : pour chaque rôle, distincte de la déconnexion et de la désactivation d'un profil.
         Text(

@@ -152,7 +152,7 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
             if (engine.pendingOps > 0) engine.flush()
             when (val r = engine.createList(name)) {
                 is Outcome.Ok -> { render(); followList(); loadOpenLists(); after() }
-                is Outcome.Fail -> demo.say(if (r.code == "active_exists") "Une liste est déjà en cours." else if (r.failure == Failure.NETWORK || r.failure == Failure.TIMEOUT) networkMessage() else explain(r))
+                is Outcome.Fail -> if (r.code == "quota_reached") quotaReached() else demo.say(if (r.code == "active_exists") "Une liste est déjà en cours." else if (r.failure == Failure.NETWORK || r.failure == Failure.TIMEOUT) networkMessage() else explain(r))
             }
         }
     }
@@ -313,7 +313,8 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
     private suspend fun onEvent(name: String) {
         when (name) {
             "ready" -> { backoff = 1000; online = true; refreshAll() }
-            "list.updated", "list.closed", "list.created", "list.deleted" -> { if (demo.multiLists) loadOpenLists(); flushAndRefresh() }
+            "list.updated", "list.closed", "list.created", "list.deleted" -> { if (demo.multiLists) loadOpenLists(); flushAndRefresh(); if (name == "list.created") loadPlan() }
+            "plan.updated" -> loadPlan()
             "catalog.updated" -> refreshCatalog()
             "prefs.updated" -> session.verify()
             "budget.updated" -> if (demo.budget != null) loadBudget()
@@ -322,7 +323,22 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
 
     /* ───── Synchronisation ───── */
 
-    suspend fun refreshAll() { refreshCatalog(); if (demo.multiLists) loadOpenLists(); flushAndRefresh() }
+    suspend fun refreshAll() { refreshCatalog(); if (demo.multiLists) loadOpenLists(); flushAndRefresh(); loadPlan() }
+
+    /** Listes gratuites restantes et droit payant de la famille (serveur ancien sans cette route : rien n'est affiché). */
+    suspend fun loadPlan() {
+        when (val r = session.api.call("GET", "/api/family/plan")) {
+            is Outcome.Ok -> demo.plan = FamilyPlan.parse(r.value)
+            is Outcome.Fail -> if (r.failure == Failure.NOT_FOUND) demo.plan = null
+        }
+    }
+
+    /** Création refusée par la règle des listes gratuites : message clair, écran dédié, rien n'est perdu. */
+    private fun quotaReached() {
+        scope.launch { loadPlan() }
+        demo.say(if (demo.plan?.canPurchase == true) "Les listes gratuites de la famille sont utilisées." else "Les listes gratuites de la famille sont utilisées : demandez à un administrateur de débloquer Mes Courses.")
+        demo.planPrompt = true
+    }
 
     suspend fun refreshCatalog() {
         when (val r = session.api.call("GET", "/api/catalog")) {
@@ -340,6 +356,7 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
     suspend fun flushAndRefresh() {
         val rep = engine.flush()
         if (rep.messages.isNotEmpty()) demo.say(rep.messages.joinToString(" "))
+        if (rep.quotaReached) { loadPlan(); demo.planPrompt = true }
         if (!rep.networkDown) engine.refresh()
         logInfo("CoursesData", "flush envoyées=${rep.sent} gardées=${rep.orphaned} réseau=${rep.networkDown} messages=${rep.messages} | à reprendre=${engine.orphans.size} en attente=${engine.pendingOps} liste=${engine.list?.id} en ligne=${engine.online}")
         demo.listLoaded = true
@@ -594,7 +611,7 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
         scope.launch {
             when (val r = engine.createList()) {
                 is Outcome.Ok -> { render(); syncDraft() }
-                is Outcome.Fail -> demo.say(if (r.code == "active_exists") "Une liste est déjà en cours." else networkMessage())
+                is Outcome.Fail -> if (r.code == "quota_reached") quotaReached() else demo.say(if (r.code == "active_exists") "Une liste est déjà en cours." else networkMessage())
             }
             flushAndRefresh()
         }

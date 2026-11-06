@@ -38,7 +38,7 @@ fun AdminHubScreen(nav: (String) -> Unit) {
         "Famille et accès" to listOf(Entry("Profils", Icons.Rounded.Groups, "v08"), Entry("Récupération", Icons.Rounded.Key, "stub/Récupération")),
         "Famille" to ((if (serverSupports(demo.serverSchema, 26)) listOf(Entry("Identifiant famille", Icons.Rounded.Badge, "v18")) else emptyList()) +
             listOf(Entry("Pays et ville", Icons.Rounded.Public, "v15"), Entry("Paramètres avancés", Icons.Rounded.Tune, "v17"))),
-        "Préférences" to listOf(Entry("Affichage", Icons.Rounded.Palette, "v11"), Entry("Notifications et rappels", Icons.Rounded.Notifications, "stub/Notifications")),
+        "Préférences" to listOf(Entry("Affichage", Icons.Rounded.Palette, "v11"), Entry("Notifications et rappels", Icons.Rounded.Notifications, "stub/Notifications"), Entry("Mes Courses Famille", Icons.Rounded.Verified, "v20")),
         "Application" to listOf(Entry("Sauvegarde", Icons.Rounded.Cloud, "stub/Sauvegarde"), Entry("À propos", Icons.Rounded.Info, "stub/À propos")),
     )
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {

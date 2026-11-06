@@ -128,7 +128,9 @@ fun AdminListScreen(nav: (String) -> Unit) {
                         Text("Choisissez les articles de vos prochaines courses.", style = MaterialTheme.typography.bodySmall)
                         Spacer(Modifier.height(14.dp))
                         // Ouvre le parcours de sélection : la liste n'est créée qu'à la validation des articles.
-                        PrimaryButton("Créer une liste", { nav("v04") }, leading = Icons.Rounded.Add)
+                        // Listes gratuites utilisées : l'écran « Mes Courses Famille » s'ouvre à la place, aucune liste n'est créée.
+                        PrimaryButton("Créer une liste", { if (demo.plan?.blocked == true) nav("v20") else nav("v04") }, leading = Icons.Rounded.Add)
+                        FreeListsHint(demo.plan, Modifier.padding(top = 8.dp))
                     } else {
                         Text("La liste est vide.", style = MaterialTheme.typography.titleSmall)
                         Text("Ajoutez des articles pour commencer.", style = MaterialTheme.typography.bodySmall)

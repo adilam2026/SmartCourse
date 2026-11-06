@@ -13,7 +13,7 @@ data class EffLine(
     val price: PriceRef?, val buyer: String?, val boughtAt: String?, val pending: Boolean,
 )
 
-data class FlushReport(val sent: Int = 0, val messages: List<String> = emptyList(), val orphaned: Int = 0, val networkDown: Boolean = false)
+data class FlushReport(val sent: Int = 0, val messages: List<String> = emptyList(), val orphaned: Int = 0, val networkDown: Boolean = false, val quotaReached: Boolean = false)
 
 /**
  * Moteur de la liste en cours (sans interface) : copie locale de la liste, brouillons, file « Envoi en attente » et articles « à reprendre ».
@@ -166,7 +166,7 @@ class ListEngine(
     }
 
     suspend fun flush(): FlushReport = flushLock.withLock {
-        var sent = 0; var orphaned = 0
+        var sent = 0; var orphaned = 0; var quota = false
         val msgs = LinkedHashSet<String>()
         while (outbox.isNotEmpty()) {
             val b = outbox.first()
@@ -204,21 +204,23 @@ class ListEngine(
                 is Outcome.Fail -> {
                     when (r.failure) {
                         Failure.NOT_FOUND -> {
-                            // Liste supprimée entre-temps : jamais recréée ; les demandes d'articles sont gardées.
+                            // Liste supprimée entre-temps (jamais recréée), ou nouvelle liste refusée par la règle des listes gratuites :
+                            // les demandes d'articles sont gardées sur le téléphone (« Reprendre »).
                             b.ops.filter { keeps(it) }.forEach { stash(it); orphaned++ }
-                            msgs += "La liste n'existe plus : vos articles sont gardés, appuyez sur « Reprendre »."
+                            if (r.code == "quota_reached") { quota = true; msgs += "Les listes gratuites de la famille sont utilisées : vos articles sont gardés sur ce téléphone." }
+                            else msgs += "La liste n'existe plus : vos articles sont gardés, appuyez sur « Reprendre »."
                             outbox = outbox.drop(1); saveOutbox()
                         }
                         Failure.FORBIDDEN, Failure.BAD_REQUEST, Failure.CONFLICT, Failure.UNKNOWN -> {
                             msgs += "Une demande a été refusée par le serveur et n'a pas été envoyée."
                             outbox = outbox.drop(1); saveOutbox()
                         }
-                        else -> { noteFailure(r); return@withLock FlushReport(sent, msgs.toList(), orphaned, networkDown = true) }
+                        else -> { noteFailure(r); return@withLock FlushReport(sent, msgs.toList(), orphaned, networkDown = true, quotaReached = quota) }
                     }
                 }
             }
         }
-        FlushReport(sent, msgs.toList(), orphaned, false)
+        FlushReport(sent, msgs.toList(), orphaned, false, quota)
     }
 
     private fun stash(op: Op) {
@@ -252,7 +254,11 @@ class ListEngine(
     }
 
     suspend fun createList(name: String? = null): Outcome<ListData?> {
-        val r = api.call("POST", "/api/lists", if (name.isNullOrBlank()) kotlinx.serialization.json.JsonObject(emptyMap()) else kotlinx.serialization.json.buildJsonObject { put("name", kotlinx.serialization.json.JsonPrimitive(name.trim())) })
+        // requestId : un renvoi de la même demande (réponse perdue) retrouve la liste déjà créée, sans création ni comptage en double.
+        val r = api.call("POST", "/api/lists", kotlinx.serialization.json.buildJsonObject {
+            put("requestId", kotlinx.serialization.json.JsonPrimitive(app.smartcourse.courses.nativeproto.randomUuid()))
+            if (!name.isNullOrBlank()) put("name", kotlinx.serialization.json.JsonPrimitive(name.trim()))
+        })
         return when (r) {
             is Outcome.Ok -> { setList(r.value["list"] as? kotlinx.serialization.json.JsonObject); online = true; Outcome.Ok(list) }
             is Outcome.Fail -> { noteFailure(r); r }

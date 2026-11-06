@@ -17,7 +17,7 @@ val mesure = project.findProperty("mesure") == "1"
 // Fichiers propres à Android, remplacés pour iOS par leur équivalent dans src/iosMain (même nom de classes et de fonctions).
 val androidOnly = listOf(
     "MainActivity.kt", "Notify.kt", "Reminders.kt", "AppUpdate.kt", "PlatformAndroid.kt", "NotificationsAndroid.kt",
-    "net/HttpAndroid.kt", "net/StorageAndroid.kt",
+    "net/HttpAndroid.kt", "net/StorageAndroid.kt", "BillingAndroid.kt",
 )
 
 // Variante : recette (par défaut) ou FINALE (-Pfinal=1, TestFlight / App Store) : serveur fixé à la compilation (HTTPS obligatoire),
