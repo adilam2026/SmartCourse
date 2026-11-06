@@ -644,7 +644,10 @@ final class ParcoursRecetteTests: XCTestCase {
         search("Citrons")
         addToSelection("Citrons", waitCard("Citrons", 20))
         attach("m3c-selection")
-        tapButton("Terminer ma sélection")
+        // Barre du bas (hors de la zone retenue par tapButton) : touchée directement.
+        if let bar = anyContaining("Terminer ma sélection").allElementsBoundByIndex.filter({ $0.frame.height > 0 }).max(by: { $0.frame.minY < $1.frame.minY }) {
+            press(bar); sleep(3)
+        } else { tapButton("Terminer ma sélection") }
         sleep(3)
         attach("m3d-apres-selection")
         if !anyContaining("attente").firstMatch.waitForExistence(timeout: 20) {
