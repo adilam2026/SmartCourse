@@ -1,3 +1,4 @@
+import { storesFromEnv } from "./store/service.js";
 import { reserveExistingCodes } from "./family-id.js";
 import { buildApp } from "./app.js";
 import { ensureInstallToken } from "./auth.js";
@@ -83,8 +84,26 @@ setInterval(() => void purgeSignups(), 6 * 3_600_000).unref();
 const external = config.BACKUP_MODE === "external";
 const backup = config.BACKUP_KEY || external ? createBackupStorage(config) : null;
 const assetLinks = existsSync("./assetlinks.json") ? JSON.parse(readFileSync("./assetlinks.json", "utf8")) : undefined;
-const app = await buildApp({ db, assetLinks, loginRateLimit: { max: config.LOGIN_RATE_MAX, timeWindow: "1 minute" }, store: photoStore, webDir: existsSync(config.WEB_DIR) ? config.WEB_DIR : undefined, backupStorage: external ? "s3" : backup?.kind ?? null, backupMode: config.BACKUP_MODE, brevoWebhookSecret: process.env.BREVO_WEBHOOK_SECRET, contactEmail: config.CONTACT_EMAIL, catalogManagers: (process.env.CATALOG_MANAGERS ?? "").split(/[\s,;]+/).filter((x) => /^[0-9a-f-]{36}$/i.test(x)) });
+const stores = storesFromEnv();
+console.log(`Achats : Google Play ${stores.google ? "configuré" : "non configuré"}, App Store ${stores.apple ? (stores.apple.hasApi ? "configuré (avec API)" : "configuré (sans API)") : "non configuré"}, achats de test ${stores.sandbox?.all ? "admis" : "refusés"}.`);
+const app = await buildApp({ db, assetLinks, loginRateLimit: { max: config.LOGIN_RATE_MAX, timeWindow: "1 minute" }, store: photoStore, webDir: existsSync(config.WEB_DIR) ? config.WEB_DIR : undefined, backupStorage: external ? "s3" : backup?.kind ?? null, backupMode: config.BACKUP_MODE, brevoWebhookSecret: process.env.BREVO_WEBHOOK_SECRET, contactEmail: config.CONTACT_EMAIL, catalogManagers: (process.env.CATALOG_MANAGERS ?? "").split(/[\s,;]+/).filter((x) => /^[0-9a-f-]{36}$/i.test(x)), stores });
 await app.listen({ port: config.PORT, host: "0.0.0.0" });
+
+// Achats : rapprochement avec les stores toutes les 12 heures (rattrape une notification perdue, confirme un achat Google en retard).
+if (stores.google || stores.apple?.hasApi) {
+  const { StoreService } = await import("./store/service.js");
+  const svc = new StoreService(db, undefined, stores);
+  const reconcile = async () => {
+    try {
+      const r = await svc.reconcile();
+      if (r.changed || r.voided || r.unreachable) console.log(`Achats rapprochés : ${JSON.stringify(r)}`);
+    } catch (e) {
+      console.error(`Rapprochement des achats impossible : ${(e as Error).message}`);
+    }
+  };
+  setTimeout(() => void reconcile(), 60_000).unref();
+  setInterval(() => void reconcile(), 12 * 3_600_000).unref();
+}
 
 if (external) {
   // The scheduled job (external job, no longer shipped) makes, restores elsewhere and records the backups; the app does not run its own, and

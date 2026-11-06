@@ -47,6 +47,20 @@ try {
         for (const b of all) console.log(`  ${b.key}  (${b.at.toISOString()})`);
       } else console.log("\nAucun stockage de sauvegarde configuré ici : vérifiez les sauvegardes existantes dans Railway.");
     }
+  } else if (cmd === "store-status" || cmd === "store-reconcile") {
+    // Achats : état agrégé (aucun identifiant) ; rapprochement avec les stores (à planifier chaque jour, sans risque : relit les stores).
+    const counts = (
+      await db.query("SELECT platform, kind, status, environment, count(*)::int AS n FROM family_entitlements GROUP BY 1,2,3,4 ORDER BY 1,2,3,4")
+    ).rows;
+    console.log("Droits :", JSON.stringify(counts));
+    const refused = (await db.query("SELECT type, count(*)::int AS n FROM entitlement_events WHERE source = 'refused' AND received_at > now() - interval '30 days' GROUP BY 1")).rows;
+    console.log("Achats refusés (30 jours) :", JSON.stringify(refused));
+    if (cmd === "store-reconcile") {
+      const { StoreService, storesFromEnv } = await import("./store/service.js");
+      const svc = new StoreService(db, undefined, storesFromEnv());
+      if (!svc.google && !svc.apple) console.log("Aucun store configuré : rien à rapprocher.");
+      else console.log("Rapprochement :", JSON.stringify(await svc.reconcile()));
+    }
   } else if (cmd === "quota-status" || cmd === "quota-activate" || cmd === "quota-deactivate") {
     // Listes gratuites par famille : activation et retour arrière EXPLICITES (sans --execute : état et simulation seulement).
     const { quotaStatus, quotaActivate, quotaDeactivate } = await import("./list-quota.js");
@@ -109,7 +123,7 @@ try {
       console.log(`Import : ${inserted} prix écrits, ${skipped} déjà présents (conservés${replace ? "" : ", utilisez --replace pour les remplacer"}), ${res.length - kept.length} lignes exclues. Aucun prix de famille modifié.`);
     } else console.log(`Simulation seulement : ${kept.length} lignes seraient importées. Pour écrire : admin-cli prices-import <fichier.csv> --execute`);
   } else {
-    console.log("Usage :\n  admin-cli reset <CODE_FAMILLE> <identifiant>\n  admin-cli token\n  admin-cli purge-family <CODE_FAMILLE> [--execute --confirm <CODE_FAMILLE>]\n  admin-cli prices-report <tableau.csv>\n  admin-cli prices-import <tableau.csv> [--execute] [--replace]\n  admin-cli quota-status | quota-activate [--execute] | quota-deactivate [--execute]");
+    console.log("Usage :\n  admin-cli reset <CODE_FAMILLE> <identifiant>\n  admin-cli token\n  admin-cli purge-family <CODE_FAMILLE> [--execute --confirm <CODE_FAMILLE>]\n  admin-cli prices-report <tableau.csv>\n  admin-cli prices-import <tableau.csv> [--execute] [--replace]\n  admin-cli quota-status | quota-activate [--execute] | quota-deactivate [--execute]\n  admin-cli store-status | store-reconcile");
     process.exitCode = 1;
   }
 } catch (e) {

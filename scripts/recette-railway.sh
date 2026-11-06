@@ -11,6 +11,8 @@ esac
 export BREVO_API_KEY=cle-de-test BREVO_FROM_EMAIL=noreply@smartcourse.test BREVO_API_URL=http://127.0.0.1:3199/v3/smtp/email
 unset S3_BUCKET S3_ENDPOINT S3_REGION S3_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY BACKUP_S3_BUCKET BACKUP_S3_ENDPOINT BACKUP_S3_REGION BACKUP_S3_ACCESS_KEY_ID BACKUP_S3_SECRET_ACCESS_KEY
 node /app/recette/mock-brevo.mjs &
+# Achats de test des stores (testeurs Google Play, Apple Sandbox/TestFlight) admis sur la recette seulement.
+export STORE_ACCEPT_SANDBOX=1
 node dist/index.js &
 APP=$!
 P=${PORT:-3000}

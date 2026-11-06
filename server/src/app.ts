@@ -13,6 +13,8 @@ import { familyProductRoutes } from "./family-products.js";
 import { appUpdateRoutes } from "./app-update.js";
 import { COOKIE, makeGuard } from "./guard.js";
 import { listRoutes } from "./list-routes.js";
+import { storeRoutes } from "./store-routes.js";
+import { StoreService, type StoreDeps } from "./store/service.js";
 import { statsRoutes } from "./stats-routes.js";
 import { PushService } from "./push.js";
 import { pushRoutes } from "./push-routes.js";
@@ -74,6 +76,10 @@ export interface AppDeps {
   requireCity?: boolean;
   /** Contrôles de disponibilité d'un identifiant famille et changements d'identifiant, par IP. */
   familyIdRateLimit?: { max: number; timeWindow: string };
+  /** Vérification des achats (Google Play, App Store) ; sans configuration, les achats sont refusés poliment (503). */
+  stores?: StoreDeps;
+  /** Présentations d'achats par IP (30 par minute par défaut). */
+  purchaseRateLimit?: { max: number; timeWindow: string };
 }
 
 
@@ -114,6 +120,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const { db } = deps;
   const hub = deps.hub ?? new SseHub();
   const push = deps.push ?? new PushService(db);
+  const stores = new StoreService(db, hub, deps.stores ?? {});
   const recovery = deps.recovery ?? new RecoveryService(db, mailerFromEnv());
   const app = Fastify({ logger: process.env.NODE_ENV !== "test", trustProxy: true });
   recovery.useLogger(app.log); // la vraie cause des échecs d'envoi va dans les journaux du serveur, jamais à l'écran
@@ -449,6 +456,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   priceCommunityRoutes(app, { db, guard, hub });
   statsRoutes(app, { db, guard });
   pushRoutes(app, { db, guard, push });
+  storeRoutes(app, { db, guard, store: stores, rateLimit: deps.purchaseRateLimit });
 
   // --- flux SSE ---
   app.get("/api/events", { preHandler: guard() }, async (req, reply) => {

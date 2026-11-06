@@ -96,7 +96,7 @@ describe("migration 030 sur des familles en production (025 → 030)", () => {
       };
       const rev = Number((await db.query("SELECT catalog_rev FROM families WHERE id = $1", [fam])).rows[0].catalog_rev);
 
-      expect(await migrate(db)).toEqual(["029_catalogue_captures.sql", "030_unit_decisions.sql", "031_list_quota.sql"]);
+      expect(await migrate(db)).toEqual(["029_catalogue_captures.sql", "030_unit_decisions.sql", "031_list_quota.sql", "032_store_purchases.sql"]);
 
       // ---- Catalogue commun
       const unitOf = async (key: string) => (await db.query("SELECT unit FROM initial_catalog WHERE key = $1 UNION ALL SELECT unit FROM extended_catalog WHERE key = $1", [key])).rows[0]?.unit;

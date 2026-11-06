@@ -38,14 +38,16 @@ export interface QuotaState {
   blocked: boolean;
 }
 
-/** Droit payant en vigueur : achat à vie actif, ou abonnement dont la période payée n'est pas finie (annulé compris jusqu'à son terme). */
+/** Droit payant en vigueur : achat à vie actif, ou abonnement dont la période payée n'est pas finie (annulé compris jusqu'à son terme), ou en période de grâce. */
 export async function activeEntitlement(q: Q, familyId: string): Promise<Entitlement | null> {
   const r = (
     await q.query(
       `SELECT kind, status, platform, expires_at, auto_renewing FROM family_entitlements
         WHERE family_id = $1
           AND ((kind = 'lifetime' AND status = 'active')
-            OR (kind = 'annual' AND status IN ('active', 'grace', 'cancelled') AND expires_at > now()))
+            OR (kind = 'annual' AND status IN ('active', 'cancelled') AND expires_at > now())
+            -- période de grâce confirmée par le store : accès maintenu (Google jusqu'à 30 jours, Apple 16) ; borne de sûreté
+            OR (kind = 'annual' AND status = 'grace' AND expires_at > now() - interval '30 days'))
         ORDER BY (kind = 'lifetime') DESC, expires_at DESC NULLS FIRST LIMIT 1`,
       [familyId],
     )

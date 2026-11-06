@@ -65,10 +65,10 @@ app_config.list_quota_enabled  boolean DEFAULT false             -- interrupteur
 |---|---|---|
 | Produits | `courses_famille_annuel` (abonnement, base plan annuel renouvelable), `courses_famille_a_vie` (achat unique non consommable) | mêmes identifiants : abonnement auto-renouvelable (groupe « Mes Courses Famille ») et non consommable |
 | Prix affichés | `ProductDetails` (prix et devise du store) | `Product.displayPrice` |
-| Rattachement à la famille | `obfuscatedAccountId` = identifiant opaque de la famille, `obfuscatedProfileId` = acheteur | `appAccountToken` = UUID propre à la famille |
-| Vérification | serveur → Google Play Developer API (`purchases.subscriptionsv2.get`, `purchases.products.get`), puis **accusé de réception** par le serveur (sinon remboursement automatique à 3 jours) | serveur → vérification de la signature JWS de la transaction (chaîne Apple) et App Store Server API (`/inApps/v1/transactions`) |
-| Événements | Real-time developer notifications (Pub/Sub, message signé) → `/api/billing/google/notifications` | App Store Server Notifications V2 (JWS) → `/api/billing/apple/notifications` (URL sandbox = recette) |
-| Restaurer | `queryPurchasesAsync` → renvoi au serveur | `Transaction.currentEntitlements` / `AppStore.sync()` → renvoi au serveur |
+| Rattachement à la famille | `obfuscatedAccountId` = jeton store de la famille (`storeAccountToken`, UUID aléatoire, migration 032) | `appAccountToken` = le même jeton |
+| Vérification | serveur → Google Play Developer API (`purchases.subscriptionsv2.get`, `purchases.products.get`), puis **accusé de réception** par le serveur (sinon remboursement automatique à 3 jours) | serveur → vérification de la signature JWS de la transaction (chaîne jusqu'à « Apple Root CA - G3 », empreinte épinglée) et, si la clé est fournie, App Store Server API (`/inApps/v1/subscriptions`, `/inApps/v1/transactions`) |
+| Événements | Real-time developer notifications (Pub/Sub, envoi push) → `POST /api/store/google/rtdn?token=<GOOGLE_RTDN_TOKEN>` ; le contenu sert seulement à savoir quel achat **revérifier** auprès de Google | App Store Server Notifications V2 (JWS vérifié) → `POST /api/store/apple/notifications` (URL sandbox = recette) |
+| Présenter / restaurer | `POST /api/family/purchases {platform:"google", productId, purchaseToken}` (achat, puis `queryPurchasesAsync` pour restaurer) | `POST /api/family/purchases {platform:"apple", signedTransaction}` (`jwsRepresentation` ; `Transaction.currentEntitlements` pour restaurer) |
 | Gérer l'abonnement | lien profond Play « Abonnements » | `showManageSubscriptions` (écran Apple) |
 
 - **Partage Android ↔ iPhone** : le droit appartient à la famille sur le serveur ; un membre sur l'autre plateforme est débloqué
@@ -126,9 +126,12 @@ mise à jour conseillée puis obligatoire, lot serveur d'abord sur la recette.
    proposée par Google, ajustable).
 2. *Produits intégrés* : `courses_famille_a_vie`, 15 USD.
 3. *Paramètres › Testeurs de licence* : ajouter les comptes Gmail de test.
-4. *Monétiser › Configuration de la monétisation* : notifications en temps réel → sujet Google Cloud Pub/Sub (projet Google Cloud lié).
+4. *Monétiser › Configuration de la monétisation* : notifications en temps réel → sujet Google Cloud Pub/Sub (projet Google Cloud lié),
+   avec un abonnement Pub/Sub de type **push** vers `https://<serveur>/api/store/google/rtdn?token=<GOOGLE_RTDN_TOKEN>`
+   (jeton aléatoire long, choisi par vous, saisi seulement dans Pub/Sub et dans les variables du serveur).
 5. *Utilisateurs et autorisations* : compte de service Google Cloud (API Google Play Android Developer) avec seulement
-   « Afficher les données financières » et « Gérer les commandes et les abonnements » ; clé JSON → variable du serveur de recette.
+   « Afficher les données financières » et « Gérer les commandes et les abonnements », limité à l'application ; clé JSON →
+   variable `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` du serveur de recette, avec `GOOGLE_PLAY_PACKAGE` (nom du paquet Android).
 6. *Tests › Test interne* : envoi de la version de test (après votre accord).
 
 **App Store Connect** (Account Holder ou Admin pour les contrats ; App Manager pour les produits) :
@@ -136,9 +139,23 @@ mise à jour conseillée puis obligatoire, lot serveur d'abord sur la recette.
 2. *Abonnements* : groupe « Mes Courses Famille », abonnement `courses_famille_annuel` (1 an, palier de prix ≈ 7 USD).
 3. *Achats intégrés* : `courses_famille_a_vie`, non consommable (palier ≈ 15 USD) ; *Partage familial* désactivé (la famille est gérée
    par l'application).
-4. *Informations sur l'app › Notifications du serveur App Store* : URL de production et URL **sandbox** (= recette), version 2.
-5. *Utilisateurs et accès › Intégrations › Achats intégrés* : clé « In-App Purchase » (.p8) → variables du serveur de recette.
+4. *Informations sur l'app › Notifications du serveur App Store* : URL **sandbox** = `https://<recette>/api/store/apple/notifications`,
+   version 2 (l'URL de production seulement au lancement, après votre accord).
+5. *Utilisateurs et accès › Intégrations › Achats intégrés* : clé « In-App Purchase » (.p8) → variables `APPLE_IAP_KEY_ID`,
+   `APPLE_IAP_ISSUER_ID`, `APPLE_IAP_KEY_P8` du serveur de recette, avec `APPLE_BUNDLE_ID` (seule obligatoire pour vérifier les
+   transactions ; la clé ajoute l'état à jour des abonnements et le rapprochement).
 6. *Utilisateurs et accès › Sandbox* : comptes testeurs.
+
+### Variables du serveur (aucune valeur dans le dépôt ni dans les journaux)
+
+| Variable | Rôle |
+|---|---|
+| `GOOGLE_PLAY_PACKAGE`, `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` | vérification Google (sans elles : achats Android refusés poliment, 503) |
+| `GOOGLE_RTDN_TOKEN` | protège l'adresse des notifications Google (sans lui : adresse fermée, 404) |
+| `APPLE_BUNDLE_ID` | vérification des transactions Apple (sans lui : achats iPhone refusés poliment, notifications 404) |
+| `APPLE_IAP_KEY_ID`, `APPLE_IAP_ISSUER_ID`, `APPLE_IAP_KEY_P8` | facultatives : API App Store Server (état à jour, rapprochement) |
+| `STORE_ACCEPT_SANDBOX=1` | achats de test admis (posée automatiquement sur la recette ; **jamais** en production) |
+| `STORE_SANDBOX_FAMILIES` | production : familles (UUID) dont les achats de test sont admis — la famille de vérification Apple / Google |
 
 ## 9. Lots de travail proposés
 
@@ -146,6 +163,12 @@ mise à jour conseillée puis obligatoire, lot serveur d'abord sur la recette.
    retour arrière, tests 9/10/11, concurrence, rejeu, hors connexion. (Aucun compte store nécessaire.)
 2. Écrans communs : compteur discret, écran de paiement (administrateur) / message (autres), état du droit.
 3. Vérification Google + iPhone côté serveur (avec simulateurs de réponses des stores dans les tests), notifications, rapprochement
-   périodique.
+   périodique. **Fait** (migration 032) : `POST /api/family/purchases`, notifications Google et Apple, rapprochement toutes les
+   12 h et `admin-cli store-status | store-reconcile`, événement `plan.updated`. Règles vérifiées par 18 tests : jeton de famille
+   obligatoire, jamais deux familles, présentations simultanées et rejouées, paiement en attente, arrêt du renouvellement (accès
+   jusqu'à l'échéance), expiration sans nouveau lot gratuit, période de grâce, suspension, remboursement et révocation définitifs
+   (sauf annulation du remboursement par Apple), abonnement Google repris (ancien jeton remplacé), achat Partage familial Apple
+   refusé, achat de test refusé hors recette, notification d'un achat jamais présenté, signature / racine / application Apple
+   invalides refusées. Retour arrière : `server/rollback/032_store_purchases.down.sql`.
 4. Android Play Billing, iPhone StoreKit 2, restaurer, gérer l'abonnement.
 5. Essais réels sur la recette avec les comptes de test des stores, partage Android ↔ iPhone.

@@ -37,6 +37,8 @@ data class FamilyPlan(
     val expiresAt: String? = null,
     val autoRenewing: Boolean = false,
     val canPurchase: Boolean = false,
+    /** Jeton store de la famille (administrateurs seulement) : transmis au store à l'achat, sans lui le serveur refuse l'achat. */
+    val storeAccountToken: String? = null,
 ) {
     val entitled get() = entitlementKind != null
     /** Afficher discrètement le nombre de listes gratuites restantes. */
@@ -53,6 +55,7 @@ data class FamilyPlan(
                 quotaActive = b("quotaActive"), freeLimit = i("freeLimit", 10), used = i("used", 0), freeRemaining = i("freeRemaining", 10),
                 blocked = b("blocked"), entitlementKind = s("kind"), entitlementStatus = s("status"), entitlementPlatform = s("platform"),
                 expiresAt = s("expiresAt"), autoRenewing = e?.get("autoRenewing")?.jsonPrimitive?.booleanOrNull ?: false, canPurchase = b("canPurchase"),
+                storeAccountToken = p["storeAccountToken"]?.jsonPrimitive?.contentOrNull,
             )
         }
     }

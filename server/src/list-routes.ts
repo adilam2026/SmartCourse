@@ -1,11 +1,11 @@
 import type { FastifyInstance } from "fastify";
+import { familyPlan } from "./store-routes.js";
 import { z } from "zod";
 import type { Db } from "./db.js";
 import { HttpError } from "./errors.js";
 import type { Guard } from "./guard.js";
 import type { SseHub } from "./hub.js";
 import type { PushService } from "./push.js";
-import { quotaState } from "./list-quota.js";
 import { applyOps, closeList, createList, deleteArchivedList, ensureActiveList, getActiveListView, getListView, listHistory, openLists, repriceList, type OpIn } from "./lists.js";
 import { can, type Action } from "./permissions.js";
 
@@ -79,8 +79,7 @@ export function listRoutes(app: FastifyInstance, { db, hub, guard, push }: { db:
 
   // Listes gratuites restantes et droit payant de la famille (tous les membres) ; seuls les administrateurs peuvent acheter.
   app.get("/api/family/plan", { preHandler: guard() }, async (req) => {
-    const st = await quotaState(db, req.auth!.familyId);
-    return { plan: { ...st, canPurchase: req.auth!.role === "admin" } };
+    return { plan: await familyPlan(db, req.auth!) };
   });
 
   app.get("/api/lists", { preHandler: guard("history.read") }, async (req) => {
