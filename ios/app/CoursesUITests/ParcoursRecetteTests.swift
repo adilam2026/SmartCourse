@@ -611,12 +611,15 @@ final class ParcoursRecetteTests: XCTestCase {
     private var proposition: XCUIElement { anyContaining("Une nouvelle version de Mes Courses est disponible").firstMatch }
 
     func test7_MiseAJourObligatoire() throws {
-        relaunch(reset: true)
         let api = try XCTUnwrap(apiLogin("adil", "482913"), "connexion API impossible")
         defer { politique(api, latest: nil, min: nil, actif: false) } // jamais laissé actif, même en cas d'échec
         politique(api, latest: nil, min: nil, actif: false)
         let list = try XCTUnwrap(freshList(api), "liste de recette non ouverte")
-        try login("adil", "482913")
+        // Session ouverte par l'API et transmise à l'application de recette (la connexion par l'écran est testée ailleurs).
+        let me = try XCTUnwrap(apiJSON(api, "GET", "/api/me").1?["me"], "profil introuvable")
+        app.launchEnvironment["COURSES_COOKIE"] = String(api.dropFirst("sc_session=".count))
+        app.launchEnvironment["COURSES_ME"] = String(data: try JSONSerialization.data(withJSONObject: me), encoding: .utf8)
+        relaunch(reset: true)
         waitFor("Ajouter des articles", 40)
         // 1. Version autorisée et à jour : rien.
         XCTAssertFalse(proposition.waitForExistence(timeout: 6), "proposition affichée sans raison")

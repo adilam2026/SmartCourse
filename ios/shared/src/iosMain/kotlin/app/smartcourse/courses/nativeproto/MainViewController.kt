@@ -38,6 +38,14 @@ object CoursesIos {
         // Recette seulement : contrôles automatiques qui changent de profil (même compte, même serveur) : session locale effacée au
         // lancement, comme « Effacer les données » sur Android. Les données restent sur le serveur commun.
         if (!BuildConfig.FINAL && platform.Foundation.NSProcessInfo.processInfo.environment["COURSES_RESET"] == "1") storage.clearSession()
+        // Recette seulement : session ouverte par les contrôles automatiques via l'API (le clavier du simulateur n'apparaît pas
+        // toujours pour une connexion par l'écran). Jamais dans la version finale.
+        if (!BuildConfig.FINAL) {
+            val env = platform.Foundation.NSProcessInfo.processInfo.environment
+            val cookie = env["COURSES_COOKIE"] as? String
+            val me = env["COURSES_ME"] as? String
+            if (!cookie.isNullOrBlank() && !me.isNullOrBlank()) { storage.cookie = cookie; storage.meJson = me }
+        }
         val s = Session(storage, ApiClient(storage), scope)
         if (BuildConfig.FINAL) s.setServer(BuildConfig.SERVER_URL)
         // Recette seulement : adresse du serveur de recette fournie au lancement par les contrôles automatiques (simulateur).
