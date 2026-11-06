@@ -12,6 +12,7 @@ import app.smartcourse.courses.nativeproto.net.normalizeServer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import platform.Foundation.NSApplicationSupportDirectory
 import platform.Foundation.NSSearchPathForDirectoriesInDomains
 import platform.Foundation.NSUserDomainMask
@@ -53,6 +54,22 @@ object CoursesIos {
 
     /** Application en arrière-plan : flux en direct fermé (comme onStop sur Android). */
     fun onBackground() { LiveHolder.current?.onBackground(); NotifIos.scheduleReminders() }
+
+    /** Partie StoreKit 2 (Swift), fournie au lancement par l'application iPhone. */
+    var storeKit: IosStoreKit?
+        get() = IosStore.kit
+        set(v) { IosStore.kit = v }
+
+    /** Transaction App Store conclue hors du parcours d'achat (Transaction.updates, côté Swift) : présentée au serveur si connecté. */
+    fun onStoreTransaction(jws: String, transactionId: String) {
+        val d = LiveHolder.current ?: return // non connecté : présentée à la prochaine ouverture de « Mes Courses Famille »
+        scope.launch {
+            IosStore.deliver(object : PurchaseServer {
+                override val accountToken get() = d.demo.plan?.storeAccountToken
+                override suspend fun submit(body: kotlinx.serialization.json.JsonObject) = d.submitPurchase(body)
+            }, jws, transactionId)
+        }
+    }
 
     /** Jeton APNs reçu d'Apple (AppDelegate Swift), en hexadécimal. */
     fun onApnsToken(hex: String) = NotifIos.onToken(hex)

@@ -76,14 +76,34 @@ sealed interface BuyResult {
     data class Failed(val message: String) : BuyResult
 }
 
+/** Côté serveur (commun) : jeton store de la famille et présentation d'un achat au serveur, qui le vérifie auprès du store. */
+interface PurchaseServer {
+    /** Jeton à transmettre au store (Google obfuscatedAccountId, Apple appAccountToken) ; null hors administrateurs. */
+    val accountToken: String?
+    suspend fun submit(body: JsonObject): BuyResult
+}
+
+/** Refus du serveur traduits en message clair (le serveur ne garde jamais un achat qu'il n'a pas pu vérifier). */
+fun purchaseMessage(code: String?): String = when (code) {
+    "purchase_other_family" -> "Cet achat est déjà rattaché à une autre famille Mes Courses : il ne peut pas débloquer celle-ci."
+    "purchase_not_for_family" -> "Cet achat n'a pas été fait depuis cette famille Mes Courses : il ne peut pas la débloquer."
+    "purchase_family_shared" -> "Achat partagé par le Partage familial Apple : l'administrateur de la famille doit faire l'achat lui-même."
+    "purchase_sandbox" -> "Achat de test refusé sur ce serveur."
+    "purchase_unknown", "purchase_invalid" -> "Achat non reconnu par le store."
+    "store_unavailable" -> "Le store ne peut pas être vérifié pour le moment. Votre achat est conservé : touchez « Restaurer les achats » plus tard."
+    else -> "Achat non transmis au serveur (connexion ?). Votre achat est conservé : touchez « Restaurer les achats » plus tard."
+}
+
 /** Partie propre à la plateforme : Google Play Billing (Android), StoreKit (iPhone). */
 interface StoreHost {
     val storeName: String
     /** Le store répond et les produits sont configurés. */
     suspend fun offers(): List<StoreOffer>
     suspend fun buy(productId: String): BuyResult
-    /** Retransmet au serveur les achats connus du store ; renvoie le nombre d'achats retrouvés. */
+    /** Retransmet au serveur les achats connus du store ; renvoie le nombre d'achats acceptés. Peut demander la connexion au store. */
     suspend fun restore(): Int
+    /** Comme restore(), sans rien demander à la personne : achats restés sans réponse du serveur (coupure, application fermée). */
+    suspend fun syncSilently() {}
     /** Ouvre la gestion de l'abonnement dans le store (arrêter, changer). */
     fun manageSubscription()
     /** Où arrêter un abonnement de ce store (texte affiché). */
@@ -110,13 +130,22 @@ fun PlanScreen(onBack: () -> Unit) {
     val demo = LocalDemo.current
     val data = demo.data
     val plan = demo.plan
-    val store = rememberStoreHost()
+    val server = remember(data) {
+        data?.let { d ->
+            object : PurchaseServer {
+                override val accountToken get() = d.demo.plan?.storeAccountToken
+                override suspend fun submit(body: JsonObject) = d.submitPurchase(body)
+            }
+        }
+    }
+    val store = rememberStoreHost(server)
     val scope = rememberCoroutineScope()
     var offers by remember { mutableStateOf<List<StoreOffer>?>(null) }
     var busy by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         data?.loadPlan()
         offers = runCatching { store.offers() }.getOrDefault(emptyList())
+        if (demo.plan?.canPurchase == true) runCatching { store.syncSilently() }
     }
     fun act(block: suspend () -> Unit) { if (!busy) scope.launch { busy = true; try { block() } finally { busy = false; data?.loadPlan() } } }
 

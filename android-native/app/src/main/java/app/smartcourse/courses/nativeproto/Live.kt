@@ -333,6 +333,16 @@ class AppData(val demo: Demo, val session: Session, val me: Me, private val kv: 
         }
     }
 
+    /** Achat (ou restauration) présenté au serveur, qui le vérifie auprès du store ; l'état de la famille est mis à jour. */
+    suspend fun submitPurchase(body: JsonObject): BuyResult = when (val r = session.api.call("POST", "/api/family/purchases", body)) {
+        is Outcome.Ok -> {
+            FamilyPlan.parse(r.value)?.let { demo.plan = it }
+            val st = ((r.value["result"] as? JsonObject)?.get("status") as? kotlinx.serialization.json.JsonPrimitive)?.content
+            if (st == "pending") BuyResult.Pending else BuyResult.Done
+        }
+        is Outcome.Fail -> BuyResult.Failed(purchaseMessage(r.code))
+    }
+
     /** Création refusée par la règle des listes gratuites : message clair, écran dédié, rien n'est perdu. */
     private fun quotaReached() {
         scope.launch { loadPlan() }
