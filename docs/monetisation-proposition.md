@@ -170,5 +170,9 @@ mise à jour conseillée puis obligatoire, lot serveur d'abord sur la recette.
    (sauf annulation du remboursement par Apple), abonnement Google repris (ancien jeton remplacé), achat Partage familial Apple
    refusé, achat de test refusé hors recette, notification d'un achat jamais présenté, signature / racine / application Apple
    invalides refusées. Retour arrière : `server/rollback/032_store_purchases.down.sql`.
-4. Android Play Billing, iPhone StoreKit 2, restaurer, gérer l'abonnement.
+4. Android Play Billing, iPhone StoreKit 2, restaurer, gérer l'abonnement. **Fait (compilation)** : Play Billing 8.0.0
+   (`BillingAndroid.kt`), pont Swift StoreKit 2 (`ios/app/Courses/StoreKitBridge.swift`, `BillingIos.kt`) ; l'achat porte le
+   jeton store de la famille, la transaction est présentée au serveur (Apple : terminée seulement après acceptation) ; les achats
+   restés sans réponse sont représentés à l'ouverture de l'écran. Tant que les produits n'existent pas dans les stores, aucune
+   offre ne s'affiche (message « offres pas disponibles »). Essais réels : lot 5, après configuration des stores.
 5. Essais réels sur la recette avec les comptes de test des stores, partage Android ↔ iPhone.
