@@ -288,6 +288,25 @@ describe("moteur de synchronisation", () => {
     expect(e2.getState().notices.map((n) => n.text).join(" ")).toContain("clôturée");
   });
 
+  it("création implicite refusée (listes gratuites utilisées) : les articles sont gardés et proposés, rien n'est perdu", async () => {
+    srv.listId = null;
+    const post = srv.api.postOps;
+    srv.api.postOps = async (listId: string, ops: Op[], batch?: { id: string; at?: string }) => {
+      if (listId === "active") { srv.calls.push({ listId, ops, batch }); throw new ApiError(404, "quota_reached", "Les listes gratuites de la famille sont utilisées"); }
+      return post(listId, ops, batch);
+    };
+    const e = await boot();
+    await e.toggle("lait");
+    await e.toggle("riz");
+    await e.validate();
+    expect(srv.calls.map((c) => c.listId)).toEqual(["active"]);
+    expect(e.getState().batches).toEqual([]);
+    expect(e.getState().orphan?.productIds.sort()).toEqual(["lait", "riz"]);
+    expect(e.getState().notices.map((n) => n.text).join(" ")).toContain("listes gratuites");
+    const again = await boot(); // conservé après redémarrage
+    expect(again.getState().orphan?.productIds.sort()).toEqual(["lait", "riz"]);
+  });
+
   it("les brouillons sont rattachés à un profil : une autre personne ne les voit pas", async () => {
     const e1 = await boot();
     await e1.toggle("lait");

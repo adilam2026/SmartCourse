@@ -51,6 +51,9 @@ export type CatalogView = "all" | "categories";
 /** V3 : trois présentations des articles à choisir (mémorisée par utilisateur sur cet appareil). */
 /** Brouillon et lots d'envoi faits alors qu'aucune liste n'existe : la liste en cours est créée par le serveur à l'enregistrement. */
 export const NO_LIST = "none";
+/** Listes gratuites utilisées (création de la liste refusée) : rien n'est perdu ; le déblocage se fait dans l'application Mes Courses. */
+export const QUOTA_NOTICE =
+  "Les listes gratuites de la famille sont utilisées : vos articles vous sont proposés à nouveau. Un administrateur peut débloquer Mes Courses pour toute la famille dans l'application Mes Courses (Android ou iPhone).";
 export type V3Mode = "list" | "squares" | "cards";
 
 /** The subset of EventSource the engine uses (so tests can fake it). */
@@ -726,13 +729,15 @@ export class Engine {
         if (e instanceof ApiError && e.status >= 500) return this.scheduleRetry();
         // La liste visée n'existe plus (clôturée puis supprimée) : rien n'est ajouté à une archive ni recréé ; les articles redeviennent une
         // proposition « Reprendre » (jamais perdus en silence).
-        if (e instanceof ApiError && e.status === 404 && batch.listId !== NO_LIST) {
+        // Nouvelle liste refusée par la règle des listes gratuites : même chose, les articles restent proposés (« Reprendre »).
+        const quota = e instanceof ApiError && e.code === "quota_reached";
+        if (e instanceof ApiError && e.status === 404 && (batch.listId !== NO_LIST || quota)) {
           const adds = [...new Set(batch.ops.filter((o) => o.type === "add" || o.type === "request_again").map((o) => (o as { productId: string }).productId))];
           const rest = this.s.batches.filter((b) => b.id !== batch.id);
           this.dropped.add(batch.id);
           this.set({ batches: rest, toggles: normalizeToggles(this.s.list, rest, this.s.toggles), sending: false });
           await this.stashOrphan(batch.listId, adds);
-          this.notice("Cette liste n'existe plus : vos articles vous sont proposés à nouveau, rien n'a été ajouté à une liste archivée.");
+          this.notice(quota ? QUOTA_NOTICE : "Cette liste n'existe plus : vos articles vous sont proposés à nouveau, rien n'a été ajouté à une liste archivée.");
           await this.persistOutbox();
           continue;
         }

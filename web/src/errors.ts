@@ -32,6 +32,8 @@ const BY_CODE: Record<string, string> = {
   setup_incomplete: "Installation à terminer : vérifiez votre adresse e-mail.",
   reset_not_ready: "Vérifiez d'abord votre adresse e-mail de récupération.",
   active_exists: "Une liste est déjà en cours.",
+  // Règle des listes gratuites : la création d'une nouvelle liste est refusée ; tout le reste reste utilisable. Aucun achat sur le site.
+  quota_reached: "Les listes gratuites de la famille sont utilisées. Un administrateur peut débloquer Mes Courses pour toute la famille dans l'application Mes Courses (Android ou iPhone). La liste en cours, l'historique et les statistiques restent accessibles.",
   op_in_progress: "Une opération est déjà en cours. Réessayez dans un instant.",
   primary_cannot_delete: "Le profil principal ne peut être supprimé qu'avec toute la famille (Réglages → Réinitialiser la famille).",
   admin_cannot_delete: "Retirez d'abord le rôle administrateur de ce profil.",
