@@ -42,7 +42,7 @@ appareils incapables d'installer la version exigée, ni confirmation du déploie
 3. **Panne réseau ou du service.** L'application ne bloque que sur une réponse explicite du serveur. Une vérification impossible
    ne bloque jamais, y compris au démarrage.
 4. **Données conservées.** L'écran se pose au-dessus de l'application sans rien effacer. Les modifications en attente continuent
-   de partir (contrôle iPhone : un article ajouté hors connexion doit arriver au serveur pendant le blocage).
+   de partir (vérifié sur iPhone : un article ajouté hors connexion arrive au serveur pendant le blocage).
 5. **Désactivation immédiate.** Deux moyens :
    - bouton « Désactiver le blocage maintenant » sur `/gestion/mise-a-jour` ;
    - sans la page : `admin-cli update-disable [android|ios]`.
@@ -89,7 +89,9 @@ activé, avec les deux confirmations. En cas de problème, désactivation imméd
   - désactivation ;
   - version égale au minimum.
 
-  Le réglage iPhone de la recette est remis à zéro à la fin, même en cas d'échec.
+  Le réglage iPhone de la recette est remis à zéro à la fin, même en cas d'échec. Pour ce contrôle, la session de recette
+  est ouverte par l'API et transmise au lancement (crochet absent de la version finale). La connexion par l'écran est
+  contrôlée ailleurs, mais le clavier du simulateur n'y apparaît pas toujours.
 - **Android, sur une recette jetable locale à la CI, même code serveur** (section Z de `scripts/native-e2e-final.sh`, groupe
   `[android-e2e:Z]`) :
   - aucune mise à jour, puis proposition et « Plus tard » ;
