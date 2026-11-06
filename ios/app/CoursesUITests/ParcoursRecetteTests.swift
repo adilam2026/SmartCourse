@@ -207,7 +207,13 @@ final class ParcoursRecetteTests: XCTestCase {
         }
         XCTAssertGreaterThanOrEqual(champs().count, 3, "champs de connexion : \(champs().count) trouvés")
         // Comme un utilisateur : toucher le premier champ, taper, puis « Retour » pour passer au champ suivant.
-        press(champs()[0]); sleep(1)
+        // Le clavier du simulateur n'apparaît pas toujours au premier toucher (simulateur neuf) : jusqu'à trois essais.
+        for essai in 1...3 {
+            press(champs()[0]); sleep(1)
+            if app.keyboards.firstMatch.waitForExistence(timeout: 6) { break }
+            print("\(stamp()) iPhone : clavier absent au toucher n° \(essai) du premier champ, nouvel essai")
+            press(waitFor("Bienvenue")); sleep(2)
+        }
         for (i, texte) in [family, user, code].enumerated() {
             if i > 0 && !app.keyboards.firstMatch.exists {
                 // Pas de passage automatique au champ suivant : toucher le champ n° i+1.
