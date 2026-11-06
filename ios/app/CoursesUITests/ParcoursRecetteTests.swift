@@ -627,12 +627,20 @@ final class ParcoursRecetteTests: XCTestCase {
         XCTAssertTrue(anyContaining("Ajouter des articles").firstMatch.waitForExistence(timeout: 30), "application inutilisable hors connexion")
         sleep(8)
         XCTAssertFalse(bloque.exists, "blocage déclenché par une simple panne réseau")
+        attach("m3a-lance-hors-connexion")
         tapButton("Ajouter des articles")
+        attach("m3b-catalogue")
         search("Citrons")
         addToSelection("Citrons", waitCard("Citrons", 20))
+        attach("m3c-selection")
         tapButton("Terminer ma sélection")
         sleep(3)
-        XCTAssertTrue(anyContaining("attente").firstMatch.waitForExistence(timeout: 20), "aucune modification en attente hors connexion")
+        attach("m3d-apres-selection")
+        if !anyContaining("attente").firstMatch.waitForExistence(timeout: 20) {
+            print("Arborescence (ajout hors connexion) :\n\(app.debugDescription)")
+            XCTFail("aucune modification en attente hors connexion")
+        }
+        XCTAssertTrue(anyContaining("Citrons").firstMatch.exists, "« Citrons » absent de la liste hors connexion")
         attach("m3-hors-connexion-sans-blocage")
         // 4. Réseau rétabli, retour au premier plan : blocage (version 1 < minimale 2) ; la modification en attente part quand même.
         reseau(false)
