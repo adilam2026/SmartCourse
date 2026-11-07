@@ -14,6 +14,8 @@ Aucun e-mail n'est écrit dans ce dépôt : la commande de recherche se tape dir
   - « Photos manquantes » non vide ;
   - « Usage de l'application » avec le classement des familles.
 - **Autre administrateur de la même famille** : entrée absente et API refusée (403).
+- Contrôle PL : 12/12, exécution GitHub Actions 42386912005. Captures dans l'artefact `android-e2e-0` :
+  `final-pl2-photos-manquantes.png`, `final-pl3-usage-classement.png`, `final-pl4-reglages-autre-admin.png`.
 - **Répétition du déploiement** sur une copie isolée de la dernière sauvegarde de production (schéma 030 → 035) :
   - données des familles inchangées ;
   - quota désactivé (aucune famille démarrée) ;
