@@ -176,3 +176,10 @@ mise à jour conseillée puis obligatoire, lot serveur d'abord sur la recette.
    restés sans réponse sont représentés à l'ouverture de l'écran. Tant que les produits n'existent pas dans les stores, aucune
    offre ne s'affiche (message « offres pas disponibles »). Essais réels : lot 5, après configuration des stores.
 5. Essais réels sur la recette avec les comptes de test des stores, partage Android ↔ iPhone.
+
+## 10. Suite (Android d'abord)
+
+- Tests Android dans Play Console, sans attendre Apple : `docs/achats-android-play-console.md` (étapes exactes, plan de test,
+  activation par plateforme, délai réel de la désactivation de la mise à jour obligatoire).
+- Activation par plateforme : `admin-cli purchases-open|purchases-close android|ios` (migration 034). Une famille n'est bloquée que si
+  un administrateur peut acheter depuis un de ses appareils.
