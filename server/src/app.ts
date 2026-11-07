@@ -14,6 +14,7 @@ import { appUpdateRoutes } from "./app-update.js";
 import { COOKIE, makeGuard } from "./guard.js";
 import { listRoutes } from "./list-routes.js";
 import { storeRoutes } from "./store-routes.js";
+import { isPlatformAdmin, platformRoutes } from "./platform.js";
 import { StoreService, type StoreDeps } from "./store/service.js";
 import { statsRoutes } from "./stats-routes.js";
 import { PushService } from "./push.js";
@@ -266,6 +267,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     me.prefs = { showPrices: !!pr?.show_prices, showTotals: !!pr?.show_totals, rev: Number(pr?.prefs_rev ?? 0) };
     me.location = await familyLocation(db, a.familyId, can(a.role, "family.manage"));
     me.features = await familyFeatures(db, a.familyId);
+    // Espace plateforme : seulement pour le profil autorisé côté serveur (identifiant interne + famille de la session).
+    if (await isPlatformAdmin(db, a.profileId, a.familyId)) me.platform = true;
     if (can(a.role, "family.manage")) {
       const f = await db.query("SELECT code, name FROM families WHERE id = $1", [a.familyId]);
       me.family = { code: f.rows[0].code, name: f.rows[0].name, loginId: await currentFamilyId(db, a.familyId) };
@@ -457,6 +460,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   statsRoutes(app, { db, guard });
   pushRoutes(app, { db, guard, push });
   storeRoutes(app, { db, guard, store: stores, rateLimit: deps.purchaseRateLimit });
+  platformRoutes(app, { db, guard });
 
   // --- flux SSE ---
   app.get("/api/events", { preHandler: guard() }, async (req, reply) => {

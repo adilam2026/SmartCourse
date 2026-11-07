@@ -68,6 +68,80 @@ try {
       const n = await disableRequired(db, which as ("android" | "ios")[], "Blocage désactivé (admin-cli)");
       console.log(n ? `Blocage désactivé : ${which.join(", ")} (effet immédiat).` : "Aucun blocage actif.");
     }
+  } else if (cmd === "platform-find" && args[0]) {
+    // Retrouver le profil à autoriser à partir d'un e-mail (comparé côté serveur ; rien n'est affiché de l'e-mail lui-même).
+    const email = args[0].trim().toLowerCase();
+    const fams = (
+      await db.query(
+        `SELECT p.family_id FROM profiles p WHERE lower(p.recovery_email) = $1 AND p.deleted_at IS NULL
+         UNION SELECT s.family_id FROM family_signups s WHERE lower(s.email) = $1 AND s.family_id IS NOT NULL`,
+        [email],
+      )
+    ).rows;
+    if (!fams.length) console.log("Aucune famille ne porte cet e-mail de récupération.");
+    for (const f of fams) {
+      console.log(`Famille (identifiant interne) : ${f.family_id}`);
+      const ps = (
+        await db.query(
+          `SELECT id, display_name, login, role, is_primary, active, lower(coalesce(recovery_email, '')) = $2 AS has_email,
+                  EXISTS (SELECT 1 FROM platform_admins a WHERE a.profile_id = p.id) AS platform
+             FROM profiles p WHERE family_id = $1 AND deleted_at IS NULL ORDER BY created_at`,
+          [f.family_id, email],
+        )
+      ).rows;
+      for (const p of ps)
+        console.log(`  profil ${p.id} · ${p.display_name} (${p.login}) · ${p.role}${p.is_primary ? " · principal" : ""}${p.active ? "" : " · désactivé"}${p.has_email ? " · porte cet e-mail" : ""}${p.platform ? " · DROIT PLATEFORME" : ""}`);
+    }
+  } else if (cmd === "platform-status") {
+    const r = (await db.query("SELECT a.profile_id, a.family_id, a.granted_at, p.display_name FROM platform_admins a JOIN profiles p ON p.id = a.profile_id ORDER BY a.granted_at")).rows;
+    console.log(r.length ? r.map((x) => `profil ${x.profile_id} (${x.display_name}) · famille ${x.family_id} · depuis ${x.granted_at.toISOString()}`).join("\n") : "Aucun droit plateforme attribué.");
+    const ex = (await db.query("SELECT family_id, reason FROM platform_excluded_families ORDER BY added_at")).rows;
+    console.log(`Familles exclues des statistiques : ${ex.length}${ex.length ? " — " + ex.map((x) => `${x.family_id} (${x.reason})`).join(", ") : ""}`);
+  } else if ((cmd === "platform-grant" || cmd === "platform-revoke") && args[0]) {
+    // Droit plateforme : attribué à l'identifiant INTERNE du profil, lié à SA famille (vérifié en base).
+    const profileId = args[0];
+    if (!/^[0-9a-f-]{36}$/i.test(profileId)) throw new Error("Identifiant interne de profil attendu (voir platform-find)");
+    const p = (await db.query("SELECT id, family_id, display_name, role, active, deleted_at FROM profiles WHERE id = $1", [profileId])).rows[0];
+    if (!p) throw new Error("Profil introuvable.");
+    const famArg = args.includes("--family") ? args[args.indexOf("--family") + 1] : null;
+    if (cmd === "platform-grant" && famArg !== p.family_id) throw new Error("--family <identifiant interne de la famille> obligatoire et doit être celle du profil");
+    const note = args.includes("--note") ? args[args.indexOf("--note") + 1] : null;
+    console.log(`Profil ${p.id} · ${p.display_name} · ${p.role}${p.active && !p.deleted_at ? "" : " · INACTIF"} · famille ${p.family_id}`);
+    if (!args.includes("--execute")) console.log(`Simulation : ${cmd === "platform-grant" ? "attribution" : "retrait"} du droit plateforme. Ajouter --execute pour appliquer.`);
+    else {
+      if (cmd === "platform-grant") {
+        if (!p.active || p.deleted_at) throw new Error("Profil inactif : droit refusé.");
+        await db.query("INSERT INTO platform_admins (profile_id, family_id, note) VALUES ($1,$2,$3) ON CONFLICT (profile_id) DO NOTHING", [p.id, p.family_id, note]);
+      } else await db.query("DELETE FROM platform_admins WHERE profile_id = $1", [p.id]);
+      await db.query("INSERT INTO platform_admins_history (profile_id, family_id, action, note) VALUES ($1,$2,$3,$4)", [p.id, p.family_id, cmd === "platform-grant" ? "grant" : "revoke", note]);
+      console.log(cmd === "platform-grant" ? "Droit plateforme attribué." : "Droit plateforme retiré (effet immédiat sur toutes les routes).");
+    }
+  } else if ((cmd === "platform-exclude" || cmd === "platform-include") && args[0]) {
+    const { familyIdFor } = await import("./family-id.js");
+    const fid = /^[0-9a-f-]{36}$/i.test(args[0]) ? args[0] : await familyIdFor(db, args[0]);
+    if (!fid) throw new Error("Famille introuvable.");
+    const reason = args.includes("--reason") ? args[args.indexOf("--reason") + 1] : "demo";
+    if (!args.includes("--execute")) console.log(`Simulation : ${cmd === "platform-exclude" ? `exclusion (${reason})` : "réintégration"} de la famille ${fid}. Ajouter --execute.`);
+    else if (cmd === "platform-exclude") {
+      await db.query("INSERT INTO platform_excluded_families (family_id, reason) VALUES ($1,$2) ON CONFLICT (family_id) DO UPDATE SET reason = $2", [fid, reason]);
+      console.log("Famille exclue des statistiques et des photos manquantes.");
+    } else {
+      await db.query("DELETE FROM platform_excluded_families WHERE family_id = $1", [fid]);
+      console.log("Famille réintégrée.");
+    }
+  } else if (cmd === "recette-platform-grant" && args[0]) {
+    // RECETTE SEULEMENT : droit plateforme pour le profil FICTIF « adil » de la famille de recette indiquée.
+    if (!/recette/i.test(process.env.RAILWAY_PROJECT_NAME ?? "")) throw new Error("Refus : commande réservée au service de recette.");
+    const { familyIdFor } = await import("./family-id.js");
+    const fid = await familyIdFor(db, args[0]);
+    if (!fid) throw new Error(`Famille ${args[0]} introuvable.`);
+    const r = await db.query(
+      `INSERT INTO platform_admins (profile_id, family_id, note) SELECT id, family_id, 'recette' FROM profiles WHERE family_id = $1 AND login = 'adil' AND deleted_at IS NULL
+       ON CONFLICT (profile_id) DO NOTHING RETURNING profile_id`,
+      [fid],
+    );
+    if (r.rows[0]) await db.query("INSERT INTO platform_admins_history (profile_id, family_id, action, note) VALUES ($1,$2,'grant','recette')", [r.rows[0].profile_id, fid]);
+    console.log(`Recette : droit plateforme ${r.rowCount ? "attribué" : "déjà présent"} (profil fictif).`);
   } else if (cmd === "purchases-status" || cmd === "purchases-open" || cmd === "purchases-close") {
     // Achats ouverts PAR PLATEFORME (sans --execute : état et simulation seulement). Une famille n'est bloquée par la règle des
     // listes gratuites que si un de ses administrateurs a un appareil d'une plateforme ouverte, en version suffisante.
@@ -163,7 +237,7 @@ try {
       console.log(`Import : ${inserted} prix écrits, ${skipped} déjà présents (conservés${replace ? "" : ", utilisez --replace pour les remplacer"}), ${res.length - kept.length} lignes exclues. Aucun prix de famille modifié.`);
     } else console.log(`Simulation seulement : ${kept.length} lignes seraient importées. Pour écrire : admin-cli prices-import <fichier.csv> --execute`);
   } else {
-    console.log("Usage :\n  admin-cli reset <CODE_FAMILLE> <identifiant>\n  admin-cli token\n  admin-cli purge-family <CODE_FAMILLE> [--execute --confirm <CODE_FAMILLE>]\n  admin-cli prices-report <tableau.csv>\n  admin-cli prices-import <tableau.csv> [--execute] [--replace]\n  admin-cli quota-status | quota-activate [--execute] | quota-deactivate [--execute]\n  admin-cli store-status | store-reconcile\n  admin-cli update-status | update-disable [android|ios]\n  admin-cli purchases-status | purchases-open <android|ios> --min-version N [--execute] | purchases-close <android|ios> [--execute]");
+    console.log("Usage :\n  admin-cli reset <CODE_FAMILLE> <identifiant>\n  admin-cli token\n  admin-cli purge-family <CODE_FAMILLE> [--execute --confirm <CODE_FAMILLE>]\n  admin-cli prices-report <tableau.csv>\n  admin-cli prices-import <tableau.csv> [--execute] [--replace]\n  admin-cli quota-status | quota-activate [--execute] | quota-deactivate [--execute]\n  admin-cli store-status | store-reconcile\n  admin-cli update-status | update-disable [android|ios]\n  admin-cli purchases-status | purchases-open <android|ios> --min-version N [--execute] | purchases-close <android|ios> [--execute]\n  admin-cli platform-find <e-mail> | platform-status | platform-grant <profil> --family <famille> [--execute] | platform-revoke <profil> [--execute] | platform-exclude|platform-include <famille> [--reason demo|verification|recette|interne] [--execute]");
     process.exitCode = 1;
   }
 } catch (e) {

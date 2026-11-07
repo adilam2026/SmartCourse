@@ -30,6 +30,8 @@ data class Me(
     val prefs: Prefs? = null,
     val location: FamilyLocation? = null,
     val features: FamilyFeatures? = null,
+    /** Espace plateforme : vrai seulement pour le profil autorisé côté serveur (jamais déduit par l'application). */
+    val platform: Boolean = false,
 )
 
 /** Pays et ville DE LA FAMILLE. [pricesAvailable] : prix indicatifs (Maroc, ou pays non encore confirmé). */

@@ -40,6 +40,10 @@ fun AdminHubScreen(nav: (String) -> Unit) {
             listOf(Entry("Pays et ville", Icons.Rounded.Public, "v15"), Entry("Paramètres avancés", Icons.Rounded.Tune, "v17"))),
         "Préférences" to listOf(Entry("Affichage", Icons.Rounded.Palette, "v11"), Entry("Notifications et rappels", Icons.Rounded.Notifications, "stub/Notifications"), Entry("Mes Courses Famille", Icons.Rounded.Verified, "v20")),
         "Application" to listOf(Entry("Sauvegarde", Icons.Rounded.Cloud, "stub/Sauvegarde"), Entry("À propos", Icons.Rounded.Info, "stub/À propos")),
+    ) + (
+        // Espace plateforme : seulement pour la session que le serveur désigne (droit attribué au profil côté serveur).
+        if (demo.data?.session?.signedMe?.platform == true || demo.data?.me?.platform == true) listOf("Plateforme" to listOf(Entry("Espace plateforme", Icons.Rounded.AdminPanelSettings, "v30")))
+        else emptyList()
     )
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         TopBar("Réglages")

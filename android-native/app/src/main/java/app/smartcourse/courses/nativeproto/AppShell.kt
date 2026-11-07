@@ -109,7 +109,7 @@ private fun tabFor(route: String?): String? = when {
     route == null -> null
     route.startsWith("v06") -> "v06"
     route.startsWith("b") -> "b1"
-    route in listOf("v08", "v09", "v10", "v11", "v20") || route.startsWith("stub") -> "v07"
+    route in listOf("v08", "v09", "v10", "v11", "v20", "v30", "v31", "v32") || route.startsWith("stub") -> "v07"
     else -> route
 }
 
@@ -207,6 +207,10 @@ fun App(session: Session, me: Me?) {
                         composable("v17") { AdvancedSettingsScreen(back, go) }
                         composable("v18") { FamilyIdScreen(back) }
                         composable("v20") { PlanScreen(back) }
+                        // Espace plateforme : écrans affichés seulement si le serveur l'autorise (chaque appel reste contrôlé côté serveur).
+                        composable("v30") { PlatformHomeScreen(back, go) }
+                        composable("v31") { PlatformPhotosScreen(back) }
+                        composable("v32") { PlatformUsageScreen(back) }
                         // Module Budget (option familiale) : vue d'ensemble, historique, opération, budgets, Mon compte, réglages, droits.
                         composable("b1") { BudgetScreen(go) }
                         composable("b2") { OperationsScreen(back) }

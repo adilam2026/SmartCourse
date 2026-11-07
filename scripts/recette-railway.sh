@@ -38,6 +38,8 @@ fi
 node dist/admin-cli.js quota-activate --execute --note "recette" >/dev/null 2>&1 && echo "Recette : règle des listes gratuites active." || echo "Recette : activation de la règle des listes gratuites impossible."
 node dist/admin-cli.js recette-operator-right RecetteCourses 2>&1 | tail -1
 node dist/admin-cli.js recette-manager RecetteCourses 2>&1 | tail -1
+# Espace plateforme : droit attribué au profil FICTIF « adil » de RecetteCourses (recette seulement).
+node dist/admin-cli.js recette-platform-grant RecetteCourses 2>&1 | tail -1
 # Achats : Android ouvert sur la recette (toutes versions) ; iPhone fermé tant que l'App Store n'est pas configuré.
 node dist/admin-cli.js purchases-open android --min-version 1 --execute --note recette >/dev/null 2>&1 && echo "Recette : achats Android ouverts." || echo "Recette : ouverture des achats Android impossible."
 wait "$APP"
