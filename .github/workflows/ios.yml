@@ -62,8 +62,8 @@ jobs:
       matrix:
         # [android-e2e:F,P,J] dans le message : ce seul groupe.
         # [android-e2e:connexion] : groupes passant par l'écran de connexion (F,G,H et C,D).
-        # [android-e2e:Z] : mise à jour de l'application seulement.
-        sections: ${{ fromJSON(contains(github.event.head_commit.message, '[android-e2e:Z]') && '["Z"]' || (contains(github.event.head_commit.message, '[android-e2e:F,P,J]') && '["F,P,J"]' || (contains(github.event.head_commit.message, '[android-e2e:connexion]') && '["F,G,H","C,D"]' || '["F,G,H","C,D","F,P,J","K,S","A","T","Q","Z"]'))) }}
+        # [android-e2e:Z] : mise à jour de l'application seulement ; [android-e2e:PL] : espace plateforme seulement.
+        sections: ${{ fromJSON(contains(github.event.head_commit.message, '[android-e2e:PL]') && '["PL"]' || contains(github.event.head_commit.message, '[android-e2e:Z]') && '["Z"]' || (contains(github.event.head_commit.message, '[android-e2e:F,P,J]') && '["F,P,J"]' || (contains(github.event.head_commit.message, '[android-e2e:connexion]') && '["F,G,H","C,D"]' || '["F,G,H","C,D","F,P,J","K,S","A","T","Q","Z"]'))) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4

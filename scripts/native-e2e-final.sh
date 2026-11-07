@@ -1227,6 +1227,57 @@ expect "Z11. données conservées : la liste garde ses articles" bash -c "$UI ha
 policy '{"latestVersionCode":null,"minVersionCode":null}'
 fi
 
+if want_s PL; then
+echo "═══ PL. Espace plateforme : entrée réservée, photos manquantes et classement (données fictives) ═══" | tee -a "$OUT/resultats.txt"
+FID=$(sql "SELECT id FROM families WHERE code='$FAMILY'")
+AID=$(sql "SELECT id FROM profiles WHERE family_id='$FID' AND login='adil'")
+# Droit plateforme pour le profil FICTIF adil de la famille de recette (comme admin-cli platform-grant)
+sql "INSERT INTO platform_admins (profile_id, family_id, note) VALUES ('$AID','$FID','recette e2e') ON CONFLICT DO NOTHING" >/dev/null
+login_api adil 482913
+api POST /api/profiles -d '{"displayName":"Karim","login":"karim","role":"admin","secret":"573918","secretConfirm":"573918"}' >/dev/null
+for n in "Quinoa" "Graines de chia" "Tahini"; do api POST /api/products/family -d "{\"name\":\"$n\"}" >/dev/null; done
+# Seconde famille FICTIVE (base jetable) : 2 listes, « quinoas » ajouté à la main → Quinoa : 2 familles sans photo
+sql "SET session_replication_role = replica;
+ INSERT INTO families (id, code, name, setup_completed_at) VALUES ('00000000-0000-0000-0000-0000000000e2','FICTIFPL2','Famille fictive 2', now()) ON CONFLICT DO NOTHING;
+ INSERT INTO profiles (id, family_id, display_name, login, role, secret_hash) VALUES ('00000000-0000-0000-0000-0000000000e3','00000000-0000-0000-0000-0000000000e2','Fictif','fictif','admin','x') ON CONFLICT DO NOTHING;
+ INSERT INTO lists (family_id, created_by, status, closed_at) SELECT '00000000-0000-0000-0000-0000000000e2','00000000-0000-0000-0000-0000000000e3','archived', now() FROM generate_series(1,2);
+ INSERT INTO products (family_id, category, name) VALUES ('00000000-0000-0000-0000-0000000000e2','autres','quinoas') ON CONFLICT DO NOTHING;" >/dev/null
+api GET /api/platform/photos >/dev/null; echo "      API photos (adil) : $(jq -c '[.rows[]|select(.bucket=="provide")|{name,familiesWithoutPhoto}]' /tmp/api.out | cut -c1-300)" | tee -a "$OUT/resultats.txt"
+launch
+$UI has "Bienvenue" && signin "$FAMILY" adil 482913
+expect "PL1. adil connecté" $UI wait "Ma liste" 25
+tapt "Réglages"
+adb shell input swipe 540 1700 540 500 300; sleep 1
+expect "PL2. adil : entrée « Espace plateforme » visible dans les Réglages" $UI wait "Espace plateforme" 10
+shot final-pl1-reglages-adil
+tapt "Espace plateforme"
+expect "PL3. espace plateforme : deux écrans proposés" bash -c "$UI wait 'Photos manquantes' 10 && $UI has 'Usage de l'"
+tapt "Photos manquantes"
+expect "PL4. photos manquantes : liste non vide (« Photo à fournir » par défaut)" bash -c "$UI wait 'Quinoa' 20 && $UI has 'Graines de chia' && $UI has 'Tahini'"
+expect "PL4b. Quinoa : 2 familles sans photo (variantes regroupées, familles distinctes)" $UI has "2 famille(s) sans photo"
+shot final-pl2-photos-manquantes
+tapt "Plus récents"
+expect "PL4c. tri « Plus récents » : liste toujours affichée" $UI wait "Quinoa" 15
+adb shell input keyevent KEYCODE_BACK; sleep 2
+tapt "Usage de l"
+expect "PL5. usage : familles inscrites et classement affichés" bash -c "$UI wait 'Familles inscrites' 20 && $UI has 'Familles actives'"
+adb shell input swipe 540 1700 540 500 300; sleep 1
+expect "PL5b. classement des familles : identifiants anonymes" bash -c "$UI wait 'Classement des familles' 10 && $UI has 'F-'"
+shot final-pl3-usage-classement
+adb shell input keyevent KEYCODE_BACK; sleep 1; adb shell input keyevent KEYCODE_BACK; sleep 1
+logout
+expect "PL6. déconnecté" $UI wait "Bienvenue" 15
+signin "$FAMILY" karim 573918
+expect "PL7. karim (autre administrateur, même famille) connecté" $UI wait "Ma liste" 25
+tapt "Réglages"
+adb shell input swipe 540 1700 540 500 300; sleep 1
+expect "PL8. karim : Réglages affichés mais entrée « Espace plateforme » absente" bash -c "$UI wait 'Se déconnecter' 10 && ! $UI has 'Espace plateforme'"
+shot final-pl4-reglages-autre-admin
+login_api karim 573918
+expect "PL9. karim : API de l'espace plateforme refusée (403)" test "$(api GET /api/platform/photos)" = 403
+logout
+fi
+
 echo "ECHECS=$FAILS" | tee -a "$OUT/resultats.txt"
 adb logcat -d -b crash > "$OUT/logcat-crash.txt" 2>&1 || true
 echo "CRASH_APPLICATION=$(grep -c app.smartcourse "$OUT/logcat-crash.txt")" | tee -a "$OUT/resultats.txt"

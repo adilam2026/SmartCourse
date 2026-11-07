@@ -65,7 +65,7 @@ export async function controleDeploiement(scratch: pg.Client, scratchUrl: string
   lines.push(`  Migrations rejouées comme au démarrage du serveur : ${applied.length ? applied.join(", ") : "aucune (sauvegarde déjà à jour)"}`);
 
   // 2. Migrations
-  check(endSchema >= "030_unit_decisions.sql", `migrations appliquées jusqu'à 030_unit_decisions.sql au moins (${endSchema})`);
+  check(endSchema >= "035_platform_space.sql", `migrations appliquées jusqu'à 035_platform_space.sql au moins (${endSchema})`);
 
   // 3. Personnalisations des familles intactes (empreintes anonymes)
   for (const k of ["products", "product_ids", "family_photos", "family_prices", "purchases", "list_items", "templates"])
@@ -127,5 +127,22 @@ export async function controleDeploiement(scratch: pg.Client, scratchUrl: string
   const toConfirm = Number((await one(scratch, "SELECT count(*)::int AS n FROM unit_corrections WHERE subject = 'family_price' AND outcome = 'price_to_confirm' AND migration LIKE '030%'")).n);
   const converted = Number((await one(scratch, "SELECT count(*)::int AS n FROM unit_corrections WHERE subject = 'family_price' AND outcome = 'price_converted' AND migration LIKE '030%'")).n);
   lines.push(`  Prix de familles (030) : ${converted} converti(s) exactement, ${toConfirm} conservé(s) et à compléter`);
+
+  // 8. Monétisation, mise à jour et espace plateforme (031 à 035) : présents mais INACTIFS après le déploiement
+  if (endSchema >= "035_platform_space.sql") {
+    const q = await one(scratch, "SELECT coalesce(bool_or(enabled), false) AS on FROM list_quota_settings");
+    const started = Number((await one(scratch, "SELECT count(*)::int AS n FROM families WHERE list_quota_since IS NOT NULL")).n);
+    check(!q.on && started === 0, "listes gratuites : règle désactivée, aucune famille démarrée (aucun blocage)");
+    const ent = Number((await one(scratch, "SELECT count(*)::int AS n FROM family_entitlements")).n);
+    check(ent === 0, "droits payants : aucun");
+    const open = Number((await one(scratch, "SELECT count(*)::int AS n FROM purchase_platforms WHERE enabled")).n);
+    check(open === 0, "achats : fermés sur Android et sur iPhone");
+    const req = Number((await one(scratch, "SELECT count(*)::int AS n FROM app_update_policy WHERE required_active")).n);
+    check(req === 0, "mise à jour obligatoire : désactivée (Android et iPhone)");
+    const pa = Number((await one(scratch, "SELECT count(*)::int AS n FROM platform_admins")).n);
+    check(pa === 0, "espace plateforme : aucun droit attribué");
+    const tok = await one(scratch, "SELECT count(*)::int AS n, count(DISTINCT store_account_token)::int AS d, count(*) FILTER (WHERE store_account_token IS NULL)::int AS z FROM families");
+    check(tok.n === tok.d && tok.z === 0, `jeton store : un par famille, tous distincts (${tok.n} familles)`);
+  }
   return { lines, problems };
 }

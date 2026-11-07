@@ -1,0 +1,95 @@
+name: Android — bundle de PRODUCTION (Google Play, serveur de production, non publié)
+# Bundle AAB signé par la clé durable, identifiant réel, relié au serveur de PRODUCTION. Code de version strictement supérieur à
+# toutes les versions déjà produites (la 1197 reste la version de TEST des achats, réservée à la recette). Rien n'est envoyé à
+# Google Play : la pré-version GitHub est importée à la main par le propriétaire, APRÈS le déploiement du serveur.
+# Côté serveur, rien ne s'active avec cette version : quota, achats et mise à jour obligatoire restent désactivés.
+# Déclenchement : à la demande, ou commit contenant [play-production] (commit sans modification de workflow).
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/ios-kmp]
+permissions:
+  contents: write
+env:
+  RECETTE_URL: https://smartcourse-recette-recette.up.railway.app
+  PROD_URL: https://smartcourse-production-c7ce.up.railway.app
+jobs:
+  bundle:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[play-production]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Clé durable présente ?
+        env:
+          KS_B64: ${{ secrets.NATIF_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.NATIF_KEYSTORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.NATIF_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.NATIF_KEY_PASSWORD }}
+          CERT: ${{ secrets.NATIF_CERT_SHA256 }}
+        run: |
+          miss=""; for v in KS_B64 KS_PASS KS_ALIAS KEY_PASS CERT; do [ -n "${!v}" ] || miss="$miss $v"; done
+          [ -z "$miss" ] || { echo "::error::Secrets manquants :$miss"; exit 1; }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17, cache: gradle }
+      - name: Composants Android (SDK 36)
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" | tail -2
+      - name: Serveur de production joignable (lecture seule)
+        run: |
+          H=$(curl -fsS -m 20 "$PROD_URL/health"); echo "$H"; echo "$H" | grep -q '"status":"ok"'
+      - name: Code de version strictement supérieur à toutes les versions publiées
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          MAX=$(gh api "repos/${{ github.repository }}/releases?per_page=100" --paginate --jq '.[].body' | grep -oE 'Code de version : [0-9]+' | grep -oE '[0-9]+' | sort -n | tail -1)
+          VC=$(( ${MAX:-1197} + 1 ))
+          [ "$VC" -gt 1197 ] || { echo "::error::code $VC non supérieur à 1197 (version de test des achats)"; exit 1; }
+          echo "Plus haut code de version publié : ${MAX:-aucun} ; version de production : $VC"
+          echo "VC=$VC" >> "$GITHUB_ENV"; echo "VN=1.1.0" >> "$GITHUB_ENV"
+      - name: Android App Bundle (release, clé durable, serveur de production)
+        working-directory: android-native
+        env:
+          KS_B64: ${{ secrets.NATIF_KEYSTORE_B64 }}
+          NATIF_KEYSTORE_PASSWORD: ${{ secrets.NATIF_KEYSTORE_PASSWORD }}
+          NATIF_KEY_ALIAS: ${{ secrets.NATIF_KEY_ALIAS }}
+          NATIF_KEY_PASSWORD: ${{ secrets.NATIF_KEY_PASSWORD }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          umask 077; echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/natif.keystore"
+          export NATIF_KEYSTORE_FILE="$RUNNER_TEMP/natif.keystore"
+          ./gradlew --no-daemon bundleRelease -Pfinal=1 -PserverUrl="$PROD_URL" -PversionCode=$VC -PversionName="$VN"
+          rm -f "$NATIF_KEYSTORE_FILE"
+          mkdir -p ../dist; cp app/build/outputs/bundle/release/app-release.aab "../dist/MesCourses-$VN.aab"
+          J=$(gh api repos/google/bundletool/releases/latest --jq '.assets[] | select(.name | test("^bundletool-all-.*\\.jar$")) | .browser_download_url' | head -1)
+          curl -fsSL -o "$RUNNER_TEMP/bundletool.jar" "$J"
+          java -jar "$RUNNER_TEMP/bundletool.jar" validate --bundle="../dist/MesCourses-$VN.aab" | head -3
+          java -jar "$RUNNER_TEMP/bundletool.jar" dump manifest --bundle="../dist/MesCourses-$VN.aab" > /tmp/manifest.xml
+          mkdir -p /tmp/aab && (cd /tmp/aab && unzip -qo "$GITHUB_WORKSPACE/dist/MesCourses-$VN.aab" 'base/dex/*')
+      - name: Contrôles (identifiant, version, signature durable, serveur de PRODUCTION seulement)
+        env:
+          CERT: ${{ secrets.NATIF_CERT_SHA256 }}
+        run: |
+          set -e
+          AAB="dist/MesCourses-$VN.aab"
+          grep -q 'package="app.smartcourse.courses.natif"' /tmp/manifest.xml
+          grep -q "android:versionCode=\"$VC\"" /tmp/manifest.xml
+          grep -q 'android:targetSdkVersion="36"' /tmp/manifest.xml
+          WANT=$(echo "$CERT" | tr -d ': ' | tr 'A-F' 'a-f')
+          FPA=$(keytool -printcert -jarfile "$AAB" | grep -m1 "SHA256:" | sed 's/.*SHA256: //' | tr -d ': ' | tr 'A-F' 'a-f')
+          [ "$FPA" = "$WANT" ] || { echo "::error::empreinte différente de NATIF_CERT_SHA256"; exit 1; }
+          strings -a /tmp/aab/base/dex/*.dex | grep -q "$PROD_URL" || { echo "::error::serveur de production absent"; exit 1; }
+          for pat in "$RECETTE_URL" trycloudflare 10.0.2.2; do ! strings -a /tmp/aab/base/dex/*.dex | grep -q "$pat" || { echo "::error::$pat présent dans le bundle de production"; exit 1; }; done
+          (cd dist && sha256sum "MesCourses-$VN.aab" | tee sha256.txt)
+      - uses: actions/upload-artifact@v4
+        with: { name: android-production, path: dist/ }
+      - name: Pré-version GitHub (pas Google Play)
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          TAG="courses-natif-production-$VN-$VC"
+          printf '%s\n' "Mes Courses $VN — bundle de PRODUCTION pour Google Play. NON publié : à importer APRÈS le déploiement du serveur, avec l'accord du propriétaire." "" \
+            "- Identifiant : app.smartcourse.courses.natif" "- Serveur : $PROD_URL" "- Code de version : $VC" "- Nom de version : $VN" \
+            "- La 1197 (test des achats, serveur de recette) reste réservée au test interne." "- SHA-256 :" "$(sed 's/^/  /' dist/sha256.txt)" > /tmp/notes.md
+          gh release create "$TAG" "dist/MesCourses-$VN.aab" --prerelease --repo "${{ github.repository }}" --target "${{ github.sha }}" \
+            --title "Mes Courses $VN ($VC) — bundle de production (non publié)" --notes-file /tmp/notes.md

@@ -69,8 +69,13 @@ try {
       console.log(n ? `Blocage désactivé : ${which.join(", ")} (effet immédiat).` : "Aucun blocage actif.");
     }
   } else if (cmd === "platform-find" && args[0]) {
-    // Retrouver le profil à autoriser à partir d'un e-mail (comparé côté serveur ; rien n'est affiché de l'e-mail lui-même).
+    // Retrouver le profil à autoriser : famille par l'e-mail (comparé côté serveur, jamais affiché), puis profil par le prénom
+    // (--name, « adil » par défaut ; majuscules et accents ignorés). Ne propose une commande QUE s'il y a une seule famille et un
+    // seul profil correspondant ; sinon, c'est au propriétaire de trancher. Le membre qui porte l'e-mail n'est jamais retenu
+    // pour cette seule raison.
     const email = args[0].trim().toLowerCase();
+    const want = ((args.includes("--name") ? args[args.indexOf("--name") + 1] : undefined) ?? "adil").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    const norm = (x: string | null) => (x ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
     const fams = (
       await db.query(
         `SELECT p.family_id FROM profiles p WHERE lower(p.recovery_email) = $1 AND p.deleted_at IS NULL
@@ -78,7 +83,8 @@ try {
         [email],
       )
     ).rows;
-    if (!fams.length) console.log("Aucune famille ne porte cet e-mail de récupération.");
+    if (!fams.length) console.log("Aucune famille ne porte cet e-mail (récupération ou création de famille). Rien à proposer.");
+    const proposals: { profile: string; family: string }[] = [];
     for (const f of fams) {
       console.log(`Famille (identifiant interne) : ${f.family_id}`);
       const ps = (
@@ -89,8 +95,20 @@ try {
           [f.family_id, email],
         )
       ).rows;
+      const candidates = ps.filter((p) => norm(p.display_name) === want || norm(p.login) === want);
       for (const p of ps)
-        console.log(`  profil ${p.id} · ${p.display_name} (${p.login}) · ${p.role}${p.is_primary ? " · principal" : ""}${p.active ? "" : " · désactivé"}${p.has_email ? " · porte cet e-mail" : ""}${p.platform ? " · DROIT PLATEFORME" : ""}`);
+        console.log(`  profil ${p.id} · ${p.display_name} (${p.login}) · ${p.role}${p.is_primary ? " · principal" : ""}${p.active ? "" : " · désactivé"}${p.has_email ? " · porte cet e-mail" : ""}${p.platform ? " · DROIT PLATEFORME" : ""}${candidates.includes(p) ? "  ← correspond au prénom" : ""}`);
+      const emailHolder = ps.find((p) => p.has_email);
+      if (emailHolder && !candidates.includes(emailHolder)) console.log(`  L'e-mail est porté par un autre membre (${emailHolder.display_name}) : ce membre ne reçoit PAS le droit.`);
+      if (candidates.length === 1 && candidates[0].active) proposals.push({ profile: candidates[0].id, family: f.family_id });
+      else if (candidates.length === 0) console.log(`  Aucun profil « ${want} » dans cette famille : à trancher par le propriétaire.`);
+      else if (candidates.length > 1) console.log(`  ${candidates.length} profils correspondent au prénom : à trancher par le propriétaire (aucune commande proposée).`);
+      else console.log("  Le profil correspondant est désactivé : à trancher par le propriétaire.");
+    }
+    if (fams.length > 1) console.log(`ATTENTION : ${fams.length} familles portent cet e-mail : à trancher par le propriétaire, aucune commande proposée.`);
+    else if (proposals.length === 1) {
+      const [pr] = proposals as [{ profile: string; family: string }];
+      console.log(`Proposition (simulation d'abord, rien n'est encore attribué) :\n  admin-cli platform-grant ${pr.profile} --family ${pr.family}\nPuis, après vérification : la même commande avec --execute`);
     }
   } else if (cmd === "platform-status") {
     const r = (await db.query("SELECT a.profile_id, a.family_id, a.granted_at, p.display_name FROM platform_admins a JOIN profiles p ON p.id = a.profile_id ORDER BY a.granted_at")).rows;
