@@ -79,7 +79,7 @@ export function listRoutes(app: FastifyInstance, { db, hub, guard, push }: { db:
 
   // Listes gratuites restantes et droit payant de la famille (tous les membres) ; seuls les administrateurs peuvent acheter.
   app.get("/api/family/plan", { preHandler: guard() }, async (req) => {
-    return { plan: await familyPlan(db, req.auth!) };
+    return { plan: await familyPlan(db, req.auth!, req.client ?? null) };
   });
 
   app.get("/api/lists", { preHandler: guard("history.read") }, async (req) => {

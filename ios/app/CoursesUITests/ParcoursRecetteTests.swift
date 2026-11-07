@@ -683,10 +683,12 @@ final class ParcoursRecetteTests: XCTestCase {
         relaunch(reset: false)
         XCTAssertTrue(bloque.waitForExistence(timeout: 30), "blocage non rétabli")
         politique(api, latest: 2, min: 2, actif: false)
-        XCUIDevice.shared.press(.home); sleep(3); app.activate()
+        // Application laissée ouverte sur l'écran bloquant (ni fermeture ni retour à l'accueil) : déblocage en moins de 45 s.
+        let t0 = Date()
         var libre = false
-        for _ in 0..<20 { if !bloque.exists { libre = true; break }; sleep(2) }
-        XCTAssertTrue(libre, "blocage toujours affiché après sa désactivation")
+        for _ in 0..<45 { if !bloque.exists { libre = true; break }; sleep(1) }
+        print("\(stamp()) iPhone : déblocage constaté \(Int(Date().timeIntervalSince(t0))) s après la désactivation, application restée ouverte")
+        XCTAssertTrue(libre, "blocage toujours affiché 45 s après sa désactivation")
         XCTAssertTrue(anyContaining("Citrons").firstMatch.waitForExistence(timeout: 20), "liste perdue après le blocage")
         attach("m6-desactive")
         // 7. Version installée = version minimale (1) : autorisée, aucun blocage.

@@ -64,6 +64,9 @@ val json = Json { ignoreUnknownKeys = true }
 
 const val COOKIE_NAME = "sc_session"
 
+/** « android/1250 », « ios/12 » : plateforme et numéro technique de version (versionCode, CFBundleVersion). */
+val CLIENT_ID: String get() = "${app.smartcourse.courses.nativeproto.UpdatePlatform.NAME}/${app.smartcourse.courses.nativeproto.BuildConfig.VERSION_CODE}"
+
 /** Extrait la valeur du cookie de session d'un en-tête Set-Cookie ; null si absent ou effacé (valeur vide). */
 fun sessionFromSetCookie(headers: List<String>): String? {
     for (h in headers) {
@@ -163,6 +166,8 @@ class ApiClient(internal val store: SessionStorage, internal val transport: Http
 
     private fun headers(withSession: Boolean, cookie: String? = store.cookie): Map<String, String> {
         val h = linkedMapOf("Accept" to "application/json")
+        // Plateforme et numéro technique de version : le serveur sait si cet appareil permet d'acheter (activation par plateforme).
+        h["X-Courses-Client"] = CLIENT_ID
         if (withSession) cookie?.let { h["Cookie"] = "$COOKIE_NAME=$it" }
         return h
     }

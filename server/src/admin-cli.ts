@@ -68,6 +68,25 @@ try {
       const n = await disableRequired(db, which as ("android" | "ios")[], "Blocage désactivé (admin-cli)");
       console.log(n ? `Blocage désactivé : ${which.join(", ")} (effet immédiat).` : "Aucun blocage actif.");
     }
+  } else if (cmd === "purchases-status" || cmd === "purchases-open" || cmd === "purchases-close") {
+    // Achats ouverts PAR PLATEFORME (sans --execute : état et simulation seulement). Une famille n'est bloquée par la règle des
+    // listes gratuites que si un de ses administrateurs a un appareil d'une plateforme ouverte, en version suffisante.
+    const { platformStates, setPlatform } = await import("./purchase-platforms.js");
+    console.log("Plateformes :", JSON.stringify(await platformStates(db)));
+    const seen = (await db.query("SELECT platform, version, count(*)::int AS profils FROM profile_clients GROUP BY 1,2 ORDER BY 1,2 DESC LIMIT 20")).rows;
+    console.log("Versions vues (profils) :", JSON.stringify(seen));
+    if (cmd !== "purchases-status") {
+      const platform = args[0];
+      if (platform !== "android" && platform !== "ios") throw new Error("Plateforme : android ou ios");
+      const minArg = args.includes("--min-version") ? Number(args[args.indexOf("--min-version") + 1]) : null;
+      if (cmd === "purchases-open" && !(minArg && minArg > 0)) throw new Error("--min-version <première version qui sait acheter> obligatoire");
+      const note = args.includes("--note") ? args[args.indexOf("--note") + 1] : undefined;
+      if (!args.includes("--execute")) console.log(`Simulation : ${cmd === "purchases-open" ? `ouverture ${platform} à partir de la version ${minArg}` : `fermeture ${platform}`}. Ajouter --execute pour appliquer.`);
+      else {
+        await setPlatform(db, platform, cmd === "purchases-open", minArg, note);
+        console.log("Fait :", JSON.stringify(await platformStates(db)));
+      }
+    }
   } else if (cmd === "store-status" || cmd === "store-reconcile") {
     // Achats : état agrégé (aucun identifiant) ; rapprochement avec les stores (à planifier chaque jour, sans risque : relit les stores).
     const counts = (
@@ -144,7 +163,7 @@ try {
       console.log(`Import : ${inserted} prix écrits, ${skipped} déjà présents (conservés${replace ? "" : ", utilisez --replace pour les remplacer"}), ${res.length - kept.length} lignes exclues. Aucun prix de famille modifié.`);
     } else console.log(`Simulation seulement : ${kept.length} lignes seraient importées. Pour écrire : admin-cli prices-import <fichier.csv> --execute`);
   } else {
-    console.log("Usage :\n  admin-cli reset <CODE_FAMILLE> <identifiant>\n  admin-cli token\n  admin-cli purge-family <CODE_FAMILLE> [--execute --confirm <CODE_FAMILLE>]\n  admin-cli prices-report <tableau.csv>\n  admin-cli prices-import <tableau.csv> [--execute] [--replace]\n  admin-cli quota-status | quota-activate [--execute] | quota-deactivate [--execute]\n  admin-cli store-status | store-reconcile\n  admin-cli update-status | update-disable [android|ios]");
+    console.log("Usage :\n  admin-cli reset <CODE_FAMILLE> <identifiant>\n  admin-cli token\n  admin-cli purge-family <CODE_FAMILLE> [--execute --confirm <CODE_FAMILLE>]\n  admin-cli prices-report <tableau.csv>\n  admin-cli prices-import <tableau.csv> [--execute] [--replace]\n  admin-cli quota-status | quota-activate [--execute] | quota-deactivate [--execute]\n  admin-cli store-status | store-reconcile\n  admin-cli update-status | update-disable [android|ios]\n  admin-cli purchases-status | purchases-open <android|ios> --min-version N [--execute] | purchases-close <android|ios> [--execute]");
     process.exitCode = 1;
   }
 } catch (e) {

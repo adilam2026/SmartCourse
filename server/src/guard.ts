@@ -3,12 +3,15 @@ import { authenticate, type AuthContext } from "./auth.js";
 import type { Db } from "./db.js";
 import { HttpError } from "./errors.js";
 import { can, type Action } from "./permissions.js";
+import { parseClient, recordClient, type ClientInfo } from "./purchase-platforms.js";
 
 export const COOKIE = "sc_session";
 
 declare module "fastify" {
   interface FastifyRequest {
     auth?: AuthContext;
+    /** Appareil déclaré par l'application (« X-Courses-Client »), null pour le web ou une ancienne version. */
+    client?: ClientInfo | null;
   }
 }
 
@@ -22,6 +25,8 @@ export const makeGuard = (db: Db) => (action?: Action, opts: { allowPending?: bo
   if (auth.mustChangeSecret && !opts.allowTemporary) throw new HttpError(403, "secret_change_required", "Choisissez d'abord votre code d'accès personnel");
   if (action && !can(auth.role, action)) throw new HttpError(403, "forbidden", "Action non autorisée");
   req.auth = auth;
+  req.client = parseClient(req.headers["x-courses-client"]);
+  if (req.client) await recordClient(db, auth.profileId, req.client).catch(() => {}); // jamais bloquant
 };
 
 export type Guard = ReturnType<typeof makeGuard>;

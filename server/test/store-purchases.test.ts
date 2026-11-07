@@ -8,6 +8,7 @@ import { quotaActivate, quotaDeactivate } from "../src/list-quota.js";
 import { AppleStore, verifyAppleJws } from "../src/store/apple.js";
 import { GooglePlay } from "../src/store/google.js";
 import { StoreService } from "../src/store/service.js";
+import { setPlatform } from "../src/purchase-platforms.js";
 import { closeTestDb, resetData, testDb, testStore } from "./helpers.js";
 import { FakeGoogle, rtdn, signJws, testAppleChain, testServiceAccount, type TestChain } from "./store-fakes.js";
 
@@ -34,6 +35,7 @@ beforeAll(async () => {
   const sandbox = { get all() { return sandboxAll; }, families: [] as string[] };
   app = await buildApp({ db, hub, store: testStore(), loginRateLimit: { max: 10_000, timeWindow: "1 minute" }, stores: { google, apple, sandbox, log: () => {} }, purchaseRateLimit: { max: 10_000, timeWindow: "1 minute" } });
   await app.ready();
+  await setPlatform(db, "android", true, 1); // achats ouverts sur Android (version 1 et plus) ; l'administrateur y est connecté
 });
 afterAll(async () => {
   await quotaDeactivate(db);
@@ -54,7 +56,7 @@ async function family() {
   const admin = cookieOf(res);
   await app.inject({ method: "POST", url: "/api/profiles", cookies: admin, payload: { displayName: "Marie", login: "marie", role: "staff", secret: "573918", secretConfirm: "573918" } });
   const staff = cookieOf(await app.inject({ method: "POST", url: "/api/auth/login", payload: { familyCode, login: "marie", secret: "573918" } }));
-  const plan = (await app.inject({ method: "GET", url: "/api/family/plan", cookies: admin })).json().plan;
+  const plan = (await app.inject({ method: "GET", url: "/api/family/plan", cookies: admin, headers: { "x-courses-client": "android/100" } })).json().plan;
   const fid = (await db.query("SELECT id FROM families WHERE store_account_token = $1", [plan.storeAccountToken])).rows[0].id as string;
   hub.add({ familyId: fid, profileId: "spy", sessionId: `spy-${n}`, send: (event) => events.push({ familyId: fid, event }), close: () => {} });
   return { admin, staff, token: plan.storeAccountToken as string, familyId: fid };

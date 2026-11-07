@@ -39,6 +39,11 @@ data class FamilyPlan(
     val canPurchase: Boolean = false,
     /** Jeton store de la famille (administrateurs seulement) : transmis au store à l'achat, sans lui le serveur refuse l'achat. */
     val storeAccountToken: String? = null,
+    /** Listes gratuites épuisées, même si la création reste permise (aucun administrateur ne peut encore acheter). */
+    val limitReached: Boolean = false,
+    /** Cet appareil permet d'acheter (plateforme ouverte, version suffisante, administrateur) ; sinon la raison. */
+    val purchaseHereAvailable: Boolean = false,
+    val purchaseHereReason: String? = null,
 ) {
     val entitled get() = entitlementKind != null
     /** Afficher discrètement le nombre de listes gratuites restantes. */
@@ -56,6 +61,11 @@ data class FamilyPlan(
                 blocked = b("blocked"), entitlementKind = s("kind"), entitlementStatus = s("status"), entitlementPlatform = s("platform"),
                 expiresAt = s("expiresAt"), autoRenewing = e?.get("autoRenewing")?.jsonPrimitive?.booleanOrNull ?: false, canPurchase = b("canPurchase"),
                 storeAccountToken = p["storeAccountToken"]?.jsonPrimitive?.contentOrNull,
+                limitReached = b("limitReached") || b("blocked"),
+                purchaseHereAvailable = (p["purchaseHere"] as? JsonObject)?.get("available")?.jsonPrimitive?.booleanOrNull
+                    // Serveur sans ouverture par plateforme : l'administrateur peut acheter comme avant.
+                    ?: b("canPurchase"),
+                purchaseHereReason = (p["purchaseHere"] as? JsonObject)?.get("reason")?.jsonPrimitive?.contentOrNull,
             )
         }
     }
@@ -114,7 +124,7 @@ interface StoreHost {
 @Composable
 fun FreeListsHint(plan: FamilyPlan?, modifier: Modifier = Modifier) {
     if (plan == null || !plan.showRemaining) return
-    val t = when (plan.freeRemaining) {
+    val t = when (if (plan.limitReached) 0 else plan.freeRemaining) {
         0 -> "Listes gratuites utilisées"
         1 -> "1 liste gratuite restante"
         else -> "${plan.freeRemaining} listes gratuites restantes"
@@ -145,7 +155,7 @@ fun PlanScreen(onBack: () -> Unit) {
     LaunchedEffect(Unit) {
         data?.loadPlan()
         offers = runCatching { store.offers() }.getOrDefault(emptyList())
-        if (demo.plan?.canPurchase == true) runCatching { store.syncSilently() }
+        if (demo.plan?.purchaseHereAvailable == true) runCatching { store.syncSilently() }
     }
     fun act(block: suspend () -> Unit) { if (!busy) scope.launch { busy = true; try { block() } finally { busy = false; data?.loadPlan() } } }
 
@@ -173,14 +183,27 @@ fun PlanScreen(onBack: () -> Unit) {
                         )
                     }
                     plan.quotaActive -> {
-                        Text(if (plan.blocked) "Listes gratuites utilisées" else "${plan.freeRemaining} sur ${plan.freeLimit} listes gratuites restantes", style = MaterialTheme.typography.titleSmall)
-                        Text("La liste en cours, l'historique, les statistiques et toutes vos données restent accessibles. Seule la création de nouvelles listes demande Mes Courses Famille.", style = MaterialTheme.typography.bodySmall)
+                        Text(if (plan.limitReached) "Listes gratuites utilisées" else "${plan.freeRemaining} sur ${plan.freeLimit} listes gratuites restantes", style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            if (plan.limitReached && !plan.blocked) "La création de listes reste possible pour le moment : l'achat n'est pas encore disponible pour les administrateurs de la famille."
+                            else "La liste en cours, l'historique, les statistiques et toutes vos données restent accessibles. Seule la création de nouvelles listes demande Mes Courses Famille.",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
                     }
                     else -> Text("Création de listes illimitée.", style = MaterialTheme.typography.titleSmall)
                 }
             }
             if (plan != null && !plan.canPurchase) {
                 NoteCard("Seuls les administrateurs de la famille peuvent débloquer Mes Courses Famille. Demandez à un administrateur.")
+            } else if (plan != null && !plan.purchaseHereAvailable && plan.entitlementKind != "lifetime") {
+                NoteCard(
+                    when (plan.purchaseHereReason) {
+                        "update_required" -> "Mettez à jour Mes Courses depuis ${store.storeName} pour pouvoir débloquer Mes Courses Famille."
+                        "platform_closed" -> "L'achat n'est pas encore disponible sur cet appareil. S'il l'est sur un autre appareil d'un administrateur (Android ou iPhone), un achat y débloque toute la famille."
+                        else -> "L'achat n'est pas disponible avec cette version de l'application."
+                    },
+                )
+                SecondaryButton("Restaurer les achats", { act { val n = store.restore(); demo.say(if (n > 0) "Achats retrouvés et vérifiés." else "Aucun achat à restaurer sur ce compte ${store.storeName}.") } }, Modifier.fillMaxWidth(), leading = Icons.Rounded.Refresh)
             } else if (plan != null) {
                 val lifetime = plan.entitlementKind == "lifetime"
                 val annual = plan.entitlementKind == "annual"
@@ -218,7 +241,13 @@ fun PlanScreen(onBack: () -> Unit) {
                     }
                 }
                 SecondaryButton("Restaurer les achats", { act { val n = store.restore(); demo.say(if (n > 0) "Achats retrouvés et vérifiés." else "Aucun achat à restaurer sur ce compte ${store.storeName}.") } }, Modifier.fillMaxWidth(), leading = Icons.Rounded.Refresh)
-                if (annual) SecondaryButton("Gérer l'abonnement", { store.manageSubscription() }, Modifier.fillMaxWidth())
+                if (annual) {
+                    val here = if (store.storeName == "Google Play") "google" else "apple"
+                    if (plan.entitlementPlatform != null && plan.entitlementPlatform != here) NoteCard(
+                        "Abonnement souscrit sur " + (if (plan.entitlementPlatform == "google") "Google Play (Android)" else "l'App Store (iPhone)") +
+                            " : il se gère (arrêt, renouvellement) depuis cet appareil-là, dans " + (if (plan.entitlementPlatform == "google") "Google Play › Paiements et abonnements" else "Réglages › votre nom › Abonnements") + ".",
+                    ) else SecondaryButton("Gérer l'abonnement", { store.manageSubscription() }, Modifier.fillMaxWidth())
+                }
             }
             InfoRow("Un achat débloque toute la famille, sur Android comme sur iPhone, sans second paiement. Les prix affichés sont ceux du store, dans votre devise.")
             Spacer(Modifier.height(12.dp))

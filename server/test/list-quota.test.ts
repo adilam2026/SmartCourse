@@ -5,6 +5,7 @@ import { buildApp } from "../src/app.js";
 import { generateInstallToken } from "../src/auth.js";
 import type { Db } from "../src/db.js";
 import { quotaActivate, quotaDeactivate } from "../src/list-quota.js";
+import { setPlatform } from "../src/purchase-platforms.js";
 import { closeTestDb, resetData, testDb, testStore } from "./helpers.js";
 
 let db: Db;
@@ -15,6 +16,7 @@ beforeAll(async () => {
   await resetData(db);
   app = await buildApp({ db, store: testStore(), loginRateLimit: { max: 10_000, timeWindow: "1 minute" } });
   await app.ready();
+  await setPlatform(db, "android", true, 1); // achats ouverts sur Android (version 1 et plus) ; l'administrateur y est connecté
 });
 afterAll(async () => {
   await quotaDeactivate(db); // jamais laissée active pour les autres fichiers de tests
@@ -30,6 +32,7 @@ async function family(multiLists = false) {
   const res = await app.inject({ method: "POST", url: "/api/setup/family", payload: { installToken: await generateInstallToken(db), familyName: `Q${++n}`, admin: { displayName: "Adil", login: "adil", secret: "482913" } } });
   const familyCode = res.json().familyCode as string;
   const admin = cookieOf(res);
+  await app.inject({ method: "GET", url: "/api/family/plan", cookies: admin, headers: { "x-courses-client": "android/100" } });
   const mk = async (login: string, role: string) => {
     await app.inject({ method: "POST", url: "/api/profiles", cookies: admin, payload: { displayName: login, login, role, secret: "573918", secretConfirm: "573918" } });
     return cookieOf(await app.inject({ method: "POST", url: "/api/auth/login", payload: { familyCode, login, secret: "573918" } }));

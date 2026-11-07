@@ -52,7 +52,16 @@ object AppUpdate {
     private var storeOpened = false
     private const val MIN_INTERVAL_MS = 30 * 60_000L
 
+    /** Tant que l'écran de blocage est affiché : nouvelle vérification toutes les [BLOCKED_RECHECK_MS], pour qu'une désactivation
+     *  côté serveur débloque l'application déjà ouverte, sans la fermer ni la réinstaller. */
+    const val BLOCKED_RECHECK_MS = 30_000L
+    private var lastApi: ApiClient? = null
+    private var lastInstalled = 0
+
+    suspend fun recheckWhileBlocked() { lastApi?.let { check(it, lastInstalled) } }
+
     suspend fun check(api: ApiClient, installed: Int) {
+        lastApi = api; lastInstalled = installed
         val due = level == UpdateLevel.REQUIRED || storeOpened || nowMillis() - checkedAt >= MIN_INTERVAL_MS
         if (!due) return
         storeOpened = false
@@ -95,6 +104,9 @@ object AppUpdate {
 fun UpdateGate() {
     if (AppUpdate.level == UpdateLevel.REQUIRED) {
         UpdateBackGuard()
+        LaunchedEffect(Unit) {
+            while (true) { kotlinx.coroutines.delay(AppUpdate.BLOCKED_RECHECK_MS); AppUpdate.recheckWhileBlocked() }
+        }
         Box(
             // Bloque toute interaction avec l'application en dessous (rien n'y est effacé).
             Modifier.fillMaxSize().background(C.Bg).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }

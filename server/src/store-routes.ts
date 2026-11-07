@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Db } from "./db.js";
 import type { Guard } from "./guard.js";
 import { quotaState } from "./list-quota.js";
+import { purchaseHere, type ClientInfo } from "./purchase-platforms.js";
 import { secretMatches } from "./recovery.js";
 import type { StoreService } from "./store/service.js";
 
@@ -19,11 +20,13 @@ const submission = z.discriminatedUnion("platform", [
   z.object({ platform: z.literal("apple"), signedTransaction: z.string().min(20).max(20_000) }),
 ]);
 
-export async function familyPlan(db: Db, auth: { familyId: string; role: string }) {
+export async function familyPlan(db: Db, auth: { familyId: string; role: string }, client: ClientInfo | null = null) {
   const st = await quotaState(db, auth.familyId);
   const canPurchase = auth.role === "admin";
   const token = canPurchase ? ((await db.query("SELECT store_account_token::text AS t FROM families WHERE id = $1", [auth.familyId])).rows[0]?.t as string | undefined) : undefined;
-  return { ...st, canPurchase, ...(token ? { storeAccountToken: token } : {}) };
+  // Cet appareil permet-il d'acheter (plateforme ouverte, version suffisante) ? Sinon, la raison, pour un message clair.
+  const here = await purchaseHere(db, auth.role, client);
+  return { ...st, canPurchase, purchaseHere: here, ...(token ? { storeAccountToken: token } : {}) };
 }
 
 export function storeRoutes(app: FastifyInstance, deps: { db: Db; guard: Guard; store: StoreService; rateLimit?: { max: number; timeWindow: string } }) {
@@ -32,7 +35,7 @@ export function storeRoutes(app: FastifyInstance, deps: { db: Db; guard: Guard; 
   app.post("/api/family/purchases", { preHandler: guard(), config: { rateLimit: deps.rateLimit ?? { max: 30, timeWindow: "1 minute" } } }, async (req) => {
     const s = submission.parse(req.body);
     const r = await store.submit({ familyId: req.auth!.familyId, profileId: req.auth!.profileId }, s);
-    return { result: { status: r.status }, plan: await familyPlan(db, req.auth!) };
+    return { result: { status: r.status }, plan: await familyPlan(db, req.auth!, req.client ?? null) };
   });
 
   app.post("/api/store/google/rtdn", async (req, reply) => {

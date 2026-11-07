@@ -5,6 +5,10 @@ name: iPhone — hors connexion, session, clavier et affichage (recette Railway)
 # Déclenchement : à la demande, ou commit contenant [controles]. Aucun accès à la production.
 on:
   workflow_dispatch:
+    inputs:
+      controle:
+        description: "Contrôles à jouer : tout, maj (mise à jour seulement) ou clavier"
+        default: tout
   push:
     branches: [claude/ios-kmp]
 permissions:
@@ -51,7 +55,7 @@ jobs:
             -derivedDataPath ../build/dd CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= 2>&1 | tee ../xcodebuild.log | grep -E "error:|BUILD|\*\*" | head -60
       - name: Hors connexion, réouverture, session (iPhone 16)
         # [controles:clavier] : seulement les contrôles du clavier et de l'affichage.
-        if: ${{ !contains(github.event.head_commit.message, '[controles:clavier]') && !contains(github.event.head_commit.message, '[controles:maj]') }}
+        if: ${{ !contains(github.event.head_commit.message, '[controles:clavier]') && inputs.controle != 'clavier' && !contains(github.event.head_commit.message, '[controles:maj]') && inputs.controle != 'maj' }}
         working-directory: ios/app
         env:
           TEST_RUNNER_COURSES_SERVER: ${{ env.RECETTE_URL }}
@@ -63,7 +67,7 @@ jobs:
             -only-testing:CoursesUITests/ParcoursRecetteTests/test4_HorsConnexion_ReouvertureEtSession \
             -derivedDataPath ../build/dd -resultBundlePath ../h.xcresult 2>&1 | tee ../h.log | grep -E "error:|Test Case|iPhone :|Serveur commun" | tail -40
       - name: Notifications de demandes (APNs simulée) et rappels (iPhone 16)
-        if: ${{ always() && !contains(github.event.head_commit.message, '[controles:clavier]') && !contains(github.event.head_commit.message, '[controles:maj]') }}
+        if: ${{ always() && !contains(github.event.head_commit.message, '[controles:clavier]') && inputs.controle != 'clavier' && !contains(github.event.head_commit.message, '[controles:maj]') && inputs.controle != 'maj' }}
         working-directory: ios/app
         env:
           TEST_RUNNER_COURSES_SERVER: ${{ env.RECETTE_URL }}
@@ -81,7 +85,7 @@ jobs:
             || { echo "::error::aucun rappel programmé"; exit 1; }
       - name: Mise à jour de l'application — proposée, bloquante, hors connexion, appareil trop ancien, désactivée (iPhone 16)
         # [controles:maj] : seulement ce contrôle. Réglage iPhone de la RECETTE modifié pendant le test, puis remis à zéro.
-        if: ${{ always() && !contains(github.event.head_commit.message, '[controles:clavier]') }}
+        if: ${{ always() && !contains(github.event.head_commit.message, '[controles:clavier]') && inputs.controle != 'clavier' }}
         working-directory: ios/app
         env:
           TEST_RUNNER_COURSES_SERVER: ${{ env.RECETTE_URL }}
@@ -93,7 +97,7 @@ jobs:
             -only-testing:CoursesUITests/ParcoursRecetteTests/test7_MiseAJourObligatoire \
             -derivedDataPath ../build/dd -resultBundlePath ../maj.xcresult 2>&1 | tee ../maj.log | grep -E "error:|Test Case|iPhone :|Serveur commun" | tail -40
       - name: Clavier et affichage — iPhone SE (petit écran)
-        if: ${{ always() && !contains(github.event.head_commit.message, '[controles:maj]') }}
+        if: ${{ always() && !contains(github.event.head_commit.message, '[controles:maj]') && inputs.controle != 'maj' }}
         working-directory: ios/app
         env:
           TEST_RUNNER_COURSES_SERVER: ${{ env.RECETTE_URL }}
@@ -104,7 +108,7 @@ jobs:
             -only-testing:CoursesUITests/ParcoursRecetteTests/test5_ClavierEtAffichage \
             -derivedDataPath ../build/dd -resultBundlePath ../se.xcresult 2>&1 | tee ../se.log | grep -E "error:|Test Case" | tail -30
       - name: Clavier et affichage — iPhone 16 Pro Max (grand écran)
-        if: ${{ always() && !contains(github.event.head_commit.message, '[controles:maj]') }}
+        if: ${{ always() && !contains(github.event.head_commit.message, '[controles:maj]') && inputs.controle != 'maj' }}
         working-directory: ios/app
         env:
           TEST_RUNNER_COURSES_SERVER: ${{ env.RECETTE_URL }}

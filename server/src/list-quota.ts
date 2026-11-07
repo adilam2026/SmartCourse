@@ -1,5 +1,6 @@
 import type pg from "pg";
 import type { Db } from "./db.js";
+import { familyCanPurchase } from "./purchase-platforms.js";
 
 /**
  * Créations de listes gratuites par famille, puis droit payant (abonnement annuel ou achat à vie) partagé par toute la famille.
@@ -34,7 +35,11 @@ export interface QuotaState {
   used: number;
   freeRemaining: number;
   entitlement: Entitlement | null;
-  /** Nouvelle création refusée. */
+  /** Au moins un administrateur a un appareil qui permet d'acheter (plateforme ouverte, version suffisante). */
+  familyCanPurchase: boolean;
+  /** Listes gratuites épuisées (règle active, sans droit payant), que la création soit refusée ou non. */
+  limitReached: boolean;
+  /** Nouvelle création refusée : limite atteinte ET un administrateur peut débloquer depuis un de ses appareils. */
   blocked: boolean;
 }
 
@@ -61,21 +66,26 @@ async function settings(q: Q): Promise<{ enabled: boolean; freeLists: number }> 
   return { enabled: Boolean(s?.enabled), freeLists: Number(s?.free_lists ?? 10) };
 }
 
-function state(s: { enabled: boolean; freeLists: number }, since: unknown, used: number, ent: Entitlement | null): QuotaState {
+function state(s: { enabled: boolean; freeLists: number }, since: unknown, used: number, ent: Entitlement | null, canPurchase: boolean): QuotaState {
   const quotaActive = s.enabled && since != null;
+  const limitReached = quotaActive && !ent && used >= s.freeLists;
   return {
     quotaActive,
     freeLimit: s.freeLists,
     used,
     freeRemaining: Math.max(0, s.freeLists - used),
     entitlement: ent,
-    blocked: quotaActive && !ent && used >= s.freeLists,
+    familyCanPurchase: canPurchase,
+    limitReached,
+    // Jamais de blocage sans solution : si aucun administrateur ne peut acheter (plateforme pas encore ouverte, ancienne version,
+    // application web), la famille continue de créer ses listes ; le compteur continue de compter.
+    blocked: limitReached && canPurchase,
   };
 }
 
 export async function quotaState(q: Q, familyId: string): Promise<QuotaState> {
   const f = (await q.query("SELECT list_quota_since, list_creations_used FROM families WHERE id = $1", [familyId])).rows[0];
-  return state(await settings(q), f?.list_quota_since, Number(f?.list_creations_used ?? 0), await activeEntitlement(q, familyId));
+  return state(await settings(q), f?.list_quota_since, Number(f?.list_creations_used ?? 0), await activeEntitlement(q, familyId), await familyCanPurchase(q, familyId));
 }
 
 export interface CreationCheck {
@@ -88,7 +98,7 @@ export interface CreationCheck {
 /** À appeler DANS la transaction de création : verrouille la famille, reconnaît une requête rejouée, évalue la règle. */
 export async function checkCreation(c: Q, familyId: string, requestKey?: string | null): Promise<CreationCheck> {
   const f = (await c.query("SELECT list_quota_since, list_creations_used FROM families WHERE id = $1 FOR UPDATE", [familyId])).rows[0];
-  const st = state(await settings(c), f?.list_quota_since, Number(f?.list_creations_used ?? 0), await activeEntitlement(c, familyId));
+  const st = state(await settings(c), f?.list_quota_since, Number(f?.list_creations_used ?? 0), await activeEntitlement(c, familyId), await familyCanPurchase(c, familyId));
   if (requestKey) {
     const prev = (await c.query("SELECT list_id FROM list_creations WHERE family_id = $1 AND request_key = $2", [familyId, requestKey])).rows[0];
     if (prev) return { replayOf: (prev.list_id as string | null) ?? null, state: st, counted: false };

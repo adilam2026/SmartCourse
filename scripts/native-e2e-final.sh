@@ -1213,9 +1213,11 @@ policy "{\"latestVersionCode\":$((VC+1)),\"minVersionCode\":$((VC+1)),\"minOs\":
 launch
 expect "Z8d. blocage de nouveau actif" $UI wait "Pour continuer à utiliser Mes Courses" 20
 # Annulation de l'obligation côté serveur : effet immédiat au retour dans l'application
+T0=$(date +%s)
 policy "{\"latestVersionCode\":$((VC+1)),\"minVersionCode\":null}"
-adb shell input keyevent KEYCODE_HOME; sleep 2; adb shell am start -n "$ACT" >/dev/null 2>&1; sleep 5
-expect "Z9. obligation annulée : accès rétabli" bash -c "$UI gone 'Pour continuer à utiliser' 8 && $UI wait 'Ma liste' 10"
+# Sans quitter l'application ni la relancer : l'écran bloquant revérifie toutes les 30 s.
+expect "Z9. obligation annulée : accès rétabli dans l'application restée ouverte (≤ 45 s)" bash -c "$UI gone 'Pour continuer à utiliser' 45 && $UI wait 'Ma liste' 10"
+echo "      délai constaté : $(( $(date +%s) - T0 )) s" | tee -a "$OUT/resultats.txt"
 # « Après mise à jour » : la version installée atteint la version exigée
 policy "{\"latestVersionCode\":$VC,\"minVersionCode\":$VC,\"availableOnPlay\":true,\"rolloutComplete\":true}"
 launch; sleep 3
