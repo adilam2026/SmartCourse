@@ -607,6 +607,21 @@ final class ParcoursRecetteTests: XCTestCase {
         XCTAssertEqual(code, 200, "réglage de mise à jour refusé : \(rep ?? [:])")
     }
 
+    /// Attend que la coupure réseau soit réellement en place (le Mac ne joint plus le serveur), au plus [secondes].
+    private func attendreCoupure(_ secondes: Int = 60) {
+        guard let base = env["COURSES_SERVER"], let u = URL(string: base + "/health") else { return }
+        for _ in 0..<secondes {
+            var joignable = false
+            var r = URLRequest(url: u); r.timeoutInterval = 2
+            let done = expectation(description: "sonde")
+            URLSession.shared.dataTask(with: r) { _, resp, _ in joignable = (resp as? HTTPURLResponse) != nil; done.fulfill() }.resume()
+            wait(for: [done], timeout: 5)
+            if !joignable { print("\(stamp()) iPhone : coupure constatée (serveur injoignable)"); return }
+            sleep(1)
+        }
+        XCTFail("coupure réseau non constatée après \(secondes) s")
+    }
+
     private var bloque: XCUIElement { anyContaining("Pour continuer à utiliser Mes Courses").firstMatch }
     private var proposition: XCUIElement { anyContaining("Une nouvelle version de Mes Courses est disponible").firstMatch }
 
@@ -637,6 +652,7 @@ final class ParcoursRecetteTests: XCTestCase {
         // 3. Blocage activé, mais iPhone hors connexion au lancement : aucun blocage (vérification impossible), modification en attente.
         politique(api, latest: 2, min: 2, actif: true)
         reseau(true)
+        attendreCoupure()
         relaunch(reset: false)
         XCTAssertTrue(anyContaining("Ajouter des articles").firstMatch.waitForExistence(timeout: 30), "application inutilisable hors connexion")
         sleep(8)
