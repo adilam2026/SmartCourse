@@ -1240,8 +1240,8 @@ for n in "Quinoa" "Graines de chia" "Tahini"; do api POST /api/products/family -
 sql "SET session_replication_role = replica;
  INSERT INTO families (id, code, name, setup_completed_at) VALUES ('00000000-0000-0000-0000-0000000000e2','FICTIFPL2','Famille fictive 2', now()) ON CONFLICT DO NOTHING;
  INSERT INTO profiles (id, family_id, display_name, login, role, secret_hash) VALUES ('00000000-0000-0000-0000-0000000000e3','00000000-0000-0000-0000-0000000000e2','Fictif','fictif','admin','x') ON CONFLICT DO NOTHING;
- INSERT INTO lists (family_id, created_by, status, closed_at) SELECT '00000000-0000-0000-0000-0000000000e2','00000000-0000-0000-0000-0000000000e3','archived', now() FROM generate_series(1,2);
- INSERT INTO products (family_id, category, name) VALUES ('00000000-0000-0000-0000-0000000000e2','autres','quinoas') ON CONFLICT DO NOTHING;" >/dev/null
+ INSERT INTO lists (family_id, created_by, status, closed_by, closed_at) SELECT '00000000-0000-0000-0000-0000000000e2','00000000-0000-0000-0000-0000000000e3','archived','00000000-0000-0000-0000-0000000000e3', now() FROM generate_series(1,2);
+ INSERT INTO products (family_id, category, name) VALUES ('00000000-0000-0000-0000-0000000000e2','autres','quinoas') ON CONFLICT DO NOTHING;" >/dev/null || ko "PL0. données fictives de la seconde famille non créées"
 api GET /api/platform/photos >/dev/null; echo "      API photos (adil) : $(jq -c '[.rows[]|select(.bucket=="provide")|{name,familiesWithoutPhoto}]' /tmp/api.out | cut -c1-300)" | tee -a "$OUT/resultats.txt"
 launch
 $UI has "Bienvenue" && signin "$FAMILY" adil 482913
