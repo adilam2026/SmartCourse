@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches: [claude/ios-kmp]
-    paths: ['ios/**', 'android-native/**', 'scripts/ios-*', '.github/workflows/ios.yml']
+    paths: ['ios/**', 'android-native/**', 'scripts/ios-*', 'scripts/native-e2e-final.sh', '.github/workflows/ios.yml']
 permissions:
   contents: read
 jobs:
